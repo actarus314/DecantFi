@@ -1,0 +1,27 @@
+# secrets & local config
+.env
+.env.local
+.envrc
+.claude/
+CLAUDE.md
+
+# deps
+node_modules/
+
+# build artifacts
+dist/
+build/
+.tsbuildinfo
+.vite/
+coverage/
+
+# runtime data
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# misc
+.DS_Store
+*.log
