@@ -35,8 +35,9 @@ function isBlndUsdc(req: QuoteRequest): boolean {
 export const comet: SourceAdapter = {
   id: 'comet',
   available: () => true, // sonde de pool : pas besoin du wallet de l'utilisateur
+  supports: (req) => isBlndUsdc(req), // pool BLND/USDC uniquement : non listee comme "echec" ailleurs
   async quote(req, cfg) {
-    if (!isBlndUsdc(req)) return null; // pool BLND/USDC uniquement
+    if (!isBlndUsdc(req)) return null; // garde-fou (le filtre supports() exclut deja les autres paires)
     try {
       return await liveComet(req, cfg);
     } catch {

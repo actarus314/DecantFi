@@ -83,6 +83,8 @@ export interface SourceAdapter {
   id: string;
   /** false => non interrogee dans ce contexte (ex. Soroswap sans cle ni SDK local). */
   available(cfg: SourceConfig): boolean;
+  /** Optionnel : false => la source ne couvre PAS cette paire (ex. Comet hors BLND/USDC). */
+  supports?(req: QuoteRequest): boolean;
   /** null = source indisponible (timeout / 429 / route absente) : le classement continue sans elle. */
   quote(req: QuoteRequest, cfg: SourceConfig): Promise<NormalizedQuote | null>;
 }
