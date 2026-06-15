@@ -1,0 +1,14 @@
+{
+  "method": "POST",
+  "url": "https://amm-api.aqua.network/api/external/v1/find-path/",
+  "params": {
+    "token_in_address": "CD25MNVTZDL4Y3XBCPCJXGXATV5WUHHOWMYFF4YBEGU5FCPGMYTVG5JY",
+    "token_out_address": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+    "amount": "10000000000"
+  },
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "assetFormat": "SAC (contract C... address); token_in_address = BLND SAC, token_out_address = USDC SAC",
+  "amountFormat": "stroops (raw 7-decimal integer as string). 1000 BLND = \"10000000000\". The API does NOT auto-scale: sending \"1000\" is interpreted as 1000 stroops (0.0001 BLND) and returns a nonsense 51-stroop quote."
+}

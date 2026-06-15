@@ -1,0 +1,14 @@
+{
+  "method": "GET",
+  "url": "https://routing.ultrastellar.com/.netlify/functions/v1/smart-routing",
+  "params": {
+    "source": "BLND:GDJEHTBE6ZHUXSWFI642DCGLUOECLHPF3KSXHPXTSTJ7E3JF6MQ5EZYY",
+    "destination": "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+    "amount": "1000",
+    "type": "send"
+  },
+  "headers": {},
+  "assetFormat": "classic-colon CODE:ISSUER (e.g. BLND:GDJEHTBE...). SAC C-addresses are NOT accepted.",
+  "amountFormat": "human units, decimal string. \"1000\" = 1000 BLND. NOT stroops: passing 10000000000 is interpreted as 10e9 units and gives nonsense.",
+  "feeNote": "The 'fee' param is an OPTIONAL profit-skim percentage (strictly > 0; 0/0.0/0.00/null/false rejected with 'Invalid params: fee'). OMIT it entirely to get the gross optimized_sum with no skim (fee_path:null). Literal fee=0 is impossible; omission realizes the design's 'fee=0 => brute' intent. fee=30 reproduces StellarTerm's UI default 30% skim."
+}

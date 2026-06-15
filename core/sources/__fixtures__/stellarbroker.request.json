@@ -1,0 +1,14 @@
+{
+  "method": "GET",
+  "url": "https://api.stellar.broker/quote?sellingAsset=BLND-GDJEHTBE6ZHUXSWFI642DCGLUOECLHPF3KSXHPXTSTJ7E3JF6MQ5EZYY&buyingAsset=USDC-GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN&sellingAmount=1000&slippageTolerance=0.005",
+  "params": {
+    "sellingAsset": "BLND-GDJEHTBE6ZHUXSWFI642DCGLUOECLHPF3KSXHPXTSTJ7E3JF6MQ5EZYY",
+    "buyingAsset": "USDC-GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+    "sellingAmount": "1000",
+    "slippageTolerance": 0.005
+  },
+  "headers": {},
+  "assetFormat": "classic CODE-ISSUER (dash). BOTH dash CODE-ISSUER and colon CODE:ISSUER (URL-encoded %3A) were tested LIVE against the server and both returned HTTP 200 status:success; the server echoes the asset back normalized to dash format in either case. XLM is passed as the literal 'XLM'. The SAC C... addresses are NOT used by this source.",
+  "amountFormat": "human/decimal units as a string, NOT stroops. sellingAmount=1000 means 1000.0000000 BLND. The server parses it with parseFloat. Response amounts (directTrade.buying, estimatedBuyingAmount, sellingAmount) are likewise decimal strings in human units.",
+  "notes": "Endpoint and exact param names confirmed from the official SDK @stellar-broker/client@0.6.14 estimateSwap() (src/estimate.js) which builds GET (origin||'https://api.stellar.broker')+'/quote?'+query. Param names: sellingAsset, buyingAsset, sellingAmount, slippageTolerance (validateQuoteRequest in src/quote-request.js). No partnerKey/auth required for /quote (the estimate endpoint); partnerKey is only for the /ws WebSocket trading session. slippageTolerance is a decimal fraction (0.005 = 0.5%), default 0.02, max 0.5."
+}
