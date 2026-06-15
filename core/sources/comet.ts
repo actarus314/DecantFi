@@ -1,13 +1,17 @@
-// Comet : sonde directe du pool backstop Blend 80/20 (BLND<->USDC UNIQUEMENT). Cross-check.
-// Simule swap_exact_amount_in via Soroban RPC (lecture seule). Le transfer_from interne exige que
-// `user` detienne le BLND => on utilise WALLET_ADDRESS (l'utilisateur sort SES positions, il detient BLND).
-// Sans walletAddress ou si solde insuffisant => null (source retiree).
+// Comet : sonde directe du pool backstop Blend 80/20 (BLND<->USDC UNIQUEMENT). Cross-check de prix.
+// Simule swap_exact_amount_in via Soroban RPC (LECTURE SEULE). La sortie ne depend QUE des reserves du
+// pool, pas de l'identite du `user` ; le user ne sert qu'au transfer_from interne (controle de solde).
+// On simule donc avec un detenteur-temoin (COMET_PROBE) qui possede du BLND + une trustline USDC, pour
+// coter sans exiger que le wallet de l'utilisateur detienne du BLND liquide (souvent stake dans Blend).
+// Au-dela du solde du temoin (gros montants) ou si le pool est absent => null (source retiree).
 import type { SourceAdapter, NormalizedQuote, QuoteRequest, SourceConfig } from './types.js';
 import { DEFAULT_GAS_XLM } from '../gas.js';
 import { hops } from './util.js';
 
 // Pool backstop Blend 80/20 BLND/USDC (resolu on-chain ; design tronquait en CAS3FL6T...VEAM).
 export const COMET_POOL = 'CAS3FL6TLZKDGGSISDBWGGPXT3NRR4DYTZD7YOD3HMYO6LTJUVGRVEAM';
+// Detenteur BLND (+ trustline USDC) utilise UNIQUEMENT comme source de la simulation read-only.
+export const COMET_PROBE = 'GA23C2NY7WGU7AGBRKI2E4X2HDZRZGY7VUZZ4SZIVFV2RND3TG3YSUQE';
 const I128_MAX = 170141183460469231731687303715884105727n;
 
 /** retval = vec [token_amount_out, spot_price_after] ; rend token_amount_out. */
@@ -30,9 +34,9 @@ function isBlndUsdc(req: QuoteRequest): boolean {
 
 export const comet: SourceAdapter = {
   id: 'comet',
-  available: (cfg) => !!cfg.walletAddress,
+  available: () => true, // sonde de pool : pas besoin du wallet de l'utilisateur
   async quote(req, cfg) {
-    if (!cfg.walletAddress || !isBlndUsdc(req)) return null;
+    if (!isBlndUsdc(req)) return null; // pool BLND/USDC uniquement
     try {
       return await liveComet(req, cfg);
     } catch {
@@ -46,7 +50,9 @@ async function liveComet(req: QuoteRequest, cfg: SourceConfig): Promise<Normaliz
   const { rpc, Address, TransactionBuilder, Networks, Account, Contract, scValToNative, nativeToScVal } = sdk;
 
   const server = new rpc.Server(cfg.rpcUrl || 'https://mainnet.sorobanrpc.com');
-  const user = cfg.walletAddress as string;
+  // Toujours le temoin : la sortie est independante du user, et le wallet de l'utilisateur ne detient
+  // souvent pas de BLND liquide (stake dans Blend) -> sinon le transfer_from simule echouerait.
+  const user = COMET_PROBE;
   const args = [
     new Address(req.sellAsset.sac).toScVal(),
     nativeToScVal(req.amountIn, { type: 'i128' }),
