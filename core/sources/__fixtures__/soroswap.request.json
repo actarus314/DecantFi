@@ -1,0 +1,39 @@
+{
+  "method": "SDK_CALL",
+  "url": "local: soroswap-router-sdk@1.4.6 Router.route() + Soroban RPC simulateTransaction (https://mainnet.sorobanrpc.com)",
+  "params": {
+    "voie": "A (keyless local SDK routing; live mainnet reserves via read-only RPC simulation)",
+    "sdk": "soroswap-router-sdk@1.4.6",
+    "routerConstructor": {
+      "protocols": ["soroswap"],
+      "network": "PUBLIC",
+      "maxHops": 2,
+      "pairsCacheInSeconds": 20,
+      "getPairsFns": "[{ protocol: 'soroswap', fn: live reserves from Soroban RPC }]"
+    },
+    "routeCall": {
+      "amount": "CurrencyAmount.fromRawAmount(BLND, '10000000000')",
+      "quoteCurrency": "USDC token",
+      "tradeType": "EXACT_INPUT"
+    },
+    "rpcUrl": "https://mainnet.sorobanrpc.com",
+    "factory": "CA4HEQTL2WPEUYKYKCDOHCDNIV4QHNJ7EL4J4NQ6VADP7SYHVRYZ7AW2",
+    "factorySource": "GET https://api.soroswap.finance/api/mainnet/factory (keyless, HTTP 200)",
+    "pairAddress": "CCCDU62TWI744KFK6COAW2PARPVPXKKE3DBVBUZCFWZOGGD7HZ5YEY3X",
+    "onchainCalls": [
+      "factory.get_pair(BLND_SAC, USDC_SAC) -> pair address",
+      "pair.get_reserves() -> [reserve0, reserve1]",
+      "pair.token_0(), pair.token_1()"
+    ],
+    "assetIn": "CD25MNVTZDL4Y3XBCPCJXGXATV5WUHHOWMYFF4YBEGU5FCPGMYTVG5JY",
+    "assetOut": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"
+  },
+  "headers": {},
+  "assetFormat": "SAC contract address (C...), 7 decimals. Soroswap operates on Soroban contract addresses (SAC), not classic asset codes.",
+  "amountFormat": "raw stroops string '10000000000' (= 1000 BLND, 7 decimals) via CurrencyAmount.fromRawAmount. The human '1000' form is NOT accepted by the SDK amount math.",
+  "notes": [
+    "Keyless. SOROSWAP_API_KEY empty. No private key, no signing, no submission: pure read-only simulateTransaction.",
+    "The SDK's own blockchain pair-fetch path is broken on current mainnet: its bundled @stellar/stellar-sdk v11 cannot decode protocol-22+ XDR (SorobanDataBuilder.fromXDR -> 'Bad union switch: 1'). Worked around by feeding live reserves (read via repo @stellar/stellar-sdk v15) into the Router through getPairsFns. All route selection + Soroswap 0.3% pool-fee math (997/1000) run inside the SDK.",
+    "Voie B (HTTP) NOT usable keyless: POST https://api.soroswap.finance/quote?network=mainnet returns HTTP 403 Forbidden (requires SOROSWAP_API_KEY). Keyless metadata endpoints that DID work: GET /api/mainnet/factory (200), GET /api/mainnet/router (200)."
+  ]
+}

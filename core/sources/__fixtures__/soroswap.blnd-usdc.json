@@ -1,0 +1,51 @@
+{
+  "meta": {
+    "voie": "A (soroswap-router-sdk local routing; live mainnet reserves via Soroban RPC read-only simulation; keyless)",
+    "rpcUrl": "https://mainnet.sorobanrpc.com",
+    "factory": "CA4HEQTL2WPEUYKYKCDOHCDNIV4QHNJ7EL4J4NQ6VADP7SYHVRYZ7AW2",
+    "network": "PUBLIC",
+    "assetIn": "CD25MNVTZDL4Y3XBCPCJXGXATV5WUHHOWMYFF4YBEGU5FCPGMYTVG5JY",
+    "assetOut": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+    "amountInRaw": "10000000000",
+    "amountInHuman": "1000 BLND",
+    "tradeType": "EXACT_INPUT",
+    "protocols": [
+      "soroswap"
+    ],
+    "soroswapPoolFee": "0.3% (997/1000, applied by SDK getOutputAmountSoroswap)",
+    "capturedAt": "2026-06-15T20:14:37.191Z"
+  },
+  "livePairs": [
+    {
+      "tokenA": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "tokenB": "CD25MNVTZDL4Y3XBCPCJXGXATV5WUHHOWMYFF4YBEGU5FCPGMYTVG5JY",
+      "reserveA": "283864233781",
+      "reserveB": "5579386834748",
+      "protocol": "soroswap",
+      "fee": "30",
+      "_pairAddress": "CCCDU62TWI744KFK6COAW2PARPVPXKKE3DBVBUZCFWZOGGD7HZ5YEY3X"
+    }
+  ],
+  "trade": {
+    "amountIn": "10000000000",
+    "amountOutMin": "506342052",
+    "path": [
+      "CD25MNVTZDL4Y3XBCPCJXGXATV5WUHHOWMYFF4YBEGU5FCPGMYTVG5JY",
+      "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"
+    ]
+  },
+  "tradeType": "EXACT_INPUT",
+  "priceImpact": "0.177840%",
+  "amountCurrency": {
+    "token": "CD25MNVTZDL4Y3XBCPCJXGXATV5WUHHOWMYFF4YBEGU5FCPGMYTVG5JY",
+    "raw": "10000000000",
+    "decimals": 7
+  },
+  "quoteCurrency": {
+    "token": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+    "raw": "506342052",
+    "decimals": 7
+  },
+  "netFieldPath": "trade.amountOutMin",
+  "netUSDC": "50.6342052 USDC"
+}

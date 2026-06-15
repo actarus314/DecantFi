@@ -1,0 +1,49 @@
+{
+  "_embedded": {
+    "records": [
+      {
+        "source_asset_type": "credit_alphanum4",
+        "source_asset_code": "BLND",
+        "source_asset_issuer": "GDJEHTBE6ZHUXSWFI642DCGLUOECLHPF3KSXHPXTSTJ7E3JF6MQ5EZYY",
+        "source_amount": "1000.0000000",
+        "destination_asset_type": "credit_alphanum4",
+        "destination_asset_code": "USDC",
+        "destination_asset_issuer": "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+        "destination_amount": "45.6531063",
+        "path": [
+          {
+            "asset_type": "credit_alphanum4",
+            "asset_code": "AQUA",
+            "asset_issuer": "GBNZILSTVQZ4R7IKQDGHYGY2QXL5QOFJYQMXPKWRRM5PAV7Y4M67AQUA"
+          }
+        ]
+      },
+      {
+        "source_asset_type": "credit_alphanum4",
+        "source_asset_code": "BLND",
+        "source_asset_issuer": "GDJEHTBE6ZHUXSWFI642DCGLUOECLHPF3KSXHPXTSTJ7E3JF6MQ5EZYY",
+        "source_amount": "1000.0000000",
+        "destination_asset_type": "credit_alphanum4",
+        "destination_asset_code": "USDC",
+        "destination_asset_issuer": "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+        "destination_amount": "44.0005688",
+        "path": [
+          {
+            "asset_type": "native"
+          }
+        ]
+      },
+      {
+        "source_asset_type": "credit_alphanum4",
+        "source_asset_code": "BLND",
+        "source_asset_issuer": "GDJEHTBE6ZHUXSWFI642DCGLUOECLHPF3KSXHPXTSTJ7E3JF6MQ5EZYY",
+        "source_amount": "1000.0000000",
+        "destination_asset_type": "credit_alphanum4",
+        "destination_asset_code": "USDC",
+        "destination_asset_issuer": "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+        "destination_amount": "39.4823709",
+        "path": []
+      }
+    ]
+  }
+}

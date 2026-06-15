@@ -1,0 +1,14 @@
+{
+  "method": "GET",
+  "url": "https://horizon.stellar.org/paths/strict-send",
+  "params": {
+    "source_asset_type": "credit_alphanum4",
+    "source_asset_code": "BLND",
+    "source_asset_issuer": "GDJEHTBE6ZHUXSWFI642DCGLUOECLHPF3KSXHPXTSTJ7E3JF6MQ5EZYY",
+    "source_amount": "1000",
+    "destination_assets": "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+  },
+  "headers": {},
+  "assetFormat": "classic-colon (CODE:ISSUER) for destination_assets; source asset split into source_asset_type / source_asset_code / source_asset_issuer",
+  "amountFormat": "human-readable decimal units (1000 = 1000 BLND), NOT stroops; Horizon echoes back as \"1000.0000000\""
+}

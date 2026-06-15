@@ -1,0 +1,12 @@
+{
+  "method": "GET",
+  "url": "https://swap-api.xbull.io/swaps/quote?fromAsset=CD25MNVTZDL4Y3XBCPCJXGXATV5WUHHOWMYFF4YBEGU5FCPGMYTVG5JY&toAsset=CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75&amount=10000000000",
+  "params": {
+    "fromAsset": "CD25MNVTZDL4Y3XBCPCJXGXATV5WUHHOWMYFF4YBEGU5FCPGMYTVG5JY",
+    "toAsset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+    "amount": "10000000000"
+  },
+  "headers": {},
+  "assetFormat": "SAC (C... Soroban Asset Contract); fromAsset=BLND SAC, toAsset=USDC SAC",
+  "amountFormat": "stroops (raw integer, 7 decimals). amount=10000000000 = 1000 BLND. NOT whole units."
+}

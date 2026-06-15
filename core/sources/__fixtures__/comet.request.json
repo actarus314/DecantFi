@@ -1,0 +1,31 @@
+{
+  "method": "POST",
+  "url": "https://mainnet.sorobanrpc.com",
+  "params": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "simulateTransaction",
+    "params": {
+      "transaction": "AAAAAgAAAAA1sWm4/Y1PgMGKkaJy+jjzHJsfrTOeSyipa6i0e5m3iQAAAGQDELvZAAAMawAAAAEAAAAAAAAAAAAAAABqMF2jAAAAAAAAAAEAAAAAAAAAGAAAAAAAAAABJbKv015UMxpIkMNjGfee2xjweJ5H/Dh7OzDvLmmlTRoAAAAUc3dhcF9leGFjdF9hbW91bnRfaW4AAAAGAAAAEgAAAAH11jazyNfMbuETxJua4J17ahzuszBS8wEhqdKJ5mYnUwAAAAoAAAAAAAAAAAAAAAJUC+QAAAAAEgAAAAGt785ZruUpaPdgYdSUwlJbdWWfpClqZfSZ7ynlZHfklgAAAAoAAAAAAAAAAAAAAAAAAAAAAAAACn////////////////////8AAAASAAAAAAAAAAA1sWm4/Y1PgMGKkaJy+jjzHJsfrTOeSyipa6i0e5m3iQAAAAAAAAAAAAAAAA=="
+    }
+  },
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "assetFormat": "SAC (Soroban Asset Contract C... address)",
+  "amountFormat": "i128 stroops (1000 BLND = 10000000000, 7 decimals)",
+  "sourceAccount": "GA23C2NY7WGU7AGBRKI2E4X2HDZRZGY7VUZZ4SZIVFV2RND3TG3YSUQE",
+  "decodedCall": {
+    "contract": "CAS3FL6TLZKDGGSISDBWGGPXT3NRR4DYTZD7YOD3HMYO6LTJUVGRVEAM",
+    "function": "swap_exact_amount_in",
+    "args": {
+      "token_in": "CD25MNVTZDL4Y3XBCPCJXGXATV5WUHHOWMYFF4YBEGU5FCPGMYTVG5JY",
+      "token_amount_in": "10000000000",
+      "token_out": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "min_amount_out": "0",
+      "max_price": "170141183460469231731687303715884105727",
+      "user": "GA23C2NY7WGU7AGBRKI2E4X2HDZRZGY7VUZZ4SZIVFV2RND3TG3YSUQE"
+    }
+  },
+  "note": "Read-only simulateTransaction. No signing, no submission. params.transaction is the real base64 tx XDR POSTed to the RPC."
+}

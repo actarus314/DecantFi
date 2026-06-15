@@ -1,0 +1,26 @@
+{
+  "name": "stellar-swap",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Recommandeur de route nette BLND -> USDC/EURC sur Stellar (meta-agregateur de cotations, read-only).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "quote": "tsx cli/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^15.1.0",
+    "soroswap-router-sdk": "^1.4.6"
+  }
+}

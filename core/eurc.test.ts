@@ -1,0 +1,49 @@
+import { describe, it, expect } from 'vitest';
+import { compareEurc, type EurcQuoters } from './eurc.js';
+import { toStroops, toNumber } from './amount.js';
+import { quote } from '../test/factory.js';
+import { USDC, EURC } from './assets.js';
+
+const EUR_PER_USD = 0.92;
+
+function quoters(opts: { directEurc?: string; usdc?: string }): EurcQuoters {
+  return {
+    blndToEurc: async () =>
+      opts.directEurc ? [quote('xbull', toStroops(opts.directEurc), { buyAsset: EURC })] : [],
+    blndToUsdc: async () => (opts.usdc ? [quote('xbull', toStroops(opts.usdc))] : []),
+    usdcToEurc: async (amt) => {
+      const eur = toNumber(amt) * EUR_PER_USD;
+      return [quote('soroswap', toStroops(eur.toFixed(7)), { sellAsset: USDC, buyAsset: EURC, amountIn: amt })];
+    },
+  };
+}
+
+describe('compareEurc', () => {
+  it('via-USDC gagne quand il bat le direct (cas du design ~46,7 vs ~43,6)', async () => {
+    const r = await compareEurc(toStroops('1000'), quoters({ directEurc: '43.6', usdc: '50.8' }));
+    expect(r.winner).toBe('via-usdc');
+    // 50.8 * 0.92 = 46.736
+    expect(r.bestNetEurc).toBe(toStroops('46.736'));
+    expect(r.viaUsdc?.txCount).toBe(2);
+    expect(r.viaUsdc?.usdcMid).toBe(toStroops('50.8'));
+    expect(r.viaUsdcAdvantage).toBe(toStroops('46.736') - toStroops('43.6'));
+  });
+
+  it('direct gagne quand il est meilleur', async () => {
+    const r = await compareEurc(toStroops('1000'), quoters({ directEurc: '60', usdc: '50.8' }));
+    expect(r.winner).toBe('direct');
+    expect(r.bestNetEurc).toBe(toStroops('60'));
+  });
+
+  it('via-USDC seul si pas de route directe', async () => {
+    const r = await compareEurc(toStroops('1000'), quoters({ usdc: '50.8' }));
+    expect(r.winner).toBe('via-usdc');
+    expect(r.direct).toBeUndefined();
+  });
+
+  it('aucune route -> winner null', async () => {
+    const r = await compareEurc(toStroops('1000'), quoters({}));
+    expect(r.winner).toBeNull();
+    expect(r.bestNetEurc).toBeUndefined();
+  });
+});
