@@ -53,7 +53,9 @@ export async function quoteAll(
   cfg: EngineConfig,
   prices: Prices,
 ): Promise<{ quotes: NormalizedQuote[]; errors: string[] }> {
-  const adapters = (cfg.adapters ?? ADAPTERS).filter((a) => a.available(cfg));
+  const adapters = (cfg.adapters ?? ADAPTERS).filter(
+    (a) => a.available(cfg) && (a.supports ? a.supports(req) : true),
+  );
   const settled = await Promise.allSettled(adapters.map((a) => a.quote(req, cfg)));
   const quotes: NormalizedQuote[] = [];
   const errors: string[] = [];

@@ -4,6 +4,14 @@
 // Verifie au design : via-USDC bat souvent le direct (pas de marche BLND/EURC profond).
 import type { NormalizedQuote, Stroops } from './sources/types.js';
 import { rankQuotes } from './rank.js';
+import { fromStroops } from './amount.js';
+
+/** true si a et b sont a moins de ~0,1 % l'un de l'autre (memes pools sous-jacents). */
+function closeEnough(a: Stroops, b: Stroops): boolean {
+  if (b <= 0n) return a === b;
+  const diff = a > b ? a - b : b - a;
+  return diff * 1000n <= b;
+}
 
 export interface ViaUsdcResult {
   leg1: NormalizedQuote; // meilleur BLND -> USDC
@@ -63,8 +71,14 @@ export async function compareEurc(amountBlnd: Stroops, q: EurcQuoters): Promise<
     directNet !== undefined && viaNet !== undefined ? viaNet - directNet : undefined;
 
   let note = 'Aucune route EURC trouvee.';
-  if (winner === 'via-usdc') note = 'via-USDC gagne, mais 2 swaps a executer (drift inter-tx possible).';
-  else if (winner === 'direct') note = 'Direct gagne (1 seul swap).';
+  if (winner === 'via-usdc' && viaUsdcAdvantage !== undefined) {
+    note = `via-USDC gagne (+${fromStroops(viaUsdcAdvantage)} EURC) mais 2 swaps (drift inter-tx possible).`;
+  } else if (winner === 'direct') {
+    note =
+      viaNet !== undefined && directNet !== undefined && closeEnough(viaNet, directNet)
+        ? 'via-USDC ≈ direct : pas de marche BLND/EURC independant (tout passe par USDC). 1 swap suffit.'
+        : 'Direct gagne (1 seul swap).';
+  }
 
   return { direct, viaUsdc, winner, bestNetEurc, viaUsdcAdvantage, note };
 }

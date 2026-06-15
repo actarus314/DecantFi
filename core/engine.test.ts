@@ -65,6 +65,25 @@ describe('quote vers USDC', () => {
     expect(r.errors).toContain('boom');
   });
 
+  it('exclut une source qui ne supporte pas la paire (pas listee comme echec)', async () => {
+    const na: SourceAdapter = {
+      id: 'na',
+      available: () => true,
+      supports: () => false,
+      async quote() {
+        return null;
+      },
+    };
+    const r = await quote({
+      sell: BLND,
+      buy: USDC,
+      amountIn: toStroops('1000'),
+      cfg: cfg([fakeAdapter('a', toStroops('50.5')), na]),
+    });
+    expect(r.errors).not.toContain('na');
+    expect(r.ranking.ranked.map((q) => q.source)).toEqual(['a']);
+  });
+
   it('ignore les sources non disponibles', async () => {
     const r = await quote({
       sell: BLND,

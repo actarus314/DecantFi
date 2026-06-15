@@ -30,8 +30,8 @@ direct / via-USDC. **Rien n'est signé ni soumis** — l'exécution se fait dans
 ## Config (`.env`, tout optionnel)
 - `SOROSWAP_API_KEY` — non requis (Soroswap tourne en keyless via `soroswap-router-sdk` local).
 - `STELLAR_RPC_URL` / `STELLAR_HORIZON_URL` — surchargent les endpoints publics par défaut.
-- `WALLET_ADDRESS` — adresse **publique** ; si fournie, active la sonde directe du pool Comet
-  (BLND/USDC) en cross-check (la simulation lit votre solde BLND, lecture seule). Jamais de clé privée.
+- `WALLET_ADDRESS` — adresse **publique** (jamais de clé privée). Non requise pour les cotations ;
+  réservée à l'affichage de la position Blend (ultérieur). La sonde Comet n'en dépend pas.
 
 ## Limites connues (v1)
 - **Slippage par leg (EURC via-USDC)** : la tolérance `--slippage` n'est pas répartie entre les 2 legs.
@@ -42,6 +42,11 @@ direct / via-USDC. **Rien n'est signé ni soumis** — l'exécution se fait dans
   autres sources compense.
 - **Prix spot** : récupérés via DefiLlama (impact de prix indicatif) ; si indisponible, la colonne Δspot
   s'efface — le classement par net reste valable.
+- **EURC direct ≈ via-USDC** : quand la même source gagne les deux, les nets sont identiques — il n'existe
+  pas de marché BLND/EURC indépendant, tout passe par USDC. Le via-USDC ne gagne que si des sources
+  **différentes** sont meilleures sur chaque leg. L'outil signale ce cas explicitement.
+- **Comet** : sonde de prix du pool backstop (BLND↔USDC), via une simulation read-only avec un compte
+  témoin détenant du BLND ; peut se retirer pour de très gros montants (solde du témoin).
 
 ## Tests
 ```bash
