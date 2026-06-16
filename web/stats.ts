@@ -30,13 +30,25 @@ export interface Meta {
   eurUsd: number | null;
   xlmUsd: number | null;
   windowDays: 7;
-  bigSonde: 750;
+  /** Sondes configurées (COLLECTOR_SIZES_BLND), en BLND entiers, triées croissant. */
+  sondes: number[];
+}
+
+/** Une route distincte (chemin + outils) classée par fréquence de victoire sur la fenêtre. */
+export interface RouteRank {
+  path: string;   // ex. 'BLND→USDC→EURC'
+  tools: string;  // ex. 'xBull + Ultra'
+  wins: number;
+  winPct: number;
 }
 
 export interface Overview {
   meta: Meta;
-  ladders: { '250': LadderRow[]; '750': LadderRow[] };
+  /** Échelles du dernier tick ok, une par sonde (clé = BLND entier, ex. '250'). */
+  ladders: Record<string, LadderRow[]>;
   winnerDist: Array<{ display: string; pct: number }>;
+  /** Meilleures routes (chemins gagnants) sur 7 j, par fréquence de victoire. */
+  bestRoutes: RouteRank[];
   hourlyUtc: (number | null)[];
   heatUtc: (number | null)[][];
 }
@@ -162,11 +174,6 @@ function bigSondeStroops(cfg: CollectorConfig): bigint {
   return sorted[sorted.length - 1] ?? 7_500_000_000n;
 }
 
-function smallSondeStroops(cfg: CollectorConfig): bigint {
-  const sorted = [...cfg.sizesBlnd].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  return sorted[0] ?? 2_500_000_000n;
-}
-
 // ─── Dernière tick ok — échelle ──────────────────────────────────────────────
 
 function buildLadder(db: DatabaseSync, pair: string, amountIn: bigint): LadderRow[] {
@@ -242,6 +249,36 @@ function buildWinnerDist(
     display: displayName(String(r['source_id'] ?? '')),
     pct: Math.round((Number(r['cnt'] as bigint) / Number(total)) * 1000) / 10,
   }));
+}
+
+// ─── Meilleures routes (7 j) ──────────────────────────────────────────────────
+
+/** Classe les chemins gagnants distincts (source_id + route) par nombre de victoires sur la fenêtre. */
+function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string): RouteRank[] {
+  const stmt = prepBig(db, `
+    SELECT q.source_id, q.route_summary, COUNT(*) AS wins
+    FROM quote q JOIN tick t ON t.id = q.tick_id
+    WHERE q.is_winner = 1 AND q.pair = ? AND t.ok = 1 AND t.started_at >= ?
+    GROUP BY q.source_id, q.route_summary
+    ORDER BY wins DESC
+  `);
+  const rows = stmt.all(pair, windowStart) as Array<Record<string, unknown>>;
+  if (rows.length === 0) return [];
+
+  let total = 0n;
+  for (const r of rows) total += r['wins'] as bigint;
+  const totalNum = Number(total);
+  if (totalNum === 0) return [];
+
+  return rows.map((r) => {
+    const wins = Number(r['wins'] as bigint);
+    return {
+      path: prettyRoute(r['route_summary'] != null ? String(r['route_summary']) : ''),
+      tools: shortName(String(r['source_id'] ?? '')),
+      wins,
+      winPct: Math.round((wins / totalNum) * 1000) / 10,
+    };
+  });
 }
 
 // ─── Efficience horaire / heatmap ─────────────────────────────────────────────
@@ -352,7 +389,7 @@ function buildHeatUtc(rows: WinnerEffRow[]): (number | null)[][] {
 
 // ─── Meta ──────────────────────────────────────────────────────────────────────
 
-function buildMeta(db: DatabaseSync, cadenceSec: number): Meta {
+function buildMeta(db: DatabaseSync, cadenceSec: number, sondes: number[]): Meta {
   const cntStmt = prepBig(db, `SELECT COUNT(*) as n FROM tick`);
   const cntOkStmt = prepBig(db, `SELECT COUNT(*) as n FROM tick WHERE ok = 1`);
   const lastStmt = prepBig(db,
@@ -371,7 +408,7 @@ function buildMeta(db: DatabaseSync, cadenceSec: number): Meta {
     eurUsd: lastRow?.['eur_usd'] != null ? Number(lastRow['eur_usd']) : null,
     xlmUsd: lastRow?.['xlm_usd'] != null ? Number(lastRow['xlm_usd']) : null,
     windowDays: 7,
-    bigSonde: 750,
+    sondes,
   };
 }
 
@@ -387,18 +424,19 @@ export function overview(
   const nowDate = now ?? new Date();
   const windowStart = new Date(nowDate.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const big = bigSondeStroops(cfg);
-  const small = smallSondeStroops(cfg);
+  // Sondes configurées (COLLECTOR_SIZES_BLND), triées croissant. Une échelle par sonde.
+  const sizes = [...cfg.sizesBlnd].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const sondes = sizes.map((s) => toNumber(s));
+  const big = bigSondeStroops(cfg); // plus grande sonde pour profil horaire / heatmap
 
-  const meta = buildMeta(db, cfg.cadenceSec);
-  const ladders = {
-    '250': buildLadder(db, pair, small),
-    '750': buildLadder(db, pair, big),
-  };
+  const meta = buildMeta(db, cfg.cadenceSec, sondes);
+  const ladders: Record<string, LadderRow[]> = {};
+  for (const size of sizes) ladders[String(toNumber(size))] = buildLadder(db, pair, size);
   const winnerDist = buildWinnerDist(db, pair, windowStart);
+  const bestRoutes = buildBestRoutes(db, pair, windowStart);
   const effRows = fetchWinnerEffRows(db, pair, big, windowStart, pairUi);
   const hourlyUtc = buildHourlyUtc(effRows);
   const heatUtc = buildHeatUtc(effRows);
 
-  return { meta, ladders, winnerDist, hourlyUtc, heatUtc };
+  return { meta, ladders, winnerDist, bestRoutes, hourlyUtc, heatUtc };
 }

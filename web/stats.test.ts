@@ -121,7 +121,9 @@ function buildTestDb(): void {
               price_impact_pct: 0.3 + i * 0.05,
               gas_in_target: 0n,
               fee_total: 0n,
-              route_summary: null,
+              route_summary: pairUi === 'EURC'
+                ? (eurcPath === 'via-usdc' ? 'xbull:BLND->USDC | xbull:USDC->EURC' : 'BLND->EURC')
+                : 'BLND->USDC',
               is_winner: isWinner,
               eurc_path: eurcPath,
               raw_json: null,
@@ -158,7 +160,7 @@ afterAll(() => {
 
 describe('ladders', () => {
   it('ordre net_out desc', () => {
-    const rows = result_usdc.ladders['750'];
+    const rows = result_usdc.ladders['750']!;
     expect(rows.length).toBeGreaterThan(1);
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i]!.net).toBeLessThanOrEqual(rows[i - 1]!.net);
@@ -166,7 +168,7 @@ describe('ladders', () => {
   });
 
   it('winner = premier (is_winner)', () => {
-    const rows = result_usdc.ladders['750'];
+    const rows = result_usdc.ladders['750']!;
     expect(rows[0]!.winner).toBe(true);
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i]!.winner).toBe(false);
@@ -174,7 +176,7 @@ describe('ladders', () => {
   });
 
   it('deltaVsWinner = 0 pour le gagnant, négatif sinon', () => {
-    const rows = result_usdc.ladders['250'];
+    const rows = result_usdc.ladders['250']!;
     expect(rows[0]!.deltaVsWinner).toBeCloseTo(0, 5);
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i]!.deltaVsWinner).toBeLessThan(0);
@@ -182,7 +184,7 @@ describe('ladders', () => {
   });
 
   it('chips mappés correctement (stellarbroker=est, xbull=obs)', () => {
-    const rows = result_usdc.ladders['750'];
+    const rows = result_usdc.ladders['750']!;
     const xbull = rows.find(r => r.display === 'xBull');
     const stellarbroker = rows.find(r => r.display === 'StellarBroker');
     expect(xbull?.chip).toBe('obs');
@@ -190,7 +192,7 @@ describe('ladders', () => {
   });
 
   it('notes mappées (gagnant, cross-check, fee=0...)', () => {
-    const rows = result_usdc.ladders['750'];
+    const rows = result_usdc.ladders['750']!;
     const winner = rows.find(r => r.winner);
     expect(winner?.note).toContain('gagnant');
     const comet = rows.find(r => r.display === 'Comet (pool)');
@@ -200,7 +202,7 @@ describe('ladders', () => {
   });
 
   it('EURC note via-USDC sur le gagnant', () => {
-    const rows = result_eurc.ladders['250'];
+    const rows = result_eurc.ladders['250']!;
     const winner = rows.find(r => r.winner);
     expect(winner?.note).toContain('via-USDC');
   });
@@ -220,6 +222,22 @@ describe('winnerDist', () => {
     const dist = result_usdc.winnerDist;
     expect(dist[0]!.display).toBe('xBull');
     expect(dist[0]!.pct).toBeGreaterThan(90);
+  });
+});
+
+// ─── Test bestRoutes ─────────────────────────────────────────────────────────
+
+describe('bestRoutes', () => {
+  it('classe les routes gagnantes, % somme ≈ 100, chemin + outils renseignés', () => {
+    const routes = result_usdc.bestRoutes;
+    expect(routes.length).toBeGreaterThan(0);
+    expect(routes[0]!.path).toContain('BLND');
+    expect(routes[0]!.tools.length).toBeGreaterThan(0);
+    expect(routes.reduce((a, r) => a + r.winPct, 0)).toBeCloseTo(100, 0);
+    // trié par victoires décroissantes
+    for (let i = 1; i < routes.length; i++) {
+      expect(routes[i]!.wins).toBeLessThanOrEqual(routes[i - 1]!.wins);
+    }
   });
 });
 
