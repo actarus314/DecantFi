@@ -161,6 +161,7 @@ table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent);
 .zcursor{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed var(--caption);display:none;pointer-events:none;}
 .ztip{position:absolute;top:-4px;transform:translateX(-50%);background:var(--val);color:var(--bg);font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;white-space:nowrap;display:none;pointer-events:none;}
 .pulse{animation:pl 2.6s ease-in-out infinite;}@keyframes pl{0%,100%{opacity:1}50%{opacity:.3}}
+.zdot{position:absolute;width:11px;height:11px;border-radius:50%;background:var(--val);transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--val) 25%,transparent);}
 
 .dist{display:grid; grid-template-columns:max-content 1fr max-content; gap:.5rem .6rem; align-items:center; font-size:12px;}
 .dist .drow{display:contents;}
@@ -821,31 +822,36 @@ function hebdoHtml(m, heatLocal, today, sel) {
   return `<div class="heb">${html}</div>`;
 }
 
-function zoomHtml(m, heatEffLocal, sel, today, nowHour, u) {
+function zoomHtml(m, heatLocal, sel, today, nowHour, u) {
   const days = t('days');
-  const de = m.dayEff[sel];
   const meanLine = m.dayNet[sel] == null ? '—' : `${fmt(m.dayNet[sel])}<small style="font-size:12px;color:var(--sub)"> ${u}</small>`;
   const vsLine = m.dayVs[sel] == null ? '' : `${m.dayVs[sel] >= 0 ? '+' : ''}${m.dayVs[sel].toFixed(2)} % ${t('vs_week')}`;
   const kpi = `<div class="zmk"><span class="k">${t('day_avg')} · ${days[sel]}</span><span class="v">${meanLine}</span><span class="s" style="color:${(m.dayVs[sel] || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${vsLine}</span></div>`;
-  const dev = (heatEffLocal[sel] || []).map(e => (e == null || !de) ? null : (e / de - 1) * 100);
+  // Courbe = % d'écart au net moyen 7 j, identique aux cases du tableau (heatLocal) → le survol == la case.
+  const dev = (heatLocal[sel] || []).slice();
   zoomDev = dev;
   const axis = `<div class="zaxis"><span>00</span><span>03</span><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span></div>`;
   if (dev.filter(x => x != null).length === 0) return `<div class="zm">${kpi}<div><p class="help">${t('hmap_insufficient')}</p></div></div>`;
-  const W = 520, H = 120, mid = H / 2, n = 24, sx = W / (n - 1), sc = 44 / 0.8;
+  // Échelle verticale dynamique : le zéro (= moyenne 7 j) reste au centre (mid) → split vert/rouge correct,
+  // et la courbe remplit la boîte sans jamais clipper.
+  const absVals = dev.filter(x => x != null).map(x => Math.abs(x));
+  const maxAbs = absVals.length ? Math.max(...absVals) : 1;
+  const W = 520, H = 120, mid = H / 2, n = 24, sx = W / (n - 1), sc = (mid - 4) / (maxAbs || 1);
   const pts = dev.map((v, i) => [i * sx, mid - (v == null ? 0 : Math.max(-mid + 4, Math.min(mid - 4, v * sc)))]);
   const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
   const area = `M0,${mid} ` + pts.map(p => 'L' + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + ` L${W},${mid} Z`;
   const showNow = sel === today && dev[nowHour] != null;
-  const nX = (nowHour * sx).toFixed(1), nY = pts[nowHour][1].toFixed(1);
-  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="120" preserveAspectRatio="none" style="overflow:visible">
+  const nowLeft = showNow ? (nowHour / (n - 1) * 100).toFixed(2) : 0;
+  const nowTop = showNow ? (pts[nowHour][1] / H * 100).toFixed(2) : 0;
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="180" preserveAspectRatio="none" style="display:block;overflow:visible">
     <defs><clipPath id="zab"><rect x="0" y="0" width="${W}" height="${mid}"/></clipPath><clipPath id="zbe"><rect x="0" y="${mid}" width="${W}" height="${H - mid}"/></clipPath></defs>
     <path d="${area}" fill="var(--green)" fill-opacity=".45" clip-path="url(#zab)"/>
     <path d="${area}" fill="var(--red)" fill-opacity=".45" clip-path="url(#zbe)"/>
-    <line x1="0" y1="${mid}" x2="${W}" y2="${mid}" stroke="var(--sub)" stroke-dasharray="4 4"/>
-    <path d="${line}" fill="none" stroke="var(--heading)" stroke-width="2.5"/>
-    ${showNow ? `<circle class="pulse" cx="${nX}" cy="${nY}" r="6.5" fill="none" stroke="var(--val)" stroke-width="2"/><circle cx="${nX}" cy="${nY}" r="3" fill="var(--val)"/>` : ''}
+    <line x1="0" y1="${mid}" x2="${W}" y2="${mid}" stroke="var(--sub)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+    <path d="${line}" fill="none" stroke="var(--heading)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
   </svg>`;
-  return `<div class="zm">${kpi}<div><div class="zwrap" onmousemove="zoomMove(event,this)" onmouseleave="zoomLeave()">${svg}<div class="zcursor" id="zcur"></div><div class="ztip" id="ztip"></div></div>${axis}</div></div>`;
+  const nowDot = showNow ? `<span class="zdot pulse" style="left:${nowLeft}%;top:${nowTop}%"></span>` : '';
+  return `<div class="zm">${kpi}<div><div class="zwrap" onmousemove="zoomMove(event,this)" onmouseleave="zoomLeave()">${svg}${nowDot}<div class="zcursor" id="zcur"></div><div class="ztip" id="ztip"></div></div>${axis}</div></div>`;
 }
 
 function selectDay(d) { selDay = d; renderApp(); }
@@ -967,7 +973,7 @@ function buildPage() {
     </div></div>
 
   <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span></div>
-    <div class="card">${noData || zoomHtml(tm, heatEffLocal, selDay, TODAY, NOW_HOUR, u) + limitedNote}</div></div>
+    <div class="card">${noData || zoomHtml(tm, heatLocal, selDay, TODAY, NOW_HOUR, u) + limitedNote}</div></div>
 
   <div class="zone"><div class="zone-h">${t('section_routes')}</div>
     <div class="card">
@@ -1006,6 +1012,7 @@ async function loadBalance() {
       walletConfigured = b.configured !== false;
     }
   } catch {}
+  renderApp();
 }
 
 // ─── Compte à rebours (setInterval unique) ───────────────────────────────────
