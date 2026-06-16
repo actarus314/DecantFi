@@ -8,12 +8,12 @@
 :root{
   --bg:#f1f5f9; --card-bg:#ffffff; --card-border:#e2e8f0; --section-bg:#f8fafc;
   --val:#0f172a; --caption:#64748b; --sub:#94a3b8; --heading:#475569;
-  --accent:#2563eb; --amber:#d97706; --green:#16a34a; --red:#dc2626; --tool:#ea580c;
+  --accent:#2563eb; --amber:#d97706; --green:#16a34a; --red:#dc2626; --tool:#ea580c; --select:#7c3aed;
 }
 :root.dark{
   --bg:#0f172a; --card-bg:#1e293b; --card-border:#334155; --section-bg:#0f172a;
   --val:#f1f5f9; --caption:#94a3b8; --sub:#64748b; --heading:#cbd5e1;
-  --accent:#3b82f6; --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --tool:#f97316;
+  --accent:#3b82f6; --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --tool:#f97316; --select:#8b5cf6;
 }
 *{box-sizing:border-box;}
 body{margin:0; background:var(--bg); color:var(--val);
@@ -25,7 +25,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 .brand .dim{color:var(--caption); font-weight:600;}
 .pagenav{display:inline-flex; gap:4px; background:var(--section-bg); border:1px solid var(--card-border); border-radius:9999px; padding:3px;}
 .pagenav button{border:0; background:transparent; color:var(--caption); font-size:13px; font-weight:700; padding:5px 16px; border-radius:9999px; cursor:pointer; transition:all .15s;}
-.pagenav button.active{background:var(--accent); color:#fff;}
+.pagenav button.active{background:var(--select); color:#fff;}
 .fresh{display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--caption);
   background:var(--card-bg); border:1px solid var(--card-border); border-radius:9999px; padding:2px 9px;}
 .fresh .dot{width:7px; height:7px; border-radius:9999px; background:var(--green);}
@@ -57,7 +57,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 .suffix{font-size:13px; color:var(--sub); font-weight:600;}
 .btn{font-size:12px; font-weight:600; padding:.52rem .9rem; border-radius:.5rem; border:1px solid var(--card-border);
   background:var(--section-bg); color:var(--val); cursor:pointer;}
-.btn.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
+.btn.primary{background:var(--green); border-color:var(--green); color:#fff;}
 .sim .result{margin-top:.9rem; padding-top:.9rem; border-top:1px solid var(--card-border);
   display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap;}
 .sim .result .meta{font-size:12px; color:var(--caption); font-variant-numeric:tabular-nums;}
@@ -90,6 +90,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 .openlink{display:inline-flex; align-items:center; gap:3px; font-size:12px; font-weight:600; color:var(--accent); text-decoration:none;
   border:1px solid color-mix(in srgb, var(--accent) 45%, var(--card-border)); border-radius:7px; padding:3px 9px;}
 .openlink:hover{background:color-mix(in srgb, var(--accent) 10%, transparent);}
+.openlink.btnlike{padding:.52rem .9rem; border-radius:.5rem;}
 .seg{display:inline-flex; gap:2px; background:var(--section-bg); border:1px solid var(--card-border); border-radius:9999px; padding:2px; vertical-align:middle;}
 .seg button{border:0; background:transparent; color:var(--caption); font-size:11px; font-weight:600; padding:3px 11px; border-radius:9999px; cursor:pointer;}
 .seg button.active{background:var(--accent); color:#fff;}
@@ -222,7 +223,6 @@ const STRINGS = {
     sim_btn_simulate: 'Simuler',
     sim_btn_clear: 'Vider',
     sim_loading: 'Cotation en cours…',
-    sim_note: 'Cotation live, non journalisée · solde en lecture seule, jamais la clé.',
     sim_errors: 'Sources en échec :',
     sim_open: 'Ouvrir ↗',
 
@@ -359,7 +359,6 @@ const STRINGS = {
     sim_btn_simulate: 'Simulate',
     sim_btn_clear: 'Clear',
     sim_loading: 'Fetching quote…',
-    sim_note: 'Live quote, not logged · balance read-only, never the key.',
     sim_errors: 'Failed sources:',
     sim_open: 'Open ↗',
 
@@ -549,6 +548,9 @@ function rotateHeatUtc(heat, offsetH) {
 const fmt = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt3 = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const fmt0 = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
+// Couleur d'impact : ancrée sur le référentiel (0 % = au prix DefiLlama = vert ; IMPACT_RED_AT % = rouge), indépendante des valeurs du tableau.
+const IMPACT_RED_AT = 3;
+const impactColor = pct => `hsl(${(140 - 140 * Math.min(Math.max(pct, 0) / IMPACT_RED_AT, 1)).toFixed(0)} 70% 42%)`;
 
 function freshLabel(lastTickAt) {
   if (!lastTickAt) return `<span class="fresh"><span class="dot" style="background:var(--amber)"></span>${t('fresh_none')}</span>`;
@@ -578,9 +580,9 @@ function agoLabel(lastTickAt) {
 
 function tool(name) { return `<span class="tool">${name}</span>`; }
 
-function openLink(dl) {
+function openLink(dl, big) {
   if (!dl) return '';
-  return `<a class="openlink" href="${dl}" target="_blank" rel="noopener">${t('sim_open')}</a>`;
+  return `<a class="openlink${big ? ' btnlike' : ''}" href="${dl}" target="_blank" rel="noopener">${t('sim_open')}</a>`;
 }
 
 // ─── Ruban de route ───────────────────────────────────────────────────────────
@@ -636,7 +638,7 @@ function ladderRows(rows, u) {
       <td>${fmt3(r.net)}</td>
       <td class="${deltaClass}">${delta}</td>
       <td><span class="chip ${r.chip}">${chipLabel(r.chip)}</span></td>
-      <td class="muted">${impact}</td>
+      <td style="${r.impactPct != null ? `color:${impactColor(r.impactPct)};font-weight:700` : 'color:var(--caption)'}">${impact}</td>
       <td class="left">${routeText}</td></tr>`;
   }).join('');
 }
@@ -682,7 +684,6 @@ function simCard() {
     resultHtml = `<div class="result">
       <div style="flex:1 1 100%">${route}</div>
       <span class="meta" style="flex:1 1 100%; margin-top:.4rem">${rateStr}${impactStr}</span>
-      ${b.deepLink ? `<span style="flex:1 1 100%; margin-top:.5rem">${openLink(b.deepLink)}</span>` : ''}
     </div>`;
     if (simResult.errors && simResult.errors.length > 0) {
       resultHtml += `<p class="help" style="margin:.4rem 0 0">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
@@ -695,6 +696,7 @@ function simCard() {
         onchange="onExecSlippage(this.value)">
       <span class="suffix">%</span>
       <button class="btn primary" onclick="doExecute()">${t('exec_btn')}</button>
+      ${b.deepLink ? openLink(b.deepLink, true) : ''}
     </div>`;
   }
 
@@ -706,8 +708,7 @@ function simCard() {
       <button class="btn primary" onclick="doSim()">${t('sim_btn_simulate')}</button>
       <button class="btn" onclick="clearSim()">${t('sim_btn_clear')}</button>
     </div>
-    <div id="simOut">${resultHtml}</div>
-    <p class="help" style="margin:.55rem 0 0">${t('sim_note')}</p></div>`;
+    <div id="simOut">${resultHtml}</div></div>`;
 }
 
 // ─── Distribution gagnants ────────────────────────────────────────────────────
@@ -858,10 +859,6 @@ function buildPage() {
   return `
   <div class="topbar">
     <span class="brand">stellarswap <span class="dim">· ${t('brand_dim')}</span></span>
-    <span class="pagenav">
-      <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
-      <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
-    </span>
     ${freshHtml}
     ${refreshHtml()}
     <span class="topbar-right">
@@ -876,7 +873,10 @@ function buildPage() {
     </span>
   </div>
 
-  <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}</div>${simCard()}</div>
+  <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}<span class="pagenav" style="margin-left:auto">
+      <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
+      <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
+    </span></div>${simCard()}</div>
 
   <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
     ${ladderContent}</div>
