@@ -29,8 +29,8 @@ export interface LiveLadderRow {
 
 /** Route lisible depuis les hops d'une cotation : "BLND→XLM→USDC" (ou "BLND→<cible>" si pas de hop). */
 function routeStr(hops: RouteHop[], sell: string, buy: string): string {
-  if (hops.length === 0) return `${sell}→${buy}`;
-  return [hops[0]!.sell, ...hops.map((h) => h.buy)].join('→');
+  if (hops.length === 0) return `${sell} → ${buy}`;
+  return [hops[0]!.sell, ...hops.map((h) => h.buy)].join(' → ');
 }
 
 export interface LiveQuote {
@@ -212,7 +212,7 @@ export async function liveQuote(
       source: `${v.leg1.source}+${v.leg2.source}`,
       netOut: v.netEurc,
       conf: 'estimate',
-      route: `${r1}→${r2.split('→').slice(1).join('→')}`, // fusionne le nœud USDC partagé
+      route: `${r1} → ${r2.split(' → ').slice(1).join(' → ')}`, // fusionne le nœud USDC partagé
       eurcPath: 'via-usdc',
       impactPct: priceImpactPct(amountStroops, v.netEurc, result.prices.blndUsd, targetUsdPerUnit('EURC', result.prices)) ?? null,
     });

@@ -118,12 +118,12 @@ export function chipFor(netConfidence: string, sourceId: string, eurcPath: strin
 }
 
 /** xBull ne renvoie qu'un ID de route opaque (pas le chemin) → un swap atomique 2-nœuds (A→B)
- *  est rendu "A→…→B" pour signaler des hops internes masqués. Les autres sources exposent leur
+ *  est rendu "A → ☁ → B" (nuage = hops internes inaccessibles, pas un wrap). Les autres sources exposent leur
  *  chemin réel (Soroswap via trade.path, Aquarius/Ultra multi-hop) → inchangés. */
 export function maskedRoute(path: string, sourceId: string): string {
   if (sourceId !== 'xbull') return path; // seul xBull masque son chemin
-  const nodes = path.split('→');
-  return nodes.length === 2 ? `${nodes[0]}→…→${nodes[1]}` : path;
+  const nodes = path.split(' → ');
+  return nodes.length === 2 ? `${nodes[0]} → ☁ → ${nodes[1]}` : path;
 }
 
 /** route_summary DB → chaîne lisible. "BLND->XLM->USDC" → "BLND→XLM→USDC" ;
@@ -138,9 +138,9 @@ export function prettyRoute(summary: string): string {
         if (chain[chain.length - 1] !== node) chain.push(node);
       }
     }
-    return chain.join('→');
+    return chain.join(' → ');
   }
-  return summary.split('->').map((x) => x.trim()).filter(Boolean).join('→');
+  return summary.split('->').map((x) => x.trim()).filter(Boolean).join(' → ');
 }
 
 // ─── Mapping DB pair ─────────────────────────────────────────────────────────
