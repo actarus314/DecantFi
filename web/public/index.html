@@ -547,6 +547,7 @@ function rotateHeatUtc(heat, offsetH) {
 
 // ─── Formatage ────────────────────────────────────────────────────────────────
 const fmt = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt3 = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const fmt0 = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
 
 function freshLabel(lastTickAt) {
@@ -596,8 +597,8 @@ function routeFromParts(parts, big) {
 
 function routeSimple(sonde, netVal, src, pairUi, big) {
   const hops = pairUi === 'USDC'
-    ? [{ asset: 'BLND', qty: `${sonde} BLND` }, { tool: src }, { asset: 'USDC', qty: `${fmt(netVal)} USDC`, out: true }]
-    : [{ asset: 'BLND', qty: `${sonde} BLND` }, { tool: src }, { asset: 'EURC', qty: `${fmt(netVal)} EURC`, out: true }];
+    ? [{ asset: 'BLND', qty: `${sonde} BLND` }, { tool: src }, { asset: 'USDC', qty: `${fmt3(netVal)} USDC`, out: true }]
+    : [{ asset: 'BLND', qty: `${sonde} BLND` }, { tool: src }, { asset: 'EURC', qty: `${fmt3(netVal)} EURC`, out: true }];
   return routeFromParts(hops, big);
 }
 
@@ -626,13 +627,13 @@ function ladderHead(u) {
 function ladderRows(rows, u) {
   if (!rows || rows.length === 0) return `<tr><td colspan="6" class="muted" style="text-align:center;padding:1.2rem">${t('ladder_empty')}</td></tr>`;
   return rows.map(r => {
-    const delta = r.deltaVsWinner === 0 ? '—' : `−${fmt(Math.abs(r.deltaVsWinner))}`;
+    const delta = r.deltaVsWinner === 0 ? '—' : `−${fmt3(Math.abs(r.deltaVsWinner))}`;
     const deltaClass = r.deltaVsWinner < 0 ? 'neg' : 'muted';
     const impact = r.impactPct != null ? fmt(r.impactPct) + ' %' : '—';
     const routeText = renderRoute(r.route);
     return `<tr class="${r.winner ? 'win' : ''}">
       <td><span class="srcname">${r.display}</span>${r.note ? ` <span class="muted">· ${noteLabel(r.note)}</span>` : ''}</td>
-      <td>${fmt(r.net)}</td>
+      <td>${fmt3(r.net)}</td>
       <td class="${deltaClass}">${delta}</td>
       <td><span class="chip ${r.chip}">${chipLabel(r.chip)}</span></td>
       <td class="muted">${impact}</td>
@@ -675,7 +676,7 @@ function simCard() {
     const b = simResult.best;
     const route = b.route && b.route.length > 0
       ? routeFromParts(b.route, true)
-      : routeSimple(fmt0(simAmt), b.net, b.display, target, true);
+      : routeSimple(fmt3(simAmt), b.net, b.display, target, true);
     const rateStr = b.rate > 0 ? b.rate.toFixed(6) + ' ' + target + '/BLND' : '';
     const impactStr = b.impactPct != null ? ` · impact ${fmt(b.impactPct)} %` : '';
     resultHtml = `<div class="result">
@@ -864,7 +865,6 @@ function buildPage() {
     ${freshHtml}
     ${refreshHtml()}
     <span class="topbar-right">
-      <span class="tznote">${t('tz_note')}</span>
       ${walletAddress
         ? `<span style="display:inline-flex;align-items:center;gap:.35rem">
             <span class="ctrl-btn" style="cursor:default;font-variant-numeric:tabular-nums">${shortAddr(walletAddress)}</span>
@@ -891,7 +891,7 @@ function buildPage() {
       </div>${heatmap(heatLocal, TODAY)}${limitedNote}`}
     </div></div>
 
-  <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="right muted" style="font-size:11px">${t('section_hourly_note')}</span></div>
+  <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span> <span class="right muted" style="font-size:11px">${t('section_hourly_note')}</span></div>
     <div class="chartcard">${noData || hourBars(hourlyLocal, NOW_HOUR) + limitedNote}</div></div>
 
   <div class="zone"><div class="zone-h">${t('section_routes')}</div>
@@ -1118,7 +1118,7 @@ function execModal() {
     const rv = build.review;
     const venueLabel = rv.venue === 'xbull' ? 'xBull' : rv.venue === 'soroswap' ? 'Soroswap' : rv.venue;
     const fidelityNote = rv.fidelity
-      ? `<p class="help" style="margin:.6rem 0 0">${t('review_fidelity', rv.fidelity.displayedWinner, fmt(rv.fidelity.displayedWinnerNet))}</p>`
+      ? `<p class="help" style="margin:.6rem 0 0">${t('review_fidelity', rv.fidelity.displayedWinner, fmt3(rv.fidelity.displayedWinnerNet))}</p>`
       : '';
     // Disclosure restore AVANT signature : la 1re signature restaure l'état du contrat, le swap est rebuild + re-revu ensuite.
     const restoreNote = build.type === 'restore'
@@ -1128,9 +1128,9 @@ function execModal() {
       <div style="font-size:14px;font-weight:700;margin-bottom:.9rem">${t('review_title')}</div>
       <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.8rem">
         <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
-        <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt(rv.sendAmount)} BLND</td></tr>
-        <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt(rv.netOut)} ${target}</td></tr>
-        <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt(rv.minReceived)} ${target}</td></tr>
+        <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} BLND</td></tr>
+        <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${target}</td></tr>
+        <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt3(rv.minReceived)} ${target}</td></tr>
         <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${venueLabel}</td></tr>
         <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
       </table>
