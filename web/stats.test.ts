@@ -121,7 +121,9 @@ function buildTestDb(): void {
               price_impact_pct: 0.3 + i * 0.05,
               gas_in_target: 0n,
               fee_total: 0n,
-              route_summary: null,
+              route_summary: pairUi === 'EURC'
+                ? (eurcPath === 'via-usdc' ? 'xbull:BLND->USDC | xbull:USDC->EURC' : 'BLND->EURC')
+                : 'BLND->USDC',
               is_winner: isWinner,
               eurc_path: eurcPath,
               raw_json: null,
@@ -220,6 +222,22 @@ describe('winnerDist', () => {
     const dist = result_usdc.winnerDist;
     expect(dist[0]!.display).toBe('xBull');
     expect(dist[0]!.pct).toBeGreaterThan(90);
+  });
+});
+
+// ─── Test bestRoutes ─────────────────────────────────────────────────────────
+
+describe('bestRoutes', () => {
+  it('classe les routes gagnantes, % somme ≈ 100, chemin + outils renseignés', () => {
+    const routes = result_usdc.bestRoutes;
+    expect(routes.length).toBeGreaterThan(0);
+    expect(routes[0]!.path).toContain('BLND');
+    expect(routes[0]!.tools.length).toBeGreaterThan(0);
+    expect(routes.reduce((a, r) => a + r.winPct, 0)).toBeCloseTo(100, 0);
+    // trié par victoires décroissantes
+    for (let i = 1; i < routes.length; i++) {
+      expect(routes[i]!.wins).toBeLessThanOrEqual(routes[i - 1]!.wins);
+    }
   });
 });
 

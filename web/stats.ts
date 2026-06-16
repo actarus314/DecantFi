@@ -34,11 +34,21 @@ export interface Meta {
   sondes: number[];
 }
 
+/** Une route distincte (chemin + outils) classée par fréquence de victoire sur la fenêtre. */
+export interface RouteRank {
+  path: string;   // ex. 'BLND→USDC→EURC'
+  tools: string;  // ex. 'xBull + Ultra'
+  wins: number;
+  winPct: number;
+}
+
 export interface Overview {
   meta: Meta;
   /** Échelles du dernier tick ok, une par sonde (clé = BLND entier, ex. '250'). */
   ladders: Record<string, LadderRow[]>;
   winnerDist: Array<{ display: string; pct: number }>;
+  /** Meilleures routes (chemins gagnants) sur 7 j, par fréquence de victoire. */
+  bestRoutes: RouteRank[];
   hourlyUtc: (number | null)[];
   heatUtc: (number | null)[][];
 }
@@ -241,6 +251,36 @@ function buildWinnerDist(
   }));
 }
 
+// ─── Meilleures routes (7 j) ──────────────────────────────────────────────────
+
+/** Classe les chemins gagnants distincts (source_id + route) par nombre de victoires sur la fenêtre. */
+function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string): RouteRank[] {
+  const stmt = prepBig(db, `
+    SELECT q.source_id, q.route_summary, COUNT(*) AS wins
+    FROM quote q JOIN tick t ON t.id = q.tick_id
+    WHERE q.is_winner = 1 AND q.pair = ? AND t.ok = 1 AND t.started_at >= ?
+    GROUP BY q.source_id, q.route_summary
+    ORDER BY wins DESC
+  `);
+  const rows = stmt.all(pair, windowStart) as Array<Record<string, unknown>>;
+  if (rows.length === 0) return [];
+
+  let total = 0n;
+  for (const r of rows) total += r['wins'] as bigint;
+  const totalNum = Number(total);
+  if (totalNum === 0) return [];
+
+  return rows.map((r) => {
+    const wins = Number(r['wins'] as bigint);
+    return {
+      path: prettyRoute(r['route_summary'] != null ? String(r['route_summary']) : ''),
+      tools: shortName(String(r['source_id'] ?? '')),
+      wins,
+      winPct: Math.round((wins / totalNum) * 1000) / 10,
+    };
+  });
+}
+
 // ─── Efficience horaire / heatmap ─────────────────────────────────────────────
 
 interface WinnerEffRow {
@@ -393,9 +433,10 @@ export function overview(
   const ladders: Record<string, LadderRow[]> = {};
   for (const size of sizes) ladders[String(toNumber(size))] = buildLadder(db, pair, size);
   const winnerDist = buildWinnerDist(db, pair, windowStart);
+  const bestRoutes = buildBestRoutes(db, pair, windowStart);
   const effRows = fetchWinnerEffRows(db, pair, big, windowStart, pairUi);
   const hourlyUtc = buildHourlyUtc(effRows);
   const heatUtc = buildHeatUtc(effRows);
 
-  return { meta, ladders, winnerDist, hourlyUtc, heatUtc };
+  return { meta, ladders, winnerDist, bestRoutes, hourlyUtc, heatUtc };
 }

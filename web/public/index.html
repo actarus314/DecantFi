@@ -35,7 +35,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 .topbar-right{margin-left:auto; display:inline-flex; align-items:center; gap:.45rem;}
 .ctrl-btn{background:transparent; border:1px solid var(--card-border); color:var(--caption); border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px; font-weight:600;}
 .ctrl-btn:hover{background:var(--section-bg);}
-.ctrl-btn.active-lang{background:var(--accent); border-color:var(--accent); color:#fff;}
+/* .ctrl-btn.active-lang — supprimé (un seul bouton drapeau) */
 
 /* Refresh controls */
 .refresh-wrap{display:inline-flex; align-items:center; gap:.45rem; flex-wrap:wrap;}
@@ -128,6 +128,16 @@ table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent);
 .dist .dbar > span{display:block; height:100%; background:var(--accent); border-radius:9999px;}
 .dist .dpct{width:42px; text-align:right; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600;}
 
+/* Meilleures routes (7 j) */
+.rk{display:flex; flex-direction:column; gap:.5rem;}
+.rk .rrow{display:flex; align-items:center; gap:.6rem; font-size:12px; white-space:nowrap;}
+.rk .rank{width:18px; text-align:center; font-weight:700; color:var(--sub); flex-shrink:0;}
+.rk .rpath{font-weight:600; color:var(--val); flex-shrink:0;}
+.rk .rtools{color:var(--caption); font-weight:500; flex-shrink:0;}
+.rk .rbar{flex:1; min-width:20px; height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden; flex-shrink:1;}
+.rk .rbar > span{display:block; height:100%; background:var(--accent); border-radius:9999px;}
+.rk .rpct{width:42px; text-align:right; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600; flex-shrink:0;}
+
 .hours{display:grid; grid-template-columns:repeat(24,1fr); gap:3px; align-items:end; height:120px;}
 .hours .hb{border-radius:3px 3px 0 0; min-height:4px;}
 .hmark{display:grid; grid-template-columns:repeat(24,1fr); gap:3px; height:14px; margin-bottom:2px;}
@@ -193,8 +203,10 @@ const STRINGS = {
     section_slots_note: 'rollup horaire · 7 j',
     section_hourly: 'Profil horaire moyen',
     section_hourly_note: '▼ heure en cours',
-    section_now: 'Dernier relevé — sondes journalisées',
+    section_routes: 'Meilleures routes (7 j)',
     section_who: 'Qui gagne le plus souvent (7 j)',
+    routes_wins: 'victoires',
+    routes_empty: 'Historique limité — le classement se remplira avec les ticks.',
 
     // Simulateur
     sim_label: (u) => `Simuler une sortie — BLND → ${u}`,
@@ -217,7 +229,7 @@ const STRINGS = {
     ladder_col_impact: 'Impact',
     ladder_col_route: 'Route',
     ladder_tip_chip: 'Observé = cotation réelle de la source<br>Calculé = route composée (2 swaps)<br>Estimé = borne/plancher (frais opaques)',
-    ladder_tip_impact: 'Écart entre le montant reçu et sa valeur au prix de référence (DefiLlama). Positif = tu reçois moins (frais + slippage). Négatif = tu reçois plus (le prix on-chain bat la référence).',
+    ladder_tip_impact: 'Écart entre le montant reçu et sa valeur au prix de référence (DefiLlama).<br><br>Positif = tu reçois moins (frais + slippage).<br>Négatif = tu reçois plus (le prix on-chain bat la référence).',
     ladder_empty: 'Aucune donnée',
     ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
 
@@ -246,7 +258,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: 'xBull domine habituellement ; Comet ne concourt que sur USDC (pool backstop). Diversité = robustesse aux pannes.',
-    dist_note_eurc: 'xBull + Ultra (via-USDC) domine habituellement ; pas de marché BLND/EURC direct. Diversité = robustesse aux pannes.',
+    dist_note_eurc: 'Pas de pool BLND/EURC natif : les lignes « BLND→EURC » sont des swaps atomiques routés en interne (Aquarius via sUSD, Ultra via XLM… ; xBull & Soroswap masquent leurs hops). Notre route via-USDC explicite (2 swaps) les bat souvent.',
 
     // Divers
     loading: 'Chargement…',
@@ -292,8 +304,10 @@ const STRINGS = {
     section_slots_note: 'hourly rollup · 7 d',
     section_hourly: 'Average hourly profile',
     section_hourly_note: '▼ current hour',
-    section_now: 'Last fetch — logged probes',
+    section_routes: 'Best routes (7 d)',
     section_who: 'Who wins most often (7 d)',
+    routes_wins: 'wins',
+    routes_empty: 'Limited history — ranking fills up as ticks accumulate.',
 
     // Simulateur
     sim_label: (u) => `Simulate a swap — BLND → ${u}`,
@@ -316,7 +330,7 @@ const STRINGS = {
     ladder_col_impact: 'Impact',
     ladder_col_route: 'Route',
     ladder_tip_chip: 'Observed = real quote from the source<br>Calculated = composite route (2 swaps)<br>Estimated = floor/ceiling (opaque fees)',
-    ladder_tip_impact: 'Gap between the amount received and its value at the reference price (DefiLlama). Positive = you receive less (fees + slippage). Negative = you receive more (on-chain beats the reference).',
+    ladder_tip_impact: 'Gap between the amount received and its value at the reference price (DefiLlama).<br><br>Positive = you receive less (fees + slippage).<br>Negative = you receive more (on-chain beats the reference).',
     ladder_empty: 'No data',
     ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
 
@@ -345,7 +359,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: 'xBull usually dominates; Comet only competes on USDC (backstop pool). Diversity = resilience to failures.',
-    dist_note_eurc: 'xBull + Ultra (via-USDC) usually dominates; no direct BLND/EURC market. Diversity = resilience to failures.',
+    dist_note_eurc: 'No native BLND/EURC pool: the "BLND→EURC" rows are atomic swaps routed internally (Aquarius via sUSD, Ultra via XLM…; xBull & Soroswap hide their hops). Our explicit via-USDC route (2 swaps) often beats them.',
 
     // Divers
     loading: 'Loading…',
@@ -522,21 +536,23 @@ function ladderTable(rows, u) {
   return `<div style="overflow-x:auto"><table class="flt">${ladderHead(u)}<tbody>${ladderRows(rows, u)}</tbody></table></div>`;
 }
 
-// ─── Carte "Dernier relevé" ────────────────────────────────────────────────────
-function bestCard(sonde) {
-  if (!overview) return `<div class="kpi"><span class="sub">${t('loading')}</span></div>`;
-  const rows = overview.ladders[String(sonde)];
-  if (!rows || rows.length === 0) return `<div class="kpi"><span class="sub">${t('no_data')}</span></div>`;
-  const winner = rows.find(r => r.winner) || rows[0];
-  if (!winner) return `<div class="kpi"><span class="sub">${t('no_data')}</span></div>`;
-  const chip = `<span class="chip ${winner.chip}">${chipLabel(winner.chip)}</span>`;
-  const route = routeSimple(sonde, winner.net, winner.display, target, false);
-  const impactStr = winner.impactPct != null ? `impact ${fmt(winner.impactPct)} %` : '';
-  return `<div class="kpi" style="gap:.6rem">
-    ${route}
-    <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap">
-      ${chip}
-      <span class="sub">${impactStr}</span></div></div>`;
+// ─── Carte "Meilleures routes (7 j)" ──────────────────────────────────────────
+function bestRoutesCard() {
+  const routes = overview ? (overview.bestRoutes || []) : [];
+  if (routes.length === 0) {
+    return `<p class="help">${t('routes_empty')}</p>`;
+  }
+  const top = routes.slice(0, 6);
+  const maxPct = Math.max(...top.map(r => r.winPct));
+  return `<div class="rk">${top.map((r, i) => `
+    <div class="rrow">
+      <span class="rank">${i + 1}</span>
+      <span class="rpath">${r.path}</span>
+      <span class="rtools muted"> · ${r.tools}</span>
+      <span class="rbar"><span style="width:${maxPct > 0 ? r.winPct / maxPct * 100 : 0}%"></span></span>
+      <span class="rpct">${r.winPct} %</span>
+    </div>`).join('')}
+  </div>`;
 }
 
 // ─── Simulateur ───────────────────────────────────────────────────────────────
@@ -717,12 +733,13 @@ function buildPage() {
   // Fraîcheur + compte à rebours
   const freshHtml = meta ? freshLabel(meta.lastTickAt) : `<span class="fresh">${t('loading')}</span>`;
 
-  // "il y a X min" depuis le dernier tick pour le titre de la carte
-  const agoStr = meta && meta.lastTickAt ? ` <span class="muted" style="font-weight:400;text-transform:none;font-size:11px">${agoLabel(meta.lastTickAt)}</span>` : '';
-
   // Glyphe thème : reflète l'action (clic vers l'autre thème)
   const isDark = document.documentElement.classList.contains('dark');
   const themeGlyph = isDark ? t('theme_light') : t('theme_dark');
+
+  // Glyphe langue : affiche la cible (langue vers laquelle on bascule)
+  const langGlyph = lang === 'fr' ? t('lang_en') : t('lang_fr');
+  const langTitle = lang === 'fr' ? t('lang_en_title') : t('lang_fr_title');
 
   return `
   <div class="topbar">
@@ -736,8 +753,7 @@ function buildPage() {
     <span class="topbar-right">
       <span class="tznote">${t('tz_note')}</span>
       <button class="ctrl-btn" onclick="toggleTheme()" title="${isDark ? t('theme_light') : t('theme_dark')}">${themeGlyph}</button>
-      <button class="ctrl-btn ${lang==='fr'?'active-lang':''}" onclick="setLang('fr')" title="${t('lang_fr_title')}">${t('lang_fr')}</button>
-      <button class="ctrl-btn ${lang==='en'?'active-lang':''}" onclick="setLang('en')" title="${t('lang_en_title')}">${t('lang_en')}</button>
+      <button class="ctrl-btn" onclick="toggleLang()" title="${langTitle}">${langGlyph}</button>
     </span>
   </div>
 
@@ -760,8 +776,8 @@ function buildPage() {
     <div class="chartcard">${noData || hourBars(hourlyLocal, NOW_HOUR) + limitedNote}</div></div>
 
   <div class="zone"><div class="grid2">
-    <div class="card"><h3>${t('section_now')}${agoStr}</h3>
-      <div style="display:flex; flex-direction:column; gap:.6rem">${sondes.map(s => bestCard(s)).join('')}</div></div>
+    <div class="card"><h3>${t('section_routes')}</h3>
+      ${bestRoutesCard()}</div>
     <div class="card"><h3>${t('section_who')}</h3>
       ${noData || distBars(dist) + limitedNote}
       <p class="help" style="margin:.6rem 0 0">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p>
@@ -883,9 +899,9 @@ function toggleTheme() {
   renderApp();
 }
 
-function setLang(l) {
-  lang = l;
-  localStorage.setItem('lang', l);
+function toggleLang() {
+  lang = lang === 'fr' ? 'en' : 'fr';
+  localStorage.setItem('lang', lang);
   renderApp();
 }
 
