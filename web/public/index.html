@@ -133,7 +133,9 @@ table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent);
 .rk .rrow{display:contents;}
 .rk .rlabel{white-space:nowrap;}
 .rk .rpath{font-weight:600; color:var(--val);}
-.hops-hidden{cursor:help; font-size:13px; opacity:.8; vertical-align:middle; filter:grayscale(.2);}
+.hops-hidden{cursor:help; display:inline-flex; vertical-align:-4px;}
+.hops-hidden svg{width:18px; height:18px;}
+.hops-hidden svg path{fill:var(--section-bg); stroke:var(--heading); stroke-width:1.6; stroke-linejoin:round;}
 .rk .rtools{color:var(--caption); font-weight:500;}
 .rk .rbar{min-width:20px; height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden;}
 .rk .rbar > span{display:block; height:100%; background:var(--accent); border-radius:9999px;}
@@ -236,7 +238,7 @@ const STRINGS = {
     chip_obs: 'observé',
     chip_calc: 'calculé',
     chip_est: 'estimé',
-    hops_hidden: 'Hops internes masqués par xBull — route inaccessible (pas un retour à la ligne).',
+    hops_hidden: 'Hops internes masqués par xBull',
 
     // Heatmap / profil
     hmap_insufficient: 'Données insuffisantes',
@@ -336,7 +338,7 @@ const STRINGS = {
     chip_obs: 'observed',
     chip_calc: 'calculated',
     chip_est: 'estimated',
-    hops_hidden: 'Internal hops hidden by xBull — route inaccessible (not a line wrap).',
+    hops_hidden: 'Internal hops hidden by xBull',
 
     // Heatmap / profil
     hmap_insufficient: 'Insufficient data',
@@ -410,7 +412,7 @@ function noteLabel(note) {
 // Route lisible : rend le glyphe nuage ☁ (hops xBull inaccessibles) en pastille avec infobulle.
 function renderRoute(s) {
   if (!s) return '—';
-  return s.split('☁').join(`<span class="hops-hidden" title="${t('hops_hidden')}">☁</span>`);
+  return s.split('☁').join(`<span class="hops-hidden" title="${t('hops_hidden')}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span>`);
 }
 
 // ─── Timezone client ──────────────────────────────────────────────────────────
