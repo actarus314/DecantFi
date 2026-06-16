@@ -354,10 +354,9 @@ function buildHourlyUtc(rows: WinnerEffRow[]): (number | null)[] {
     b.length === 0 ? null : b.reduce((a, x) => a + x, 0) / b.length,
   );
 
-  // Moyenne globale (sur les buckets non-null)
-  const nonNull = avgs.filter((v): v is number => v !== null);
-  if (nonNull.length === 0) return new Array<null>(24).fill(null);
-  const globalAvg = nonNull.reduce((a, x) => a + x, 0) / nonNull.length;
+  // Base unique : moyenne 7 j globale sur tous les échantillons bruts
+  // (même dénominateur que la heatmap → les deux vues coïncident).
+  const globalAvg = rows.reduce((a, r) => a + r.eff, 0) / rows.length;
   if (globalAvg <= 0) return new Array<null>(24).fill(null);
 
   // % d'écart à la moyenne
@@ -385,12 +384,9 @@ function buildHeatUtc(rows: WinnerEffRow[]): (number | null)[][] {
     day.map((b) => (b.length === 0 ? null : b.reduce((a, x) => a + x, 0) / b.length)),
   );
 
-  // Moyenne globale sur tous les buckets non-null
-  const allVals: number[] = [];
-  for (const day of avgs) for (const v of day) if (v !== null) allVals.push(v);
-  if (allVals.length === 0) return Array.from({ length: 7 }, () => new Array<null>(24).fill(null));
-
-  const globalAvg = allVals.reduce((a, x) => a + x, 0) / allVals.length;
+  // Base unique : moyenne 7 j globale sur tous les échantillons bruts
+  // (même dénominateur que le profil horaire → les deux vues coïncident).
+  const globalAvg = rows.reduce((a, r) => a + r.eff, 0) / rows.length;
   if (globalAvg <= 0) return Array.from({ length: 7 }, () => new Array<null>(24).fill(null));
 
   return avgs.map((day) =>
