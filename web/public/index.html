@@ -288,6 +288,8 @@ const STRINGS = {
     vs_day_avg: 'vs moy. du jour',
     per_week: '/ sem.',
     today_badge: 'auj.',
+    vs_week_line: 'moy. 7 j',
+    zoom_legend: 'Aire colorée = écart à la moyenne du jour (vert au-dessus, rouge en-dessous) · ligne tirets = moyenne 7 j · le jour en cours s\'arrête à maintenant',
 
     // Notes
     limited_note: (n) => `historique limité : ${n} tick${n > 1 ? 's' : ''} ok`,
@@ -431,6 +433,8 @@ const STRINGS = {
     vs_day_avg: 'vs day avg',
     per_week: '/ wk',
     today_badge: 'today',
+    vs_week_line: '7-d avg',
+    zoom_legend: 'Shaded area = deviation from the day average (green above, red below) · dashed line = 7-day average · today stops at now',
 
     // Notes
     limited_note: (n) => `limited history: ${n} tick${n > 1 ? 's' : ''} ok`,
@@ -764,34 +768,28 @@ function distBars(winnerDist) {
 const hh2 = x => String(x).padStart(2, '0') + ' h';
 const pctTxt = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)} %`;
 
-// Dérive moyennes/jour normalisées du prix (eff × sonde × prix ACTUEL), écarts, meilleurs/pires.
-function timeModel(heatLocal, heatEffLocal, meta, pairUi) {
-  const probe = Math.max(...((meta && meta.sondes && meta.sondes.length) ? meta.sondes : [750]));
-  const blndUsd = (meta && meta.blndUsd) || 0;
-  const eurUsd = (meta && meta.eurUsd) || 0;
-  const spot = pairUi === 'EURC' ? (eurUsd > 0 ? blndUsd / eurUsd : 0) : blndUsd; // prix cible/BLND, fixe pour tous les jours
+function timeModel(heatEffLocal, weekAvg) {
+  const wk = (weekAvg && weekAvg > 0) ? weekAvg : null;
+  const cellPct = heatEffLocal.map(row => row.map(v => (v == null || !wk) ? null : (v / wk - 1) * 100));
   const dayEff = heatEffLocal.map(row => { const v = row.filter(x => x != null); return v.length ? v.reduce((a, x) => a + x, 0) / v.length : null; });
-  const effVals = dayEff.filter(x => x != null);
-  const weekEff = effVals.length ? effVals.reduce((a, x) => a + x, 0) / effVals.length : null;
-  const dayNet = dayEff.map(e => (e == null || spot <= 0) ? null : e * probe * spot);
-  const dayVs = dayEff.map(e => (e == null || !weekEff) ? null : (e / weekEff - 1) * 100);
+  const dayVs = dayEff.map(e => (e == null || !wk) ? null : (e / wk - 1) * 100);
   let bestDay = -1, worstDay = -1, bv = -Infinity, wv = Infinity;
   dayEff.forEach((e, i) => { if (e == null) return; if (e > bv) { bv = e; bestDay = i; } if (e < wv) { wv = e; worstDay = i; } });
   let bestCell = null, worstCell = null, bc = -Infinity, wc = Infinity;
-  heatLocal.forEach((row, d) => row.forEach((v, h) => { if (v == null) return; if (v > bc) { bc = v; bestCell = { d, h, v }; } if (v < wc) { wc = v; worstCell = { d, h, v }; } }));
-  return { probe, spot, dayEff, weekEff, dayNet, dayVs, bestDay, worstDay, bestCell, worstCell };
+  cellPct.forEach((row, d) => row.forEach((v, h) => { if (v == null) return; if (v > bc) { bc = v; bestCell = { d, h, v }; } if (v < wc) { wc = v; worstCell = { d, h, v }; } }));
+  return { cellPct, dayEff, dayVs, weekAvg: wk, bestDay, worstDay, bestCell, worstCell };
 }
 
-function encartHtml(m, heatLocal, today, nowHour) {
+function encartHtml(m, today, nowHour) {
   const days = t('days');
-  const nowVal = (heatLocal[today] && heatLocal[today][nowHour] != null) ? heatLocal[today][nowHour] : null;
+  const nowVal = (m.cellPct[today] && m.cellPct[today][nowHour] != null) ? m.cellPct[today][nowHour] : null;
   const slot = m.bestCell ? `
     <div class="enck"><div class="l">${t('slot_best')}</div>
       <div class="v g">${days[m.bestCell.d]} ${hh2(m.bestCell.h)}</div><div class="s">${pctTxt(m.bestCell.v)} ${t('vs_week')}</div>
       <div class="sub2">${t('slot_avoid')} : <span class="r">${days[m.worstCell.d]} ${hh2(m.worstCell.h)} · ${pctTxt(m.worstCell.v)}</span></div></div>` : '';
   const day = m.bestDay >= 0 ? `
     <div class="enck"><div class="l">${t('encart_best_day')}</div>
-      <div class="v g">${days[m.bestDay]}</div><div class="s">${fmt(m.dayNet[m.bestDay])} · ${pctTxt(m.dayVs[m.bestDay])} ${t('per_week')}</div>
+      <div class="v g">${days[m.bestDay]}</div><div class="s">${fmt(m.dayEff[m.bestDay] * 100)} % · ${pctTxt(m.dayVs[m.bestDay])} ${t('per_week')}</div>
       <div class="sub2">${t('slot_avoid')} : <span class="r">${days[m.worstDay]} · ${pctTxt(m.dayVs[m.worstDay])} ${t('per_week')}</span></div></div>` : '';
   const now = `
     <div class="enck"><div class="l">${t('encart_now')}</div>
@@ -800,18 +798,18 @@ function encartHtml(m, heatLocal, today, nowHour) {
   return `<div class="enc">${slot}${day}${now}</div>`;
 }
 
-function hebdoHtml(m, heatLocal, today, sel) {
+function hebdoHtml(m, today, sel) {
   const days = t('days');
-  const allv = []; for (const row of heatLocal) for (const v of row) if (v != null) allv.push(v);
+  const allv = []; for (const row of m.cellPct) for (const v of row) if (v != null) allv.push(v);
   if (allv.length === 0) return `<p class="help">${t('hmap_insufficient')}</p>`;
   const lo = Math.min(...allv), hi = Math.max(...allv), rg = (hi - lo) || 1;
   const col = x => `hsl(${Math.round(8 + (x - lo) / rg * 125)} 60% 46%)`;
   let html = '';
   for (let d = 0; d < 7; d++) {
-    const cells = (heatLocal[d] || []).map((v, h) => v == null
+    const cells = (m.cellPct[d] || []).map((v, h) => v == null
       ? `<span class="hc" style="background:var(--card-border)"></span>`
       : `<span class="hc" style="background:${col(v)}" title="${days[d]} ${hh2(h)} · ${v > 0 ? '+' : ''}${v.toFixed(2)} %"></span>`).join('');
-    const meanTxt = m.dayNet[d] == null ? '—' : `${fmt(m.dayNet[d])}<small>${m.dayVs[d] >= 0 ? '+' : ''}${m.dayVs[d].toFixed(2)} % ${t('per_week')}</small>`;
+    const meanTxt = m.dayEff[d] == null ? '—' : `${fmt(m.dayEff[d] * 100)} %<small>${m.dayVs[d] >= 0 ? '+' : ''}${m.dayVs[d].toFixed(2)} % ${t('per_week')}</small>`;
     html += `<div class="hrow${d === sel ? ' sel' : ''}" onclick="selectDay(${d})">
       <div class="hlbl${d === m.bestDay ? ' best' : ''}">
         <span class="hday">${days[d]}${d === m.bestDay ? ' ★' : ''}</span>
@@ -822,49 +820,56 @@ function hebdoHtml(m, heatLocal, today, sel) {
   return `<div class="heb">${html}</div>`;
 }
 
-function zoomHtml(m, heatLocal, sel, today, nowHour, u) {
+function zoomHtml(m, series, sel, today, nowSlot, u) {
   const days = t('days');
-  const meanLine = m.dayNet[sel] == null ? '—' : `${fmt(m.dayNet[sel])}<small style="font-size:12px;color:var(--sub)"> ${u}</small>`;
+  const meanLine = m.dayEff[sel] == null ? '—' : `${fmt(m.dayEff[sel] * 100)} %`;
   const vsLine = m.dayVs[sel] == null ? '' : `${m.dayVs[sel] >= 0 ? '+' : ''}${m.dayVs[sel].toFixed(2)} % ${t('vs_week')}`;
   const kpi = `<div class="zmk"><span class="k">${t('day_avg')} · ${days[sel]}</span><span class="v">${meanLine}</span><span class="s" style="color:${(m.dayVs[sel] || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${vsLine}</span></div>`;
-  // Courbe = % d'écart au net moyen 7 j, identique aux cases du tableau (heatLocal) → le survol == la case.
-  const dev = (heatLocal[sel] || []).slice();
-  zoomDev = dev;
+  zoomDev = series ? series.slice() : [];
   const axis = `<div class="zaxis"><span>00</span><span>03</span><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span></div>`;
-  if (dev.filter(x => x != null).length === 0) return `<div class="zm">${kpi}<div><p class="help">${t('hmap_insufficient')}</p></div></div>`;
-  // Échelle verticale dynamique : le zéro (= moyenne 7 j) reste au centre (mid) → split vert/rouge correct,
-  // et la courbe remplit la boîte sans jamais clipper.
-  const absVals = dev.filter(x => x != null).map(x => Math.abs(x));
-  const maxAbs = absVals.length ? Math.max(...absVals) : 1;
-  const W = 520, H = 120, mid = H / 2, n = 24, sx = W / (n - 1), sc = (mid - 4) / (maxAbs || 1);
-  const pts = dev.map((v, i) => [i * sx, mid - (v == null ? 0 : Math.max(-mid + 4, Math.min(mid - 4, v * sc)))]);
+  const present = (series || []).map((v, i) => (v == null ? null : { i, v })).filter(Boolean);
+  if (present.length === 0) return `<div class="zm">${kpi}<div><p class="help">${t('hmap_insufficient')}</p></div></div>`;
+  const wk = m.weekAvg;
+  const effv = present.map(p => p.v);
+  const dayMean = effv.reduce((a, x) => a + x, 0) / effv.length;
+  let lo = Math.min(...effv), hi = Math.max(...effv);
+  if (wk != null) { lo = Math.min(lo, wk); hi = Math.max(hi, wk); }
+  const pad = (hi - lo) * 0.18 || 0.001; lo -= pad; hi += pad;
+  const span = (hi - lo) || 1;
+  const W = 520, H = 120, n = 96, sx = W / (n - 1);
+  const yOf = v => H * (1 - (v - lo) / span);
+  const baseY = yOf(dayMean);
+  const pts = present.map(p => [p.i * sx, yOf(p.v)]);
   const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
-  const area = `M0,${mid} ` + pts.map(p => 'L' + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + ` L${W},${mid} Z`;
-  const showNow = sel === today && dev[nowHour] != null;
-  const nowLeft = showNow ? (nowHour / (n - 1) * 100).toFixed(2) : 0;
-  const nowTop = showNow ? (pts[nowHour][1] / H * 100).toFixed(2) : 0;
+  const area = `M${pts[0][0].toFixed(1)},${baseY.toFixed(1)} ` + pts.map(p => 'L' + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + ` L${pts[pts.length - 1][0].toFixed(1)},${baseY.toFixed(1)} Z`;
+  const wkY = wk != null ? yOf(wk) : null;
+  const showNow = sel === today && series[nowSlot] != null;
+  const nowX = showNow ? (nowSlot / (n - 1) * 100).toFixed(2) : 0;
+  const nowY = showNow ? (yOf(series[nowSlot]) / H * 100).toFixed(2) : 0;
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="180" preserveAspectRatio="none" style="display:block;overflow:visible">
-    <defs><clipPath id="zab"><rect x="0" y="0" width="${W}" height="${mid}"/></clipPath><clipPath id="zbe"><rect x="0" y="${mid}" width="${W}" height="${H - mid}"/></clipPath></defs>
-    <path d="${area}" fill="var(--green)" fill-opacity=".45" clip-path="url(#zab)"/>
-    <path d="${area}" fill="var(--red)" fill-opacity=".45" clip-path="url(#zbe)"/>
-    <line x1="0" y1="${mid}" x2="${W}" y2="${mid}" stroke="var(--sub)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+    <defs><clipPath id="zab"><rect x="0" y="0" width="${W}" height="${baseY.toFixed(1)}"/></clipPath><clipPath id="zbe"><rect x="0" y="${baseY.toFixed(1)}" width="${W}" height="${(H - baseY).toFixed(1)}"/></clipPath></defs>
+    <path d="${area}" fill="var(--green)" fill-opacity=".4" clip-path="url(#zab)"/>
+    <path d="${area}" fill="var(--red)" fill-opacity=".4" clip-path="url(#zbe)"/>
+    ${wkY != null ? `<line x1="0" y1="${wkY.toFixed(1)}" x2="${W}" y2="${wkY.toFixed(1)}" stroke="var(--caption)" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"/>` : ''}
     <path d="${line}" fill="none" stroke="var(--heading)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
   </svg>`;
-  const nowDot = showNow ? `<span class="zdot pulse" style="left:${nowLeft}%;top:${nowTop}%"></span>` : '';
-  return `<div class="zm">${kpi}<div><div class="zwrap" onmousemove="zoomMove(event,this)" onmouseleave="zoomLeave()">${svg}${nowDot}<div class="zcursor" id="zcur"></div><div class="ztip" id="ztip"></div></div>${axis}</div></div>`;
+  const nowDot = showNow ? `<span class="zdot pulse" style="left:${nowX}%;top:${nowY}%"></span>` : '';
+  const wkTag = wkY != null ? `<span style="position:absolute;right:3px;top:${(wkY / H * 100).toFixed(1)}%;transform:translateY(-50%);font-size:9px;font-weight:600;color:var(--caption);background:var(--card-bg);padding:0 3px;border-radius:3px">${t('vs_week_line')}</span>` : '';
+  return `<div class="zm">${kpi}<div><div class="zwrap" onmousemove="zoomMove(event,this)" onmouseleave="zoomLeave()">${svg}${nowDot}${wkTag}<div class="zcursor" id="zcur"></div><div class="ztip" id="ztip"></div></div>${axis}<p class="help" style="margin:.45rem 0 0;font-size:11px">${t('zoom_legend')}</p></div></div>`;
 }
 
 function selectDay(d) { selDay = d; renderApp(); }
 function zoomMove(e, el) {
   const r = el.getBoundingClientRect();
   const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-  const h = Math.round(frac * 23);
+  const s = Math.round(frac * 95);
   const cur = document.getElementById('zcur'), tip = document.getElementById('ztip');
-  if (!cur || !tip || zoomDev[h] == null) { if (cur) cur.style.display = 'none'; if (tip) tip.style.display = 'none'; return; }
-  const left = (h / 23 * 100) + '%';
+  if (!cur || !tip || zoomDev[s] == null) { if (cur) cur.style.display = 'none'; if (tip) tip.style.display = 'none'; return; }
+  const left = (s / 95 * 100) + '%';
   cur.style.left = left; cur.style.display = 'block';
   tip.style.left = left; tip.style.display = 'block';
-  tip.textContent = `${hh2(h)} · ${zoomDev[h] >= 0 ? '+' : ''}${zoomDev[h].toFixed(2)} %`;
+  const hh = String(Math.floor(s / 4)).padStart(2, '0'), mm = String((s % 4) * 15).padStart(2, '0');
+  tip.textContent = `${hh}:${mm} · ${zoomDev[s].toFixed(3)}`;
 }
 function zoomLeave() { const c = document.getElementById('zcur'), p = document.getElementById('ztip'); if (c) c.style.display = 'none'; if (p) p.style.display = 'none'; }
 
@@ -903,9 +908,6 @@ function buildPage() {
   const NOW_HOUR = nowLocalHour();
   const TODAY = todayLocalDow();
 
-  const heatLocal = overview ? rotateHeatUtc(overview.heatUtc, offsetH) : Array.from({length:7}, () => new Array(24).fill(null));
-  const heatEffLocal = overview ? rotateHeatUtc(overview.heatEffUtc, offsetH) : Array.from({length:7}, () => new Array(24).fill(null));
-  const tm = timeModel(heatLocal, heatEffLocal, meta, target);
   if (selDay < 0 || selDay > 6) selDay = TODAY;
 
   // Sondes dynamiques depuis meta (fallback [250,750] si pas encore chargé)
@@ -913,6 +915,15 @@ function buildPage() {
 
   // Réconcilier ladderSonde avec les sondes disponibles
   if (!sondes.includes(ladderSonde)) ladderSonde = sondes[0];
+
+  const NOW_SLOT = nowLocalHour() * 4 + Math.floor(new Date().getMinutes() / 15);
+  const sondeKey = String(ladderSonde);
+  const EMPTY24 = Array.from({length:7}, () => new Array(24).fill(null));
+  const EMPTY96 = Array.from({length:7}, () => new Array(96).fill(null));
+  const heatEffLocal = overview && overview.heatEffUtc && overview.heatEffUtc[sondeKey] ? rotateHeatUtc(overview.heatEffUtc[sondeKey], offsetH) : EMPTY24;
+  const intraday = overview && overview.intradayLocal && overview.intradayLocal[sondeKey] ? overview.intradayLocal[sondeKey] : EMPTY96;
+  const weekAvg = overview && overview.effWeekAvg ? overview.effWeekAvg[sondeKey] : null;
+  const tm = timeModel(heatEffLocal, weekAvg);
 
   // Échelle courante
   let ladderZoneTitle = t('section_ladder');
@@ -967,13 +978,13 @@ function buildPage() {
   <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
     <div class="ladder-wrap${simLoading || refreshing ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading || refreshing ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${simLoading ? t('sim_loading') : t('refresh_loading')}</div>` : ''}</div></div>
 
-  <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right muted" style="font-size:11px">${t('section_slots_note')}</span></div>
+  <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right"><span class="seg">${sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('')}</span></span></div>
     <div class="card">
-      ${noData || `${encartHtml(tm, heatLocal, TODAY, NOW_HOUR)}${hebdoHtml(tm, heatLocal, TODAY, selDay)}${limitedNote}`}
+      ${noData || `${encartHtml(tm, TODAY, NOW_HOUR)}${hebdoHtml(tm, TODAY, selDay)}${limitedNote}`}
     </div></div>
 
   <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span></div>
-    <div class="card">${noData || zoomHtml(tm, heatLocal, selDay, TODAY, NOW_HOUR, u) + limitedNote}</div></div>
+    <div class="card">${noData || zoomHtml(tm, intraday[selDay], selDay, TODAY, NOW_SLOT, u) + limitedNote}</div></div>
 
   <div class="zone"><div class="zone-h">${t('section_routes')}</div>
     <div class="card">
