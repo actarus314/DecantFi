@@ -233,6 +233,7 @@ const STRINGS = {
     section_ladder: 'Échelle des sources',
     section_slots: (u) => `Meilleurs créneaux — net BLND → ${u}`,
     section_slots_note: 'rollup horaire · 7 j',
+    slots_help: 'L\'<b>efficience</b> = part du prix de référence (DefiLlama) réellement obtenue, frais et slippage déduits — 100 % = exécution parfaite. Mesurée sur le meilleur devis de la sonde choisie (≈ 4 relevés/heure). Chaque <b>case</b> compare cette efficience à la moyenne des 7 derniers jours : <b>vert = mieux que la semaine, rouge = moins bien</b>. C\'est <b>relatif</b> — une case verte peut rester médiocre dans l\'absolu si toute la semaine est mauvaise. La <b>note du jour</b> = efficience moyenne du jour, en %.',
     section_hourly: 'Zoom journalier',
     section_hourly_note: '▼ heure en cours',
     section_routes: 'Meilleures routes (7 j)',
@@ -289,7 +290,7 @@ const STRINGS = {
     per_week: '/ sem.',
     today_badge: 'auj.',
     vs_week_line: 'moy. 7 j',
-    zoom_legend: 'Aire colorée = écart à la moyenne du jour (vert au-dessus, rouge en-dessous) · ligne tirets = moyenne 7 j · le jour en cours s\'arrête à maintenant',
+    zoom_legend: 'Les 96 relevés de 15 min du jour choisi (clique une ligne du tableau). L\'<b>aire</b> = écart à la moyenne <b>du jour</b> (vert au-dessus, rouge en-dessous) → la forme intraday. La <b>ligne tirets</b> = moyenne 7 j, pour situer la journée. Le jour en cours <b>s\'arrête à maintenant</b> (sa moyenne se construit au fil des relevés).',
 
     // Notes
     limited_note: (n) => `historique limité : ${n} tick${n > 1 ? 's' : ''} ok`,
@@ -378,6 +379,7 @@ const STRINGS = {
     section_ladder: 'Source ladder',
     section_slots: (u) => `Best time slots — net BLND → ${u}`,
     section_slots_note: 'hourly rollup · 7 d',
+    slots_help: '<b>Efficiency</b> = the share of the reference price (DefiLlama) actually obtained, fees and slippage deducted — 100 % = perfect execution. Measured on the best quote for the selected probe (≈ 4 readings/hour). Each <b>cell</b> compares this efficiency to the 7-day average: <b>green = better than the week, red = worse</b>. It\'s <b>relative</b> — a green cell can still be poor in absolute terms if the whole week is bad. The <b>day\'s note</b> = the day\'s average efficiency, in %.',
     section_hourly: 'Daily zoom',
     section_hourly_note: '▼ current hour',
     section_routes: 'Best routes (7 d)',
@@ -434,7 +436,7 @@ const STRINGS = {
     per_week: '/ wk',
     today_badge: 'today',
     vs_week_line: '7-d avg',
-    zoom_legend: 'Shaded area = deviation from the day average (green above, red below) · dashed line = 7-day average · today stops at now',
+    zoom_legend: 'The 96 fifteen-minute readings of the selected day (click a table row). The <b>area</b> = deviation from the <b>day</b> average (green above, red below) → the intraday shape. The <b>dashed line</b> = 7-day average, to place the day. Today <b>stops at now</b> (its average builds up as readings arrive).',
 
     // Notes
     limited_note: (n) => `limited history: ${n} tick${n > 1 ? 's' : ''} ok`,
@@ -980,7 +982,7 @@ function buildPage() {
 
   <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right"><span class="seg">${sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('')}</span></span></div>
     <div class="card">
-      ${noData || `${encartHtml(tm, TODAY, NOW_HOUR)}${hebdoHtml(tm, TODAY, selDay)}${limitedNote}`}
+      ${noData || `${encartHtml(tm, TODAY, NOW_HOUR)}${hebdoHtml(tm, TODAY, selDay)}<p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${t('slots_help')}</p>${limitedNote}`}
     </div></div>
 
   <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span></div>
