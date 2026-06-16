@@ -123,7 +123,7 @@ table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent);
 .srcname{font-weight:600;} .muted{color:var(--caption);}
 
 .dist .drow{display:flex; align-items:center; gap:.55rem; font-size:12px; padding:.28rem 0;}
-.dist .dname{width:104px; color:var(--val); font-weight:600;}
+.dist .dname{width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--val); font-weight:600;}
 .dist .dbar{flex:1; height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden;}
 .dist .dbar > span{display:block; height:100%; background:var(--accent); border-radius:9999px;}
 .dist .dpct{width:42px; text-align:right; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600;}
@@ -228,7 +228,7 @@ const STRINGS = {
     ladder_col_impact: 'Impact',
     ladder_col_route: 'Route',
     ladder_tip_chip: 'Observé = cotation réelle de la source<br>Calculé = route composée (2 swaps)<br>Estimé = borne/plancher (frais opaques)',
-    ladder_tip_impact: 'Écart entre le montant reçu et sa valeur au prix de référence (DefiLlama).<br><br>Positif = tu reçois moins (frais + slippage).<br>Négatif = tu reçois plus (le prix on-chain bat la référence).',
+    ladder_tip_impact: 'Écart entre le montant reçu et sa valeur au prix de référence (DefiLlama).<br><br>Positif = on reçoit moins (frais + slippage).<br>Négatif = on reçoit plus (le prix on-chain bat la référence).',
     ladder_empty: 'Aucune donnée',
     ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
 
@@ -257,7 +257,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: 'xBull domine habituellement ; Comet ne concourt que sur USDC (pool backstop). Diversité = robustesse aux pannes.',
-    dist_note_eurc: 'Pas de pool BLND/EURC natif : les lignes « BLND→EURC » sont des swaps atomiques routés en interne (Aquarius via sUSD, Ultra via XLM… ; xBull & Soroswap masquent leurs hops). Notre route via-USDC explicite (2 swaps) les bat souvent.',
+    dist_note_eurc: 'Pas de pool BLND/EURC natif : les lignes « BLND→EURC » sont des swaps atomiques routés en interne (Aquarius via sUSD, Ultra via XLM… ; xBull & Soroswap masquent leurs hops). La route via-USDC explicite (2 swaps) les bat souvent.',
 
     // Divers
     loading: 'Chargement…',
@@ -356,7 +356,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: 'xBull usually dominates; Comet only competes on USDC (backstop pool). Diversity = resilience to failures.',
-    dist_note_eurc: 'No native BLND/EURC pool: the "BLND→EURC" rows are atomic swaps routed internally (Aquarius via sUSD, Ultra via XLM…; xBull & Soroswap hide their hops). Our explicit via-USDC route (2 swaps) often beats them.',
+    dist_note_eurc: 'No native BLND/EURC pool: the "BLND→EURC" rows are atomic swaps routed internally (Aquarius via sUSD, Ultra via XLM…; xBull & Soroswap hide their hops). The explicit via-USDC route (2 swaps) often beats them.',
 
     // Divers
     loading: 'Loading…',
@@ -546,7 +546,7 @@ function bestRoutesCard() {
       <span class="rank">${i + 1}</span>
       <span class="rlabel"><span class="rpath">${r.path}</span><span class="rtools"> · ${r.tools}</span></span>
       <span class="rbar"><span style="width:${maxPct > 0 ? r.winPct / maxPct * 100 : 0}%"></span></span>
-      <span class="rpct">${r.winPct} %</span>
+      <span class="rpct">${r.winPct.toFixed(1)} %</span>
     </div>`).join('')}
   </div>`;
 }
@@ -747,7 +747,7 @@ function buildPage() {
     <span class="topbar-right">
       <span class="tznote">${t('tz_note')}</span>
       <button class="ctrl-btn" onclick="toggleTheme()" title="${isDark ? t('theme_light') : t('theme_dark')}">${themeGlyph}</button>
-      <button class="ctrl-btn" onclick="toggleLang()" title="${langTitle}">${langGlyph}</button>
+      <button class="ctrl-btn" onclick="toggleLang()" title="${langTitle}" style="font-size:18px;line-height:1;padding:1px 7px">${langGlyph}</button>
     </span>
   </div>
 
@@ -771,13 +771,13 @@ function buildPage() {
 
   <div class="zone">
     <div class="card"><h3>${t('section_routes')}</h3>
-      ${bestRoutesCard()}</div>
+      ${bestRoutesCard()}
+      <p class="help" style="margin:.6rem 0 0">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p></div>
   </div>
 
   <div class="zone">
     <div class="card"><h3>${t('section_who')}</h3>
       ${noData || distBars(dist) + limitedNote}
-      <p class="help" style="margin:.6rem 0 0">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p>
     </div>
   </div>`;
 }
