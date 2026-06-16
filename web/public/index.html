@@ -297,8 +297,8 @@ const STRINGS = {
     no_data_waiting: 'En attente du collecteur (aucun tick ok).',
 
     // Distribution note
-    dist_note_usdc: 'xBull domine habituellement ; Comet ne concourt que sur USDC (pool backstop). Diversité = robustesse aux pannes.',
-    dist_note_eurc: 'Pas de pool BLND/EURC profond : les lignes « BLND → EURC » sont des swaps atomiques routés en interne via USDC/XLM (Soroswap affiche BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM ; seul xBull masque son chemin). La route via-USDC explicite (2 swaps) les bat souvent.',
+    dist_note_usdc: '<b>xBull</b> domine habituellement ; <b>Comet</b> ne concourt que sur USDC (pool backstop). <b>Diversité = robustesse aux pannes.</b>',
+    dist_note_eurc: '<b>Pas de pool BLND/EURC profond</b> : les lignes « BLND → EURC » sont des <b>swaps atomiques routés en interne</b> via USDC/XLM (Soroswap affiche BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM ; <b>seul xBull masque son chemin</b>). La route <b>via-USDC explicite (2 swaps) les bat souvent</b>.',
 
     // Divers
     loading: 'Chargement…',
@@ -443,8 +443,8 @@ const STRINGS = {
     no_data_waiting: 'Waiting for collector (no ok tick yet).',
 
     // Distribution note
-    dist_note_usdc: 'xBull usually dominates; Comet only competes on USDC (backstop pool). Diversity = resilience to failures.',
-    dist_note_eurc: 'No deep BLND/EURC pool: the "BLND → EURC" rows are atomic swaps routed internally via USDC/XLM (Soroswap shows BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM; only xBull hides its path). The explicit via-USDC route (2 swaps) often beats them.',
+    dist_note_usdc: '<b>xBull</b> usually dominates; <b>Comet</b> only competes on USDC (backstop pool). <b>Diversity = resilience to failures.</b>',
+    dist_note_eurc: '<b>No deep BLND/EURC pool</b>: the "BLND → EURC" rows are <b>atomic swaps routed internally</b> via USDC/XLM (Soroswap shows BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM; <b>only xBull hides its path</b>). The explicit <b>via-USDC route (2 swaps) often beats them</b>.',
 
     // Divers
     loading: 'Loading…',
@@ -991,7 +991,7 @@ function buildPage() {
   <div class="zone"><div class="zone-h">${t('section_routes')}</div>
     <div class="card">
       ${bestRoutesCard()}${limitedNote}
-      <p class="help" style="margin:.6rem 0 0">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p></div>
+      <p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p></div>
   </div>
 
   <div class="zone"><div class="zone-h">${t('section_who')}</div>
