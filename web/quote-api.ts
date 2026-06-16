@@ -5,7 +5,7 @@ import { readBlndBalance } from '../core/balance.js';
 import { BLND, USDC, EURC } from '../core/assets.js';
 import { toStroops, toNumber } from '../core/amount.js';
 import { priceImpactPct, targetUsdPerUnit } from '../core/prices.js';
-import { displayName, noteFor, chipFor, type Chip } from './stats.js';
+import { displayName, noteFor, chipFor, maskedRoute, type Chip } from './stats.js';
 import type { WebConfig } from './config.js';
 import type { RouteHop } from '../core/sources/types.js';
 
@@ -222,7 +222,7 @@ export async function liveQuote(
   const ladder: LiveLadderRow[] = raw.map((r, i) => ({
     display: displayName(r.source),
     note: noteFor(r.source, i === 0, r.eurcPath),
-    route: r.route,
+    route: maskedRoute(r.route, r.source),
     net: toNumber(r.netOut),
     deltaVsWinner: toNumber(r.netOut) - topNetNum,
     chip: r.eurcPath === 'via-usdc' ? 'calc' : chipFor(r.conf, r.source, r.eurcPath),

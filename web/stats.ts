@@ -117,6 +117,15 @@ export function chipFor(netConfidence: string, sourceId: string, eurcPath: strin
   return 'est';
 }
 
+/** xBull ne renvoie qu'un ID de route opaque (pas le chemin) → un swap atomique 2-nœuds (A→B)
+ *  est rendu "A→…→B" pour signaler des hops internes masqués. Les autres sources exposent leur
+ *  chemin réel (Soroswap via trade.path, Aquarius/Ultra multi-hop) → inchangés. */
+export function maskedRoute(path: string, sourceId: string): string {
+  if (sourceId !== 'xbull') return path; // seul xBull masque son chemin
+  const nodes = path.split('→');
+  return nodes.length === 2 ? `${nodes[0]}→…→${nodes[1]}` : path;
+}
+
 /** route_summary DB → chaîne lisible. "BLND->XLM->USDC" → "BLND→XLM→USDC" ;
  *  composite "a:BLND->USDC | b:USDC->EURC" → "BLND→USDC→EURC" (nœud USDC fusionné). */
 export function prettyRoute(summary: string): string {
@@ -214,7 +223,7 @@ function buildLadder(db: DatabaseSync, pair: string, amountIn: bigint): LadderRo
     return {
       display: displayName(sourceId),
       note: noteFor(sourceId, isWinner, eurcPath),
-      route: prettyRoute(r['route_summary'] != null ? String(r['route_summary']) : ''),
+      route: maskedRoute(prettyRoute(r['route_summary'] != null ? String(r['route_summary']) : ''), sourceId),
       net,
       deltaVsWinner,
       chip: chipFor(netConf, sourceId, eurcPath),
@@ -272,9 +281,10 @@ function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string): R
 
   return rows.map((r) => {
     const wins = Number(r['wins'] as bigint);
+    const sourceId = String(r['source_id'] ?? '');
     return {
-      path: prettyRoute(r['route_summary'] != null ? String(r['route_summary']) : ''),
-      tools: shortName(String(r['source_id'] ?? '')),
+      path: maskedRoute(prettyRoute(r['route_summary'] != null ? String(r['route_summary']) : ''), sourceId),
+      tools: shortName(sourceId),
       wins,
       winPct: Math.round((wins / totalNum) * 1000) / 10,
     };
