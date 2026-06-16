@@ -134,13 +134,14 @@ export function prettyRoute(summary: string): string {
     const chain: string[] = [];
     for (const seg of summary.split('|')) {
       const path = seg.includes(':') ? seg.slice(seg.indexOf(':') + 1) : seg;
-      for (const node of path.split('->').map((x) => x.trim()).filter(Boolean)) {
+      for (const raw of path.split('->').map((x) => x.trim()).filter(Boolean)) {
+        const node = raw === 'native' ? 'XLM' : raw;
         if (chain[chain.length - 1] !== node) chain.push(node);
       }
     }
     return chain.join(' → ');
   }
-  return summary.split('->').map((x) => x.trim()).filter(Boolean).join(' → ');
+  return summary.split('->').map((x) => x.trim()).filter(Boolean).map((n) => (n === 'native' ? 'XLM' : n)).join(' → ');
 }
 
 // ─── Mapping DB pair ─────────────────────────────────────────────────────────
