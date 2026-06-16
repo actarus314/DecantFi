@@ -51,6 +51,8 @@ export interface Overview {
   bestRoutes: RouteRank[];
   hourlyUtc: (number | null)[];
   heatUtc: (number | null)[][];
+  /** 7×24 efficience moyenne brute par (dow, hour) UTC — pour la moyenne/jour normalisée du prix. */
+  heatEffUtc: (number | null)[][];
 }
 
 // ─── Mappings display / note / chip ──────────────────────────────────────────
@@ -354,10 +356,9 @@ function buildHourlyUtc(rows: WinnerEffRow[]): (number | null)[] {
     b.length === 0 ? null : b.reduce((a, x) => a + x, 0) / b.length,
   );
 
-  // Moyenne globale (sur les buckets non-null)
-  const nonNull = avgs.filter((v): v is number => v !== null);
-  if (nonNull.length === 0) return new Array<null>(24).fill(null);
-  const globalAvg = nonNull.reduce((a, x) => a + x, 0) / nonNull.length;
+  // Base unique : moyenne 7 j globale sur tous les échantillons bruts
+  // (même dénominateur que la heatmap → les deux vues coïncident).
+  const globalAvg = rows.reduce((a, r) => a + r.eff, 0) / rows.length;
   if (globalAvg <= 0) return new Array<null>(24).fill(null);
 
   // % d'écart à la moyenne
@@ -385,16 +386,30 @@ function buildHeatUtc(rows: WinnerEffRow[]): (number | null)[][] {
     day.map((b) => (b.length === 0 ? null : b.reduce((a, x) => a + x, 0) / b.length)),
   );
 
-  // Moyenne globale sur tous les buckets non-null
-  const allVals: number[] = [];
-  for (const day of avgs) for (const v of day) if (v !== null) allVals.push(v);
-  if (allVals.length === 0) return Array.from({ length: 7 }, () => new Array<null>(24).fill(null));
-
-  const globalAvg = allVals.reduce((a, x) => a + x, 0) / allVals.length;
+  // Base unique : moyenne 7 j globale sur tous les échantillons bruts
+  // (même dénominateur que le profil horaire → les deux vues coïncident).
+  const globalAvg = rows.reduce((a, r) => a + r.eff, 0) / rows.length;
   if (globalAvg <= 0) return Array.from({ length: 7 }, () => new Array<null>(24).fill(null));
 
   return avgs.map((day) =>
     day.map((v) => v === null ? null : (v / globalAvg - 1) * 100),
+  );
+}
+
+/** 7×24 efficience moyenne brute par (dow, hour) UTC — sert la moyenne/jour normalisée du prix. */
+function buildHeatEffUtc(rows: WinnerEffRow[]): (number | null)[][] {
+  const buckets: number[][][] = Array.from({ length: 7 }, () =>
+    Array.from({ length: 24 }, () => []),
+  );
+  for (const r of rows) {
+    const dayBucket = buckets[r.dow_utc];
+    if (dayBucket) {
+      const hourBucket = dayBucket[r.hour_utc];
+      if (hourBucket) hourBucket.push(r.eff);
+    }
+  }
+  return buckets.map((day) =>
+    day.map((b) => (b.length === 0 ? null : b.reduce((a, x) => a + x, 0) / b.length)),
   );
 }
 
@@ -448,6 +463,7 @@ export function overview(
   const effRows = fetchWinnerEffRows(db, pair, big, windowStart, pairUi);
   const hourlyUtc = buildHourlyUtc(effRows);
   const heatUtc = buildHeatUtc(effRows);
+  const heatEffUtc = buildHeatEffUtc(effRows);
 
-  return { meta, ladders, winnerDist, bestRoutes, hourlyUtc, heatUtc };
+  return { meta, ladders, winnerDist, bestRoutes, hourlyUtc, heatUtc, heatEffUtc };
 }

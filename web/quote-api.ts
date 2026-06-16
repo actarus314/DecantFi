@@ -81,8 +81,8 @@ function prettyVenue(v: string): string {
 
 function buildRoute(hops: RouteHop[], amountIn: bigint, netOut: bigint, pairUi: string): RibbonPart[] {
   const parts: RibbonPart[] = [];
-  const amtStr = toNumber(amountIn).toFixed(2);
-  const netStr = toNumber(netOut).toFixed(2);
+  const amtStr = toNumber(amountIn).toFixed(3);
+  const netStr = toNumber(netOut).toFixed(3);
 
   if (hops.length === 0) {
     // Route simple déduite du pair
