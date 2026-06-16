@@ -1,3 +1,4 @@
+name: stellarswap
 services:
   collector:
     image: ghcr.io/actarus314/stellarswap-collector:${IMAGE_TAG:-latest}
@@ -12,7 +13,7 @@ services:
     pids_limit: 256
     mem_limit: 512m
     volumes:
-      - /docker/stellarswap-collector/data:/app/data
+      - /docker/stellarswap/backend/data:/app/data
     env_file: .env
     environment:
       - COLLECTOR_DB_PATH=/app/data/quotes.db
