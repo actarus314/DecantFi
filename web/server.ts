@@ -7,6 +7,7 @@ import { loadWebConfig } from './config.js';
 import { openReadOnly } from './read-db.js';
 import { overview } from './stats.js';
 import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
+import { manualRefresh, refreshBusy } from './refresh.js';
 import { toStroops } from '../core/amount.js';
 
 const cfg = loadWebConfig();
@@ -107,6 +108,19 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (req.method === 'GET' && path === '/api/balance') {
       const result = await walletBalance(cfg);
       json(res, 200, result);
+      return;
+    }
+
+    // Refresh manuel : journalise un tick (note='manual', purgé au prochain poll programmé),
+    // puis renvoie l'overview rafraîchi de la paire demandée.
+    if (req.method === 'POST' && path === '/api/refresh') {
+      if (refreshBusy()) {
+        json(res, 429, { error: 'refresh déjà en cours' });
+        return;
+      }
+      const pair = parsePair(query['pair'] ?? 'USDC') ?? 'USDC';
+      const refresh = await manualRefresh(cfg);
+      json(res, 200, { refresh, overview: overview(db, pair, cfg) });
       return;
     }
 

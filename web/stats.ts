@@ -13,6 +13,7 @@ export type Chip = 'obs' | 'calc' | 'est';
 export interface LadderRow {
   display: string;
   note: string;
+  route: string;
   net: number;
   deltaVsWinner: number;
   chip: Chip;
@@ -104,6 +105,23 @@ export function chipFor(netConfidence: string, sourceId: string, eurcPath: strin
   return 'est';
 }
 
+/** route_summary DB → chaîne lisible. "BLND->XLM->USDC" → "BLND→XLM→USDC" ;
+ *  composite "a:BLND->USDC | b:USDC->EURC" → "BLND→USDC→EURC" (nœud USDC fusionné). */
+export function prettyRoute(summary: string): string {
+  if (!summary) return '';
+  if (summary.includes('|')) {
+    const chain: string[] = [];
+    for (const seg of summary.split('|')) {
+      const path = seg.includes(':') ? seg.slice(seg.indexOf(':') + 1) : seg;
+      for (const node of path.split('->').map((x) => x.trim()).filter(Boolean)) {
+        if (chain[chain.length - 1] !== node) chain.push(node);
+      }
+    }
+    return chain.join('→');
+  }
+  return summary.split('->').map((x) => x.trim()).filter(Boolean).join('→');
+}
+
 // ─── Mapping DB pair ─────────────────────────────────────────────────────────
 
 function dbPair(pairUi: string): string {
@@ -162,7 +180,7 @@ function buildLadder(db: DatabaseSync, pair: string, amountIn: bigint): LadderRo
   const tickId = lastTickRow['id'] as bigint;
 
   const stmt = prepBig(db, `
-    SELECT q.source_id, q.net_out, q.net_confidence, q.price_impact_pct, q.is_winner, q.eurc_path
+    SELECT q.source_id, q.net_out, q.net_confidence, q.price_impact_pct, q.is_winner, q.eurc_path, q.route_summary
     FROM quote q
     WHERE q.tick_id = ? AND q.pair = ? AND q.amount_in = ?
     ORDER BY q.net_out DESC
@@ -189,6 +207,7 @@ function buildLadder(db: DatabaseSync, pair: string, amountIn: bigint): LadderRo
     return {
       display: displayName(sourceId),
       note: noteFor(sourceId, isWinner, eurcPath),
+      route: prettyRoute(r['route_summary'] != null ? String(r['route_summary']) : ''),
       net,
       deltaVsWinner,
       chip: chipFor(netConf, sourceId, eurcPath),

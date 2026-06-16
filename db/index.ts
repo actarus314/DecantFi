@@ -53,6 +53,14 @@ export class Db {
     }
   }
 
+  /** Supprime les ticks manuels (note='manual'). Appelé par le poll programmé : la donnée
+   *  canonique reste la cadence régulière ; les refresh manuels ne sont que provisoires.
+   *  Les quotes/raw partent en cascade (FK ON DELETE CASCADE). Renvoie le nb de ticks supprimés. */
+  purgeManualTicks(): number {
+    const r = this.db.prepare(`DELETE FROM tick WHERE note = 'manual'`).run();
+    return Number(r.changes);
+  }
+
   /** Accès brut (queries, maintenance, tests). */
   raw(): DatabaseSync {
     return this.db;

@@ -18,11 +18,18 @@ export interface RibbonPart {
 export interface LiveLadderRow {
   display: string;
   note: string;
+  route: string;
   net: number;
   deltaVsWinner: number;
   chip: Chip;
   impactPct: number | null;
   winner: boolean;
+}
+
+/** Route lisible depuis les hops d'une cotation : "BLND→XLM→USDC" (ou "BLND→<cible>" si pas de hop). */
+function routeStr(hops: RouteHop[], sell: string, buy: string): string {
+  if (hops.length === 0) return `${sell}→${buy}`;
+  return [hops[0]!.sell, ...hops.map((h) => h.buy)].join('→');
 }
 
 export interface LiveQuote {
@@ -47,7 +54,7 @@ export interface LiveQuote {
 // ─── Deep-links (pages réelles, sans prefill inventé) ────────────────────────
 
 const DEEP_LINKS: Record<string, string> = {
-  xbull: 'https://swap.xbull.app/',
+  xbull: 'https://swap.xbull.io/',
   soroswap: 'https://app.soroswap.finance/',
   aquarius: 'https://aqua.network/',
   ultrastellar: 'https://www.ultrastellar.com/',
@@ -198,6 +205,7 @@ export async function liveQuote(
     ladder.push({
       display: displayName(rSource),
       note: noteFor(rSource, rq.rank === 1, rEurcPath),
+      route: routeStr(rq.route, rq.sellAsset.symbol, rq.buyAsset.symbol),
       net: rNet,
       deltaVsWinner: rNet - winNetNum,
       chip: chipFor(rConf, rSource, rEurcPath),

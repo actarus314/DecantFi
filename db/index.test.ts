@@ -44,4 +44,19 @@ describe('openDb + insertTickWithQuotes', () => {
     expect((db.raw().prepare('SELECT COUNT(*) AS n FROM quote_raw').get() as any).n).toBe(0);
     db.close();
   });
+
+  it('purgeManualTicks : ne supprime que les ticks note=manual (+ cascade), garde le reste', () => {
+    const db = openDb(':memory:');
+    const scheduled = db.insertTickWithQuotes(tick, quotes);
+    db.insertTickWithQuotes({ ...tick, started_at: '2026-06-16T10:05:00.000Z', note: 'manual' }, quotes);
+    db.insertTickWithQuotes({ ...tick, started_at: '2026-06-16T10:06:00.000Z', note: 'exception: boom', ok: false }, []);
+
+    expect(db.purgeManualTicks()).toBe(1); // 1 seul tick manuel
+    const ids = db.raw().prepare('SELECT id, note FROM tick ORDER BY id').all() as any[];
+    expect(ids.map((r) => r.note)).toEqual([null, 'exception: boom']); // manuel parti, programmé + exception restent
+    // quotes du tick manuel partis en cascade ; ceux du programmé restent
+    const qn = db.raw().prepare('SELECT COUNT(*) AS n FROM quote WHERE tick_id = ?').get(scheduled) as any;
+    expect(Number(qn.n)).toBe(2);
+    db.close();
+  });
 });
