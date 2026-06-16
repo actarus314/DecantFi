@@ -25,7 +25,8 @@ body{margin:0; background:var(--bg); color:var(--val);
 .brand .dim{color:var(--caption); font-weight:600;}
 .pagenav{display:inline-flex; gap:4px; background:var(--section-bg); border:1px solid var(--card-border); border-radius:9999px; padding:3px;}
 .pagenav button{border:0; background:transparent; color:var(--caption); font-size:13px; font-weight:700; padding:5px 16px; border-radius:9999px; cursor:pointer; transition:all .15s;}
-.pagenav button.active{background:var(--select); color:#fff;}
+.pagenav button.active{background:#1e293b; color:#fff;}
+.dark .pagenav button.active{background:#e2e8f0; color:#0f172a;}
 .fresh{display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--caption);
   background:var(--card-bg); border:1px solid var(--card-border); border-radius:9999px; padding:2px 9px;}
 .fresh .dot{width:7px; height:7px; border-radius:9999px; background:var(--green);}
@@ -57,7 +58,8 @@ body{margin:0; background:var(--bg); color:var(--val);
 .suffix{font-size:13px; color:var(--sub); font-weight:600;}
 .btn{font-size:12px; font-weight:600; padding:.52rem .9rem; border-radius:.5rem; border:1px solid var(--card-border);
   background:var(--section-bg); color:var(--val); cursor:pointer;}
-.btn.primary{background:var(--green); border-color:var(--green); color:#fff;}
+.btn.primary{background:#0d9488; border-color:#0d9488; color:#fff;}
+.dark .btn.primary{background:#14b8a6; border-color:#14b8a6; color:#04201d;}
 .sim .result{margin-top:.9rem; padding-top:.9rem; border-top:1px solid var(--card-border);
   display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap;}
 .sim .result .meta{font-size:12px; color:var(--caption); font-variant-numeric:tabular-nums;}
@@ -126,6 +128,39 @@ table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent);
 .refresh-overlay{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:.45rem; font-size:12px; font-weight:600; color:var(--caption);}
 .refresh-spinner{width:15px; height:15px; border:2px solid var(--card-border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+/* Section temporelle : encart / hebdo / zoom */
+.enc{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;}
+@media(max-width:760px){.enc{grid-template-columns:1fr;}}
+.enck{border:1px solid var(--card-border);border-radius:.55rem;padding:.55rem .75rem;background:var(--section-bg);}
+.enck .l{font-size:11px;font-weight:600;color:var(--caption);}
+.enck .v{font-size:18px;font-weight:700;line-height:1.15;margin-top:2px;font-variant-numeric:tabular-nums;}
+.enck .v.g{color:var(--green);}.enck .v.r{color:var(--red);}
+.enck .s{font-size:11px;color:var(--sub);}
+.enck .sub2{font-size:11px;color:var(--caption);margin-top:6px;padding-top:5px;border-top:1px solid var(--card-border);}
+.enck .sub2 .r{color:var(--red);font-weight:700;}
+.heb{display:flex;flex-direction:column;gap:3px;margin-top:.9rem;}
+.hrow{display:grid;grid-template-columns:max-content 1fr;gap:13px;align-items:center;padding:2px 3px;border-radius:8px;cursor:pointer;}
+.hrow:hover{background:var(--section-bg);}
+.hrow.sel{background:color-mix(in srgb,var(--heading) 9%,transparent);outline:2px solid var(--heading);outline-offset:-2px;}
+.hlbl{display:flex;align-items:center;gap:8px;padding:5px 9px;border-radius:7px;min-width:212px;}
+.hlbl.best{background:color-mix(in srgb,var(--green) 18%,transparent);}
+.hlbl .hday{font-size:12px;font-weight:700;width:78px;}
+.hlbl .hmean{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;}
+.hlbl .hmean small{display:block;font-size:10px;font-weight:600;color:var(--sub);}
+.htd{font-size:9px;font-weight:700;text-transform:uppercase;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 50%,var(--card-border));border-radius:5px;padding:1px 5px;}
+.hcells{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;}
+.hcells .hc{height:16px;border-radius:3px;}
+.zm{display:grid;grid-template-columns:185px 1fr;gap:16px;align-items:stretch;}
+@media(max-width:680px){.zm{grid-template-columns:1fr;}}
+.zmk{border:1px solid var(--card-border);border-radius:.55rem;padding:.7rem .9rem;background:var(--section-bg);display:flex;flex-direction:column;justify-content:center;gap:.15rem;}
+.zmk .k{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--caption);}
+.zmk .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;}
+.zmk .s{font-size:12px;font-weight:600;}
+.zwrap{position:relative;}
+.zaxis{display:grid;grid-template-columns:repeat(8,1fr);font-size:10px;color:var(--sub);margin-top:4px;}
+.zcursor{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed var(--caption);display:none;pointer-events:none;}
+.ztip{position:absolute;top:-4px;transform:translateX(-50%);background:var(--val);color:var(--bg);font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;white-space:nowrap;display:none;pointer-events:none;}
+.pulse{animation:pl 2.6s ease-in-out infinite;}@keyframes pl{0%,100%{opacity:1}50%{opacity:.3}}
 
 .dist{display:grid; grid-template-columns:max-content 1fr max-content; gap:.5rem .6rem; align-items:center; font-size:12px;}
 .dist .drow{display:contents;}
@@ -147,23 +182,6 @@ table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent);
 .rk .rbar > span{display:block; height:100%; background:var(--accent); border-radius:9999px;}
 .rk .rpct{text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600;}
 
-.hours{display:grid; grid-template-columns:repeat(24,1fr); gap:3px; align-items:end; height:120px;}
-.hours .hb{border-radius:3px 3px 0 0; min-height:4px;}
-.hmark{display:grid; grid-template-columns:repeat(24,1fr); gap:3px; height:14px; margin-bottom:2px;}
-.hmark .m{font-size:12px; line-height:1; color:var(--accent); text-align:center; font-weight:700;}
-.heat .hd.today{color:#fff; background:var(--accent); font-weight:700; border-radius:6px; padding:2px 0; text-align:center;}
-.haxis{display:grid; grid-template-columns:repeat(24,1fr); gap:3px; margin-top:5px; font-size:11px; color:var(--sub); text-align:center;}
-.heat{display:grid; grid-template-columns:34px repeat(24,1fr); gap:3px; align-items:center;}
-.heat .hd{font-size:11px; color:var(--sub); text-align:right; padding-right:4px;}
-.heat .cell{height:15px; border-radius:3px;}
-.heat .colh{font-size:11px; color:var(--sub); text-align:center;}
-.legend{display:flex; align-items:center; gap:.5rem; font-size:11px; color:var(--caption); margin-top:.6rem;}
-.legend .scale{display:flex; gap:2px;} .legend .scale i{width:16px; height:11px; border-radius:2px; display:inline-block;}
-.callout{border:1px solid var(--card-border); background:var(--section-bg); border-radius:.6rem; padding:.7rem .9rem; display:flex; gap:.9rem; align-items:center; flex-wrap:wrap;}
-.callout .big{font-size:18px; font-weight:700;} .callout .lbl{font-size:11px; color:var(--caption); text-transform:uppercase; letter-spacing:.05em;}
-
-.chartcard{border:1px solid var(--card-border); background:var(--card-bg); border-radius:.7rem; padding:.85rem .9rem;}
-.chartcard .ch-h{display:flex; align-items:center; justify-content:space-between; font-size:11px; color:var(--caption); margin-bottom:.45rem;}
 
 /* P2 : classes textuelles passées à --caption */
 .limited-note{font-size:11px; color:var(--caption); margin:.4rem 0 0; padding:.3rem .6rem; border-left:2px solid var(--card-border);}
@@ -214,7 +232,7 @@ const STRINGS = {
     section_ladder: 'Échelle des sources',
     section_slots: (u) => `Meilleurs créneaux — net BLND → ${u}`,
     section_slots_note: 'rollup horaire · 7 j',
-    section_hourly: 'Profil horaire moyen',
+    section_hourly: 'Zoom journalier',
     section_hourly_note: '▼ heure en cours',
     section_routes: 'Meilleures routes (7 j)',
     section_who: 'Qui gagne le plus souvent (7 j)',
@@ -254,7 +272,7 @@ const STRINGS = {
     hmap_legend_lo: 'net plus faible',
     hmap_legend_hi: 'net plus élevé',
     hmap_legend_note: 'heure locale · % écart au net moyen 7 j',
-    days: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+    days: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
     hour_now_suffix: ' · maintenant',
 
     // Callout meilleurs créneaux
@@ -262,6 +280,13 @@ const STRINGS = {
     slot_gain: 'Gain vs moyenne',
     slot_avoid: 'À éviter',
     slot_gap: 'Écart',
+    encart_best_day: 'Meilleur jour',
+    encart_now: 'Maintenant',
+    day_avg: 'Moyenne du jour',
+    vs_week: 'vs semaine',
+    vs_day_avg: 'vs moy. du jour',
+    per_week: '/ sem.',
+    today_badge: 'auj.',
 
     // Notes
     limited_note: (n) => `historique limité : ${n} tick${n > 1 ? 's' : ''} ok`,
@@ -350,7 +375,7 @@ const STRINGS = {
     section_ladder: 'Source ladder',
     section_slots: (u) => `Best time slots — net BLND → ${u}`,
     section_slots_note: 'hourly rollup · 7 d',
-    section_hourly: 'Average hourly profile',
+    section_hourly: 'Daily zoom',
     section_hourly_note: '▼ current hour',
     section_routes: 'Best routes (7 d)',
     section_who: 'Who wins most often (7 d)',
@@ -390,7 +415,7 @@ const STRINGS = {
     hmap_legend_lo: 'lower net',
     hmap_legend_hi: 'higher net',
     hmap_legend_note: 'local time · % deviation from 7-day avg net',
-    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
     hour_now_suffix: ' · now',
 
     // Callout meilleurs créneaux
@@ -398,6 +423,13 @@ const STRINGS = {
     slot_gain: 'Gain vs avg',
     slot_avoid: 'Avoid',
     slot_gap: 'Gap',
+    encart_best_day: 'Best day',
+    encart_now: 'Now',
+    day_avg: 'Day average',
+    vs_week: 'vs week',
+    vs_day_avg: 'vs day avg',
+    per_week: '/ wk',
+    today_badge: 'today',
 
     // Notes
     limited_note: (n) => `limited history: ${n} tick${n > 1 ? 's' : ''} ok`,
@@ -475,6 +507,8 @@ async function ensureKit() {
 let target = 'USDC';
 let lang = localStorage.getItem('lang') || 'fr';
 let ladderSonde = 250;
+let selDay = -1;       // jour affiché dans le zoom (init = aujourd'hui au 1er rendu)
+let zoomDev = [];      // écarts horaires du jour affiché (pour le survol)
 let simAmt = 0;
 let simActive = false;
 let simLoading = false;
@@ -725,67 +759,110 @@ function distBars(winnerDist) {
   ).join('')}</div>`;
 }
 
-// ─── Profil horaire ───────────────────────────────────────────────────────────
-function hourBars(hourlyLocal, nowHour) {
-  const v = hourlyLocal;
-  const nonNull = v.filter(x => x !== null);
-  if (nonNull.length === 0) return `<p class="help">${t('hmap_insufficient')}</p>`;
-  const min = Math.min(...nonNull);
-  const max = Math.max(...nonNull);
-  const range = max - min || 1;
-  const col = x => `hsl(${Math.round(8 + (x - min) / range * 125)} 62% 46%)`;
-  const mk = v.map((_, i) => `<div class="m">${i === nowHour ? '▼' : ''}</div>`).join('');
-  const bars = v.map((x, i) => x === null
-    ? `<div class="hb" style="height:4%;background:var(--card-border)"></div>`
-    : `<div class="hb" style="height:${18 + (x - min) / range * 82}%; background:${col(x)}" title="${String(i).padStart(2,'0')} h${i === nowHour ? t('hour_now_suffix') : ''} · ${x > 0 ? '+' : ''}${x.toFixed(2)} %"></div>`
-  ).join('');
-  const ax = v.map((_, i) => `<span>${i % 3 === 0 ? String(i).padStart(2, '0') : ''}</span>`).join('');
-  return `<div class="hmark">${mk}</div><div class="hours">${bars}</div><div class="haxis">${ax}</div>`;
+// ─── Section temporelle : modèle + rendu (encart / hebdo / zoom) ────────────────
+const hh2 = x => String(x).padStart(2, '0') + ' h';
+const pctTxt = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)} %`;
+
+// Dérive moyennes/jour normalisées du prix (eff × sonde × prix ACTUEL), écarts, meilleurs/pires.
+function timeModel(heatLocal, heatEffLocal, meta, pairUi) {
+  const probe = Math.max(...((meta && meta.sondes && meta.sondes.length) ? meta.sondes : [750]));
+  const blndUsd = (meta && meta.blndUsd) || 0;
+  const eurUsd = (meta && meta.eurUsd) || 0;
+  const spot = pairUi === 'EURC' ? (eurUsd > 0 ? blndUsd / eurUsd : 0) : blndUsd; // prix cible/BLND, fixe pour tous les jours
+  const dayEff = heatEffLocal.map(row => { const v = row.filter(x => x != null); return v.length ? v.reduce((a, x) => a + x, 0) / v.length : null; });
+  const effVals = dayEff.filter(x => x != null);
+  const weekEff = effVals.length ? effVals.reduce((a, x) => a + x, 0) / effVals.length : null;
+  const dayNet = dayEff.map(e => (e == null || spot <= 0) ? null : e * probe * spot);
+  const dayVs = dayEff.map(e => (e == null || !weekEff) ? null : (e / weekEff - 1) * 100);
+  let bestDay = -1, worstDay = -1, bv = -Infinity, wv = Infinity;
+  dayEff.forEach((e, i) => { if (e == null) return; if (e > bv) { bv = e; bestDay = i; } if (e < wv) { wv = e; worstDay = i; } });
+  let bestCell = null, worstCell = null, bc = -Infinity, wc = Infinity;
+  heatLocal.forEach((row, d) => row.forEach((v, h) => { if (v == null) return; if (v > bc) { bc = v; bestCell = { d, h, v }; } if (v < wc) { wc = v; worstCell = { d, h, v }; } }));
+  return { probe, spot, dayEff, weekEff, dayNet, dayVs, bestDay, worstDay, bestCell, worstCell };
 }
 
-function bestWorstHour(hourlyLocal) {
-  let bestH = -1, bestV = -Infinity, worstH = -1, worstV = Infinity;
-  for (let i = 0; i < hourlyLocal.length; i++) {
-    const v = hourlyLocal[i];
-    if (v === null) continue;
-    if (v > bestV) { bestV = v; bestH = i; }
-    if (v < worstV) { worstV = v; worstH = i; }
-  }
-  if (bestH === -1) return null;
-  return {
-    bestLabel: `${String(bestH).padStart(2,'0')} h`,
-    bestGain: `+${bestV.toFixed(2)} %`,
-    worstLabel: `${String(worstH).padStart(2,'0')} h`,
-    worstGain: `${worstV.toFixed(2)} %`,
-  };
-}
-
-// ─── Heatmap ──────────────────────────────────────────────────────────────────
-function heatmap(heatLocal, today) {
+function encartHtml(m, heatLocal, today, nowHour) {
   const days = t('days');
-  const allVals = [];
-  for (const row of heatLocal) for (const v of row) if (v !== null) allVals.push(v);
-  if (allVals.length === 0) return `<p class="help">${t('hmap_insufficient')}</p>`;
-  const lo = Math.min(...allVals), hi = Math.max(...allVals);
-  const range = hi - lo || 1;
-  const col = x => `hsl(${Math.round(8 + (x - lo) / range * 125)} 60% 46%)`;
-
-  let html = '<div class="heat"><div class="hd"></div>';
-  for (let h = 0; h < 24; h++) html += `<div class="colh">${h % 4 === 0 ? String(h).padStart(2,'0') : ''}</div>`;
-  for (let d = 0; d < 7; d++) {
-    html += `<div class="hd${d === today ? ' today' : ''}">${days[d]}</div>`;
-    const row = heatLocal[d] || [];
-    for (let h = 0; h < 24; h++) {
-      const x = row[h] ?? null;
-      html += x === null
-        ? `<div class="cell" style="background:var(--card-border)"></div>`
-        : `<div class="cell" style="background:${col(x)}" title="${days[d]} ${String(h).padStart(2,'0')} h · ${x > 0 ? '+' : ''}${x.toFixed(2)} %"></div>`;
-    }
-  }
-  html += '</div>';
-  const sc = [0,.25,.5,.75,1].map(t2 => `<i style="background:hsl(${Math.round(8 + t2*125)} 60% 46%)"></i>`).join('');
-  return html + `<div class="legend"><span>${t('hmap_legend_lo')}</span><span class="scale">${sc}</span><span>${t('hmap_legend_hi')}</span><span style="margin-left:auto">${t('hmap_legend_note')}</span></div>`;
+  const nowVal = (heatLocal[today] && heatLocal[today][nowHour] != null) ? heatLocal[today][nowHour] : null;
+  const slot = m.bestCell ? `
+    <div class="enck"><div class="l">${t('slot_best')}</div>
+      <div class="v g">${days[m.bestCell.d]} ${hh2(m.bestCell.h)}</div><div class="s">${pctTxt(m.bestCell.v)} ${t('vs_week')}</div>
+      <div class="sub2">${t('slot_avoid')} : <span class="r">${days[m.worstCell.d]} ${hh2(m.worstCell.h)} · ${pctTxt(m.worstCell.v)}</span></div></div>` : '';
+  const day = m.bestDay >= 0 ? `
+    <div class="enck"><div class="l">${t('encart_best_day')}</div>
+      <div class="v g">${days[m.bestDay]}</div><div class="s">${fmt(m.dayNet[m.bestDay])} · ${pctTxt(m.dayVs[m.bestDay])} ${t('per_week')}</div>
+      <div class="sub2">${t('slot_avoid')} : <span class="r">${days[m.worstDay]} · ${pctTxt(m.dayVs[m.worstDay])} ${t('per_week')}</span></div></div>` : '';
+  const now = `
+    <div class="enck"><div class="l">${t('encart_now')}</div>
+      <div class="v ${nowVal == null ? '' : nowVal >= 0 ? 'g' : 'r'}">${days[today]} ${hh2(nowHour)}</div>
+      <div class="s">${nowVal == null ? '—' : pctTxt(nowVal) + ' ' + t('vs_week')}</div></div>`;
+  return `<div class="enc">${slot}${day}${now}</div>`;
 }
+
+function hebdoHtml(m, heatLocal, today, sel) {
+  const days = t('days');
+  const allv = []; for (const row of heatLocal) for (const v of row) if (v != null) allv.push(v);
+  if (allv.length === 0) return `<p class="help">${t('hmap_insufficient')}</p>`;
+  const lo = Math.min(...allv), hi = Math.max(...allv), rg = (hi - lo) || 1;
+  const col = x => `hsl(${Math.round(8 + (x - lo) / rg * 125)} 60% 46%)`;
+  let html = '';
+  for (let d = 0; d < 7; d++) {
+    const cells = (heatLocal[d] || []).map((v, h) => v == null
+      ? `<span class="hc" style="background:var(--card-border)"></span>`
+      : `<span class="hc" style="background:${col(v)}" title="${days[d]} ${hh2(h)} · ${v > 0 ? '+' : ''}${v.toFixed(2)} %"></span>`).join('');
+    const meanTxt = m.dayNet[d] == null ? '—' : `${fmt(m.dayNet[d])}<small>${m.dayVs[d] >= 0 ? '+' : ''}${m.dayVs[d].toFixed(2)} % ${t('per_week')}</small>`;
+    html += `<div class="hrow${d === sel ? ' sel' : ''}" onclick="selectDay(${d})">
+      <div class="hlbl${d === m.bestDay ? ' best' : ''}">
+        <span class="hday">${days[d]}${d === m.bestDay ? ' ★' : ''}</span>
+        <span class="hmean">${meanTxt}</span>
+        ${d === today ? `<span class="htd">${t('today_badge')}</span>` : ''}
+      </div><div class="hcells">${cells}</div></div>`;
+  }
+  return `<div class="heb">${html}</div>`;
+}
+
+function zoomHtml(m, heatEffLocal, sel, today, nowHour, u) {
+  const days = t('days');
+  const de = m.dayEff[sel];
+  const meanLine = m.dayNet[sel] == null ? '—' : `${fmt(m.dayNet[sel])}<small style="font-size:12px;color:var(--sub)"> ${u}</small>`;
+  const vsLine = m.dayVs[sel] == null ? '' : `${m.dayVs[sel] >= 0 ? '+' : ''}${m.dayVs[sel].toFixed(2)} % ${t('vs_week')}`;
+  const kpi = `<div class="zmk"><span class="k">${t('day_avg')} · ${days[sel]}</span><span class="v">${meanLine}</span><span class="s" style="color:${(m.dayVs[sel] || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${vsLine}</span></div>`;
+  const dev = (heatEffLocal[sel] || []).map(e => (e == null || !de) ? null : (e / de - 1) * 100);
+  zoomDev = dev;
+  const axis = `<div class="zaxis"><span>00</span><span>03</span><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span></div>`;
+  if (dev.filter(x => x != null).length === 0) return `<div class="zm">${kpi}<div><p class="help">${t('hmap_insufficient')}</p></div></div>`;
+  const W = 520, H = 120, mid = H / 2, n = 24, sx = W / (n - 1), sc = 44 / 0.8;
+  const pts = dev.map((v, i) => [i * sx, mid - (v == null ? 0 : Math.max(-mid + 4, Math.min(mid - 4, v * sc)))]);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const area = `M0,${mid} ` + pts.map(p => 'L' + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + ` L${W},${mid} Z`;
+  const showNow = sel === today && dev[nowHour] != null;
+  const nX = (nowHour * sx).toFixed(1), nY = pts[nowHour][1].toFixed(1);
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="120" preserveAspectRatio="none" style="overflow:visible">
+    <defs><clipPath id="zab"><rect x="0" y="0" width="${W}" height="${mid}"/></clipPath><clipPath id="zbe"><rect x="0" y="${mid}" width="${W}" height="${H - mid}"/></clipPath></defs>
+    <path d="${area}" fill="var(--green)" fill-opacity=".45" clip-path="url(#zab)"/>
+    <path d="${area}" fill="var(--red)" fill-opacity=".45" clip-path="url(#zbe)"/>
+    <line x1="0" y1="${mid}" x2="${W}" y2="${mid}" stroke="var(--sub)" stroke-dasharray="4 4"/>
+    <path d="${line}" fill="none" stroke="var(--heading)" stroke-width="2.5"/>
+    ${showNow ? `<circle class="pulse" cx="${nX}" cy="${nY}" r="6.5" fill="none" stroke="var(--val)" stroke-width="2"/><circle cx="${nX}" cy="${nY}" r="3" fill="var(--val)"/>` : ''}
+  </svg>`;
+  return `<div class="zm">${kpi}<div><div class="zwrap" onmousemove="zoomMove(event,this)" onmouseleave="zoomLeave()">${svg}<div class="zcursor" id="zcur"></div><div class="ztip" id="ztip"></div></div>${axis}</div></div>`;
+}
+
+function selectDay(d) { selDay = d; renderApp(); }
+function zoomMove(e, el) {
+  const r = el.getBoundingClientRect();
+  const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  const h = Math.round(frac * 23);
+  const cur = document.getElementById('zcur'), tip = document.getElementById('ztip');
+  if (!cur || !tip || zoomDev[h] == null) { if (cur) cur.style.display = 'none'; if (tip) tip.style.display = 'none'; return; }
+  const left = (h / 23 * 100) + '%';
+  cur.style.left = left; cur.style.display = 'block';
+  tip.style.left = left; tip.style.display = 'block';
+  tip.textContent = `${hh2(h)} · ${zoomDev[h] >= 0 ? '+' : ''}${zoomDev[h].toFixed(2)} %`;
+}
+function zoomLeave() { const c = document.getElementById('zcur'), p = document.getElementById('ztip'); if (c) c.style.display = 'none'; if (p) p.style.display = 'none'; }
+
+// ─── Bouton Rafraîchir (helper plus bas) ────────────────────────────────────────
 
 // ─── Bouton Rafraîchir ────────────────────────────────────────────────────────
 function refreshHtml() {
@@ -820,10 +897,10 @@ function buildPage() {
   const NOW_HOUR = nowLocalHour();
   const TODAY = todayLocalDow();
 
-  const hourlyLocal = overview ? rotateUtc(overview.hourlyUtc, offsetH) : new Array(24).fill(null);
   const heatLocal = overview ? rotateHeatUtc(overview.heatUtc, offsetH) : Array.from({length:7}, () => new Array(24).fill(null));
-
-  const bw = bestWorstHour(hourlyLocal);
+  const heatEffLocal = overview ? rotateHeatUtc(overview.heatEffUtc, offsetH) : Array.from({length:7}, () => new Array(24).fill(null));
+  const tm = timeModel(heatLocal, heatEffLocal, meta, target);
+  if (selDay < 0 || selDay > 6) selDay = TODAY;
 
   // Sondes dynamiques depuis meta (fallback [250,750] si pas encore chargé)
   const sondes = meta && meta.sondes && meta.sondes.length > 0 ? meta.sondes : [250, 750];
@@ -886,16 +963,11 @@ function buildPage() {
 
   <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right muted" style="font-size:11px">${t('section_slots_note')}</span></div>
     <div class="card">
-      ${noData || `<div class="callout" style="margin-bottom:.9rem">
-        <div><div class="lbl">${t('slot_best')}</div><div class="big pos">${bw ? bw.bestLabel : '—'}</div></div>
-        <div><div class="lbl">${t('slot_gain')}</div><div class="big pos">${bw ? bw.bestGain : '—'}</div></div>
-        <div style="border-left:1px solid var(--card-border); padding-left:.9rem"><div class="lbl">${t('slot_avoid')}</div><div class="big neg">${bw ? bw.worstLabel : '—'}</div></div>
-        <div><div class="lbl">${t('slot_gap')}</div><div class="big neg">${bw ? bw.worstGain : '—'}</div></div>
-      </div>${heatmap(heatLocal, TODAY)}${limitedNote}`}
+      ${noData || `${encartHtml(tm, heatLocal, TODAY, NOW_HOUR)}${hebdoHtml(tm, heatLocal, TODAY, selDay)}${limitedNote}`}
     </div></div>
 
-  <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span> <span class="right muted" style="font-size:11px">${t('section_hourly_note')}</span></div>
-    <div class="chartcard">${noData || hourBars(hourlyLocal, NOW_HOUR) + limitedNote}</div></div>
+  <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span></div>
+    <div class="card">${noData || zoomHtml(tm, heatEffLocal, selDay, TODAY, NOW_HOUR, u) + limitedNote}</div></div>
 
   <div class="zone"><div class="zone-h">${t('section_routes')}</div>
     <div class="card">

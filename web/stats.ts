@@ -51,6 +51,8 @@ export interface Overview {
   bestRoutes: RouteRank[];
   hourlyUtc: (number | null)[];
   heatUtc: (number | null)[][];
+  /** 7×24 efficience moyenne brute par (dow, hour) UTC — pour la moyenne/jour normalisée du prix. */
+  heatEffUtc: (number | null)[][];
 }
 
 // ─── Mappings display / note / chip ──────────────────────────────────────────
@@ -394,6 +396,23 @@ function buildHeatUtc(rows: WinnerEffRow[]): (number | null)[][] {
   );
 }
 
+/** 7×24 efficience moyenne brute par (dow, hour) UTC — sert la moyenne/jour normalisée du prix. */
+function buildHeatEffUtc(rows: WinnerEffRow[]): (number | null)[][] {
+  const buckets: number[][][] = Array.from({ length: 7 }, () =>
+    Array.from({ length: 24 }, () => []),
+  );
+  for (const r of rows) {
+    const dayBucket = buckets[r.dow_utc];
+    if (dayBucket) {
+      const hourBucket = dayBucket[r.hour_utc];
+      if (hourBucket) hourBucket.push(r.eff);
+    }
+  }
+  return buckets.map((day) =>
+    day.map((b) => (b.length === 0 ? null : b.reduce((a, x) => a + x, 0) / b.length)),
+  );
+}
+
 // ─── Meta ──────────────────────────────────────────────────────────────────────
 
 function buildMeta(db: DatabaseSync, cadenceSec: number, sondes: number[]): Meta {
@@ -444,6 +463,7 @@ export function overview(
   const effRows = fetchWinnerEffRows(db, pair, big, windowStart, pairUi);
   const hourlyUtc = buildHourlyUtc(effRows);
   const heatUtc = buildHeatUtc(effRows);
+  const heatEffUtc = buildHeatEffUtc(effRows);
 
-  return { meta, ladders, winnerDist, bestRoutes, hourlyUtc, heatUtc };
+  return { meta, ladders, winnerDist, bestRoutes, hourlyUtc, heatUtc, heatEffUtc };
 }
