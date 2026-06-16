@@ -121,6 +121,11 @@ table.flt td.left{text-align:left; color:var(--caption);}
 table.flt tr:last-child td{border-bottom:0;}
 table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent); font-weight:600;}
 .srcname{font-weight:600;} .muted{color:var(--caption);}
+.ladder-wrap{position:relative;}
+.ladder-wrap.refreshing .ladder-inner{opacity:.4; filter:blur(2px); pointer-events:none; transition:opacity .15s;}
+.refresh-overlay{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:.45rem; font-size:12px; font-weight:600; color:var(--caption);}
+.refresh-spinner{width:15px; height:15px; border:2px solid var(--card-border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
 
 .dist{display:grid; grid-template-columns:max-content 1fr max-content; gap:.5rem .6rem; align-items:center; font-size:12px;}
 .dist .drow{display:contents;}
@@ -489,6 +494,7 @@ let execSlippagePct = 0.5; // UI %, → bps = Math.round(execSlippagePct*100)
 // Compte à rebours : nextTickAt en ms depuis epoch (null = inconnu)
 let nextTickAt = null;
 let countdownInterval = null;
+let lastImminentPollAt = 0;
 
 function t(key, ...args) {
   const s = STRINGS[lang];
@@ -548,9 +554,6 @@ function rotateHeatUtc(heat, offsetH) {
 const fmt = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt3 = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const fmt0 = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
-// Couleur d'impact : ancrée sur le référentiel (0 % = au prix DefiLlama = vert ; IMPACT_RED_AT % = rouge), indépendante des valeurs du tableau.
-const IMPACT_RED_AT = 3;
-const impactColor = pct => `hsl(${(140 - 140 * Math.min(Math.max(pct, 0) / IMPACT_RED_AT, 1)).toFixed(0)} 70% 42%)`;
 
 function freshLabel(lastTickAt) {
   if (!lastTickAt) return `<span class="fresh"><span class="dot" style="background:var(--amber)"></span>${t('fresh_none')}</span>`;
@@ -638,7 +641,7 @@ function ladderRows(rows, u) {
       <td>${fmt3(r.net)}</td>
       <td class="${deltaClass}">${delta}</td>
       <td><span class="chip ${r.chip}">${chipLabel(r.chip)}</span></td>
-      <td style="${r.impactPct != null ? `color:${impactColor(r.impactPct)};font-weight:700` : 'color:var(--caption)'}">${impact}</td>
+      <td>${impact}</td>
       <td class="left">${routeText}</td></tr>`;
   }).join('');
 }
@@ -669,7 +672,7 @@ function simCard() {
   const walletLabel = walletConfigured
     ? t('sim_wallet_ok', fmt0(walletBlnd))
     : t('sim_wallet_ko');
-  const simInput = simActive ? fmt0(simAmt) : '';
+  const simInput = simActive ? fmt3(simAmt) : '';
 
   let resultHtml = '';
   if (simLoading) {
@@ -879,7 +882,7 @@ function buildPage() {
     </span></div>${simCard()}</div>
 
   <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
-    ${ladderContent}</div>
+    <div class="ladder-wrap${simLoading ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${t('sim_loading')}</div>` : ''}</div></div>
 
   <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right muted" style="font-size:11px">${t('section_slots_note')}</span></div>
     <div class="card">
@@ -939,6 +942,12 @@ function startCountdownTick() {
   countdownInterval = setInterval(() => {
     const el = document.getElementById('countdown');
     if (el) el.textContent = computeCountdownText();
+    // Échéance dépassée : re-fetch périodique jusqu'à ce que le collecteur ait tické,
+    // sinon le compte à rebours reste figé sur « imminent ».
+    if (nextTickAt !== null && Date.now() >= nextTickAt && Date.now() - lastImminentPollAt > 20000) {
+      lastImminentPollAt = Date.now();
+      void loadOverview();
+    }
   }, 1000);
 }
 
