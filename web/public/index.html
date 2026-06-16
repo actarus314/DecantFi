@@ -122,22 +122,22 @@ table.flt tr:last-child td{border-bottom:0;}
 table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent); font-weight:600;}
 .srcname{font-weight:600;} .muted{color:var(--caption);}
 
-.dist .drow{display:flex; align-items:center; gap:.55rem; font-size:12px; padding:.28rem 0;}
-.dist .dname{width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--val); font-weight:600;}
-.dist .dbar{flex:1; height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden;}
+.dist{display:grid; grid-template-columns:max-content 1fr max-content; gap:.5rem .6rem; align-items:center; font-size:12px;}
+.dist .drow{display:contents;}
+.dist .dname{white-space:nowrap; color:var(--val); font-weight:600;}
+.dist .dbar{height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden; min-width:20px;}
 .dist .dbar > span{display:block; height:100%; background:var(--accent); border-radius:9999px;}
-.dist .dpct{width:42px; text-align:right; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600;}
+.dist .dpct{text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600;}
 
 /* Meilleures routes (7 j) */
-.rk{display:flex; flex-direction:column; gap:.5rem;}
-.rk .rrow{display:flex; align-items:center; gap:.6rem; font-size:12px;}
-.rk .rank{width:18px; text-align:center; font-weight:700; color:var(--sub); flex-shrink:0;}
-.rk .rlabel{min-width:300px; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-shrink:0;}
+.rk{display:grid; grid-template-columns:max-content 1fr max-content; gap:.55rem .65rem; align-items:center; font-size:12px;}
+.rk .rrow{display:contents;}
+.rk .rlabel{white-space:nowrap;}
 .rk .rpath{font-weight:600; color:var(--val);}
 .rk .rtools{color:var(--caption); font-weight:500;}
-.rk .rbar{flex:1; min-width:20px; height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden; flex-shrink:1;}
+.rk .rbar{min-width:20px; height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden;}
 .rk .rbar > span{display:block; height:100%; background:var(--accent); border-radius:9999px;}
-.rk .rpct{width:42px; text-align:right; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600; flex-shrink:0;}
+.rk .rpct{text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600;}
 
 .hours{display:grid; grid-template-columns:repeat(24,1fr); gap:3px; align-items:end; height:120px;}
 .hours .hb{border-radius:3px 3px 0 0; min-height:4px;}
@@ -541,9 +541,8 @@ function bestRoutesCard() {
   }
   const top = routes.slice(0, 6);
   const maxPct = Math.max(...top.map(r => r.winPct));
-  return `<div class="rk">${top.map((r, i) => `
+  return `<div class="rk">${top.map((r) => `
     <div class="rrow">
-      <span class="rank">${i + 1}</span>
       <span class="rlabel"><span class="rpath">${r.path}</span><span class="rtools"> · ${r.tools}</span></span>
       <span class="rbar"><span style="width:${maxPct > 0 ? r.winPct / maxPct * 100 : 0}%"></span></span>
       <span class="rpct">${r.winPct.toFixed(1)} %</span>
@@ -771,7 +770,7 @@ function buildPage() {
 
   <div class="zone">
     <div class="card"><h3>${t('section_routes')}</h3>
-      ${bestRoutesCard()}
+      ${bestRoutesCard()}${limitedNote}
       <p class="help" style="margin:.6rem 0 0">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p></div>
   </div>
 
