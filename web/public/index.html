@@ -130,10 +130,11 @@ table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent);
 
 /* Meilleures routes (7 j) */
 .rk{display:flex; flex-direction:column; gap:.5rem;}
-.rk .rrow{display:flex; align-items:center; gap:.6rem; font-size:12px; white-space:nowrap;}
+.rk .rrow{display:flex; align-items:center; gap:.6rem; font-size:12px;}
 .rk .rank{width:18px; text-align:center; font-weight:700; color:var(--sub); flex-shrink:0;}
-.rk .rpath{font-weight:600; color:var(--val); flex-shrink:0;}
-.rk .rtools{color:var(--caption); font-weight:500; flex-shrink:0;}
+.rk .rlabel{min-width:300px; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-shrink:0;}
+.rk .rpath{font-weight:600; color:var(--val);}
+.rk .rtools{color:var(--caption); font-weight:500;}
 .rk .rbar{flex:1; min-width:20px; height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden; flex-shrink:1;}
 .rk .rbar > span{display:block; height:100%; background:var(--accent); border-radius:9999px;}
 .rk .rpct{width:42px; text-align:right; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600; flex-shrink:0;}
@@ -209,15 +210,13 @@ const STRINGS = {
     routes_empty: 'Historique limité — le classement se remplira avec les ticks.',
 
     // Simulateur
-    sim_label: (u) => `Simuler une sortie — BLND → ${u}`,
     sim_placeholder: 'montant BLND',
     sim_wallet_ok: (n) => `Solde wallet (${n} BLND)`,
     sim_wallet_ko: 'Solde wallet (non configuré)',
     sim_btn_simulate: 'Simuler',
     sim_btn_clear: 'Vider',
     sim_loading: 'Cotation en cours…',
-    sim_hint: 'Saisissez un montant ou utilisez le solde wallet. L\'échelle des sources ci-dessous montre alors le dernier tick journalisé.',
-    sim_note: 'Cotation live (non journalisée). Solde lu sur l\'adresse publique du wallet — read-only, jamais la clé.',
+    sim_note: 'Cotation live, non journalisée · solde en lecture seule, jamais la clé.',
     sim_errors: 'Sources en échec :',
     sim_open: 'Ouvrir ↗',
 
@@ -310,15 +309,13 @@ const STRINGS = {
     routes_empty: 'Limited history — ranking fills up as ticks accumulate.',
 
     // Simulateur
-    sim_label: (u) => `Simulate a swap — BLND → ${u}`,
     sim_placeholder: 'BLND amount',
     sim_wallet_ok: (n) => `Wallet balance (${n} BLND)`,
     sim_wallet_ko: 'Wallet balance (not configured)',
     sim_btn_simulate: 'Simulate',
     sim_btn_clear: 'Clear',
     sim_loading: 'Fetching quote…',
-    sim_hint: 'Enter an amount or use the wallet balance. The source ladder below shows the last logged tick.',
-    sim_note: 'Live quote (not logged). Balance read from the public wallet address — read-only, never the key.',
+    sim_note: 'Live quote, not logged · balance read-only, never the key.',
     sim_errors: 'Failed sources:',
     sim_open: 'Open ↗',
 
@@ -547,8 +544,7 @@ function bestRoutesCard() {
   return `<div class="rk">${top.map((r, i) => `
     <div class="rrow">
       <span class="rank">${i + 1}</span>
-      <span class="rpath">${r.path}</span>
-      <span class="rtools muted"> · ${r.tools}</span>
+      <span class="rlabel"><span class="rpath">${r.path}</span><span class="rtools"> · ${r.tools}</span></span>
       <span class="rbar"><span style="width:${maxPct > 0 ? r.winPct / maxPct * 100 : 0}%"></span></span>
       <span class="rpct">${r.winPct} %</span>
     </div>`).join('')}
@@ -580,11 +576,9 @@ function simCard() {
     if (simResult.errors && simResult.errors.length > 0) {
       resultHtml += `<p class="help" style="margin:.4rem 0 0">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
     }
-  } else {
-    resultHtml = `<p class="help" style="margin:.7rem 0 0">${t('sim_hint')}</p>`;
   }
 
-  return `<div class="sim"><label>${t('sim_label', target)}</label>
+  return `<div class="sim">
     <div class="controls">
       <input id="simAmt" type="text" value="${simInput}" placeholder="${t('sim_placeholder')}" oninput="onAmt(this.value)">
       <span class="suffix">BLND</span>
@@ -757,7 +751,7 @@ function buildPage() {
     </span>
   </div>
 
-  <div class="zone"><div class="zone-h">${t('section_sim')}</div>${simCard()}</div>
+  <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}</div>${simCard()}</div>
 
   <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
     ${ladderContent}</div>
@@ -775,14 +769,17 @@ function buildPage() {
   <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="right muted" style="font-size:11px">${t('section_hourly_note')}</span></div>
     <div class="chartcard">${noData || hourBars(hourlyLocal, NOW_HOUR) + limitedNote}</div></div>
 
-  <div class="zone"><div class="grid2">
+  <div class="zone">
     <div class="card"><h3>${t('section_routes')}</h3>
       ${bestRoutesCard()}</div>
+  </div>
+
+  <div class="zone">
     <div class="card"><h3>${t('section_who')}</h3>
       ${noData || distBars(dist) + limitedNote}
       <p class="help" style="margin:.6rem 0 0">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p>
     </div>
-  </div></div>`;
+  </div>`;
 }
 
 function renderApp() {
