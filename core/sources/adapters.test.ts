@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { xdr, scValToNative } from '@stellar/stellar-sdk';
 import type { QuoteRequest } from './types.js';
-import { BLND, USDC } from '../assets.js';
+import { BLND, USDC, EURC } from '../assets.js';
 import { toStroops } from '../amount.js';
 import { loadFixture } from '../../test/loadFixture.js';
 import { parseXbull } from './xbull.js';
@@ -84,6 +84,16 @@ describe('soroswap', () => {
     expect(q.source).toBe('soroswap');
     expect(q.netOut).toBe(506342052n);
     expect(q.route.map((h) => h.sell)).toContain('BLND');
+  });
+
+  it('multi-hop : path 3 noeuds -> 2 hops BLND->USDC->EURC', () => {
+    const route = { quoteCurrency: { quotient: '439000000' }, trade: { path: [BLND.sac, USDC.sac, EURC.sac] } };
+    const reqE: QuoteRequest = { sellAsset: BLND, buyAsset: EURC, amountIn: toStroops('1000'), slippageBps: 50 };
+    const q = parseSoroswapRoute(route, reqE)!;
+    expect(q.route).toHaveLength(2);
+    expect(q.route[0]).toMatchObject({ sell: 'BLND', buy: 'USDC' });
+    expect(q.route[1]).toMatchObject({ sell: 'USDC', buy: 'EURC' });
+    expect(q.netOut).toBe(439000000n);
   });
 });
 

@@ -1,5 +1,9 @@
 // xBull : routeur Soroban. GET swap-api.xbull.io/swaps/quote (SAC C..., montant en stroops).
 // Reponse: toAmount = NET (fee 0,1 % incluse), fee.platformFee en stroops cible. netConfidence: exact.
+// Route OPAQUE : l'API ne renvoie que `route` (ID/UUID interne), JAMAIS le chemin. Verifie 2026-06-16 sur la
+// spec officielle swap.apis.xbull.app/public-api.yaml : QuoteSwapResponseDto = route + amounts + fee (aucun
+// champ hops) ; accept-quote ne rend qu'un XDR (appel de contrat router par ID) et exige un `sender`.
+// => impossible de deplier la route cote lecture ; l'UI affiche l'ellipse BLND->...->cible.
 import type { SourceAdapter, NormalizedQuote, QuoteRequest, FeeItem } from './types.js';
 import { DEFAULT_GAS_XLM } from '../gas.js';
 import { getJson } from './http.js';

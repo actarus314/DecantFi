@@ -1,10 +1,12 @@
 // Soroswap : agregateur Soroban. v1 KEYLESS = routage local (soroswap-router-sdk) sur les reserves
 // du pool BLND/USDC lues en live via Soroban RPC (simulateTransaction, lecture seule). La math de frais
 // de pool 0,3 % tourne dans le SDK => amountOut NET. Pas de pool direct => null (la source se retire).
-// Note v1 : seule la paire DIRECTE est alimentee (pas de multi-hop keyless) ; documente.
+// Multi-hop : le routeur recoit TOUS les pools existants entre {vendu, achete, USDC, XLM} (hubs profonds)
+// et choisit le meilleur chemin (<= 2 hops). Sans pools intermediaires il ne route que le pool direct
+// (souvent minuscule, ex. BLND/EURC) ; via USDC/XLM il trouve BLND->USDC->EURC, etc. 1 tx atomique.
 import type { SourceAdapter, NormalizedQuote, QuoteRequest, SourceConfig } from './types.js';
 import { DEFAULT_GAS_XLM } from '../gas.js';
-import { bySac } from '../assets.js';
+import { USDC, XLM, bySac } from '../assets.js';
 import { bigintOrNull, hops } from './util.js';
 
 const FACTORY = 'CA4HEQTL2WPEUYKYKCDOHCDNIV4QHNJ7EL4J4NQ6VADP7SYHVRYZ7AW2'; // mainnet, keyless
@@ -79,28 +81,40 @@ async function liveRoute(req: QuoteRequest, cfg: SourceConfig): Promise<Normaliz
     return scValToNative(sim.result!.retval);
   };
 
-  const pairAddr = await simCall(
-    FACTORY,
-    'get_pair',
-    new Address(req.sellAsset.sac).toScVal(),
-    new Address(req.buyAsset.sac).toScVal(),
-  );
-  const [reserves, token0, token1] = await Promise.all([
-    simCall(pairAddr, 'get_reserves'),
-    simCall(pairAddr, 'token_0'),
-    simCall(pairAddr, 'token_1'),
-  ]);
+  // Univers d'actifs : vendu + achete + hubs Stellar profonds (USDC, XLM). Deduplique.
+  const universe = Array.from(new Set([req.sellAsset.sac, req.buyAsset.sac, USDC.sac, XLM.sac]));
+  const candidates: Array<[string, string]> = [];
+  for (let i = 0; i < universe.length; i++) {
+    for (let j = i + 1; j < universe.length; j++) candidates.push([universe[i]!, universe[j]!]);
+  }
 
-  const livePairs = [
-    {
-      tokenA: token0,
-      tokenB: token1,
-      reserveA: reserves[0].toString(),
-      reserveB: reserves[1].toString(),
-      protocol: Protocol.SOROSWAP,
-      fee: '30',
-    },
-  ];
+  // Lit chaque pool en parallele. Un pool absent OU une lecture en echec est simplement ignore.
+  // ponytail: drop silencieux d'un pool = Soroswap sous-cote (il perd, jamais de faux gagnant) ;
+  // distinguer "absent" de "RPC en echec" serait un raffinement si la ligne Soroswap montre des trous.
+  const livePairs = (
+    await Promise.all(
+      candidates.map(async ([a, b]) => {
+        try {
+          const pair = await simCall(FACTORY, 'get_pair', new Address(a).toScVal(), new Address(b).toScVal());
+          const [reserves, token0] = await Promise.all([simCall(pair, 'get_reserves'), simCall(pair, 'token_0')]);
+          const t0 = String(token0);
+          // Soroswap : reserves[0]<->token_0, reserves[1]<->token_1 (meme mapping que la voie single-pair).
+          return {
+            tokenA: t0,
+            tokenB: t0 === a ? b : a,
+            reserveA: reserves[0].toString(),
+            reserveB: reserves[1].toString(),
+            protocol: Protocol.SOROSWAP,
+            fee: '30',
+          };
+        } catch {
+          return null;
+        }
+      }),
+    )
+  ).filter((p): p is NonNullable<typeof p> => p !== null);
+
+  if (livePairs.length === 0) return null;
 
   const tIn = new Token(Networks.PUBLIC, req.sellAsset.sac, req.sellAsset.decimals, req.sellAsset.code, req.sellAsset.symbol);
   const tOut = new Token(Networks.PUBLIC, req.buyAsset.sac, req.buyAsset.decimals, req.buyAsset.code, req.buyAsset.symbol);
