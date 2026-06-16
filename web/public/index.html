@@ -256,7 +256,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: 'xBull domine habituellement ; Comet ne concourt que sur USDC (pool backstop). Diversité = robustesse aux pannes.',
-    dist_note_eurc: 'Pas de pool BLND/EURC natif : les lignes « BLND→EURC » sont des swaps atomiques routés en interne (Aquarius via sUSD, Ultra via XLM… ; xBull & Soroswap masquent leurs hops). La route via-USDC explicite (2 swaps) les bat souvent.',
+    dist_note_eurc: 'Pas de pool BLND/EURC profond : les lignes « BLND→EURC » sont des swaps atomiques routés en interne via USDC/XLM (Soroswap affiche BLND→USDC→EURC, Aquarius via sUSD, Ultra via XLM ; seul xBull masque son chemin). La route via-USDC explicite (2 swaps) les bat souvent.',
 
     // Divers
     loading: 'Chargement…',
@@ -355,7 +355,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: 'xBull usually dominates; Comet only competes on USDC (backstop pool). Diversity = resilience to failures.',
-    dist_note_eurc: 'No native BLND/EURC pool: the "BLND→EURC" rows are atomic swaps routed internally (Aquarius via sUSD, Ultra via XLM…; xBull & Soroswap hide their hops). The explicit via-USDC route (2 swaps) often beats them.',
+    dist_note_eurc: 'No deep BLND/EURC pool: the "BLND→EURC" rows are atomic swaps routed internally via USDC/XLM (Soroswap shows BLND→USDC→EURC, Aquarius via sUSD, Ultra via XLM; only xBull hides its path). The explicit via-USDC route (2 swaps) often beats them.',
 
     // Divers
     loading: 'Loading…',
