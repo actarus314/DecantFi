@@ -39,9 +39,10 @@ async function main(): Promise<void> {
     try {
       const { tick, quotes } = await runTick({ probes, cfg, now: () => new Date(), fetchPrices, quote });
       db.insertTickWithQuotes(tick, quotes);
+      const purged = db.purgeManualTicks(); // le poll programmé prime : on jette les refresh manuels provisoires
       writeFileSync(heartbeat, new Date().toISOString());
       process.stdout.write(`[tick] ${tick.started_at} ok=${tick.ok} quotes=${quotes.length}` +
-        `${tick.source_errors ? ` errors=${tick.source_errors}` : ''}\n`);
+        `${purged ? ` purged=${purged}` : ''}${tick.source_errors ? ` errors=${tick.source_errors}` : ''}\n`);
     } catch (e) {
       // Exception inattendue : on enregistre quand même un tick ok=0 (trou visible, spec §7) ; la boucle continue.
       const msg = e instanceof Error ? e.message : String(e);

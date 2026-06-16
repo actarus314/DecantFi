@@ -47,7 +47,14 @@ export async function compareEurc(amountBlnd: Stroops, q: EurcQuoters): Promise<
     const usdcReceived = leg1.grossOut;
     const leg2 = rankQuotes(await q.usdcToEurc(usdcReceived)).best;
     if (leg2 && leg2.netOut > 0n) {
-      viaUsdc = { leg1, leg2, usdcMid: usdcReceived, netEurc: leg2.netOut, txCount: 2 };
+      // leg2.netOut deduit deja le gas du leg 2 (finalize). Le gas du leg 1 (en USDC) n'est nulle part
+      // soustrait du resultat EURC -> sinon le via-USDC est avantage du gas d'un swap vs le direct.
+      // On le reconvertit en EURC au taux REEL du leg 2 (netOut/amountIn) puis on le deduit.
+      const leg1GasEurc = leg2.amountIn > 0n
+        ? (leg1.gasInTarget * leg2.netOut) / leg2.amountIn
+        : 0n;
+      const netEurc = leg2.netOut > leg1GasEurc ? leg2.netOut - leg1GasEurc : 0n;
+      if (netEurc > 0n) viaUsdc = { leg1, leg2, usdcMid: usdcReceived, netEurc, txCount: 2 };
     }
   }
 

@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>stellarswap — compagnon de swap</title>
+<style>
+:root{
+  --bg:#f1f5f9; --card-bg:#ffffff; --card-border:#e2e8f0; --section-bg:#f8fafc;
+  --val:#0f172a; --caption:#64748b; --sub:#94a3b8; --heading:#475569;
+  --accent:#2563eb; --amber:#d97706; --green:#16a34a; --red:#dc2626; --tool:#ea580c;
+}
+:root.dark{
+  --bg:#0f172a; --card-bg:#1e293b; --card-border:#334155; --section-bg:#0f172a;
+  --val:#f1f5f9; --caption:#94a3b8; --sub:#64748b; --heading:#cbd5e1;
+  --accent:#3b82f6; --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --tool:#f97316;
+}
+*{box-sizing:border-box;}
+body{margin:0; background:var(--bg); color:var(--val);
+  font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; -webkit-font-smoothing:antialiased;}
+.page{max-width:1180px; margin:0 auto; padding:1.1rem 1.25rem 5rem;}
+
+.topbar{display:flex; align-items:center; gap:.7rem; margin-bottom:1rem; flex-wrap:wrap;}
+.brand{font-size:15px; font-weight:700; letter-spacing:-.01em;}
+.brand .dim{color:var(--caption); font-weight:600;}
+.pagenav{display:inline-flex; gap:4px; background:var(--section-bg); border:1px solid var(--card-border); border-radius:9999px; padding:3px;}
+.pagenav button{border:0; background:transparent; color:var(--caption); font-size:13px; font-weight:700; padding:5px 16px; border-radius:9999px; cursor:pointer; transition:all .15s;}
+.pagenav button.active{background:var(--accent); color:#fff;}
+.fresh{display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--caption);
+  background:var(--card-bg); border:1px solid var(--card-border); border-radius:9999px; padding:2px 9px;}
+.fresh .dot{width:7px; height:7px; border-radius:9999px; background:var(--green);}
+.tznote{font-size:11px; color:var(--sub);}
+
+/* Topbar right controls (theme + lang) */
+.topbar-right{margin-left:auto; display:inline-flex; align-items:center; gap:.45rem;}
+.ctrl-btn{background:transparent; border:1px solid var(--card-border); color:var(--caption); border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px; font-weight:600;}
+.ctrl-btn:hover{background:var(--section-bg);}
+.ctrl-btn.active-lang{background:var(--accent); border-color:var(--accent); color:#fff;}
+
+/* Refresh controls */
+.refresh-wrap{display:inline-flex; align-items:center; gap:.45rem; flex-wrap:wrap;}
+.refresh-note{font-size:11px; color:var(--sub);}
+
+.zone{margin-bottom:2.2rem;}
+.zone-h{font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--heading);
+  margin:0 0 .55rem; display:flex; align-items:center; gap:.5rem;}
+.zone-h .right{margin-left:auto; font-weight:600; letter-spacing:0; text-transform:none;}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:.75rem;}
+.grid4{display:grid; grid-template-columns:repeat(4,1fr); gap:.75rem;}
+@media(max-width:880px){.grid2{grid-template-columns:1fr;} .grid4{grid-template-columns:1fr 1fr;}}
+
+.sim{border:1px solid var(--card-border); background:var(--card-bg); border-radius:.7rem; padding:1rem 1.1rem;}
+.sim .controls{display:flex; gap:.55rem; flex-wrap:wrap; align-items:center;}
+.sim label{font-size:11px; color:var(--caption); font-weight:600; text-transform:uppercase; letter-spacing:.05em; width:100%;}
+.sim input{font-size:15px; padding:.5rem .7rem; border-radius:.5rem; border:1px solid var(--card-border);
+  background:var(--section-bg); color:var(--val); width:150px; font-variant-numeric:tabular-nums;}
+.suffix{font-size:13px; color:var(--sub); font-weight:600;}
+.btn{font-size:12px; font-weight:600; padding:.52rem .9rem; border-radius:.5rem; border:1px solid var(--card-border);
+  background:var(--section-bg); color:var(--val); cursor:pointer;}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
+.sim .result{margin-top:.9rem; padding-top:.9rem; border-top:1px solid var(--card-border);
+  display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap;}
+.sim .result .meta{font-size:12px; color:var(--caption); font-variant-numeric:tabular-nums;}
+
+.kpi{display:flex; flex-direction:column; gap:.25rem; border-radius:.5rem; border:1px solid var(--card-border); background:var(--card-bg); padding:.55rem 1rem;}
+.kpi.hero .v{font-size:28px;} .kpi.hero{padding:.8rem 1.05rem; gap:.3rem;}
+.kpi .v{font-size:20px; font-weight:600; line-height:1.1; color:var(--val); font-variant-numeric:tabular-nums;}
+.kpi .v .u{margin-left:.25rem; font-size:11px; font-weight:400; color:var(--sub);}
+.kpi .v.green{color:var(--green);}
+.kpi .c{font-size:12px; font-weight:600; color:var(--caption);}
+.kpi .sub{font-size:11px; color:var(--sub); font-variant-numeric:tabular-nums;}
+
+.chip{display:inline-block; border:1px solid; background:transparent; border-radius:9999px; font-weight:600; font-size:11px; padding:0 7px; line-height:1.6; vertical-align:middle;}
+.chip.obs{border-color:#4ade80; color:#15803d;} .dark .chip.obs{border-color:#15803d; color:#4ade80;}
+.chip.calc{border-color:#60a5fa; color:#1d4ed8;} .dark .chip.calc{border-color:#1d4ed8; color:#60a5fa;}
+.chip.est{border-color:#c4b5fd; color:#6d28d9;} .dark .chip.est{border-color:#6d28d9; color:#c4b5fd;}
+.tag{font-size:11px; font-weight:600; color:var(--caption); background:var(--section-bg); border:1px solid var(--card-border); border-radius:6px; padding:1px 7px;}
+.pos{color:var(--green);} .neg{color:var(--red);}
+
+.routeline{display:flex; align-items:flex-start; gap:.5rem; flex-wrap:wrap;}
+.rasset{display:inline-flex; flex-direction:column; align-items:center; gap:3px;}
+.asset{font-weight:700; font-size:14px; padding:4px 11px; border-radius:9px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--val);}
+.asset.out{color:var(--green); border-color:color-mix(in srgb, var(--green) 45%, var(--card-border));}
+.rasset .qty{font-size:13px; font-weight:700; color:var(--val); font-variant-numeric:tabular-nums;}
+.rasset .qty.o{color:var(--green);}
+.rasset .qty.big{font-size:22px; line-height:1.1;}
+.leg{display:inline-flex; flex-direction:column; align-items:center; gap:2px; padding-top:4px;}
+.leg .ar{font-size:13px; line-height:1; color:var(--sub);}
+.tool{display:inline-block; font-size:13px; font-weight:700; padding:2px 9px; border-radius:7px; background:var(--tool); color:#fff; letter-spacing:-.01em; white-space:nowrap;}
+.openlink{display:inline-flex; align-items:center; gap:3px; font-size:12px; font-weight:600; color:var(--accent); text-decoration:none;
+  border:1px solid color-mix(in srgb, var(--accent) 45%, var(--card-border)); border-radius:7px; padding:3px 9px;}
+.openlink:hover{background:color-mix(in srgb, var(--accent) 10%, transparent);}
+.seg{display:inline-flex; gap:2px; background:var(--section-bg); border:1px solid var(--card-border); border-radius:9999px; padding:2px; vertical-align:middle;}
+.seg button{border:0; background:transparent; color:var(--caption); font-size:11px; font-weight:600; padding:3px 11px; border-radius:9999px; cursor:pointer;}
+.seg button.active{background:var(--accent); color:#fff;}
+
+.card{border:1px solid var(--card-border); background:var(--card-bg); border-radius:.7rem; padding:.9rem 1rem;}
+.card h3{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--heading); margin:0 0 .55rem;}
+
+/* Tooltip CSS — positionné en dessous pour éviter le clipping overflow de la table */
+.tip-wrap{position:relative; display:inline-block; cursor:default;}
+.tip-wrap .tip-icon{font-size:10px; color:var(--sub); margin-left:3px; vertical-align:middle; cursor:help;}
+.tip-wrap .tip-box{
+  display:none; position:absolute; top:calc(100% + 4px); left:50%; transform:translateX(-50%);
+  background:var(--val); color:var(--bg); font-size:11px; font-weight:400; line-height:1.45;
+  text-transform:none; letter-spacing:0; border-radius:6px; padding:.45rem .65rem;
+  white-space:normal; width:260px; z-index:100; pointer-events:none; box-shadow:0 3px 10px rgba(0,0,0,.18);}
+.tip-wrap:hover .tip-box{display:block;}
+/* Arrow up */
+.tip-wrap .tip-box::before{
+  content:''; position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
+  border:5px solid transparent; border-bottom-color:var(--val);}
+
+table.flt{width:100%; border-collapse:collapse; font-size:13px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:.6rem; overflow:hidden;}
+table.flt th{font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--caption); text-align:right; padding:8px 12px; background:var(--section-bg); font-weight:600; border-bottom:1px solid var(--card-border);}
+table.flt th:first-child{text-align:left;}
+table.flt th.left{text-align:left;}
+table.flt td{padding:8px 12px; text-align:right; color:var(--val); border-bottom:1px solid var(--card-border); font-variant-numeric:tabular-nums;}
+table.flt td:first-child{text-align:left;}
+table.flt td.left{text-align:left; color:var(--sub);}
+table.flt tr:last-child td{border-bottom:0;}
+table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent); font-weight:600;}
+.srcname{font-weight:600;} .muted{color:var(--sub);}
+
+.dist .drow{display:flex; align-items:center; gap:.55rem; font-size:12px; padding:.28rem 0;}
+.dist .dname{width:104px; color:var(--val); font-weight:600;}
+.dist .dbar{flex:1; height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden;}
+.dist .dbar > span{display:block; height:100%; background:var(--accent); border-radius:9999px;}
+.dist .dpct{width:42px; text-align:right; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600;}
+
+.hours{display:grid; grid-template-columns:repeat(24,1fr); gap:3px; align-items:end; height:120px;}
+.hours .hb{border-radius:3px 3px 0 0; min-height:4px;}
+.hmark{display:grid; grid-template-columns:repeat(24,1fr); gap:3px; height:14px; margin-bottom:2px;}
+.hmark .m{font-size:12px; line-height:1; color:var(--accent); text-align:center; font-weight:700;}
+.heat .hd.today{color:#fff; background:var(--accent); font-weight:700; border-radius:6px; padding:2px 0; text-align:center;}
+.haxis{display:grid; grid-template-columns:repeat(24,1fr); gap:3px; margin-top:5px; font-size:11px; color:var(--sub); text-align:center;}
+.heat{display:grid; grid-template-columns:34px repeat(24,1fr); gap:3px; align-items:center;}
+.heat .hd{font-size:11px; color:var(--sub); text-align:right; padding-right:4px;}
+.heat .cell{height:15px; border-radius:3px;}
+.heat .colh{font-size:11px; color:var(--sub); text-align:center;}
+.legend{display:flex; align-items:center; gap:.5rem; font-size:11px; color:var(--caption); margin-top:.6rem;}
+.legend .scale{display:flex; gap:2px;} .legend .scale i{width:16px; height:11px; border-radius:2px; display:inline-block;}
+.callout{border:1px solid var(--card-border); background:var(--section-bg); border-radius:.6rem; padding:.7rem .9rem; display:flex; gap:.9rem; align-items:center; flex-wrap:wrap;}
+.callout .big{font-size:18px; font-weight:700;} .callout .lbl{font-size:11px; color:var(--caption); text-transform:uppercase; letter-spacing:.05em;}
+
+.chartcard{border:1px solid var(--card-border); background:var(--card-bg); border-radius:.7rem; padding:.85rem .9rem;}
+.chartcard .ch-h{display:flex; align-items:center; justify-content:space-between; font-size:11px; color:var(--caption); margin-bottom:.45rem;}
+
+.limited-note{font-size:11px; color:var(--sub); margin:.4rem 0 0; padding:.3rem .6rem; border-left:2px solid var(--card-border);}
+</style>
+</head>
+<body>
+<div class="page"><div id="app"></div></div>
+<script>
+// ─── i18n ─────────────────────────────────────────────────────────────────────
+const STRINGS = {
+  fr: {
+    // Topbar / brand
+    brand_dim: 'compagnon de swap',
+    tz_note: 'UTC stocké · affiché en heure locale (Europe/Paris)',
+    theme_btn: '☀/☾',
+    lang_fr: 'FR',
+    lang_en: 'EN',
+
+    // Fraîcheur / countdown
+    fresh_none: 'aucun tick',
+    fresh_instant: 'à l\'instant',
+    fresh_min: (n) => `il y a ${n} min`,
+    fresh_h: (n) => `il y a ${n} h`,
+    countdown_label: (m, s) => `prochain relevé dans ${m}:${String(s).padStart(2,'0')}`,
+    countdown_imminent: 'imminent',
+
+    // Refresh
+    refresh_btn: 'Rafraîchir',
+    refresh_loading: 'Relevé en cours…',
+    refresh_429: 'Relevé déjà en cours, veuillez patienter.',
+    refresh_note: 'Rafraîchissement manuel provisoire — remplacé au prochain relevé programmé.',
+
+    // Paire / nav
+    pair_usdc: 'USDC',
+    pair_eurc: 'EURC',
+
+    // Sections
+    section_sim: 'Simulateur',
+    section_ladder: 'Échelle des sources',
+    section_slots: (u) => `Meilleurs créneaux — net BLND → ${u}`,
+    section_slots_note: 'rollup horaire · 7 j',
+    section_hourly: 'Profil horaire moyen',
+    section_hourly_note: '▼ heure en cours',
+    section_now: 'Dernier relevé — sondes journalisées',
+    section_who: 'Qui gagne le plus souvent (7 j)',
+
+    // Simulateur
+    sim_label: (u) => `Simuler une sortie — BLND → ${u}`,
+    sim_placeholder: 'montant BLND',
+    sim_wallet_ok: (n) => `Solde wallet (${n} BLND)`,
+    sim_wallet_ko: 'Solde wallet (non configuré)',
+    sim_btn_simulate: 'Simuler',
+    sim_btn_clear: 'Vider',
+    sim_loading: 'Cotation en cours…',
+    sim_hint: 'Saisissez un montant ou utilisez le solde wallet. L\'échelle des sources ci-dessous montre alors le dernier tick journalisé.',
+    sim_note: 'Cotation live (non journalisée). Solde lu sur l\'adresse publique du wallet — read-only, jamais la clé.',
+    sim_errors: 'Sources en échec :',
+    sim_open: 'Ouvrir ↗',
+
+    // Tableau ladder
+    ladder_col_tool: 'Outil de swap',
+    ladder_col_net: (u) => `Net (${u})`,
+    ladder_col_delta: 'Δ gagnant',
+    ladder_col_chip: 'Confiance',
+    ladder_col_impact: 'Impact',
+    ladder_col_route: 'Route',
+    ladder_tip_chip: 'observé = cotation réelle de la source · calculé = route composée (2 swaps) · estimé = borne/plancher (frais opaques)',
+    ladder_tip_impact: 'écart de prix dû à la taille de l\'ordre vs le prix spot (profondeur du pool) ; plus c\'est haut, plus l\'ordre déplace le marché',
+    ladder_empty: 'Aucune donnée',
+    ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
+
+    // Chips
+    chip_obs: 'observé',
+    chip_calc: 'calculé',
+    chip_est: 'estimé',
+
+    // Heatmap / profil
+    hmap_insufficient: 'Données insuffisantes',
+    hmap_legend_lo: 'net plus faible',
+    hmap_legend_hi: 'net plus élevé',
+    hmap_legend_note: 'heure locale · % écart au net moyen 7 j',
+    days: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+    hour_now_suffix: ' · maintenant',
+
+    // Callout meilleurs créneaux
+    slot_best: 'Meilleur créneau',
+    slot_gain: 'Gain vs moyenne',
+    slot_avoid: 'À éviter',
+    slot_gap: 'Écart',
+
+    // Notes
+    limited_note: (n) => `historique limité : ${n} tick${n > 1 ? 's' : ''} ok`,
+    no_data_waiting: 'En attente du collecteur (aucun tick ok).',
+
+    // Distribution note
+    dist_note_usdc: 'xBull domine habituellement ; Comet ne concourt que sur USDC (pool backstop). Diversité = robustesse aux pannes.',
+    dist_note_eurc: 'xBull + Ultra (via-USDC) domine habituellement ; pas de marché BLND/EURC direct. Diversité = robustesse aux pannes.',
+
+    // Divers
+    loading: 'Chargement…',
+    no_data: 'Aucune donnée',
+    last_tick_ago: (n) => `il y a ${n} min`,
+
+    // Carte dernier relevé
+    last_release_ago: (n) => `il y a ${n} min`,
+  },
+  en: {
+    // Topbar / brand
+    brand_dim: 'swap companion',
+    tz_note: 'UTC stored · displayed in local time (Europe/Paris)',
+    theme_btn: '☀/☾',
+    lang_fr: 'FR',
+    lang_en: 'EN',
+
+    // Fraîcheur / countdown
+    fresh_none: 'no tick yet',
+    fresh_instant: 'just now',
+    fresh_min: (n) => `${n} min ago`,
+    fresh_h: (n) => `${n} h ago`,
+    countdown_label: (m, s) => `next update in ${m}:${String(s).padStart(2,'0')}`,
+    countdown_imminent: 'imminent',
+
+    // Refresh
+    refresh_btn: 'Refresh',
+    refresh_loading: 'Fetching…',
+    refresh_429: 'Fetch already in progress, please wait.',
+    refresh_note: 'Manual refresh is provisional — replaced at next scheduled tick.',
+
+    // Paire / nav
+    pair_usdc: 'USDC',
+    pair_eurc: 'EURC',
+
+    // Sections
+    section_sim: 'Simulator',
+    section_ladder: 'Source ladder',
+    section_slots: (u) => `Best time slots — net BLND → ${u}`,
+    section_slots_note: 'hourly rollup · 7 d',
+    section_hourly: 'Average hourly profile',
+    section_hourly_note: '▼ current hour',
+    section_now: 'Last fetch — logged probes',
+    section_who: 'Who wins most often (7 d)',
+
+    // Simulateur
+    sim_label: (u) => `Simulate a swap — BLND → ${u}`,
+    sim_placeholder: 'BLND amount',
+    sim_wallet_ok: (n) => `Wallet balance (${n} BLND)`,
+    sim_wallet_ko: 'Wallet balance (not configured)',
+    sim_btn_simulate: 'Simulate',
+    sim_btn_clear: 'Clear',
+    sim_loading: 'Fetching quote…',
+    sim_hint: 'Enter an amount or use the wallet balance. The source ladder below shows the last logged tick.',
+    sim_note: 'Live quote (not logged). Balance read from the public wallet address — read-only, never the key.',
+    sim_errors: 'Failed sources:',
+    sim_open: 'Open ↗',
+
+    // Tableau ladder
+    ladder_col_tool: 'Swap tool',
+    ladder_col_net: (u) => `Net (${u})`,
+    ladder_col_delta: 'Δ winner',
+    ladder_col_chip: 'Confidence',
+    ladder_col_impact: 'Impact',
+    ladder_col_route: 'Route',
+    ladder_tip_chip: 'observed = real quote from the source · calculated = composite route (2 swaps) · estimated = floor/ceiling (opaque fees)',
+    ladder_tip_impact: 'price deviation caused by order size vs spot price (pool depth); the higher, the more the order moves the market',
+    ladder_empty: 'No data',
+    ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
+
+    // Chips
+    chip_obs: 'observed',
+    chip_calc: 'calculated',
+    chip_est: 'estimated',
+
+    // Heatmap / profil
+    hmap_insufficient: 'Insufficient data',
+    hmap_legend_lo: 'lower net',
+    hmap_legend_hi: 'higher net',
+    hmap_legend_note: 'local time · % deviation from 7-day avg net',
+    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    hour_now_suffix: ' · now',
+
+    // Callout meilleurs créneaux
+    slot_best: 'Best slot',
+    slot_gain: 'Gain vs avg',
+    slot_avoid: 'Avoid',
+    slot_gap: 'Gap',
+
+    // Notes
+    limited_note: (n) => `limited history: ${n} tick${n > 1 ? 's' : ''} ok`,
+    no_data_waiting: 'Waiting for collector (no ok tick yet).',
+
+    // Distribution note
+    dist_note_usdc: 'xBull usually dominates; Comet only competes on USDC (backstop pool). Diversity = resilience to failures.',
+    dist_note_eurc: 'xBull + Ultra (via-USDC) usually dominates; no direct BLND/EURC market. Diversity = resilience to failures.',
+
+    // Divers
+    loading: 'Loading…',
+    no_data: 'No data',
+    last_tick_ago: (n) => `${n} min ago`,
+
+    // Carte dernier relevé
+    last_release_ago: (n) => `${n} min ago`,
+  },
+};
+
+// ─── État global ──────────────────────────────────────────────────────────────
+let target = 'USDC';
+let lang = localStorage.getItem('lang') || 'fr';
+let ladderSonde = 250;
+let simAmt = 0;
+let simActive = false;
+let simLoading = false;
+let walletBlnd = 0;
+let walletConfigured = false;
+let overview = null; // données de /api/overview
+let simResult = null; // données de /api/quote (live)
+let refreshing = false;
+let refreshMsg = '';
+
+// Compte à rebours : nextTickAt en ms depuis epoch (null = inconnu)
+let nextTickAt = null;
+let countdownInterval = null;
+
+function t(key, ...args) {
+  const s = STRINGS[lang];
+  const v = s ? s[key] : undefined;
+  if (typeof v === 'function') return v(...args);
+  return v !== undefined ? v : key;
+}
+
+function chipLabel(chip) {
+  const map = { obs: t('chip_obs'), calc: t('chip_calc'), est: t('chip_est') };
+  return map[chip] || chip;
+}
+
+// Notes générées côté backend (FR) : traduit les fragments en EN. Vocabulaire fermé.
+function noteLabel(note) {
+  if (!note || lang !== 'en') return note;
+  const map = { 'gagnant': 'winner', 'plancher (fee opaque)': 'floor (opaque fee)', 'plancher DEX': 'DEX floor' };
+  return note.split(' · ').map((f) => map[f] || f).join(' · ');
+}
+
+// ─── Timezone client ──────────────────────────────────────────────────────────
+function localOffset() {
+  const now = new Date();
+  const paris = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
+  const utc = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+  return Math.round((paris - utc) / 3600000);
+}
+function nowLocalHour() {
+  const d = new Date();
+  return parseInt(d.toLocaleString('en-US', { timeZone: 'Europe/Paris', hour: 'numeric', hour12: false }), 10) % 24;
+}
+function todayLocalDow() {
+  const d = new Date();
+  const dayStr = d.toLocaleString('en-US', { timeZone: 'Europe/Paris', weekday: 'short' });
+  const map = { Sun: 6, Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5 };
+  return map[dayStr] ?? 0;
+}
+
+function rotateUtc(arr, offsetH) {
+  if (!arr || arr.length !== 24) return arr;
+  const r = new Array(24);
+  for (let h = 0; h < 24; h++) r[(h + offsetH + 24) % 24] = arr[h];
+  return r;
+}
+function rotateHeatUtc(heat, offsetH) {
+  if (!heat || heat.length !== 7) return heat;
+  return heat.map(row => rotateUtc(row, offsetH));
+}
+
+// ─── Formatage ────────────────────────────────────────────────────────────────
+const fmt = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt0 = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
+
+function freshLabel(lastTickAt) {
+  if (!lastTickAt) return `<span class="fresh"><span class="dot" style="background:var(--amber)"></span>${t('fresh_none')}</span>`;
+  const diff = (Date.now() - new Date(lastTickAt).getTime()) / 60000;
+  const color = diff < 30 ? 'var(--green)' : diff < 120 ? 'var(--amber)' : 'var(--red)';
+  // Countdown text — rendered in a placeholder updated by setInterval
+  return `<span class="fresh"><span class="dot" style="background:${color}"></span><span id="countdown">${computeCountdownText()}</span></span>`;
+}
+
+function computeCountdownText() {
+  if (nextTickAt === null) {
+    // If we have meta, show elapsed ago instead (fallback pre-nextTickAt set)
+    return t('countdown_imminent');
+  }
+  const secLeft = Math.round((nextTickAt - Date.now()) / 1000);
+  if (secLeft <= 0) return t('countdown_imminent');
+  const m = Math.floor(secLeft / 60);
+  const s = secLeft % 60;
+  return t('countdown_label', m, s);
+}
+
+function agoLabel(lastTickAt) {
+  if (!lastTickAt) return '';
+  const diff = Math.round((Date.now() - new Date(lastTickAt).getTime()) / 60000);
+  return t('last_release_ago', diff);
+}
+
+function tool(name) { return `<span class="tool">${name}</span>`; }
+
+function openLink(dl) {
+  if (!dl) return '';
+  return `<a class="openlink" href="${dl}" target="_blank" rel="noopener">${t('sim_open')}</a>`;
+}
+
+// ─── Ruban de route ───────────────────────────────────────────────────────────
+function routeFromParts(parts, big) {
+  if (!parts || parts.length === 0) return '';
+  return '<div class="routeline">' + parts.map(p => {
+    if (p.tool !== undefined) {
+      return `<span class="leg">${tool(p.tool)}<span class="ar">→</span></span>`;
+    }
+    const qtyClass = `qty${p.out ? ' o' : ''}${big ? ' big' : ''}`;
+    return `<span class="rasset"><span class="asset${p.out ? ' out' : ''}">${p.asset}</span>${p.qty ? `<span class="${qtyClass}">${p.qty}</span>` : ''}</span>`;
+  }).join('') + '</div>';
+}
+
+function routeSimple(sonde, netVal, src, pairUi, big) {
+  const hops = pairUi === 'USDC'
+    ? [{ asset: 'BLND', qty: `${sonde} BLND` }, { tool: src }, { asset: 'USDC', qty: `${fmt(netVal)} USDC`, out: true }]
+    : [{ asset: 'BLND', qty: `${sonde} BLND` }, { tool: src }, { asset: 'EURC', qty: `${fmt(netVal)} EURC`, out: true }];
+  return routeFromParts(hops, big);
+}
+
+// ─── Échelle de sources ───────────────────────────────────────────────────────
+function ladderHead(u) {
+  return `<thead><tr>
+    <th>${t('ladder_col_tool')}</th>
+    <th>${t('ladder_col_net', u)}</th>
+    <th>${t('ladder_col_delta')}</th>
+    <th>
+      <div class="tip-wrap" style="display:inline-flex;align-items:center;">
+        ${t('ladder_col_chip')}<span class="tip-icon">ⓘ</span>
+        <span class="tip-box">${t('ladder_tip_chip')}</span>
+      </div>
+    </th>
+    <th>
+      <div class="tip-wrap" style="display:inline-flex;align-items:center;">
+        ${t('ladder_col_impact')}<span class="tip-icon">ⓘ</span>
+        <span class="tip-box">${t('ladder_tip_impact')}</span>
+      </div>
+    </th>
+    <th class="left">${t('ladder_col_route')}</th>
+  </tr></thead>`;
+}
+
+function ladderRows(rows, u) {
+  if (!rows || rows.length === 0) return `<tr><td colspan="6" class="muted" style="text-align:center;padding:1.2rem">${t('ladder_empty')}</td></tr>`;
+  return rows.map(r => {
+    const delta = r.deltaVsWinner === 0 ? '—' : `−${fmt(Math.abs(r.deltaVsWinner))}`;
+    const deltaClass = r.deltaVsWinner < 0 ? 'neg' : 'muted';
+    const impact = r.impactPct != null ? fmt(r.impactPct) + ' %' : '—';
+    const routeText = r.route || '—';
+    return `<tr class="${r.winner ? 'win' : ''}">
+      <td><span class="srcname">${r.display}</span>${r.note ? ` <span class="muted">· ${noteLabel(r.note)}</span>` : ''}</td>
+      <td>${fmt(r.net)}</td>
+      <td class="${deltaClass}">${delta}</td>
+      <td><span class="chip ${r.chip}">${chipLabel(r.chip)}</span></td>
+      <td class="muted">${impact}</td>
+      <td class="left">${routeText}</td></tr>`;
+  }).join('');
+}
+
+function ladderTable(rows, u) {
+  return `<div style="overflow-x:auto"><table class="flt">${ladderHead(u)}<tbody>${ladderRows(rows, u)}</tbody></table></div>`;
+}
+
+// ─── Carte "Dernier relevé" ────────────────────────────────────────────────────
+function bestCard(sonde) {
+  if (!overview) return `<div class="kpi"><span class="sub">${t('loading')}</span></div>`;
+  const rows = overview.ladders[String(sonde)];
+  if (!rows || rows.length === 0) return `<div class="kpi"><span class="sub">${t('no_data')}</span></div>`;
+  const winner = rows.find(r => r.winner) || rows[0];
+  if (!winner) return `<div class="kpi"><span class="sub">${t('no_data')}</span></div>`;
+  const chip = `<span class="chip ${winner.chip}">${chipLabel(winner.chip)}</span>`;
+  const route = routeSimple(sonde, winner.net, winner.display, target, false);
+  const impactStr = winner.impactPct != null ? `impact ${fmt(winner.impactPct)} %` : '';
+  return `<div class="kpi" style="gap:.6rem">
+    ${route}
+    <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap">
+      ${chip}
+      <span class="sub">${impactStr}</span></div></div>`;
+}
+
+// ─── Simulateur ───────────────────────────────────────────────────────────────
+function simCard() {
+  const walletLabel = walletConfigured
+    ? t('sim_wallet_ok', fmt0(walletBlnd))
+    : t('sim_wallet_ko');
+  const simInput = simActive ? fmt0(simAmt) : '';
+
+  let resultHtml = '';
+  if (simLoading) {
+    resultHtml = `<p class="sub" style="margin:.7rem 0 0">${t('sim_loading')}</p>`;
+  } else if (simResult && simActive) {
+    const b = simResult.best;
+    const route = b.route && b.route.length > 0
+      ? routeFromParts(b.route, true)
+      : routeSimple(fmt0(simAmt), b.net, b.display, target, true);
+    const rateStr = b.rate > 0 ? b.rate.toFixed(6) + ' ' + target + '/BLND' : '';
+    const impactStr = b.impactPct != null ? ` · impact ${fmt(b.impactPct)} %` : '';
+    resultHtml = `<div class="result">
+      <div style="flex:1 1 100%">${route}</div>
+      <span class="meta" style="flex:1 1 100%; margin-top:.4rem">${rateStr}${impactStr}</span>
+      ${b.deepLink ? `<span style="flex:1 1 100%; margin-top:.5rem">${openLink(b.deepLink)}</span>` : ''}
+    </div>`;
+    if (simResult.errors && simResult.errors.length > 0) {
+      resultHtml += `<p class="sub" style="margin:.4rem 0 0; font-size:11px">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
+    }
+  } else {
+    resultHtml = `<p class="sub" style="margin:.7rem 0 0">${t('sim_hint')}</p>`;
+  }
+
+  return `<div class="sim"><label>${t('sim_label', target)}</label>
+    <div class="controls">
+      <input id="simAmt" type="text" value="${simInput}" placeholder="${t('sim_placeholder')}" oninput="onAmt(this.value)">
+      <span class="suffix">BLND</span>
+      <button class="btn" onclick="useWallet()" ${!walletConfigured ? 'disabled' : ''}>${walletLabel}</button>
+      <button class="btn primary" onclick="doSim()">${t('sim_btn_simulate')}</button>
+      <button class="btn" onclick="clearSim()">${t('sim_btn_clear')}</button>
+    </div>
+    <div id="simOut">${resultHtml}</div>
+    <p class="sub" style="margin:.55rem 0 0">${t('sim_note')}</p></div>`;
+}
+
+// ─── Distribution gagnants ────────────────────────────────────────────────────
+function distBars(winnerDist) {
+  if (!winnerDist || winnerDist.length === 0) return `<p class="sub">${t('no_data')}</p>`;
+  const max = Math.max(...winnerDist.map(d => d.pct));
+  return `<div class="dist">${winnerDist.map(d =>
+    `<div class="drow"><span class="dname">${d.display}</span>
+    <span class="dbar"><span style="width:${max > 0 ? d.pct/max*100 : 0}%"></span></span>
+    <span class="dpct">${d.pct.toFixed(1)} %</span></div>`
+  ).join('')}</div>`;
+}
+
+// ─── Profil horaire ───────────────────────────────────────────────────────────
+function hourBars(hourlyLocal, nowHour) {
+  const v = hourlyLocal;
+  const nonNull = v.filter(x => x !== null);
+  if (nonNull.length === 0) return `<p class="sub">${t('hmap_insufficient')}</p>`;
+  const min = Math.min(...nonNull);
+  const max = Math.max(...nonNull);
+  const range = max - min || 1;
+  const col = x => `hsl(${Math.round(8 + (x - min) / range * 125)} 62% 46%)`;
+  const mk = v.map((_, i) => `<div class="m">${i === nowHour ? '▼' : ''}</div>`).join('');
+  const bars = v.map((x, i) => x === null
+    ? `<div class="hb" style="height:4%;background:var(--card-border)"></div>`
+    : `<div class="hb" style="height:${18 + (x - min) / range * 82}%; background:${col(x)}" title="${String(i).padStart(2,'0')} h${i === nowHour ? t('hour_now_suffix') : ''} · ${x > 0 ? '+' : ''}${x.toFixed(2)} %"></div>`
+  ).join('');
+  const ax = v.map((_, i) => `<span>${i % 3 === 0 ? String(i).padStart(2, '0') : ''}</span>`).join('');
+  return `<div class="hmark">${mk}</div><div class="hours">${bars}</div><div class="haxis">${ax}</div>`;
+}
+
+function bestWorstHour(hourlyLocal) {
+  let bestH = -1, bestV = -Infinity, worstH = -1, worstV = Infinity;
+  for (let i = 0; i < hourlyLocal.length; i++) {
+    const v = hourlyLocal[i];
+    if (v === null) continue;
+    if (v > bestV) { bestV = v; bestH = i; }
+    if (v < worstV) { worstV = v; worstH = i; }
+  }
+  if (bestH === -1) return null;
+  return {
+    bestLabel: `${String(bestH).padStart(2,'0')} h`,
+    bestGain: `+${bestV.toFixed(2)} %`,
+    worstLabel: `${String(worstH).padStart(2,'0')} h`,
+    worstGain: `${worstV.toFixed(2)} %`,
+  };
+}
+
+// ─── Heatmap ──────────────────────────────────────────────────────────────────
+function heatmap(heatLocal, today) {
+  const days = t('days');
+  const allVals = [];
+  for (const row of heatLocal) for (const v of row) if (v !== null) allVals.push(v);
+  if (allVals.length === 0) return `<p class="sub">${t('hmap_insufficient')}</p>`;
+  const lo = Math.min(...allVals), hi = Math.max(...allVals);
+  const range = hi - lo || 1;
+  const col = x => `hsl(${Math.round(8 + (x - lo) / range * 125)} 60% 46%)`;
+
+  let html = '<div class="heat"><div class="hd"></div>';
+  for (let h = 0; h < 24; h++) html += `<div class="colh">${h % 4 === 0 ? String(h).padStart(2,'0') : ''}</div>`;
+  for (let d = 0; d < 7; d++) {
+    html += `<div class="hd${d === today ? ' today' : ''}">${days[d]}</div>`;
+    const row = heatLocal[d] || [];
+    for (let h = 0; h < 24; h++) {
+      const x = row[h] ?? null;
+      html += x === null
+        ? `<div class="cell" style="background:var(--card-border)"></div>`
+        : `<div class="cell" style="background:${col(x)}" title="${days[d]} ${String(h).padStart(2,'0')} h · ${x > 0 ? '+' : ''}${x.toFixed(2)} %"></div>`;
+    }
+  }
+  html += '</div>';
+  const sc = [0,.25,.5,.75,1].map(t2 => `<i style="background:hsl(${Math.round(8 + t2*125)} 60% 46%)"></i>`).join('');
+  return html + `<div class="legend"><span>${t('hmap_legend_lo')}</span><span class="scale">${sc}</span><span>${t('hmap_legend_hi')}</span><span style="margin-left:auto">${t('hmap_legend_note')}</span></div>`;
+}
+
+// ─── Bouton Rafraîchir ────────────────────────────────────────────────────────
+function refreshHtml() {
+  const disabled = refreshing ? 'disabled' : '';
+  const label = refreshing ? t('refresh_loading') : t('refresh_btn');
+  const msg = refreshMsg ? `<span class="refresh-note">${refreshMsg}</span>` : '';
+  return `<span class="refresh-wrap">
+    <button class="btn" onclick="doRefresh()" ${disabled}>${label}</button>
+    ${msg}
+    <span class="refresh-note">${t('refresh_note')}</span>
+  </span>`;
+}
+
+// ─── Page principale ──────────────────────────────────────────────────────────
+function buildPage() {
+  const u = target;
+  const meta = overview ? overview.meta : null;
+  const nTicksOk = meta ? meta.nTicksOk : 0;
+  const limitedNote = nTicksOk < 24
+    ? `<p class="limited-note">${t('limited_note', nTicksOk)}</p>`
+    : '';
+  const noData = nTicksOk === 0
+    ? `<p class="sub" style="margin:.6rem 0">${t('no_data_waiting')}</p>`
+    : null;
+
+  // Met à jour nextTickAt depuis le meta (fait une fois par render)
+  if (meta && meta.lastTickAt && meta.cadenceSec) {
+    nextTickAt = new Date(meta.lastTickAt).getTime() + meta.cadenceSec * 1000;
+  }
+
+  // Timezone locale
+  const offsetH = localOffset();
+  const NOW_HOUR = nowLocalHour();
+  const TODAY = todayLocalDow();
+
+  const hourlyLocal = overview ? rotateUtc(overview.hourlyUtc, offsetH) : new Array(24).fill(null);
+  const heatLocal = overview ? rotateHeatUtc(overview.heatUtc, offsetH) : Array.from({length:7}, () => new Array(24).fill(null));
+
+  const bw = bestWorstHour(hourlyLocal);
+
+  // Échelle courante
+  let ladderZoneTitle = t('section_ladder');
+  let ladderZoneRight = '';
+  let ladderContent = '';
+  if (simActive && simResult) {
+    ladderZoneRight = `<span class="tag">${t('ladder_sim_tag', fmt0(simAmt), u)}</span>`;
+    ladderContent = ladderTable(simResult.ladder, u);
+  } else {
+    ladderZoneRight = `<span class="seg">${[250,750].map(n =>
+      `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`
+    ).join('')}</span>`;
+    const rows = overview ? overview.ladders[String(ladderSonde)] : null;
+    ladderContent = ladderTable(rows || [], u);
+  }
+
+  const dist = overview ? overview.winnerDist : [];
+
+  // Fraîcheur + compte à rebours
+  const freshHtml = meta ? freshLabel(meta.lastTickAt) : `<span class="fresh">${t('loading')}</span>`;
+
+  // "il y a X min" depuis le dernier tick pour le titre de la carte
+  const agoStr = meta && meta.lastTickAt ? ` <span class="muted" style="font-weight:400;text-transform:none;font-size:11px">${agoLabel(meta.lastTickAt)}</span>` : '';
+
+  return `
+  <div class="topbar">
+    <span class="brand">stellarswap <span class="dim">· ${t('brand_dim')}</span></span>
+    <span class="pagenav">
+      <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
+      <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
+    </span>
+    ${freshHtml}
+    ${refreshHtml()}
+    <span class="topbar-right">
+      <span class="tznote">${t('tz_note')}</span>
+      <button class="ctrl-btn" onclick="toggleTheme()">${t('theme_btn')}</button>
+      <button class="ctrl-btn ${lang==='fr'?'active-lang':''}" onclick="setLang('fr')">${t('lang_fr')}</button>
+      <button class="ctrl-btn ${lang==='en'?'active-lang':''}" onclick="setLang('en')">${t('lang_en')}</button>
+    </span>
+  </div>
+
+  <div class="zone"><div class="zone-h">${t('section_sim')}</div>${simCard()}</div>
+
+  <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
+    ${ladderContent}</div>
+
+  <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right muted" style="font-size:11px">${t('section_slots_note')}</span></div>
+    <div class="card">
+      ${noData || `<div class="callout" style="margin-bottom:.9rem">
+        <div><div class="lbl">${t('slot_best')}</div><div class="big pos">${bw ? bw.bestLabel : '—'}</div></div>
+        <div><div class="lbl">${t('slot_gain')}</div><div class="big pos">${bw ? bw.bestGain : '—'}</div></div>
+        <div style="border-left:1px solid var(--card-border); padding-left:.9rem"><div class="lbl">${t('slot_avoid')}</div><div class="big neg">${bw ? bw.worstLabel : '—'}</div></div>
+        <div><div class="lbl">${t('slot_gap')}</div><div class="big neg">${bw ? bw.worstGain : '—'}</div></div>
+      </div>${heatmap(heatLocal, TODAY)}${limitedNote}`}
+    </div></div>
+
+  <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="right muted" style="font-size:11px">${t('section_hourly_note')}</span></div>
+    <div class="chartcard">${noData || hourBars(hourlyLocal, NOW_HOUR) + limitedNote}</div></div>
+
+  <div class="zone"><div class="grid2">
+    <div class="card"><h3>${t('section_now')}${agoStr}</h3>
+      <div style="display:flex; flex-direction:column; gap:.6rem">${bestCard(250)}${bestCard(750)}</div></div>
+    <div class="card"><h3>${t('section_who')}</h3>
+      ${noData || distBars(dist) + limitedNote}
+      <p class="sub" style="margin:.6rem 0 0; line-height:1.4">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p>
+    </div>
+  </div></div>`;
+}
+
+function renderApp() {
+  document.getElementById('app').innerHTML = buildPage();
+}
+
+// ─── Chargement des données ───────────────────────────────────────────────────
+async function loadOverview() {
+  try {
+    const r = await fetch(`/api/overview?pair=${target}`);
+    if (r.ok) overview = await r.json();
+  } catch {}
+  renderApp();
+}
+
+async function loadBalance() {
+  try {
+    const r = await fetch('/api/balance');
+    if (r.ok) {
+      const b = await r.json();
+      walletBlnd = b.blnd || 0;
+      walletConfigured = b.configured !== false;
+    }
+  } catch {}
+}
+
+// ─── Compte à rebours (setInterval unique) ───────────────────────────────────
+function startCountdownTick() {
+  if (countdownInterval) return; // déjà actif
+  countdownInterval = setInterval(() => {
+    const el = document.getElementById('countdown');
+    if (el) el.textContent = computeCountdownText();
+  }, 1000);
+}
+
+// ─── Actions utilisateur ──────────────────────────────────────────────────────
+function setTarget(t2) {
+  target = t2;
+  simResult = null;
+  overview = null;
+  refreshMsg = '';
+  renderApp();
+  void loadOverview();
+}
+
+function setSonde(n) {
+  ladderSonde = n;
+  renderApp();
+}
+
+function onAmt(v) {
+  const n = parseFloat(String(v).replace(/\s| /g,'').replace(',','.'));
+  if (!isNaN(n) && n > 0) { simAmt = n; simActive = true; }
+  else { simActive = false; }
+}
+
+function clearSim() {
+  simActive = false;
+  simResult = null;
+  renderApp();
+}
+
+function useWallet() {
+  if (!walletConfigured || walletBlnd <= 0) return;
+  simAmt = walletBlnd;
+  simActive = true;
+  renderApp();
+  void doSim();
+}
+
+async function doSim() {
+  if (!simActive || simAmt <= 0) return;
+  simLoading = true;
+  simResult = null;
+  renderApp();
+  try {
+    const r = await fetch(`/api/quote?pair=${target}&amount=${simAmt}`);
+    if (r.ok) simResult = await r.json();
+  } catch {}
+  simLoading = false;
+  renderApp();
+}
+
+async function doRefresh() {
+  if (refreshing) return;
+  refreshing = true;
+  refreshMsg = '';
+  renderApp();
+  try {
+    const r = await fetch(`/api/refresh?pair=${target}`, { method: 'POST' });
+    if (r.status === 429) {
+      refreshMsg = t('refresh_429');
+    } else if (r.ok) {
+      const data = await r.json();
+      if (data.overview) {
+        overview = data.overview;
+        // Réinitialise nextTickAt depuis le nouveau overview
+        const meta = overview.meta;
+        if (meta && meta.lastTickAt && meta.cadenceSec) {
+          nextTickAt = new Date(meta.lastTickAt).getTime() + meta.cadenceSec * 1000;
+        }
+      }
+      refreshMsg = '';
+    }
+  } catch {}
+  refreshing = false;
+  renderApp();
+}
+
+function toggleTheme() {
+  document.documentElement.classList.toggle('dark');
+  localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+}
+
+function setLang(l) {
+  lang = l;
+  localStorage.setItem('lang', l);
+  renderApp();
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+// Restitue le thème persisté (ou préférence système)
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme === 'dark' || (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+  document.documentElement.classList.add('dark');
+}
+
+// Restitue la langue persistée
+const savedLang = localStorage.getItem('lang');
+if (savedLang === 'en' || savedLang === 'fr') lang = savedLang;
+
+renderApp();
+startCountdownTick();
+void Promise.all([loadOverview(), loadBalance()]);
+</script>
+</body>
+</html>

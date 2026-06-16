@@ -27,6 +27,35 @@ services:
       start_period: 1000s   # > cadence par défaut (900s) : couvre le 1er intervalle ; + heartbeat de boot
     # backend pur : AUCUN bloc ports (n'expose rien).
 
+  web:
+    image: ghcr.io/actarus314/stellarswap-collector:${IMAGE_TAG:-latest}
+    build: .
+    command: ["node", "dist/web/server.js"]
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 256m
+    ports:
+      - "${WEB_HOST_PORT:-8080}:8080"   # NUC = 8080 ; surchargeable (port hôte occupé en dev)
+    volumes:
+      - /docker/stellarswap/backend/data:/app/data
+    env_file: .env
+    environment:
+      - COLLECTOR_DB_PATH=/app/data/quotes.db
+    networks:
+      - stellarswap
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/api/overview').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 networks:
   stellarswap:
     driver: bridge
