@@ -378,6 +378,13 @@ function chipLabel(chip) {
   return map[chip] || chip;
 }
 
+// Notes générées côté backend (FR) : traduit les fragments en EN. Vocabulaire fermé.
+function noteLabel(note) {
+  if (!note || lang !== 'en') return note;
+  const map = { 'gagnant': 'winner', 'plancher (fee opaque)': 'floor (opaque fee)', 'plancher DEX': 'DEX floor' };
+  return note.split(' · ').map((f) => map[f] || f).join(' · ');
+}
+
 // ─── Timezone client ──────────────────────────────────────────────────────────
 function localOffset() {
   const now = new Date();
@@ -493,7 +500,7 @@ function ladderRows(rows, u) {
     const impact = r.impactPct != null ? fmt(r.impactPct) + ' %' : '—';
     const routeText = r.route || '—';
     return `<tr class="${r.winner ? 'win' : ''}">
-      <td><span class="srcname">${r.display}</span>${r.note ? ` <span class="muted">· ${r.note}</span>` : ''}</td>
+      <td><span class="srcname">${r.display}</span>${r.note ? ` <span class="muted">· ${noteLabel(r.note)}</span>` : ''}</td>
       <td>${fmt(r.net)}</td>
       <td class="${deltaClass}">${delta}</td>
       <td><span class="chip ${r.chip}">${chipLabel(r.chip)}</span></td>
