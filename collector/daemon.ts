@@ -8,7 +8,7 @@ import { loadCollectorConfig } from './config.js';
 import { buildProbes } from './probes.js';
 import { runTick, failedTick } from './tick.js';
 import { runMaintenance } from './maintenance.js';
-import { jitteredDelayMs, runLoop, sleep } from './scheduler.js';
+import { jitteredDelayMs, runLoop, interruptibleSleep } from './scheduler.js';
 import { ensureDirWritable } from './fsguard.js';
 import { openDb } from '../db/index.js';
 
@@ -32,6 +32,7 @@ async function main(): Promise<void> {
   writeFileSync(heartbeat, new Date().toISOString()); // heartbeat de boot : healthcheck sain avant le 1er tick
   let lastMaintenanceDay = '';
   let stopping = false;
+  const abort = new AbortController(); // réveille le sleep à l'arrêt → arrêt propre immédiat
 
   const tickAndStore = async (): Promise<void> => {
     const startedAt = new Date();
@@ -64,14 +65,14 @@ async function main(): Promise<void> {
     }
   };
 
-  const shutdown = (): void => { stopping = true; };
+  const shutdown = (): void => { stopping = true; abort.abort(); };
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 
   process.stdout.write(`[daemon] démarré · cadence=${cfg.cadenceSec}s · sondes=${probes.length} · db=${cfg.dbPath}\n`);
   await runLoop({
     delayMs: () => jitteredDelayMs(cfg.cadenceSec, cfg.jitterSec),
-    sleep,
+    sleep: (ms) => interruptibleSleep(ms, abort.signal),
     onTick: tickAndStore,
     shouldStop: () => stopping,
   });
