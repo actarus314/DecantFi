@@ -882,7 +882,7 @@ function buildPage() {
     </span></div>${simCard()}</div>
 
   <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
-    <div class="ladder-wrap${simLoading ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${t('sim_loading')}</div>` : ''}</div></div>
+    <div class="ladder-wrap${simLoading || refreshing ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading || refreshing ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${simLoading ? t('sim_loading') : t('refresh_loading')}</div>` : ''}</div></div>
 
   <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right muted" style="font-size:11px">${t('section_slots_note')}</span></div>
     <div class="card">
