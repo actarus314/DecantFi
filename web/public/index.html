@@ -133,6 +133,7 @@ table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent);
 .rk .rrow{display:contents;}
 .rk .rlabel{white-space:nowrap;}
 .rk .rpath{font-weight:600; color:var(--val);}
+.hops-hidden{cursor:help; font-size:13px; opacity:.8; vertical-align:middle; filter:grayscale(.2);}
 .rk .rtools{color:var(--caption); font-weight:500;}
 .rk .rbar{min-width:20px; height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden;}
 .rk .rbar > span{display:block; height:100%; background:var(--accent); border-radius:9999px;}
@@ -235,6 +236,7 @@ const STRINGS = {
     chip_obs: 'observé',
     chip_calc: 'calculé',
     chip_est: 'estimé',
+    hops_hidden: 'Hops internes masqués par xBull — route inaccessible (pas un retour à la ligne).',
 
     // Heatmap / profil
     hmap_insufficient: 'Données insuffisantes',
@@ -256,7 +258,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: 'xBull domine habituellement ; Comet ne concourt que sur USDC (pool backstop). Diversité = robustesse aux pannes.',
-    dist_note_eurc: 'Pas de pool BLND/EURC profond : les lignes « BLND→EURC » sont des swaps atomiques routés en interne via USDC/XLM (Soroswap affiche BLND→USDC→EURC, Aquarius via sUSD, Ultra via XLM ; seul xBull masque son chemin). La route via-USDC explicite (2 swaps) les bat souvent.',
+    dist_note_eurc: 'Pas de pool BLND/EURC profond : les lignes « BLND → EURC » sont des swaps atomiques routés en interne via USDC/XLM (Soroswap affiche BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM ; seul xBull masque son chemin). La route via-USDC explicite (2 swaps) les bat souvent.',
 
     // Divers
     loading: 'Chargement…',
@@ -334,6 +336,7 @@ const STRINGS = {
     chip_obs: 'observed',
     chip_calc: 'calculated',
     chip_est: 'estimated',
+    hops_hidden: 'Internal hops hidden by xBull — route inaccessible (not a line wrap).',
 
     // Heatmap / profil
     hmap_insufficient: 'Insufficient data',
@@ -355,7 +358,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: 'xBull usually dominates; Comet only competes on USDC (backstop pool). Diversity = resilience to failures.',
-    dist_note_eurc: 'No deep BLND/EURC pool: the "BLND→EURC" rows are atomic swaps routed internally via USDC/XLM (Soroswap shows BLND→USDC→EURC, Aquarius via sUSD, Ultra via XLM; only xBull hides its path). The explicit via-USDC route (2 swaps) often beats them.',
+    dist_note_eurc: 'No deep BLND/EURC pool: the "BLND → EURC" rows are atomic swaps routed internally via USDC/XLM (Soroswap shows BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM; only xBull hides its path). The explicit via-USDC route (2 swaps) often beats them.',
 
     // Divers
     loading: 'Loading…',
@@ -402,6 +405,12 @@ function noteLabel(note) {
   if (!note || lang !== 'en') return note;
   const map = { 'gagnant': 'winner', 'plancher (fee opaque)': 'floor (opaque fee)', 'plancher DEX': 'DEX floor' };
   return note.split(' · ').map((f) => map[f] || f).join(' · ');
+}
+
+// Route lisible : rend le glyphe nuage ☁ (hops xBull inaccessibles) en pastille avec infobulle.
+function renderRoute(s) {
+  if (!s) return '—';
+  return s.split('☁').join(`<span class="hops-hidden" title="${t('hops_hidden')}">☁</span>`);
 }
 
 // ─── Timezone client ──────────────────────────────────────────────────────────
@@ -517,7 +526,7 @@ function ladderRows(rows, u) {
     const delta = r.deltaVsWinner === 0 ? '—' : `−${fmt(Math.abs(r.deltaVsWinner))}`;
     const deltaClass = r.deltaVsWinner < 0 ? 'neg' : 'muted';
     const impact = r.impactPct != null ? fmt(r.impactPct) + ' %' : '—';
-    const routeText = r.route || '—';
+    const routeText = renderRoute(r.route);
     return `<tr class="${r.winner ? 'win' : ''}">
       <td><span class="srcname">${r.display}</span>${r.note ? ` <span class="muted">· ${noteLabel(r.note)}</span>` : ''}</td>
       <td>${fmt(r.net)}</td>
@@ -542,7 +551,7 @@ function bestRoutesCard() {
   const maxPct = Math.max(...top.map(r => r.winPct));
   return `<div class="rk">${top.map((r) => `
     <div class="rrow">
-      <span class="rlabel"><span class="rpath">${r.path}</span><span class="rtools"> · ${r.tools}</span></span>
+      <span class="rlabel"><span class="rpath">${renderRoute(r.path)}</span><span class="rtools"> · ${r.tools}</span></span>
       <span class="rbar"><span style="width:${maxPct > 0 ? r.winPct / maxPct * 100 : 0}%"></span></span>
       <span class="rpct">${r.winPct.toFixed(1)} %</span>
     </div>`).join('')}
