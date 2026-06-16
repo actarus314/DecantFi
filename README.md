@@ -5,7 +5,7 @@ Outil de **recommandation de route** pour swapper le token **BLND** vers **USDC*
 **v1 : CLI en lecture seule** — il *recommande* la meilleure route ; il ne signe ni ne soumet aucune transaction. L'exécution se fait dans votre propre wallet.
 
 ## Prérequis
-- Node 20+ (développé et testé sous Node 26)
+- Node 24+ — la CLI de cotation tourne dès Node 20, mais le **collecteur Phase 2** requiert Node ≥ 24 (`node:sqlite` intégré). Développé et testé sous Node 26.
 
 ## Installation
 ```bash
@@ -21,7 +21,7 @@ npm run quote -- 1000 USDC --split      # ajoute l'analyse de fractionnement (25
 npm run quote -- 500 USDC --slippage 30 # tolérance 0,3 % (30 bps)
 npm run quote -- 1000 USDC --json       # sortie JSON brute (pour scripts / future app)
 ```
-Options : `--from <ASSET>` (défaut BLND), `--slippage <bps>` (défaut 50), `--split`, `--json`, `--help`.
+Options : `--from <ASSET>` (défaut BLND), `--slippage <bps>` (défaut 50), `--split`, `--json`, `--balance` (cote la balance BLND **live** du wallet au lieu d'un montant), `--help`.
 
 Sortie : tableau classé par **net reçu** (frais d'agrégateur + frais de pool + gas + impact de prix),
 ligne de recommandation, plancher Horizon (valeur ajoutée des agrégateurs), et pour EURC le duel
@@ -48,16 +48,33 @@ direct / via-USDC. **Rien n'est signé ni soumis** — l'exécution se fait dans
 - **Comet** : sonde de prix du pool backstop (BLND↔USDC), via une simulation read-only avec un compte
   témoin détenant du BLND ; peut se retirer pour de très gros montants (solde du témoin).
 
+## Collecteur (Phase 2)
+
+Daemon de logging des quotes : cote périodiquement BLND→USDC/EURC (sondes **250/750 BLND**) et persiste chaque mesure dans SQLite (`node:sqlite`), avec **rétention à paliers** (raw 90 j → structuré 1 an → rollup horaire). Base de la future UI de stats « meilleurs créneaux ».
+
+```bash
+npm run collector                 # daemon (scheduler interne, cadence .env, défaut 15 min)
+npm run tick:once                 # un tick réel → DB + résumé console
+npm run history                   # journal des derniers ticks (gagnant par sonde)
+npm run export -- csv             # export CSV (ou: npm run export -- json)
+npm run quote -- --balance USDC   # cote la balance BLND live (nécessite WALLET_ADDRESS)
+```
+
+Config `.env` : `COLLECTOR_CADENCE_SEC`, `COLLECTOR_SIZES_BLND`, `COLLECTOR_PAIRS`, `COLLECTOR_DB_PATH`, `RAW_RETENTION_DAYS`, `ROLLUP_AFTER_DAYS` (voir `.env.example`).
+
+**Déploiement (NUC, Docker)** : `sudo mkdir -p /docker/stellarswap-collector/data` puis `sudo docker compose up -d`. Service durci (root:root + `cap_drop`/`read_only`/`no-new-privileges`/limites, sans port exposé). En prod, épingler `IMAGE_TAG` dans `.env` (jamais `:latest`) ; image publiée sur ghcr.io via CI sur tag `v*`. `trivy image` avant prod.
+
 ## Tests
 ```bash
-npm test         # tests unitaires (adapters figés sur fixtures réelles, normalisation, classement…)
+npm test         # tests unitaires (adapters figés sur fixtures réelles, normalisation, classement, collecteur, DB…)
 npm run typecheck
 ```
 
 ## Structure
-- `core/` — moteur pur réutilisable : adapters de sources, normalisation en net réel, classement, analyse de fractionnement, logique EURC (direct vs via-USDC), gas, prix.
-- `cli/` — interface ligne de commande.
-- *(ultérieur)* `web/` + `db/` — application self-hosted + historique de swaps et statistiques.
+- `core/` — moteur pur réutilisable : adapters de sources, normalisation en net réel, classement, analyse de fractionnement, logique EURC (direct vs via-USDC), gas, prix, lecture de balance.
+- `cli/` — interface ligne de commande (cotation + journal).
+- `collector/` + `db/` — daemon de logging des quotes + base SQLite (Phase 2 : historique, rétention).
+- *(ultérieur)* `web/` — UI self-hosted de stats « meilleurs créneaux » + alertes.
 
 ## Sources de cotation
 xBull, Aquarius, Soroswap, StellarBroker, Ultra Stellar (StellarTerm), Horizon, et une sonde directe du pool Comet (BLND/USDC) — interrogées **en parallèle** et **tolérantes aux pannes** (une source indisponible ne bloque pas le classement).

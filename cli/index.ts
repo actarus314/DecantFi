@@ -18,22 +18,28 @@ interface Args {
   json: boolean;
   split: boolean;
   help: boolean;
+  balance: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { amount: '', target: '', from: 'BLND', slippageBps: 50, json: false, split: false, help: false };
+  const a: Args = { amount: '', target: '', from: 'BLND', slippageBps: 50, json: false, split: false, help: false, balance: false };
   const pos: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i]!;
     if (t === '--json') a.json = true;
     else if (t === '--split') a.split = true;
+    else if (t === '--balance') a.balance = true;
     else if (t === '-h' || t === '--help') a.help = true;
     else if (t === '--from') a.from = argv[++i] ?? 'BLND';
     else if (t === '--slippage') a.slippageBps = Number(argv[++i]);
     else pos.push(t);
   }
-  a.amount = pos[0] ?? '';
-  a.target = pos[1] ?? '';
+  if (a.balance && pos.length === 1) {
+    a.target = pos[0] ?? '';            // --balance : un seul positionnel = la cible
+  } else {
+    a.amount = pos[0] ?? '';
+    a.target = pos[1] ?? '';
+  }
   return a;
 }
 
@@ -46,6 +52,7 @@ Options:
   --from <ASSET>      actif vendu (defaut BLND)
   --slippage <bps>    tolerance en points de base (defaut 50 = 0,5 %)
   --split             ajoute l'analyse de fractionnement (25/50/100 %)
+  --balance           cote la balance BLND live du wallet (au lieu du montant positionnel)
   --json              sortie JSON brute
   -h, --help          cette aide
 
@@ -182,7 +189,7 @@ function jsonReplacer(_k: string, v: unknown): unknown {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  if (args.help || !args.amount || !args.target) {
+  if (args.help || !args.target || (!args.amount && !args.balance)) {
     process.stdout.write(HELP);
     process.exit(args.help ? 0 : 1);
   }
@@ -191,15 +198,30 @@ async function main(): Promise<void> {
   const buy = bySymbol(args.target);
   if (!sell) fail(`actif vendu inconnu : ${args.from}`);
   if (!buy) fail(`cible inconnue : ${args.target} (attendu USDC ou EURC)`);
-  let amountIn: bigint;
-  try {
-    amountIn = toStroops(args.amount);
-  } catch {
-    return fail(`montant invalide : ${args.amount}`);
-  }
-  if (amountIn <= 0n) return fail('le montant doit etre > 0');
 
   loadEnv();
+
+  let amountIn: bigint = 0n;
+  if (args.balance) {
+    const addr = process.env.WALLET_ADDRESS;
+    if (!addr) return fail('WALLET_ADDRESS absent (.env) : requis pour --balance');
+    const { readBlndBalance } = await import('../core/balance.js');
+    amountIn = await readBlndBalance(addr, {
+      horizonUrl: process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org', timeoutMs: 12000,
+    });
+    if (amountIn <= 0n) {
+      process.stdout.write(`Balance BLND = 0 pour ${addr.slice(0, 6)}… — rien à coter.\n`);
+      process.exit(0);
+    }
+    process.stdout.write(`Balance BLND live : ${fromStroops(amountIn)} BLND → cotation…\n`);
+  } else {
+    try {
+      amountIn = toStroops(args.amount);
+    } catch {
+      return fail(`montant invalide : ${args.amount}`);
+    }
+    if (amountIn <= 0n) return fail('le montant doit etre > 0');
+  }
   const cfg: EngineConfig = {
     rpcUrl: process.env.STELLAR_RPC_URL || 'https://mainnet.sorobanrpc.com',
     horizonUrl: process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org',

@@ -5,10 +5,15 @@
   "description": "Recommandeur de route nette BLND -> USDC/EURC sur Stellar (meta-agregateur de cotations, read-only).",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "quote": "tsx cli/index.ts",
+    "history": "tsx cli/history.ts",
+    "export": "tsx cli/history.ts export",
+    "tick:once": "tsx collector/tick-once.ts",
+    "collector": "tsx collector/daemon.ts",
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

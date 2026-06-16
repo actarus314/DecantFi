@@ -1,0 +1,42 @@
+// Lecture read-only de la balance BLND classique d'un compte via Horizon. Stroops exacts ; 0 si absente.
+// Partagé : CLI (--balance) et future UI web. JAMAIS de clé privée.
+import { BLND } from './assets.js';
+import { toStroops } from './amount.js';
+import { getJson as defaultGetJson } from './sources/http.js';
+
+interface HorizonBalance {
+  balance?: string;
+  asset_code?: string;
+  asset_issuer?: string;
+  asset_type?: string;
+}
+interface HorizonAccount {
+  balances?: HorizonBalance[];
+}
+
+/** Extrait la balance BLND (code+issuer connus) en stroops. 0 si absente / réponse inattendue. */
+export function parseBlndBalance(raw: unknown): bigint {
+  const balances = (raw as HorizonAccount | null)?.balances;
+  if (!Array.isArray(balances)) return 0n;
+  const b = balances.find((x) => x.asset_code === BLND.code && x.asset_issuer === BLND.issuer);
+  if (!b || typeof b.balance !== 'string') return 0n;
+  try {
+    return toStroops(b.balance);
+  } catch {
+    return 0n;
+  }
+}
+
+export interface BalanceDeps {
+  horizonUrl: string;
+  timeoutMs?: number;
+  getJson?: (url: string, timeoutMs?: number) => Promise<unknown | null>;
+}
+
+/** Lit la balance BLND live de `address` via Horizon. Tolérant : Horizon KO → 0. */
+export async function readBlndBalance(address: string, deps: BalanceDeps): Promise<bigint> {
+  const getJson = deps.getJson ?? defaultGetJson;
+  const base = (deps.horizonUrl || 'https://horizon.stellar.org').replace(/\/$/, '');
+  const raw = await getJson(`${base}/accounts/${address}`, deps.timeoutMs);
+  return parseBlndBalance(raw);
+}
