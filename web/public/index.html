@@ -39,7 +39,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 
 /* Refresh controls */
 .refresh-wrap{display:inline-flex; align-items:center; gap:.45rem; flex-wrap:wrap;}
-.refresh-note{font-size:11px; color:var(--sub);}
+.refresh-note{font-size:11px; color:var(--caption);}
 
 .zone{margin-bottom:2.2rem;}
 .zone-h{font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--heading);
@@ -117,10 +117,10 @@ table.flt th:first-child{text-align:left;}
 table.flt th.left{text-align:left;}
 table.flt td{padding:8px 12px; text-align:right; color:var(--val); border-bottom:1px solid var(--card-border); font-variant-numeric:tabular-nums;}
 table.flt td:first-child{text-align:left;}
-table.flt td.left{text-align:left; color:var(--sub);}
+table.flt td.left{text-align:left; color:var(--caption);}
 table.flt tr:last-child td{border-bottom:0;}
 table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent); font-weight:600;}
-.srcname{font-weight:600;} .muted{color:var(--sub);}
+.srcname{font-weight:600;} .muted{color:var(--caption);}
 
 .dist .drow{display:flex; align-items:center; gap:.55rem; font-size:12px; padding:.28rem 0;}
 .dist .dname{width:104px; color:var(--val); font-weight:600;}
@@ -146,7 +146,10 @@ table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent);
 .chartcard{border:1px solid var(--card-border); background:var(--card-bg); border-radius:.7rem; padding:.85rem .9rem;}
 .chartcard .ch-h{display:flex; align-items:center; justify-content:space-between; font-size:11px; color:var(--caption); margin-bottom:.45rem;}
 
-.limited-note{font-size:11px; color:var(--sub); margin:.4rem 0 0; padding:.3rem .6rem; border-left:2px solid var(--card-border);}
+/* P2 : classes textuelles passées à --caption */
+.limited-note{font-size:11px; color:var(--caption); margin:.4rem 0 0; padding:.3rem .6rem; border-left:2px solid var(--card-border);}
+/* P3 : textes d'aide lisibles */
+.help{font-size:13px; color:var(--caption); line-height:1.45; font-style:normal;}
 </style>
 </head>
 <body>
@@ -158,9 +161,12 @@ const STRINGS = {
     // Topbar / brand
     brand_dim: 'compagnon de swap',
     tz_note: 'UTC stocké · affiché en heure locale (Europe/Paris)',
-    theme_btn: '☀/☾',
-    lang_fr: 'FR',
-    lang_en: 'EN',
+    theme_dark: '🌙',
+    theme_light: '☀️',
+    lang_fr: '🇫🇷',
+    lang_en: '🇬🇧',
+    lang_fr_title: 'Français',
+    lang_en_title: 'English',
 
     // Fraîcheur / countdown
     fresh_none: 'aucun tick',
@@ -210,8 +216,8 @@ const STRINGS = {
     ladder_col_chip: 'Confiance',
     ladder_col_impact: 'Impact',
     ladder_col_route: 'Route',
-    ladder_tip_chip: 'observé = cotation réelle de la source · calculé = route composée (2 swaps) · estimé = borne/plancher (frais opaques)',
-    ladder_tip_impact: 'écart de prix dû à la taille de l\'ordre vs le prix spot (profondeur du pool) ; plus c\'est haut, plus l\'ordre déplace le marché',
+    ladder_tip_chip: 'Observé = cotation réelle de la source<br>Calculé = route composée (2 swaps)<br>Estimé = borne/plancher (frais opaques)',
+    ladder_tip_impact: 'Écart entre le montant reçu et sa valeur au prix de référence (DefiLlama). Positif = tu reçois moins (frais + slippage). Négatif = tu reçois plus (le prix on-chain bat la référence).',
     ladder_empty: 'Aucune donnée',
     ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
 
@@ -254,9 +260,12 @@ const STRINGS = {
     // Topbar / brand
     brand_dim: 'swap companion',
     tz_note: 'UTC stored · displayed in local time (Europe/Paris)',
-    theme_btn: '☀/☾',
-    lang_fr: 'FR',
-    lang_en: 'EN',
+    theme_dark: '🌙',
+    theme_light: '☀️',
+    lang_fr: '🇫🇷',
+    lang_en: '🇬🇧',
+    lang_fr_title: 'Français',
+    lang_en_title: 'English',
 
     // Fraîcheur / countdown
     fresh_none: 'no tick yet',
@@ -306,8 +315,8 @@ const STRINGS = {
     ladder_col_chip: 'Confidence',
     ladder_col_impact: 'Impact',
     ladder_col_route: 'Route',
-    ladder_tip_chip: 'observed = real quote from the source · calculated = composite route (2 swaps) · estimated = floor/ceiling (opaque fees)',
-    ladder_tip_impact: 'price deviation caused by order size vs spot price (pool depth); the higher, the more the order moves the market',
+    ladder_tip_chip: 'Observed = real quote from the source<br>Calculated = composite route (2 swaps)<br>Estimated = floor/ceiling (opaque fees)',
+    ladder_tip_impact: 'Gap between the amount received and its value at the reference price (DefiLlama). Positive = you receive less (fees + slippage). Negative = you receive more (on-chain beats the reference).',
     ladder_empty: 'No data',
     ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
 
@@ -539,7 +548,7 @@ function simCard() {
 
   let resultHtml = '';
   if (simLoading) {
-    resultHtml = `<p class="sub" style="margin:.7rem 0 0">${t('sim_loading')}</p>`;
+    resultHtml = `<p class="help" style="margin:.7rem 0 0">${t('sim_loading')}</p>`;
   } else if (simResult && simActive) {
     const b = simResult.best;
     const route = b.route && b.route.length > 0
@@ -553,10 +562,10 @@ function simCard() {
       ${b.deepLink ? `<span style="flex:1 1 100%; margin-top:.5rem">${openLink(b.deepLink)}</span>` : ''}
     </div>`;
     if (simResult.errors && simResult.errors.length > 0) {
-      resultHtml += `<p class="sub" style="margin:.4rem 0 0; font-size:11px">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
+      resultHtml += `<p class="help" style="margin:.4rem 0 0">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
     }
   } else {
-    resultHtml = `<p class="sub" style="margin:.7rem 0 0">${t('sim_hint')}</p>`;
+    resultHtml = `<p class="help" style="margin:.7rem 0 0">${t('sim_hint')}</p>`;
   }
 
   return `<div class="sim"><label>${t('sim_label', target)}</label>
@@ -568,12 +577,12 @@ function simCard() {
       <button class="btn" onclick="clearSim()">${t('sim_btn_clear')}</button>
     </div>
     <div id="simOut">${resultHtml}</div>
-    <p class="sub" style="margin:.55rem 0 0">${t('sim_note')}</p></div>`;
+    <p class="help" style="margin:.55rem 0 0">${t('sim_note')}</p></div>`;
 }
 
 // ─── Distribution gagnants ────────────────────────────────────────────────────
 function distBars(winnerDist) {
-  if (!winnerDist || winnerDist.length === 0) return `<p class="sub">${t('no_data')}</p>`;
+  if (!winnerDist || winnerDist.length === 0) return `<p class="help">${t('no_data')}</p>`;
   const max = Math.max(...winnerDist.map(d => d.pct));
   return `<div class="dist">${winnerDist.map(d =>
     `<div class="drow"><span class="dname">${d.display}</span>
@@ -586,7 +595,7 @@ function distBars(winnerDist) {
 function hourBars(hourlyLocal, nowHour) {
   const v = hourlyLocal;
   const nonNull = v.filter(x => x !== null);
-  if (nonNull.length === 0) return `<p class="sub">${t('hmap_insufficient')}</p>`;
+  if (nonNull.length === 0) return `<p class="help">${t('hmap_insufficient')}</p>`;
   const min = Math.min(...nonNull);
   const max = Math.max(...nonNull);
   const range = max - min || 1;
@@ -622,7 +631,7 @@ function heatmap(heatLocal, today) {
   const days = t('days');
   const allVals = [];
   for (const row of heatLocal) for (const v of row) if (v !== null) allVals.push(v);
-  if (allVals.length === 0) return `<p class="sub">${t('hmap_insufficient')}</p>`;
+  if (allVals.length === 0) return `<p class="help">${t('hmap_insufficient')}</p>`;
   const lo = Math.min(...allVals), hi = Math.max(...allVals);
   const range = hi - lo || 1;
   const col = x => `hsl(${Math.round(8 + (x - lo) / range * 125)} 60% 46%)`;
@@ -650,9 +659,8 @@ function refreshHtml() {
   const label = refreshing ? t('refresh_loading') : t('refresh_btn');
   const msg = refreshMsg ? `<span class="refresh-note">${refreshMsg}</span>` : '';
   return `<span class="refresh-wrap">
-    <button class="btn" onclick="doRefresh()" ${disabled}>${label}</button>
+    <button class="btn" onclick="doRefresh()" ${disabled} title="${t('refresh_note')}">${label}</button>
     ${msg}
-    <span class="refresh-note">${t('refresh_note')}</span>
   </span>`;
 }
 
@@ -665,7 +673,7 @@ function buildPage() {
     ? `<p class="limited-note">${t('limited_note', nTicksOk)}</p>`
     : '';
   const noData = nTicksOk === 0
-    ? `<p class="sub" style="margin:.6rem 0">${t('no_data_waiting')}</p>`
+    ? `<p class="help" style="margin:.6rem 0">${t('no_data_waiting')}</p>`
     : null;
 
   // Met à jour nextTickAt depuis le meta (fait une fois par render)
@@ -683,6 +691,12 @@ function buildPage() {
 
   const bw = bestWorstHour(hourlyLocal);
 
+  // Sondes dynamiques depuis meta (fallback [250,750] si pas encore chargé)
+  const sondes = meta && meta.sondes && meta.sondes.length > 0 ? meta.sondes : [250, 750];
+
+  // Réconcilier ladderSonde avec les sondes disponibles
+  if (!sondes.includes(ladderSonde)) ladderSonde = sondes[0];
+
   // Échelle courante
   let ladderZoneTitle = t('section_ladder');
   let ladderZoneRight = '';
@@ -691,7 +705,7 @@ function buildPage() {
     ladderZoneRight = `<span class="tag">${t('ladder_sim_tag', fmt0(simAmt), u)}</span>`;
     ladderContent = ladderTable(simResult.ladder, u);
   } else {
-    ladderZoneRight = `<span class="seg">${[250,750].map(n =>
+    ladderZoneRight = `<span class="seg">${sondes.map(n =>
       `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`
     ).join('')}</span>`;
     const rows = overview ? overview.ladders[String(ladderSonde)] : null;
@@ -706,6 +720,10 @@ function buildPage() {
   // "il y a X min" depuis le dernier tick pour le titre de la carte
   const agoStr = meta && meta.lastTickAt ? ` <span class="muted" style="font-weight:400;text-transform:none;font-size:11px">${agoLabel(meta.lastTickAt)}</span>` : '';
 
+  // Glyphe thème : reflète l'action (clic vers l'autre thème)
+  const isDark = document.documentElement.classList.contains('dark');
+  const themeGlyph = isDark ? t('theme_light') : t('theme_dark');
+
   return `
   <div class="topbar">
     <span class="brand">stellarswap <span class="dim">· ${t('brand_dim')}</span></span>
@@ -717,9 +735,9 @@ function buildPage() {
     ${refreshHtml()}
     <span class="topbar-right">
       <span class="tznote">${t('tz_note')}</span>
-      <button class="ctrl-btn" onclick="toggleTheme()">${t('theme_btn')}</button>
-      <button class="ctrl-btn ${lang==='fr'?'active-lang':''}" onclick="setLang('fr')">${t('lang_fr')}</button>
-      <button class="ctrl-btn ${lang==='en'?'active-lang':''}" onclick="setLang('en')">${t('lang_en')}</button>
+      <button class="ctrl-btn" onclick="toggleTheme()" title="${isDark ? t('theme_light') : t('theme_dark')}">${themeGlyph}</button>
+      <button class="ctrl-btn ${lang==='fr'?'active-lang':''}" onclick="setLang('fr')" title="${t('lang_fr_title')}">${t('lang_fr')}</button>
+      <button class="ctrl-btn ${lang==='en'?'active-lang':''}" onclick="setLang('en')" title="${t('lang_en_title')}">${t('lang_en')}</button>
     </span>
   </div>
 
@@ -743,10 +761,10 @@ function buildPage() {
 
   <div class="zone"><div class="grid2">
     <div class="card"><h3>${t('section_now')}${agoStr}</h3>
-      <div style="display:flex; flex-direction:column; gap:.6rem">${bestCard(250)}${bestCard(750)}</div></div>
+      <div style="display:flex; flex-direction:column; gap:.6rem">${sondes.map(s => bestCard(s)).join('')}</div></div>
     <div class="card"><h3>${t('section_who')}</h3>
       ${noData || distBars(dist) + limitedNote}
-      <p class="sub" style="margin:.6rem 0 0; line-height:1.4">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p>
+      <p class="help" style="margin:.6rem 0 0">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p>
     </div>
   </div></div>`;
 }
@@ -790,6 +808,7 @@ function setTarget(t2) {
   simResult = null;
   overview = null;
   refreshMsg = '';
+  history.replaceState(null, '', '?pair=' + target);
   renderApp();
   void loadOverview();
 }
@@ -861,6 +880,7 @@ async function doRefresh() {
 function toggleTheme() {
   document.documentElement.classList.toggle('dark');
   localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+  renderApp();
 }
 
 function setLang(l) {
@@ -879,6 +899,12 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia && window.matchMe
 // Restitue la langue persistée
 const savedLang = localStorage.getItem('lang');
 if (savedLang === 'en' || savedLang === 'fr') lang = savedLang;
+
+// P1 : lire la paire depuis l'URL (?pair=EURC)
+(function() {
+  const p = new URLSearchParams(location.search).get('pair');
+  if (p === 'EURC' || p === 'USDC') target = p;
+})();
 
 renderApp();
 startCountdownTick();

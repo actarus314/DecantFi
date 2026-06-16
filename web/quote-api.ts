@@ -4,6 +4,7 @@ import { quote as engineQuote } from '../core/engine.js';
 import { readBlndBalance } from '../core/balance.js';
 import { BLND, USDC, EURC } from '../core/assets.js';
 import { toStroops, toNumber } from '../core/amount.js';
+import { priceImpactPct, targetUsdPerUnit } from '../core/prices.js';
 import { displayName, noteFor, chipFor, type Chip } from './stats.js';
 import type { WebConfig } from './config.js';
 import type { RouteHop } from '../core/sources/types.js';
@@ -191,28 +192,43 @@ export async function liveQuote(
   const combinedRoute = extraRoute ? [...bestQuote.route, ...extraRoute] : bestQuote.route;
   const route = buildRoute(combinedRoute, amountStroops, bestNet, pairUi);
 
-  // Échelle complète depuis ranking.ranked
-  const ladder: LiveLadderRow[] = [];
-  const ranked = result.ranking.ranked;
-  const winnerNet = ranked[0]?.netOut ?? 0n;
-  const winNetNum = toNumber(winnerNet);
-
-  for (const rq of ranked) {
-    const rNet = toNumber(rq.netOut);
-    const rConf = rq.netConfidence;
-    const rSource = rq.source;
-    const rEurcPath: string | null = null; // classement direct uniquement
-    ladder.push({
-      display: displayName(rSource),
-      note: noteFor(rSource, rq.rank === 1, rEurcPath),
+  // Échelle complète : ranking direct + (EURC) ligne composite via-USDC, triée par net.
+  // Le composite est TOUJOURS listé quand il existe (comme le stockage collecteur) → le tableau
+  // colle au simulateur (le gagnant peut être le composite, pas le meilleur direct).
+  const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; eurcPath: string | null; impactPct: number | null }> =
+    result.ranking.ranked.map((rq) => ({
+      source: rq.source,
+      netOut: rq.netOut,
+      conf: rq.netConfidence,
       route: routeStr(rq.route, rq.sellAsset.symbol, rq.buyAsset.symbol),
-      net: rNet,
-      deltaVsWinner: rNet - winNetNum,
-      chip: chipFor(rConf, rSource, rEurcPath),
+      eurcPath: null,
       impactPct: rq.priceImpactPct ?? null,
-      winner: rq.rank === 1,
+    }));
+  if (pairUi === 'EURC' && result.eurc?.viaUsdc) {
+    const v = result.eurc.viaUsdc;
+    const r1 = routeStr(v.leg1.route, v.leg1.sellAsset.symbol, v.leg1.buyAsset.symbol);
+    const r2 = routeStr(v.leg2.route, v.leg2.sellAsset.symbol, v.leg2.buyAsset.symbol);
+    raw.push({
+      source: `${v.leg1.source}+${v.leg2.source}`,
+      netOut: v.netEurc,
+      conf: 'estimate',
+      route: `${r1}→${r2.split('→').slice(1).join('→')}`, // fusionne le nœud USDC partagé
+      eurcPath: 'via-usdc',
+      impactPct: priceImpactPct(amountStroops, v.netEurc, result.prices.blndUsd, targetUsdPerUnit('EURC', result.prices)) ?? null,
     });
   }
+  raw.sort((a, b) => (a.netOut < b.netOut ? 1 : a.netOut > b.netOut ? -1 : 0));
+  const topNetNum = toNumber(raw[0]?.netOut ?? 0n);
+  const ladder: LiveLadderRow[] = raw.map((r, i) => ({
+    display: displayName(r.source),
+    note: noteFor(r.source, i === 0, r.eurcPath),
+    route: r.route,
+    net: toNumber(r.netOut),
+    deltaVsWinner: toNumber(r.netOut) - topNetNum,
+    chip: r.eurcPath === 'via-usdc' ? 'calc' : chipFor(r.conf, r.source, r.eurcPath),
+    impactPct: r.impactPct,
+    winner: i === 0,
+  }));
 
   return {
     best: {

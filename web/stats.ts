@@ -30,12 +30,14 @@ export interface Meta {
   eurUsd: number | null;
   xlmUsd: number | null;
   windowDays: 7;
-  bigSonde: 750;
+  /** Sondes configurées (COLLECTOR_SIZES_BLND), en BLND entiers, triées croissant. */
+  sondes: number[];
 }
 
 export interface Overview {
   meta: Meta;
-  ladders: { '250': LadderRow[]; '750': LadderRow[] };
+  /** Échelles du dernier tick ok, une par sonde (clé = BLND entier, ex. '250'). */
+  ladders: Record<string, LadderRow[]>;
   winnerDist: Array<{ display: string; pct: number }>;
   hourlyUtc: (number | null)[];
   heatUtc: (number | null)[][];
@@ -160,11 +162,6 @@ function bigSondeStroops(cfg: CollectorConfig): bigint {
   // La plus grande sonde (= 750 BLND = 7_500_000_000 stroops)
   const sorted = [...cfg.sizesBlnd].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   return sorted[sorted.length - 1] ?? 7_500_000_000n;
-}
-
-function smallSondeStroops(cfg: CollectorConfig): bigint {
-  const sorted = [...cfg.sizesBlnd].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  return sorted[0] ?? 2_500_000_000n;
 }
 
 // ─── Dernière tick ok — échelle ──────────────────────────────────────────────
@@ -352,7 +349,7 @@ function buildHeatUtc(rows: WinnerEffRow[]): (number | null)[][] {
 
 // ─── Meta ──────────────────────────────────────────────────────────────────────
 
-function buildMeta(db: DatabaseSync, cadenceSec: number): Meta {
+function buildMeta(db: DatabaseSync, cadenceSec: number, sondes: number[]): Meta {
   const cntStmt = prepBig(db, `SELECT COUNT(*) as n FROM tick`);
   const cntOkStmt = prepBig(db, `SELECT COUNT(*) as n FROM tick WHERE ok = 1`);
   const lastStmt = prepBig(db,
@@ -371,7 +368,7 @@ function buildMeta(db: DatabaseSync, cadenceSec: number): Meta {
     eurUsd: lastRow?.['eur_usd'] != null ? Number(lastRow['eur_usd']) : null,
     xlmUsd: lastRow?.['xlm_usd'] != null ? Number(lastRow['xlm_usd']) : null,
     windowDays: 7,
-    bigSonde: 750,
+    sondes,
   };
 }
 
@@ -387,14 +384,14 @@ export function overview(
   const nowDate = now ?? new Date();
   const windowStart = new Date(nowDate.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const big = bigSondeStroops(cfg);
-  const small = smallSondeStroops(cfg);
+  // Sondes configurées (COLLECTOR_SIZES_BLND), triées croissant. Une échelle par sonde.
+  const sizes = [...cfg.sizesBlnd].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const sondes = sizes.map((s) => toNumber(s));
+  const big = bigSondeStroops(cfg); // plus grande sonde pour profil horaire / heatmap
 
-  const meta = buildMeta(db, cfg.cadenceSec);
-  const ladders = {
-    '250': buildLadder(db, pair, small),
-    '750': buildLadder(db, pair, big),
-  };
+  const meta = buildMeta(db, cfg.cadenceSec, sondes);
+  const ladders: Record<string, LadderRow[]> = {};
+  for (const size of sizes) ladders[String(toNumber(size))] = buildLadder(db, pair, size);
   const winnerDist = buildWinnerDist(db, pair, windowStart);
   const effRows = fetchWinnerEffRows(db, pair, big, windowStart, pairUi);
   const hourlyUtc = buildHourlyUtc(effRows);

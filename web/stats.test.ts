@@ -158,7 +158,7 @@ afterAll(() => {
 
 describe('ladders', () => {
   it('ordre net_out desc', () => {
-    const rows = result_usdc.ladders['750'];
+    const rows = result_usdc.ladders['750']!;
     expect(rows.length).toBeGreaterThan(1);
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i]!.net).toBeLessThanOrEqual(rows[i - 1]!.net);
@@ -166,7 +166,7 @@ describe('ladders', () => {
   });
 
   it('winner = premier (is_winner)', () => {
-    const rows = result_usdc.ladders['750'];
+    const rows = result_usdc.ladders['750']!;
     expect(rows[0]!.winner).toBe(true);
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i]!.winner).toBe(false);
@@ -174,7 +174,7 @@ describe('ladders', () => {
   });
 
   it('deltaVsWinner = 0 pour le gagnant, négatif sinon', () => {
-    const rows = result_usdc.ladders['250'];
+    const rows = result_usdc.ladders['250']!;
     expect(rows[0]!.deltaVsWinner).toBeCloseTo(0, 5);
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i]!.deltaVsWinner).toBeLessThan(0);
@@ -182,7 +182,7 @@ describe('ladders', () => {
   });
 
   it('chips mappés correctement (stellarbroker=est, xbull=obs)', () => {
-    const rows = result_usdc.ladders['750'];
+    const rows = result_usdc.ladders['750']!;
     const xbull = rows.find(r => r.display === 'xBull');
     const stellarbroker = rows.find(r => r.display === 'StellarBroker');
     expect(xbull?.chip).toBe('obs');
@@ -190,7 +190,7 @@ describe('ladders', () => {
   });
 
   it('notes mappées (gagnant, cross-check, fee=0...)', () => {
-    const rows = result_usdc.ladders['750'];
+    const rows = result_usdc.ladders['750']!;
     const winner = rows.find(r => r.winner);
     expect(winner?.note).toContain('gagnant');
     const comet = rows.find(r => r.display === 'Comet (pool)');
@@ -200,7 +200,7 @@ describe('ladders', () => {
   });
 
   it('EURC note via-USDC sur le gagnant', () => {
-    const rows = result_eurc.ladders['250'];
+    const rows = result_eurc.ladders['250']!;
     const winner = rows.find(r => r.winner);
     expect(winner?.note).toContain('via-USDC');
   });
