@@ -131,6 +131,9 @@ export async function liveQuote(
       soroswapApiKey: cfg.soroswapApiKey,
       walletAddress: cfg.walletAddress,
       timeoutMs: cfg.timeoutMs,
+      // Cache RPC pour cette requête : une cotation EURC relance 3 sous-cotations qui re-lisent
+      // les mêmes pools → coalesce, évite de saturer le RPC sur un seul appel /api/quote.
+      rpcCache: new Map(),
     },
   });
 

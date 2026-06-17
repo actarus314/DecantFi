@@ -6,7 +6,8 @@
 // Au-dela du solde du temoin (gros montants) ou si le pool est absent => null (source retiree).
 import type { SourceAdapter, NormalizedQuote, QuoteRequest, SourceConfig } from './types.js';
 import { DEFAULT_GAS_XLM } from '../gas.js';
-import { hops } from './util.js';
+import { hops, cached } from './util.js';
+import { setReason, rpcReason } from './diag.js';
 
 // Pool backstop Blend 80/20 BLND/USDC (resolu on-chain ; design tronquait en CAS3FL6T...VEAM).
 export const COMET_POOL = 'CAS3FL6TLZKDGGSISDBWGGPXT3NRR4DYTZD7YOD3HMYO6LTJUVGRVEAM';
@@ -38,11 +39,15 @@ export const comet: SourceAdapter = {
   supports: (req) => isBlndUsdc(req), // pool BLND/USDC uniquement : non listee comme "echec" ailleurs
   async quote(req, cfg) {
     if (!isBlndUsdc(req)) return null; // garde-fou (le filtre supports() exclut deja les autres paires)
-    try {
-      return await liveComet(req, cfg);
-    } catch {
-      return null;
-    }
+    // Mémoïsé par (sens, montant) : la jambe BLND->USDC d'une sonde EURC duplique la sonde USDC principale.
+    return cached(cfg.rpcCache, `comet:swap:${req.sellAsset.sac}:${req.amountIn}:${req.buyAsset.sac}`, async () => {
+      try {
+        return await liveComet(req, cfg);
+      } catch (e) {
+        setReason(rpcReason(e)); // 429 / timeout / rpc — pour l'affichage santé
+        return null;
+      }
+    });
   },
 };
 
@@ -68,7 +73,7 @@ async function liveComet(req: QuoteRequest, cfg: SourceConfig): Promise<Normaliz
     .build();
 
   const sim = await server.simulateTransaction(tx);
-  if (rpc.Api.isSimulationError(sim) || !sim.result) return null;
+  if (rpc.Api.isSimulationError(sim) || !sim.result) { setReason('simulation'); return null; }
   const grossOut = decodeCometOut(scValToNative(sim.result.retval));
   if (grossOut === null) return null;
 
