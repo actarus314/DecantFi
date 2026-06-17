@@ -240,7 +240,9 @@ export async function liveQuote(
     winner: i === 0,
     sourceId: r.source,
     deepLink: deepLink(r.source, pairUi),
-    executable: ['xbull', 'soroswap'].includes(r.source.split('+')[0]?.trim() ?? ''),
+    // Les lignes composites (EURC via-USDC = "leg1+leg2") = 2 tx non atomiques → JAMAIS exécutables en 1 clic
+    // (sinon un clic exécuterait un swap direct 1-leg ≠ les 2 tx revues). Seules les venues simples le sont.
+    executable: !r.source.includes('+') && ['xbull', 'soroswap', 'horizon'].includes(r.source.trim()),
   }));
 
   return {

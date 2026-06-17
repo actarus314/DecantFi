@@ -7,7 +7,7 @@ import { loadWebConfig } from './config.js';
 import { openReadOnly } from './read-db.js';
 import { overview, buildSourceHealth } from './stats.js';
 import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
-import { pickExecutableVenue, submit, ExecError } from './execute.js';
+import { pickExecutableVenue, submit, ExecError, type Venue } from './execute.js';
 import { manualRefresh, refreshBusy } from './refresh.js';
 import { toStroops, toNumber } from '../core/amount.js';
 import { readBlndBalance } from '../core/balance.js';
@@ -68,6 +68,9 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 function isStellarPubkey(s: unknown): s is string { return typeof s === 'string' && /^G[A-Z2-7]{55}$/.test(s); }
 
 function execStatus(code: ExecError['code']): number { return code === 'down' ? 502 : 400; }
+
+const VENUES: readonly Venue[] = ['xbull', 'soroswap', 'horizon'];
+function isVenue(v: unknown): v is Venue { return typeof v === 'string' && (VENUES as readonly string[]).includes(v); }
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const rawUrl = req.url ?? '/';
@@ -192,12 +195,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const displayed = (b.displayed && typeof b.displayed === 'object')
         ? { winner: (b.displayed as any).winner, net: (b.displayed as any).net }
         : undefined;
-      let forceVenue: 'xbull' | 'soroswap' | undefined;
+      let forceVenue: Venue | undefined;
       if (b.venue !== undefined) {
-        if (b.venue !== 'xbull' && b.venue !== 'soroswap') {
-          json(res, 400, { error: 'venue invalide' }); return;
-        }
-        forceVenue = b.venue as 'xbull' | 'soroswap';
+        if (!isVenue(b.venue)) { json(res, 400, { error: 'venue invalide' }); return; }
+        forceVenue = b.venue;
       }
       try {
         const result = await pickExecutableVenue(pair, amount, b.sender, slippageBps, cfg, displayed, undefined, forceVenue);
@@ -212,7 +213,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (req.method === 'POST' && path === '/api/submit') {
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
-      if (b.venue !== 'xbull' && b.venue !== 'soroswap') { json(res, 400, { error: 'venue invalide' }); return; }
+      if (!isVenue(b.venue)) { json(res, 400, { error: 'venue invalide' }); return; }
       if (typeof b.signedXdr !== 'string' || b.signedXdr.length === 0) { json(res, 400, { error: 'signedXdr manquant' }); return; }
       if (b.venue === 'xbull' && typeof b.id !== 'string') { json(res, 400, { error: 'id requis pour xbull' }); return; }
       try {

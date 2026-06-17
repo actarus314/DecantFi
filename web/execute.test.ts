@@ -10,6 +10,9 @@ import {
   pickExecutableVenue,
   submit,
   ExecError,
+  quoteHorizon,
+  horizonPathSymbols,
+  classifyHorizonSubmit,
   type ExecDeps,
   type FetchResult,
   type SoroswapClient,
@@ -489,5 +492,68 @@ describe('submit', () => {
     await expect(
       submit('soroswap', { signedXdr: 'xdr…' }, { rpcUrl: 'r', soroswapApiKey: 'k' }, deps),
     ).rejects.toMatchObject({ name: 'ExecError', code: 'trustline' });
+  });
+});
+
+// ─── Horizon ──────────────────────────────────────────────────────────────────
+
+describe('horizonPathSymbols', () => {
+  it('mappe native → XLM et garde les codes', () => {
+    expect(horizonPathSymbols([
+      { asset_type: 'native' },
+      { asset_type: 'credit_alphanum4', asset_code: 'USDC', asset_issuer: 'GA5…' },
+    ])).toEqual(['XLM', 'USDC']);
+  });
+  it('chemin vide → []', () => {
+    expect(horizonPathSymbols([])).toEqual([]);
+  });
+});
+
+describe('quoteHorizon', () => {
+  // deps minimal : quoteHorizon n'utilise que fetchJson.
+  const depsFromBody = (body: unknown, ok = true): ExecDeps =>
+    ({ fetchJson: vi.fn(async () => ({ status: ok ? 200 : 500, ok, body })), makeSoroswap: vi.fn() }) as unknown as ExecDeps;
+
+  it('choisit le record au plus gros destination_amount + renvoie son chemin', async () => {
+    const body = { _embedded: { records: [
+      { destination_amount: '120.0', path: [] },
+      { destination_amount: '123.4567890', path: [{ asset_type: 'native' }] },
+    ] } };
+    const q = await quoteHorizon(BLND, USDC, 1000_0000000n, depsFromBody(body), 'https://h.test');
+    expect(q).not.toBeNull();
+    expect(q!.netOut).toBe(1234567890n); // 123.456789 × 1e7
+    expect(q!.path).toEqual([{ asset_type: 'native' }]);
+  });
+
+  it('records vide → null', async () => {
+    const q = await quoteHorizon(BLND, USDC, 1n, depsFromBody({ _embedded: { records: [] } }), 'h');
+    expect(q).toBeNull();
+  });
+
+  it('réponse non-ok → null', async () => {
+    const q = await quoteHorizon(BLND, EURC, 1n, depsFromBody({}, false), 'h');
+    expect(q).toBeNull();
+  });
+});
+
+describe('classifyHorizonSubmit', () => {
+  const err = (...ops: string[]) => ({ response: { data: { extras: { result_codes: { transaction: 'tx_failed', operations: ops } } } } });
+  it('op_too_few_offers (orderbook consommé) → slippage, pas down (502)', () => {
+    expect(classifyHorizonSubmit(err('op_too_few_offers'))).toBe('slippage');
+  });
+  it('op_offer_cross_self → slippage', () => {
+    expect(classifyHorizonSubmit(err('op_offer_cross_self'))).toBe('slippage');
+  });
+  it('op_under_dest_min → slippage', () => {
+    expect(classifyHorizonSubmit(err('op_under_dest_min'))).toBe('slippage');
+  });
+  it('op_no_trust → trustline', () => {
+    expect(classifyHorizonSubmit(err('op_no_trust'))).toBe('trustline');
+  });
+  it('op_underfunded → funds', () => {
+    expect(classifyHorizonSubmit(err('op_underfunded'))).toBe('funds');
+  });
+  it('code inconnu / pas de result_codes → down', () => {
+    expect(classifyHorizonSubmit(new Error('boom'))).toBe('down');
   });
 });

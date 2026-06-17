@@ -94,7 +94,7 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
     expect(aquaRow!.deepLink).toBe('https://aqua.network/');
   });
 
-  it('soroswap est exécutable, horizon ne l\'est pas', async () => {
+  it('soroswap et horizon sont exécutables (horizon sans deep-link)', async () => {
     const soroQ = makeQuote('soroswap', 5_1000000n);
     const horizonQ = makeQuote('horizon', 4_9000000n);
 
@@ -114,11 +114,11 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
     const horizonRow = result.ladder.find((r) => r.sourceId === 'horizon');
 
     expect(soroRow!.executable).toBe(true);
-    expect(horizonRow!.executable).toBe(false);
-    expect(horizonRow!.deepLink).toBeNull(); // pas dans DEEP_LINKS
+    expect(horizonRow!.executable).toBe(true); // op native PathPaymentStrictSend branchée
+    expect(horizonRow!.deepLink).toBeNull(); // exécution intégrée → pas de page de swap dédiée
   });
 
-  it('id composite xbull+ultrastellar → executable:true, deepLink xbull', async () => {
+  it('id composite (leg1+leg2) → NON exécutable (2 tx non atomiques), deepLink = base', async () => {
     const compositeQ = makeQuote('xbull+ultrastellar', 5_3000000n);
 
     vi.mocked(engineQuote).mockResolvedValue({
@@ -136,7 +136,7 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
 
     expect(row).toBeDefined();
     expect(row!.sourceId).toBe('xbull+ultrastellar');
-    expect(row!.executable).toBe(true); // base = xbull
-    expect(row!.deepLink).toBe('https://swap.xbull.io/');
+    expect(row!.executable).toBe(false); // composite = 2 tx → jamais 1-clic (sinon on exécuterait un swap direct ≠ revue)
+    expect(row!.deepLink).toBe('https://swap.xbull.io/'); // lien manuel sur la venue de base reste utile
   });
 });
