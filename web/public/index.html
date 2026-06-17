@@ -73,7 +73,8 @@ body{margin:0; background:var(--bg); color:var(--val);
 .kpi .v.green{color:var(--green);} .kpi .v.warn{color:var(--amber);} .kpi .v.bad{color:var(--red);}
 .kpi .c{font-size:12px; font-weight:600; color:var(--caption);}
 .kpi .sub{font-size:11px; color:var(--sub); font-variant-numeric:tabular-nums;}
-.kpi-row{display:flex; gap:1.2rem; flex-wrap:wrap; margin:.8rem 0 0;}
+.kpi-row{display:flex; gap:1.2rem; flex-wrap:wrap; margin:1.1rem 0 1.5rem;}
+.kpi .v .u.same{color:inherit;}
 .kpi-row .kpi{flex:1 1 0; min-width:120px;}
 .health-info{font-size:14px; color:var(--val); line-height:1.5; margin:.7rem 0 0;}
 
@@ -99,7 +100,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 .page-footer{margin-top:2rem; padding-top:1rem; border-top:1px solid var(--card-border); font-size:11px; color:var(--sub); line-height:1.6;}
 .page-footer button{background:none; border:none; font-size:11px; color:var(--sub); cursor:pointer; padding:0; text-decoration:underline; text-underline-offset:2px;}
 .page-footer button:hover{color:var(--caption);}
-.backlink{background:none; border:none; font-size:12px; color:var(--caption); cursor:pointer; padding:0 0 .5rem; text-decoration:underline; text-underline-offset:2px;}
+.backlink{background:none; border:none; font-size:12px; color:var(--caption); cursor:pointer; padding:0 0 1rem; text-decoration:underline; text-underline-offset:2px;}
 .backlink:hover{color:var(--val);}
 .tag{font-size:11px; font-weight:600; color:var(--caption); background:var(--section-bg); border:1px solid var(--card-border); border-radius:6px; padding:1px 7px;}
 .pos{color:var(--green);} .neg{color:var(--red);}
@@ -1085,8 +1086,8 @@ function buildHealthPage(topbarHtml) {
     // mêmes seuils que les barres de dispo : ≥98 % vert, ≥90 % ambre, sinon rouge
     const okCls = pct >= 98 ? 'green' : pct >= 90 ? 'warn' : 'bad';
     const coverVal = coverH >= 24
-      ? `${Math.floor(coverH / 24)}<span class="u">j</span> ${coverH % 24}<span class="u">h</span>`
-      : `${coverH}<span class="u">h</span>`;
+      ? `${Math.floor(coverH / 24)}<span class="u same">j</span> ${coverH % 24}<span class="u same">h</span>`
+      : `${coverH}<span class="u same">h</span>`;
     return `<div class="kpi-row">
       <div class="kpi"><span class="c">${t('health_kpi_readings')}</span><span class="v ${okCls}">${meta.nTicksOk}<span class="u">/ ${meta.nTicks}</span></span><span class="sub">${t('health_kpi_valid', pct)}</span></div>
       <div class="kpi"><span class="c">${t('health_kpi_cadence')}</span><span class="v">${cadH}</span><span class="sub">${t('health_kpi_perday', perDay)}</span></div>
