@@ -92,6 +92,8 @@ body{margin:0; background:var(--bg); color:var(--val);
 .page-footer{margin-top:2rem; padding-top:1rem; border-top:1px solid var(--card-border); font-size:11px; color:var(--sub); line-height:1.6;}
 .page-footer button{background:none; border:none; font-size:11px; color:var(--sub); cursor:pointer; padding:0; text-decoration:underline; text-underline-offset:2px;}
 .page-footer button:hover{color:var(--caption);}
+.backlink{background:none; border:none; font-size:12px; color:var(--caption); cursor:pointer; padding:0 0 .5rem; text-decoration:underline; text-underline-offset:2px;}
+.backlink:hover{color:var(--val);}
 .tag{font-size:11px; font-weight:600; color:var(--caption); background:var(--section-bg); border:1px solid var(--card-border); border-radius:6px; padding:1px 7px;}
 .pos{color:var(--green);} .neg{color:var(--red);}
 
@@ -385,6 +387,12 @@ const STRINGS = {
     health_ago_min: (n) => `il y a ${n} min`,
     health_ago_h: (n) => `il y a ${n} h`,
     health_ago_j: (n) => `il y a ${n} j`,
+    // Causes d'échec ③-bis
+    chip_down: 'échec',
+    reason_timeout: 'timeout',
+    reason_http: 'erreur HTTP',
+    reason_indisponible: 'indisponible',
+    nav_back: '← Tableau de bord',
   },
   en: {
     // Topbar / brand
@@ -556,6 +564,12 @@ const STRINGS = {
     health_ago_min: (n) => `${n} min ago`,
     health_ago_h: (n) => `${n} h ago`,
     health_ago_j: (n) => `${n} d ago`,
+    // Failure causes ③-bis
+    chip_down: 'failed',
+    reason_timeout: 'timeout',
+    reason_http: 'HTTP error',
+    reason_indisponible: 'unavailable',
+    nav_back: '← Dashboard',
   },
 };
 
@@ -733,6 +747,13 @@ function healthAgo(isoStr) {
   return t('health_ago_j', Math.round(diffH / 24));
 }
 
+// ─── Libellé d'une cause d'échec ③-bis (timeout/http/indisponible) ────────────
+function reasonLabel(code) {
+  if (!code) return '';
+  const lab = t('reason_' + code);
+  return lab === 'reason_' + code ? code : lab; // fallback : code brut si non mappé
+}
+
 // ─── Échelle de sources ───────────────────────────────────────────────────────
 function ladderHead(u) {
   return `<thead><tr>
@@ -772,11 +793,11 @@ function ladderRows(rows, u, down) {
   }).join('');
   // Lignes de sources en échec (axe santé, distinct des chips confiance) — ponytail: health axis
   if (down && down.length > 0) {
-    html += down.map(name =>
-      `<tr><td><span class="srcname muted">${name}</span></td>
+    html += down.map(d =>
+      `<tr><td><span class="srcname muted">${d.display}</span></td>
       <td class="muted">—</td>
       <td class="muted">—</td>
-      <td><span class="chip down">échec</span></td>
+      <td><span class="chip down">${t('chip_down')} · ${reasonLabel(d.reason)}</span></td>
       <td class="muted">—</td>
       <td class="left muted">—</td></tr>`
     ).join('');
@@ -991,7 +1012,7 @@ function buildHealthPage(topbarHtml) {
     return `${topbarHtml}<p class="help" style="margin:1rem 0">${t('loading')}</p>`;
   }
   const rows = health.sources || [];
-  // cause de panne (timeout/down) volontairement absente — nécessiterait une capture backend (différée)
+  // cause de panne (timeout/http/indisponible) capturée côté backend (③-bis) ; legacy = horodatage seul
   const tableRows = rows.map(s => {
     const trackCls = s.uptimePct >= 98 ? '' : s.uptimePct >= 90 ? ' warn' : ' bad';
     const ubar = `<div class="ubar">
@@ -1008,12 +1029,13 @@ function buildHealthPage(topbarHtml) {
       <td>${ubar}</td>
       <td><span class="days">${dots}</span></td>
       <td>${s.failedTicks}</td>
-      <td class="muted">${healthAgo(s.lastFailureAt)}</td>
+      <td class="muted">${healthAgo(s.lastFailureAt)}${s.lastFailureAt && s.lastFailureReason ? ' · ' + reasonLabel(s.lastFailureReason) : ''}</td>
     </tr>`;
   }).join('');
 
   return `${topbarHtml}
   <div class="zone">
+    <button class="backlink" onclick="setView('dashboard')">${t('nav_back')}</button>
     <div class="zone-h">${t('health_title')}</div>
     <div style="overflow-x:auto"><table class="flt">
       <thead><tr>
@@ -1104,10 +1126,6 @@ function buildPage() {
   const topbarHtml = `
   <div class="topbar">
     <span class="brand">stellarswap <span class="dim">· ${t('brand_dim')}</span></span>
-    <span class="pagenav">
-      <button class="${view==='dashboard'?'active':''}" onclick="setView('dashboard')">${t('nav_dashboard')}</button>
-      <button class="${view==='health'?'active':''}" onclick="setView('health')">${t('nav_health')}</button>
-    </span>
     ${freshHtml}
     ${refreshHtml()}
     <span class="topbar-right">

@@ -10,6 +10,7 @@ import { fetchPrices, targetUsdPerUnit, priceImpactPct, type Prices } from './pr
 import { convertXlmToTarget } from './gas.js';
 import { compareEurc, type EurcComparison } from './eurc.js';
 import { analyzeSplit, type SplitAnalysis } from './split.js';
+import { diag, type Diag } from './sources/diag.js';
 
 export interface EngineConfig extends SourceConfig {
   slippageBps?: number;
@@ -29,6 +30,8 @@ export interface QuoteResult {
   split?: SplitAnalysis;
   /** Ids des sources disponibles n'ayant pas rendu de cotation (info, non bloquant). */
   errors: string[];
+  /** Cause de l'échec par source id, si capturée (timeout / http / indisponible). */
+  errorReasons?: Record<string, string>;
 }
 
 function clampSub(a: Stroops, b: Stroops): Stroops {
@@ -52,19 +55,30 @@ export async function quoteAll(
   req: QuoteRequest,
   cfg: EngineConfig,
   prices: Prices,
-): Promise<{ quotes: NormalizedQuote[]; errors: string[] }> {
+): Promise<{ quotes: NormalizedQuote[]; errors: string[]; errorReasons: Record<string, string> }> {
   const adapters = (cfg.adapters ?? ADAPTERS).filter(
     (a) => a.available(cfg) && (a.supports ? a.supports(req) : true),
   );
-  const settled = await Promise.allSettled(adapters.map((a) => a.quote(req, cfg)));
+  // ponytail: un store ALS par adaptateur — diag.run() injecte le contexte sans changer la signature.
+  const stores: Diag[] = adapters.map(() => ({}));
+  const settled = await Promise.allSettled(
+    adapters.map((a, i) => diag.run(stores[i]!, () => a.quote(req, cfg))),
+  );
   const quotes: NormalizedQuote[] = [];
   const errors: string[] = [];
+  const errorReasons: Record<string, string> = {};
   settled.forEach((s, i) => {
     const id = adapters[i]!.id;
-    if (s.status === 'fulfilled' && s.value) quotes.push(finalize(s.value, prices));
-    else errors.push(id);
+    if (s.status === 'fulfilled' && s.value) {
+      quotes.push(finalize(s.value, prices));
+    } else {
+      errors.push(id);
+      const thrownReason = s.status === 'rejected' && (s.reason as Error)?.name === 'TimeoutError' ? 'timeout' : null;
+      const reason = thrownReason ?? stores[i]!.reason ?? 'indisponible';
+      errorReasons[id] = reason;
+    }
   });
-  return { quotes, errors };
+  return { quotes, errors, errorReasons };
 }
 
 export interface QuoteOptions {
@@ -114,5 +128,6 @@ export async function quote(opts: QuoteOptions): Promise<QuoteResult> {
     eurc,
     split,
     errors: main.errors,
+    errorReasons: main.errorReasons,
   };
 }

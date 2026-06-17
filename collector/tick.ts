@@ -89,10 +89,12 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
   };
 
   const quotes: QuoteInsert[] = [];
-  const errors = new Set<string>();
+  const reasons = new Map<string, string>(); // id → cause (timeout/http/indisponible)
   for (const probe of deps.probes) {
     const result = await deps.quote({ sell: BLND, buy: probe.buy, amountIn: probe.amountIn, cfg: sourceCfg });
-    for (const e of result.errors) errors.add(e);
+    for (const e of result.errors) {
+      if (!reasons.has(e)) reasons.set(e, result.errorReasons?.[e] ?? 'indisponible');
+    }
     quotes.push(...rowsForProbe(probe, result, prices));
   }
 
@@ -101,7 +103,10 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     started_at: startedAt.toISOString(), finished_at: finishedAt.toISOString(), cadence_sec: deps.cfg.cadenceSec,
     blnd_usd: prices.blndUsd, xlm_usd: prices.xlmUsd, eur_usd: prices.eurUsd,
     ok: quotes.some((q) => q.net_out !== null && q.net_out > 0n),
-    source_errors: errors.size > 0 ? [...errors].join(', ') : null, note: null,
+    source_errors: reasons.size > 0
+      ? JSON.stringify([...reasons].map(([id, reason]) => ({ id, reason })))
+      : null,
+    note: null,
   };
   return { tick, quotes };
 }

@@ -21,6 +21,7 @@ function usdcResult(amountIn: bigint): QuoteResult {
     request: { sell: 'BLND', buy: 'USDC', amountIn, slippageBps: 50 }, prices,
     ranking: { ranked: [{ ...best, rank: 1, deltaVsBestPct: 0 }, { ...floor, rank: 2, deltaVsBestPct: -9 }], best: { ...best, rank: 1, deltaVsBestPct: 0 }, floor },
     errors: ['stellarbroker'],
+    errorReasons: { stellarbroker: 'http' },
   };
 }
 
@@ -33,7 +34,7 @@ describe('runTick (USDC)', () => {
     });
     expect(tick.ok).toBe(true);
     expect(tick.blnd_usd).toBe(0.05);
-    expect(tick.source_errors).toBe('stellarbroker');
+    expect(JSON.parse(tick.source_errors!)).toEqual([{ id: 'stellarbroker', reason: 'http' }]);
     expect(quotes.length).toBe(2);
     expect(quotes.filter((q) => q.is_winner).map((q) => q.source_id)).toEqual(['xbull']);
     expect(quotes[0]!.eurc_path).toBeNull();
@@ -110,6 +111,7 @@ describe('runTick (tout-KO)', () => {
     const empty: QuoteResult = {
       request: { sell: 'BLND', buy: 'USDC', amountIn: toStroops('250'), slippageBps: 50 }, prices,
       ranking: { ranked: [] }, errors: ['xbull', 'horizon'],
+      errorReasons: { xbull: 'timeout', horizon: 'indisponible' },
     };
     const { tick, quotes } = await runTick({
       probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
@@ -117,6 +119,6 @@ describe('runTick (tout-KO)', () => {
     });
     expect(tick.ok).toBe(false);
     expect(quotes.length).toBe(0);
-    expect(tick.source_errors).toBe('xbull, horizon');
+    expect(JSON.parse(tick.source_errors!)).toEqual([{ id: 'xbull', reason: 'timeout' }, { id: 'horizon', reason: 'indisponible' }]);
   });
 });

@@ -493,6 +493,7 @@ export interface SourceHealth {
   failedTicks: number;
   uptimePct: number;    // arrondi à 1 décimale
   lastFailureAt: string | null;  // ISO ou null
+  lastFailureReason: string | null; // timeout / http / indisponible / null
   days: Array<'ok' | 'warn' | 'bad' | null>;  // 7 entrées, index 0 = le plus récent
   pairNote: string | null;       // ex. 'USDC uniquement' pour comet
 }
@@ -501,6 +502,20 @@ export interface SourceHealthResult {
   totalTicks: number;
   windowDays: 7;
   sources: SourceHealth[];
+}
+
+/** Parse source_errors : JSON ([{id,reason}]) ou CSV legacy ("soroswap, comet"). */
+export function parseSourceErrors(raw: unknown): Array<{ id: string; reason: string | null }> {
+  if (raw == null) return [];
+  const s = String(raw).trim();
+  if (s === '') return [];
+  if (s.startsWith('[')) {
+    try {
+      const a = JSON.parse(s);
+      if (Array.isArray(a)) return a.map((x) => ({ id: String(x.id), reason: x.reason != null ? String(x.reason) : null }));
+    } catch { /* fallthrough */ }
+  }
+  return s.split(',').map((t) => t.trim()).filter(Boolean).map((id) => ({ id, reason: null }));
 }
 
 /**
@@ -549,13 +564,14 @@ export function buildSourceHealth(
     responded: number;
     failed: number;
     lastFailureAt: string | null;
+    lastFailureReason: string | null;
     // dayTicks[i] = nb ticks dans le jour i (0=auj.), dayFails[i] = nb échecs dans le jour i
     dayTicks: number[];
     dayFails: number[];
   };
   const acc = new Map<string, SrcAcc>();
   for (const id of knownIds) {
-    acc.set(id, { responded: 0, failed: 0, lastFailureAt: null, dayTicks: new Array(7).fill(0), dayFails: new Array(7).fill(0) });
+    acc.set(id, { responded: 0, failed: 0, lastFailureAt: null, lastFailureReason: null, dayTicks: new Array(7).fill(0), dayFails: new Array(7).fill(0) });
   }
 
   // Requête B : quotes (sources qui ont répondu) sur les ticks ok de la fenêtre
@@ -594,13 +610,11 @@ export function buildSourceHealth(
     const dateKey = `${y}-${m}-${dy}`;
     const dayIdx = targetDates.indexOf(dateKey);
 
-    // Echecs sur ce tick : source_errors = CSV ou null
+    // Echecs sur ce tick : source_errors = JSON ou CSV (rétrocompat)
     const errorsRaw = row['source_errors'];
-    const failedIds = new Set<string>(
-      errorsRaw
-        ? String(errorsRaw).split(',').map((s) => s.trim()).filter((s) => !s.includes('+') && knownIds.includes(s))
-        : [],
-    );
+    const parsedErrors = parseSourceErrors(errorsRaw).filter((e) => !e.id.includes('+') && knownIds.includes(e.id));
+    const failedIds = new Set<string>(parsedErrors.map((e) => e.id));
+    const failedReasonMap = new Map<string, string | null>(parsedErrors.map((e) => [e.id, e.reason]));
 
     const tickId = String(row['id']);
     const respondedIds = respondedByTick.get(tickId) ?? new Set<string>();
@@ -614,7 +628,10 @@ export function buildSourceHealth(
       if (responded) a.responded++;
       if (failed) {
         a.failed++;
-        if (!a.lastFailureAt || startedAt > a.lastFailureAt) a.lastFailureAt = startedAt;
+        if (!a.lastFailureAt || startedAt > a.lastFailureAt) {
+          a.lastFailureAt = startedAt;
+          a.lastFailureReason = failedReasonMap.get(id) ?? null;
+        }
       }
       if (dayIdx >= 0) {
         a.dayTicks[dayIdx]! ++;
@@ -645,6 +662,7 @@ export function buildSourceHealth(
       failedTicks: a.failed,
       uptimePct,
       lastFailureAt: a.lastFailureAt,
+      lastFailureReason: a.lastFailureReason,
       days,
       pairNote: id === 'comet' ? 'USDC uniquement' : null,
     };

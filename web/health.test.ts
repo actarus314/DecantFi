@@ -194,4 +194,46 @@ describe('buildSourceHealth — sources', () => {
     // La DB stocke le format ISO sans millisecondes (ex. '2025-05-28T10:00:00Z')
     expect(soroswap!.lastFailureAt).toContain('2025-05-28T10:00:00');
   });
+
+  it('source_errors legacy CSV → lastFailureReason null (rétrocompat)', () => {
+    // tick1 a source_errors='soroswap' (CSV, sans cause)
+    const soroswap = result.sources.find(s => s.id === 'soroswap');
+    expect(soroswap!.failedTicks).toBe(1);
+    expect(soroswap!.lastFailureReason).toBeNull();
+  });
+});
+
+// ─── Cause d'échec (③-bis) : source_errors JSON [{id,reason}] ───────────────────
+
+describe('buildSourceHealth — cause JSON', () => {
+  let dir2: string;
+  let path2: string;
+  let res2: ReturnType<typeof buildSourceHealth>;
+
+  beforeAll(() => {
+    dir2 = mkdtempSync(join(tmpdir(), 'stellarswap-health-cause-'));
+    path2 = join(dir2, 'test.db');
+    const db = openDb(path2);
+    // Tick JSON : soroswap=timeout, comet=http
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-28T10:00:00Z', source_errors: '[{"id":"soroswap","reason":"timeout"},{"id":"comet","reason":"http"}]' }),
+      [mkQuote('xbull'), mkQuote('aquarius'), mkQuote('ultrastellar'), mkQuote('stellarbroker'), mkQuote('horizon')],
+    );
+    db.close();
+    const rdb = openReadOnly(path2);
+    res2 = buildSourceHealth(rdb, WINDOW_START, NOW);
+    rdb.close();
+  });
+
+  afterAll(() => { rmSync(dir2, { recursive: true, force: true }); });
+
+  it('JSON → cause par source remontée dans lastFailureReason', () => {
+    expect(res2.sources.find(s => s.id === 'soroswap')!.lastFailureReason).toBe('timeout');
+    expect(res2.sources.find(s => s.id === 'comet')!.lastFailureReason).toBe('http');
+  });
+
+  it('JSON → failedTicks comptés', () => {
+    expect(res2.sources.find(s => s.id === 'soroswap')!.failedTicks).toBe(1);
+    expect(res2.sources.find(s => s.id === 'comet')!.failedTicks).toBe(1);
+  });
 });
