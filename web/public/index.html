@@ -389,6 +389,7 @@ const STRINGS = {
     health_legend_warn: '< 25 % d\'échecs',
     health_legend_bad: '≥ 25 % d\'échecs',
     health_legend_null: 'aucun relevé',
+    health_auto_only: 'Seuls les relevés automatiques (1 toutes les 15 min) sont pris en compte ici — les rafraîchissements manuels sont exclus du calcul de stabilité.',
     health_never: '—',
     health_ago_min: (n) => `il y a ${n} min`,
     health_ago_h: (n) => `il y a ${n} h`,
@@ -575,6 +576,7 @@ const STRINGS = {
     health_legend_warn: '< 25% failures',
     health_legend_bad: '≥ 25% failures',
     health_legend_null: 'no readings',
+    health_auto_only: 'Only automatic measurements (one every 15 min) are counted here — manual refreshes are excluded from the stability stats.',
     health_never: '—',
     health_ago_min: (n) => `${n} min ago`,
     health_ago_h: (n) => `${n} h ago`,
@@ -1101,6 +1103,7 @@ function buildHealthPage(topbarHtml) {
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="b"></i></span>${t('health_legend_bad')} &nbsp;
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="g"></i></span>${t('health_legend_null')}
     </p>
+    <p class="help" style="margin:.4rem 0 0;font-size:11px">${t('health_auto_only')}</p>
   </div>`;
 }
 
