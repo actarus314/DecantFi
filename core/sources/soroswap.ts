@@ -7,7 +7,8 @@
 import type { SourceAdapter, NormalizedQuote, QuoteRequest, SourceConfig } from './types.js';
 import { DEFAULT_GAS_XLM } from '../gas.js';
 import { USDC, XLM, bySac } from '../assets.js';
-import { bigintOrNull, hops } from './util.js';
+import { bigintOrNull, hops, cached } from './util.js';
+import { setReason, rpcReason } from './diag.js';
 
 const FACTORY = 'CA4HEQTL2WPEUYKYKCDOHCDNIV4QHNJ7EL4J4NQ6VADP7SYHVRYZ7AW2'; // mainnet, keyless
 
@@ -56,7 +57,8 @@ export const soroswap: SourceAdapter = {
   async quote(req, cfg) {
     try {
       return await liveRoute(req, cfg);
-    } catch {
+    } catch (e) {
+      setReason(rpcReason(e));
       return null;
     }
   },
@@ -88,33 +90,26 @@ async function liveRoute(req: QuoteRequest, cfg: SourceConfig): Promise<Normaliz
     for (let j = i + 1; j < universe.length; j++) candidates.push([universe[i]!, universe[j]!]);
   }
 
-  // Lit chaque pool en parallele. Un pool absent OU une lecture en echec est simplement ignore.
-  // ponytail: drop silencieux d'un pool = Soroswap sous-cote (il perd, jamais de faux gagnant) ;
-  // distinguer "absent" de "RPC en echec" serait un raffinement si la ligne Soroswap montre des trous.
-  const livePairs = (
-    await Promise.all(
-      candidates.map(async ([a, b]) => {
-        try {
-          const pair = await simCall(FACTORY, 'get_pair', new Address(a).toScVal(), new Address(b).toScVal());
-          const [reserves, token0] = await Promise.all([simCall(pair, 'get_reserves'), simCall(pair, 'token_0')]);
-          const t0 = String(token0);
-          // Soroswap : reserves[0]<->token_0, reserves[1]<->token_1 (meme mapping que la voie single-pair).
-          return {
-            tokenA: t0,
-            tokenB: t0 === a ? b : a,
-            reserveA: reserves[0].toString(),
-            reserveB: reserves[1].toString(),
-            protocol: Protocol.SOROSWAP,
-            fee: '30',
-          };
-        } catch {
-          return null;
-        }
-      }),
-    )
-  ).filter((p): p is NonNullable<typeof p> => p !== null);
+  // Lit chaque pool — MÉMOÏSÉ par paire {a,b} sur cfg.rpcCache (partagé par tout le tick) : les sondes
+  // EURC relancent 3 sous-cotations qui re-lisent les mêmes pools → sans cache, rafale qui sature le RPC
+  // public (429). Le résultat (token_0 + réserves) est indépendant de l'ordre/sens/taille → clé triée.
+  // ponytail: drop silencieux d'un pool = Soroswap sous-cote (il perd, jamais de faux gagnant).
+  const readPair = ([a, b]: [string, string]) =>
+    cached(cfg.rpcCache, `soroswap:pool:${[a, b].slice().sort().join('|')}`, async () => {
+      try {
+        const pair = await simCall(FACTORY, 'get_pair', new Address(a).toScVal(), new Address(b).toScVal());
+        const [reserves, token0] = await Promise.all([simCall(pair, 'get_reserves'), simCall(pair, 'token_0')]);
+        const t0 = String(token0);
+        return { tokenA: t0, tokenB: t0 === a ? b : a, reserveA: reserves[0].toString(), reserveB: reserves[1].toString(), protocol: Protocol.SOROSWAP, fee: '30' };
+      } catch (e) {
+        setReason(rpcReason(e)); // 429 / timeout / rpc — pour l'affichage santé
+        return null;
+      }
+    });
+  const livePairs = (await Promise.all(candidates.map(readPair)))
+    .filter((p): p is NonNullable<typeof p> => p !== null);
 
-  if (livePairs.length === 0) return null;
+  if (livePairs.length === 0) { setReason('rpc'); return null; }
 
   const tIn = new Token(Networks.PUBLIC, req.sellAsset.sac, req.sellAsset.decimals, req.sellAsset.code, req.sellAsset.symbol);
   const tOut = new Token(Networks.PUBLIC, req.buyAsset.sac, req.buyAsset.decimals, req.buyAsset.code, req.buyAsset.symbol);

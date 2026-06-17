@@ -79,12 +79,14 @@ body{margin:0; background:var(--bg); color:var(--val);
 /* ponytail: health axis, distinct from confidence chips */
 .chip.down{border-color:var(--tool); color:var(--tool);}
 /* Santé des sources : barre de disponibilité + points journaliers */
-.ubar{display:inline-grid; grid-template-columns:1fr max-content; gap:.5rem; align-items:center; width:170px;}
+.ubar{display:grid; grid-template-columns:max-content 1fr max-content; gap:.45rem; align-items:center; width:190px;}
+.ubar + .ubar{margin-top:4px;}
+.ubar .sz{font-size:11px; color:var(--caption); font-weight:600; font-variant-numeric:tabular-nums; min-width:30px; text-align:right;}
 .ubar .track{height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden;}
 .ubar .track > span{display:block; height:100%; border-radius:9999px; background:var(--green);}
 .ubar .track.warn > span{background:var(--amber);}
 .ubar .track.bad > span{background:var(--tool);}
-.ubar .pct{font-size:12px; font-weight:600; color:var(--caption); text-align:right; white-space:nowrap;}
+.ubar .pct{font-size:12px; font-weight:600; color:var(--caption); text-align:right; white-space:nowrap; min-width:38px;}
 .days{display:inline-flex; gap:4px;}
 .days i{width:11px; height:11px; border-radius:50%; display:inline-block; background:var(--green);}
 .days i.w{background:var(--amber);} .days i.b{background:var(--tool);} .days i.g{background:var(--card-border);}
@@ -392,6 +394,10 @@ const STRINGS = {
     reason_timeout: 'timeout',
     reason_http: 'erreur HTTP',
     reason_indisponible: 'indisponible',
+    'reason_rate-limit': 'RPC saturé (429)',
+    reason_rpc: 'erreur RPC',
+    reason_simulation: 'simulation',
+    health_col_sizes: 'Disponibilité par sonde',
     nav_back: '← Tableau de bord',
   },
   en: {
@@ -569,6 +575,10 @@ const STRINGS = {
     reason_timeout: 'timeout',
     reason_http: 'HTTP error',
     reason_indisponible: 'unavailable',
+    'reason_rate-limit': 'RPC throttled (429)',
+    reason_rpc: 'RPC error',
+    reason_simulation: 'simulation',
+    health_col_sizes: 'Availability by probe',
     nav_back: '← Dashboard',
   },
 };
@@ -1014,11 +1024,11 @@ function buildHealthPage(topbarHtml) {
   const rows = health.sources || [];
   // cause de panne (timeout/http/indisponible) capturée côté backend (③-bis) ; legacy = horodatage seul
   const tableRows = rows.map(s => {
-    const trackCls = s.uptimePct >= 98 ? '' : s.uptimePct >= 90 ? ' warn' : ' bad';
-    const ubar = `<div class="ubar">
-      <div class="track${trackCls}"><span style="width:${s.uptimePct}%"></span></div>
-      <span class="pct">${s.uptimePct.toFixed(1)} %</span>
-    </div>`;
+    // Granularité : une barre par sonde (taille). Couleur selon la dispo de CETTE taille.
+    const bars = (s.bySize || []).map(b => {
+      const cls = b.uptimePct >= 98 ? '' : b.uptimePct >= 90 ? ' warn' : ' bad';
+      return `<div class="ubar"><span class="sz">${b.size}</span><div class="track${cls}"><span style="width:${b.uptimePct}%"></span></div><span class="pct">${b.uptimePct.toFixed(0)} %</span></div>`;
+    }).join('');
     const dots = s.days.map(d => {
       const cls = d === 'ok' ? '' : d === 'warn' ? ' w' : d === 'bad' ? ' b' : ' g';
       return `<i class="${cls.trim()}"title="${d ?? t('health_legend_null')}"></i>`;
@@ -1026,7 +1036,7 @@ function buildHealthPage(topbarHtml) {
     const pairNote = s.pairNote ? ` <span class="muted" style="font-size:11px">· ${s.pairNote}</span>` : '';
     return `<tr>
       <td><span class="srcname">${s.display}</span>${pairNote}</td>
-      <td>${ubar}</td>
+      <td>${bars}</td>
       <td><span class="days">${dots}</span></td>
       <td>${s.failedTicks}</td>
       <td class="muted">${healthAgo(s.lastFailureAt)}${s.lastFailureAt && s.lastFailureReason ? ' · ' + reasonLabel(s.lastFailureReason) : ''}</td>
@@ -1040,7 +1050,7 @@ function buildHealthPage(topbarHtml) {
     <div style="overflow-x:auto"><table class="flt">
       <thead><tr>
         <th>${t('health_col_source')}</th>
-        <th class="left">${t('health_col_uptime')}</th>
+        <th class="left">${t('health_col_sizes')}</th>
         <th>${t('health_col_days')}</th>
         <th>${t('health_col_fails')}</th>
         <th>${t('health_col_last')}</th>

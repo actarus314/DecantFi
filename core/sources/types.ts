@@ -26,6 +26,13 @@ export interface SourceConfig {
   walletAddress?: string;
   /** Timeout reseau par source (ms). */
   timeoutMs?: number;
+  /**
+   * Cache de lectures RPC partagé sur la durée d'UNE opération logique (un tick = ses 4 sondes,
+   * ou une requête web). Coalesce les lectures de pools identiques entre sondes/sous-cotations
+   * (les sondes EURC relancent 3 sous-cotations qui re-lisent les mêmes pools) → évite la rafale
+   * qui sature le RPC public (429). Clé = `${contract}:${method}:${args}`. Absent = pas de cache.
+   */
+  rpcCache?: Map<string, Promise<unknown>>;
 }
 
 export type NetConfidence = 'exact' | 'floor' | 'estimate';
