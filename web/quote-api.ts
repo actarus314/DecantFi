@@ -242,7 +242,7 @@ export async function liveQuote(
     deepLink: deepLink(r.source, pairUi),
     // Les lignes composites (EURC via-USDC = "leg1+leg2") = 2 tx non atomiques → JAMAIS exécutables en 1 clic
     // (sinon un clic exécuterait un swap direct 1-leg ≠ les 2 tx revues). Seules les venues simples le sont.
-    executable: !r.source.includes('+') && ['xbull', 'soroswap', 'horizon'].includes(r.source.trim()),
+    executable: !r.source.includes('+') && ['xbull', 'soroswap', 'horizon', 'aquarius'].includes(r.source.trim()),
   }));
 
   return {

@@ -85,9 +85,9 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
     expect(xbullRow).toBeDefined();
     expect(aquaRow).toBeDefined();
 
-    // executable : xbull = true, aquarius = false
+    // executable : xbull = true, aquarius = true (venue d'exécution branchée)
     expect(xbullRow!.executable).toBe(true);
-    expect(aquaRow!.executable).toBe(false);
+    expect(aquaRow!.executable).toBe(true);
 
     // deepLink : xbull et aquarius ont des liens connus
     expect(xbullRow!.deepLink).toBe('https://swap.xbull.io/');
