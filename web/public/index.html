@@ -24,6 +24,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 .topbar{display:flex; align-items:center; gap:.7rem; margin-bottom:1rem; flex-wrap:wrap;}
 .brand{font-size:15px; font-weight:700; letter-spacing:-.01em;}
 .brand .dim{color:var(--caption); font-weight:600;}
+.brand-logo{border-radius:5px; display:block; flex:none; margin-right:-.3rem;}
 .pagenav{display:inline-flex; gap:4px; background:var(--section-bg); border:1px solid var(--card-border); border-radius:9999px; padding:3px;}
 .pagenav button{border:0; background:transparent; color:var(--caption); font-size:13px; font-weight:700; padding:5px 16px; border-radius:9999px; cursor:pointer; transition:all .15s;}
 .pagenav button.active{background:#1e293b; color:#fff;}
@@ -1172,6 +1173,7 @@ function buildPage() {
 
   const topbarHtml = `
   <div class="topbar">
+    <img class="brand-logo" src="/favicon.svg" width="22" height="22" alt="">
     <span class="brand">stellarswap <span class="dim">· ${t('brand_dim')}</span></span>
     ${freshHtml}
     ${refreshHtml()}
