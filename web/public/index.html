@@ -70,10 +70,10 @@ body{margin:0; background:var(--bg); color:var(--val);
 .kpi.hero .v{font-size:28px;} .kpi.hero{padding:.8rem 1.05rem; gap:.3rem;}
 .kpi .v{font-size:20px; font-weight:600; line-height:1.1; color:var(--val); font-variant-numeric:tabular-nums;}
 .kpi .v .u{margin-left:.25rem; font-size:11px; font-weight:400; color:var(--sub);}
-.kpi .v.green{color:var(--green);}
+.kpi .v.green{color:var(--green);} .kpi .v.warn{color:var(--amber);} .kpi .v.bad{color:var(--red);}
 .kpi .c{font-size:12px; font-weight:600; color:var(--caption);}
 .kpi .sub{font-size:11px; color:var(--sub); font-variant-numeric:tabular-nums;}
-.kpi-row{display:flex; gap:.6rem; flex-wrap:wrap; margin:.8rem 0 0;}
+.kpi-row{display:flex; gap:1.2rem; flex-wrap:wrap; margin:.8rem 0 0;}
 .kpi-row .kpi{flex:1 1 0; min-width:120px;}
 .health-info{font-size:14px; color:var(--val); line-height:1.5; margin:.7rem 0 0;}
 
@@ -393,8 +393,8 @@ const STRINGS = {
     health_legend_bad: '≥ 25 % d\'échecs',
     health_legend_null: 'aucun relevé',
     health_auto_only: 'Seuls les relevés automatiques (1 toutes les 15 min) sont pris en compte ici — les rafraîchissements manuels sont exclus du calcul de stabilité.',
-    health_kpi_readings: 'Relevés',
-    health_kpi_valid: (n) => `${n} valides`,
+    health_kpi_readings: 'Relevés valides',
+    health_kpi_valid: (p) => `${p} % valides`,
     health_kpi_cadence: 'Cadence',
     health_kpi_perday: (n) => `≈ ${n}/j`,
     health_kpi_coverage: 'Couverture',
@@ -585,8 +585,8 @@ const STRINGS = {
     health_legend_bad: '≥ 25% failures',
     health_legend_null: 'no readings',
     health_auto_only: 'Only automatic measurements (one every 15 min) are counted here — manual refreshes are excluded from the stability stats.',
-    health_kpi_readings: 'Readings',
-    health_kpi_valid: (n) => `${n} valid`,
+    health_kpi_readings: 'Valid readings',
+    health_kpi_valid: (p) => `${p}% valid`,
     health_kpi_cadence: 'Cadence',
     health_kpi_perday: (n) => `≈ ${n}/d`,
     health_kpi_coverage: 'Coverage',
@@ -1081,10 +1081,16 @@ function buildHealthPage(topbarHtml) {
     const perDay = Math.round(86400 / meta.cadenceSec);
     const coverH = Math.round(meta.nTicks * meta.cadenceSec / 3600);
     const cadH = cadenceHuman(meta.cadenceSec);
+    const pct = meta.nTicks ? Math.round(meta.nTicksOk / meta.nTicks * 100) : 0;
+    // mêmes seuils que les barres de dispo : ≥98 % vert, ≥90 % ambre, sinon rouge
+    const okCls = pct >= 98 ? 'green' : pct >= 90 ? 'warn' : 'bad';
+    const coverVal = coverH >= 24
+      ? `${Math.floor(coverH / 24)}<span class="u">j</span> ${coverH % 24}<span class="u">h</span>`
+      : `${coverH}<span class="u">h</span>`;
     return `<div class="kpi-row">
-      <div class="kpi"><span class="c">${t('health_kpi_readings')}</span><span class="v">${meta.nTicks}</span><span class="sub">${t('health_kpi_valid', meta.nTicksOk)}</span></div>
+      <div class="kpi"><span class="c">${t('health_kpi_readings')}</span><span class="v ${okCls}">${meta.nTicksOk}<span class="u">/ ${meta.nTicks}</span></span><span class="sub">${t('health_kpi_valid', pct)}</span></div>
       <div class="kpi"><span class="c">${t('health_kpi_cadence')}</span><span class="v">${cadH}</span><span class="sub">${t('health_kpi_perday', perDay)}</span></div>
-      <div class="kpi"><span class="c">${t('health_kpi_coverage')}</span><span class="v">${coverH}<span class="u">h</span></span></div>
+      <div class="kpi"><span class="c">${t('health_kpi_coverage')}</span><span class="v">${coverVal}</span></div>
     </div>`;
   })() : '';
   // cause de panne (timeout/http/indisponible) capturée côté backend (③-bis) ; legacy = horodatage seul
@@ -1112,7 +1118,6 @@ function buildHealthPage(topbarHtml) {
   <div class="zone">
     <button class="backlink" onclick="setView('dashboard')">${t('nav_back')}</button>
     <div class="zone-h">${t('health_title')}</div>
-    <p class="health-info">${t('health_auto_only')}</p>
     ${kpiHtml}
     <div style="overflow-x:auto"><table class="flt">
       <thead><tr>
@@ -1130,6 +1135,7 @@ function buildHealthPage(topbarHtml) {
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="b"></i></span>${t('health_legend_bad')} &nbsp;
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="g"></i></span>${t('health_legend_null')}
     </p>
+    <p class="health-info">${t('health_auto_only')}</p>
   </div>`;
 }
 
