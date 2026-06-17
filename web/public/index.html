@@ -10,11 +10,13 @@
   --bg:#f1f5f9; --card-bg:#ffffff; --card-border:#e2e8f0; --section-bg:#f8fafc;
   --val:#0f172a; --caption:#64748b; --sub:#94a3b8; --heading:#475569;
   --accent:#2563eb; --amber:#d97706; --green:#16a34a; --red:#dc2626; --tool:#ea580c; --select:#7c3aed;
+  --zone-wash:30,41,59; /* slate-800 : assombrit le fond clair (texture de zone) */
 }
 :root.dark{
   --bg:#0f172a; --card-bg:#1e293b; --card-border:#334155; --section-bg:#0f172a;
   --val:#f1f5f9; --caption:#94a3b8; --sub:#64748b; --heading:#cbd5e1;
   --accent:#3b82f6; --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --tool:#f97316; --select:#8b5cf6;
+  --zone-wash:148,163,184; /* slate-400 : éclaircit le fond sombre (texture de zone) */
 }
 *{box-sizing:border-box;}
 body{margin:0; background:var(--bg); color:var(--val);
@@ -45,6 +47,19 @@ body{margin:0; background:var(--bg); color:var(--val);
 .refresh-note{font-size:11px; color:var(--caption);}
 
 .zone{margin-bottom:2.2rem;}
+/* Regroupement en 3 sur-blocs : base gris dégradé + GRAIN désaturé, dense en haut, estompé vers le bas (sans bordure ni titre) */
+.zone-group{position:relative; margin-bottom:2.6rem; padding:1.5rem 1.2rem 1.8rem; border-radius:1.2rem;
+  background:linear-gradient(180deg, rgba(var(--zone-wash),.10), rgba(var(--zone-wash),.05) 50%, rgba(var(--zone-wash),.015) 80%, transparent 100%);}
+.zone-group::before{content:""; position:absolute; inset:0; border-radius:inherit; z-index:0; pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  -webkit-mask-image:linear-gradient(180deg, rgba(0,0,0,.95), rgba(0,0,0,.3) 55%, transparent 92%);
+  mask-image:linear-gradient(180deg, rgba(0,0,0,.95), rgba(0,0,0,.3) 55%, transparent 92%);}
+.zone-group:last-of-type{margin-bottom:0;}
+.zone-group > *{position:relative; z-index:1;}
+.zone-group > .zone{margin-bottom:1.2rem;}
+.zone-group > .zone:last-child{margin-bottom:0;}
+/* cartes opaques par-dessus la texture */
+.zone-group .card, .zone-group .sim, .zone-group .ladder-wrap{box-shadow:0 1px 3px rgba(15,23,42,.05);}
 .zone-h{font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--heading);
   margin:0 0 .55rem; display:flex; align-items:center; gap:.5rem;}
 .zone-h .right{margin-left:auto; font-weight:600; letter-spacing:0; text-transform:none;}
@@ -1237,32 +1252,38 @@ function buildPage() {
 
   return `${topbarHtml}
 
-  <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}<span class="pagenav" style="margin-left:auto">
-      <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
-      <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
-    </span></div>${simCard()}</div>
+  <div class="zone-group">
+    <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}<span class="pagenav" style="margin-left:auto">
+        <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
+        <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
+      </span></div>${simCard()}</div>
 
-  <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
-    <div class="ladder-wrap${simLoading || refreshing ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading || refreshing ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${simLoading ? t('sim_loading') : t('refresh_loading')}</div>` : ''}</div>
-    ${simActive && simResult ? `<p class="help" style="margin:.5rem 0 0;font-size:11px">${t('ladder_pick_hint')}</p>` : ''}</div>
-
-  <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right"><span class="seg">${sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('')}</span></span></div>
-    <div class="card">
-      ${noData || `${encartHtml(tm, TODAY, NOW_HOUR)}${hebdoHtml(tm, TODAY, selDay)}<p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${t('slots_help')}</p>${limitedNote}`}
-    </div></div>
-
-  <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span></div>
-    <div class="card">${noData || zoomHtml(tm, intraday[selDay], selDay, TODAY, NOW_SLOT, u) + limitedNote}</div></div>
-
-  <div class="zone"><div class="zone-h">${t('section_routes')}</div>
-    <div class="card">
-      ${bestRoutesCard()}${limitedNote}
-      <p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p></div>
+    <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
+      <div class="ladder-wrap${simLoading || refreshing ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading || refreshing ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${simLoading ? t('sim_loading') : t('refresh_loading')}</div>` : ''}</div>
+      ${simActive && simResult ? `<p class="help" style="margin:.5rem 0 0;font-size:11px">${t('ladder_pick_hint')}</p>` : ''}</div>
   </div>
 
-  <div class="zone"><div class="zone-h">${t('section_who')}</div>
-    <div class="card">
-      ${noData || distBars(dist) + limitedNote}
+  <div class="zone-group">
+    <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right"><span class="seg">${sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('')}</span></span></div>
+      <div class="card">
+        ${noData || `${encartHtml(tm, TODAY, NOW_HOUR)}${hebdoHtml(tm, TODAY, selDay)}<p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${t('slots_help')}</p>${limitedNote}`}
+      </div></div>
+
+    <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span></div>
+      <div class="card">${noData || zoomHtml(tm, intraday[selDay], selDay, TODAY, NOW_SLOT, u) + limitedNote}</div></div>
+  </div>
+
+  <div class="zone-group">
+    <div class="zone"><div class="zone-h">${t('section_routes')}</div>
+      <div class="card">
+        ${bestRoutesCard()}${limitedNote}
+        <p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p></div>
+    </div>
+
+    <div class="zone"><div class="zone-h">${t('section_who')}</div>
+      <div class="card">
+        ${noData || distBars(dist) + limitedNote}
+      </div>
     </div>
   </div>
   ${footerHtml}
