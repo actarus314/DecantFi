@@ -306,6 +306,7 @@ export async function pickExecutableVenue(
   cfg: { soroswapApiKey?: string; rpcUrl: string; timeoutMs?: number },
   displayed?: { winner?: string; net?: number },
   depsOverride?: Partial<ExecDeps>,
+  forceVenue?: 'xbull' | 'soroswap',
 ): Promise<{ venue: 'xbull' | 'soroswap'; xdr: string; id?: string; type: 'full' | 'restore' | 'swap'; review: ReviewData }> {
   const deps: ExecDeps = { ...defaultDeps(cfg.timeoutMs), ...depsOverride };
   const buyAsset = target === 'EURC' ? EURC : USDC;
@@ -326,13 +327,21 @@ export async function pickExecutableVenue(
     | { venue: 'xbull'; netOut: bigint; route: string }
     | { venue: 'soroswap'; netOut: bigint; minOut: bigint; soroPath?: string[]; quote: unknown };
 
-  const candidates: Candidate[] = [];
+  let candidates: Candidate[] = [];
   if (xbullQ) candidates.push(xbullQ);
   if (soroQ) candidates.push(soroQ);
   candidates.sort((a, b) => (a.netOut < b.netOut ? 1 : a.netOut > b.netOut ? -1 : 0));
 
   if (candidates.length === 0) {
     throw new ExecError('no-route', 'aucune route exécutable');
+  }
+
+  // Forçage d'un venue précis (click-to-select depuis l'UI)
+  if (forceVenue !== undefined) {
+    candidates = candidates.filter((c) => c.venue === forceVenue);
+    if (candidates.length === 0) {
+      throw new ExecError('no-route', 'venue choisi indisponible');
+    }
   }
 
   // 3. Essayer de BUILD par ordre de netOut décroissant ; premier succès = gagnant.

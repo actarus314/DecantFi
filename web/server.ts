@@ -184,8 +184,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const displayed = (b.displayed && typeof b.displayed === 'object')
         ? { winner: (b.displayed as any).winner, net: (b.displayed as any).net }
         : undefined;
+      let forceVenue: 'xbull' | 'soroswap' | undefined;
+      if (b.venue !== undefined) {
+        if (b.venue !== 'xbull' && b.venue !== 'soroswap') {
+          json(res, 400, { error: 'venue invalide' }); return;
+        }
+        forceVenue = b.venue as 'xbull' | 'soroswap';
+      }
       try {
-        const result = await pickExecutableVenue(pair, amount, b.sender, slippageBps, cfg, displayed);
+        const result = await pickExecutableVenue(pair, amount, b.sender, slippageBps, cfg, displayed, undefined, forceVenue);
         json(res, 200, result);
       } catch (e) {
         if (e instanceof ExecError) { json(res, execStatus(e.code), { error: e.message, code: e.code }); return; }
