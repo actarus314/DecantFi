@@ -49,10 +49,12 @@ export interface Overview {
   winnerDist: Array<{ display: string; pct: number }>;
   /** Meilleures routes (chemins gagnants) sur 7 j, par fréquence de victoire. */
   bestRoutes: RouteRank[];
-  hourlyUtc: (number | null)[];
-  heatUtc: (number | null)[][];
-  /** 7×24 efficience moyenne brute par (dow, hour) UTC — pour la moyenne/jour normalisée du prix. */
-  heatEffUtc: (number | null)[][];
+  /** 7×24 efficience moyenne brute par (dow, hour) UTC — pour la moyenne/jour normalisée du prix. Clé = sonde en string (ex. '250'/'750'). */
+  heatEffUtc: Record<string, (number | null)[][]>;
+  /** Trace intraday 15 min par sonde. Clé = sonde. Valeur = 7×96, indexé par jour-de-semaine 0=Lun..6=Dim, chaque ligne = la trace de SA date locale. */
+  intradayLocal: Record<string, (number | null)[][]>;
+  /** Moyenne plate 7 j de l'efficience par sonde. */
+  effWeekAvg: Record<string, number | null>;
 }
 
 // ─── Mappings display / note / chip ──────────────────────────────────────────
@@ -178,14 +180,6 @@ export function effOf(
   return (net / amt) / spot;
 }
 
-// ─── Sonde mapping ───────────────────────────────────────────────────────────
-
-function bigSondeStroops(cfg: CollectorConfig): bigint {
-  // La plus grande sonde (= 750 BLND = 7_500_000_000 stroops)
-  const sorted = [...cfg.sizesBlnd].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  return sorted[sorted.length - 1] ?? 7_500_000_000n;
-}
-
 // ─── Dernière tick ok — échelle ──────────────────────────────────────────────
 
 function buildLadder(db: DatabaseSync, pair: string, amountIn: bigint): LadderRow[] {
@@ -297,12 +291,13 @@ function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string): R
 // ─── Efficience horaire / heatmap ─────────────────────────────────────────────
 
 interface WinnerEffRow {
-  hour_utc: number;    // 0-23
-  dow_utc: number;     // 0=Lun … 6=Dim
+  hour_utc: number;     // 0-23
+  dow_utc: number;      // 0=Lun … 6=Dim
   eff: number;
+  startedAtMs: number;  // ms epoch UTC
 }
 
-/** Agrège l'efficience du gagnant (sonde 750) par bucket (dow+hour UTC) sur 7 j. */
+/** Agrège l'efficience du gagnant par bucket (dow+hour UTC) sur 7 j. */
 function fetchWinnerEffRows(
   db: DatabaseSync,
   pair: string,
@@ -310,7 +305,6 @@ function fetchWinnerEffRows(
   windowStart: string,
   pairUi: string,
 ): WinnerEffRow[] {
-  // Lit tous les ticks ok avec les quotes gagnantes (sonde big)
   const stmt = prepBig(db, `
     SELECT t.started_at, t.blnd_usd, t.eur_usd, q.net_out, q.amount_in as q_amount_in
     FROM quote q JOIN tick t ON t.id = q.tick_id
@@ -337,63 +331,9 @@ function fetchWinnerEffRows(
     const eff = effOf(netOut, qAmountIn, pairUi, { blnd_usd: blndUsd, eur_usd: eurUsd });
     if (eff === null) continue;
 
-    result.push({ hour_utc: hourUtc, dow_utc: dowUtc, eff });
+    result.push({ hour_utc: hourUtc, dow_utc: dowUtc, eff, startedAtMs: d.getTime() });
   }
   return result;
-}
-
-function buildHourlyUtc(rows: WinnerEffRow[]): (number | null)[] {
-  if (rows.length === 0) return new Array<null>(24).fill(null);
-
-  // Moyenne d'efficience par heure UTC
-  const buckets: number[][] = Array.from({ length: 24 }, () => []);
-  for (const r of rows) {
-    const bucket = buckets[r.hour_utc];
-    if (bucket) bucket.push(r.eff);
-  }
-
-  const avgs: (number | null)[] = buckets.map((b) =>
-    b.length === 0 ? null : b.reduce((a, x) => a + x, 0) / b.length,
-  );
-
-  // Base unique : moyenne 7 j globale sur tous les échantillons bruts
-  // (même dénominateur que la heatmap → les deux vues coïncident).
-  const globalAvg = rows.reduce((a, r) => a + r.eff, 0) / rows.length;
-  if (globalAvg <= 0) return new Array<null>(24).fill(null);
-
-  // % d'écart à la moyenne
-  return avgs.map((v) => v === null ? null : (v / globalAvg - 1) * 100);
-}
-
-function buildHeatUtc(rows: WinnerEffRow[]): (number | null)[][] {
-  if (rows.length === 0) {
-    return Array.from({ length: 7 }, () => new Array<null>(24).fill(null));
-  }
-
-  // Moyenne d'efficience par (dow, hour)
-  const buckets: number[][][] = Array.from({ length: 7 }, () =>
-    Array.from({ length: 24 }, () => []),
-  );
-  for (const r of rows) {
-    const dayBucket = buckets[r.dow_utc];
-    if (dayBucket) {
-      const hourBucket = dayBucket[r.hour_utc];
-      if (hourBucket) hourBucket.push(r.eff);
-    }
-  }
-
-  const avgs: (number | null)[][] = buckets.map((day) =>
-    day.map((b) => (b.length === 0 ? null : b.reduce((a, x) => a + x, 0) / b.length)),
-  );
-
-  // Base unique : moyenne 7 j globale sur tous les échantillons bruts
-  // (même dénominateur que le profil horaire → les deux vues coïncident).
-  const globalAvg = rows.reduce((a, r) => a + r.eff, 0) / rows.length;
-  if (globalAvg <= 0) return Array.from({ length: 7 }, () => new Array<null>(24).fill(null));
-
-  return avgs.map((day) =>
-    day.map((v) => v === null ? null : (v / globalAvg - 1) * 100),
-  );
 }
 
 /** 7×24 efficience moyenne brute par (dow, hour) UTC — sert la moyenne/jour normalisée du prix. */
@@ -411,6 +351,112 @@ function buildHeatEffUtc(rows: WinnerEffRow[]): (number | null)[][] {
   return buckets.map((day) =>
     day.map((b) => (b.length === 0 ? null : b.reduce((a, x) => a + x, 0) / b.length)),
   );
+}
+
+// ─── Offset Paris ─────────────────────────────────────────────────────────────
+
+function parisOffsetHours(now: Date): number {
+  const paris = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
+  const utc = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+  return Math.round((paris.getTime() - utc.getTime()) / 3600000);
+}
+
+// ─── Intraday local 15 min ─────────────────────────────────────────────────────
+
+/**
+ * Construit une grille 7×96 (dow × slot-15min) sourcée par DATE calendaire locale.
+ *
+ * Chaque ligne i correspond au jour-de-semaine du i-ième jour le plus récent (i=0 = aujourd'hui).
+ * On ne mélange JAMAIS deux occurrences du même jour-de-semaine : on prend uniquement la date la
+ * plus récente de ce dow (donc la semaine courante, pas la semaine d'avant).
+ *
+ * // ponytail: décalage unique au moment `now` pour les 7 jours — le jour de bascule DST (2×/an)
+ * // est légèrement décalé, acceptable.
+ */
+export function buildIntradayLocal(
+  rows: WinnerEffRow[],
+  offsetH: number,
+  now: Date,
+): (number | null)[][] {
+  // Étape 1 : déterminer les 7 dates locales les plus récentes (i=0 = aujourd'hui, i=6 = il y a 6 j)
+  // Pour obtenir l'heure/date locale : localMs = utcMs + offsetH*3_600_000, puis getUTC* sur ce Date.
+  const MS_PER_DAY = 86_400_000;
+
+  // Compute "today's local date" by shifting now by offsetH hours
+  const nowMs = now.getTime();
+
+  // Map: dateKey (YYYY-MM-DD local) → dow (0=Lun..6=Dim)
+  const dateToDow = new Map<string, number>();
+  // Map: dateKey → row index in result (0=most recent .. 6=oldest)
+  const dateToResultIdx = new Map<string, number>();
+
+  for (let i = 0; i < 7; i++) {
+    const shiftedMs = nowMs - i * MS_PER_DAY + offsetH * 3_600_000;
+    const d = new Date(shiftedMs);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    const dateKey = `${y}-${m}-${day}`;
+    const jsDay = d.getUTCDay(); // 0=Sun..6=Sat
+    const dow = (jsDay + 6) % 7; // 0=Lun..6=Dim
+
+    // Only store first occurrence (most recent) for each dow
+    if (!dateToDow.has(dateKey)) {
+      dateToDow.set(dateKey, dow);
+      dateToResultIdx.set(dateKey, i);
+    }
+  }
+
+  // Étape 2 : regrouper les eff par (dateKey, slot)
+  // slot = hour*4 + floor(minutes/15), 0..95
+  type SlotMap = Map<number, number[]>;
+  const byDate = new Map<string, SlotMap>();
+
+  for (const row of rows) {
+    const localMs = row.startedAtMs + offsetH * 3_600_000;
+    const d = new Date(localMs);
+    const y = d.getUTCFullYear();
+    const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dy = String(d.getUTCDate()).padStart(2, '0');
+    const dateKey = `${y}-${mo}-${dy}`;
+
+    // Only include rows whose date is among our 7 target dates
+    if (!dateToDow.has(dateKey)) continue;
+
+    const hour = d.getUTCHours();
+    const min = d.getUTCMinutes();
+    const slot = hour * 4 + Math.floor(min / 15);
+
+    let slotMap = byDate.get(dateKey);
+    if (!slotMap) {
+      slotMap = new Map<number, number[]>();
+      byDate.set(dateKey, slotMap);
+    }
+    let slotArr = slotMap.get(slot);
+    if (!slotArr) {
+      slotArr = [];
+      slotMap.set(slot, slotArr);
+    }
+    slotArr.push(row.eff);
+  }
+
+  // Étape 3 : construire la grille résultat 7×96 (indexée par dow)
+  const result: (number | null)[][] = Array.from({ length: 7 }, () =>
+    new Array<number | null>(96).fill(null),
+  );
+
+  for (const [dateKey, dow] of dateToDow.entries()) {
+    const slotMap = byDate.get(dateKey);
+    if (!slotMap) continue;
+    const row = result[dow];
+    if (!row) continue;
+    for (const [slot, effs] of slotMap.entries()) {
+      if (effs.length === 0) continue;
+      row[slot] = effs.reduce((a, x) => a + x, 0) / effs.length;
+    }
+  }
+
+  return result;
 }
 
 // ─── Meta ──────────────────────────────────────────────────────────────────────
@@ -453,17 +499,29 @@ export function overview(
   // Sondes configurées (COLLECTOR_SIZES_BLND), triées croissant. Une échelle par sonde.
   const sizes = [...cfg.sizesBlnd].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const sondes = sizes.map((s) => toNumber(s));
-  const big = bigSondeStroops(cfg); // plus grande sonde pour profil horaire / heatmap
 
   const meta = buildMeta(db, cfg.cadenceSec, sondes);
   const ladders: Record<string, LadderRow[]> = {};
   for (const size of sizes) ladders[String(toNumber(size))] = buildLadder(db, pair, size);
   const winnerDist = buildWinnerDist(db, pair, windowStart);
   const bestRoutes = buildBestRoutes(db, pair, windowStart);
-  const effRows = fetchWinnerEffRows(db, pair, big, windowStart, pairUi);
-  const hourlyUtc = buildHourlyUtc(effRows);
-  const heatUtc = buildHeatUtc(effRows);
-  const heatEffUtc = buildHeatEffUtc(effRows);
 
-  return { meta, ladders, winnerDist, bestRoutes, hourlyUtc, heatUtc, heatEffUtc };
+  // Calcule l'offset Paris une fois pour les 7 jours
+  const offsetH = parisOffsetHours(nowDate);
+
+  const heatEffUtc: Record<string, (number | null)[][]> = {};
+  const intradayLocal: Record<string, (number | null)[][]> = {};
+  const effWeekAvg: Record<string, number | null> = {};
+
+  for (const size of sizes) {
+    const key = String(toNumber(size));
+    const effRows = fetchWinnerEffRows(db, pair, size, windowStart, pairUi);
+    heatEffUtc[key] = buildHeatEffUtc(effRows);
+    effWeekAvg[key] = effRows.length === 0
+      ? null
+      : effRows.reduce((a, r) => a + r.eff, 0) / effRows.length;
+    intradayLocal[key] = buildIntradayLocal(effRows, offsetH, nowDate);
+  }
+
+  return { meta, ladders, winnerDist, bestRoutes, heatEffUtc, intradayLocal, effWeekAvg };
 }

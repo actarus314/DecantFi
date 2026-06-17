@@ -161,6 +161,7 @@ table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent);
 .zcursor{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed var(--caption);display:none;pointer-events:none;}
 .ztip{position:absolute;top:-4px;transform:translateX(-50%);background:var(--val);color:var(--bg);font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;white-space:nowrap;display:none;pointer-events:none;}
 .pulse{animation:pl 2.6s ease-in-out infinite;}@keyframes pl{0%,100%{opacity:1}50%{opacity:.3}}
+.zdot{position:absolute;width:11px;height:11px;border-radius:50%;background:var(--val);transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--val) 25%,transparent);}
 
 .dist{display:grid; grid-template-columns:max-content 1fr max-content; gap:.5rem .6rem; align-items:center; font-size:12px;}
 .dist .drow{display:contents;}
@@ -232,6 +233,7 @@ const STRINGS = {
     section_ladder: 'Échelle des sources',
     section_slots: (u) => `Meilleurs créneaux — net BLND → ${u}`,
     section_slots_note: 'rollup horaire · 7 j',
+    slots_help: 'L\'<b>efficience</b> = part du prix de référence (DefiLlama) réellement obtenue, frais et slippage déduits — 100 % = exécution parfaite. Mesurée sur le meilleur devis de la sonde choisie (≈ 4 relevés/heure). Chaque <b>case</b> compare cette efficience à la moyenne des 7 derniers jours : <b>vert = mieux que la semaine, rouge = moins bien</b>. C\'est <b>relatif</b> — une case verte peut rester médiocre dans l\'absolu si toute la semaine est mauvaise. La <b>note du jour</b> = efficience moyenne du jour, en %.',
     section_hourly: 'Zoom journalier',
     section_hourly_note: '▼ heure en cours',
     section_routes: 'Meilleures routes (7 j)',
@@ -287,14 +289,16 @@ const STRINGS = {
     vs_day_avg: 'vs moy. du jour',
     per_week: '/ sem.',
     today_badge: 'auj.',
+    vs_week_line: 'moy. 7 j',
+    zoom_legend: 'Les 96 relevés de 15 min du jour choisi (clique une ligne du tableau). L\'<b>aire</b> = écart à la moyenne <b>du jour</b> (vert au-dessus, rouge en-dessous) → la forme intraday. La <b>ligne tirets</b> = moyenne 7 j, pour situer la journée. Le jour en cours <b>s\'arrête à maintenant</b> (sa moyenne se construit au fil des relevés).',
 
     // Notes
     limited_note: (n) => `historique limité : ${n} tick${n > 1 ? 's' : ''} ok`,
     no_data_waiting: 'En attente du collecteur (aucun tick ok).',
 
     // Distribution note
-    dist_note_usdc: 'xBull domine habituellement ; Comet ne concourt que sur USDC (pool backstop). Diversité = robustesse aux pannes.',
-    dist_note_eurc: 'Pas de pool BLND/EURC profond : les lignes « BLND → EURC » sont des swaps atomiques routés en interne via USDC/XLM (Soroswap affiche BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM ; seul xBull masque son chemin). La route via-USDC explicite (2 swaps) les bat souvent.',
+    dist_note_usdc: '<b>xBull</b> domine habituellement ; <b>Comet</b> ne concourt que sur USDC (pool backstop). <b>Diversité = robustesse aux pannes.</b>',
+    dist_note_eurc: '<b>Pas de pool BLND/EURC profond</b> : les lignes « BLND → EURC » sont des <b>swaps atomiques routés en interne</b> via USDC/XLM (Soroswap affiche BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM ; <b>seul xBull masque son chemin</b>). La route <b>via-USDC explicite (2 swaps) les bat souvent</b>.',
 
     // Divers
     loading: 'Chargement…',
@@ -375,6 +379,7 @@ const STRINGS = {
     section_ladder: 'Source ladder',
     section_slots: (u) => `Best time slots — net BLND → ${u}`,
     section_slots_note: 'hourly rollup · 7 d',
+    slots_help: '<b>Efficiency</b> = the share of the reference price (DefiLlama) actually obtained, fees and slippage deducted — 100 % = perfect execution. Measured on the best quote for the selected probe (≈ 4 readings/hour). Each <b>cell</b> compares this efficiency to the 7-day average: <b>green = better than the week, red = worse</b>. It\'s <b>relative</b> — a green cell can still be poor in absolute terms if the whole week is bad. The <b>day\'s note</b> = the day\'s average efficiency, in %.',
     section_hourly: 'Daily zoom',
     section_hourly_note: '▼ current hour',
     section_routes: 'Best routes (7 d)',
@@ -430,14 +435,16 @@ const STRINGS = {
     vs_day_avg: 'vs day avg',
     per_week: '/ wk',
     today_badge: 'today',
+    vs_week_line: '7-d avg',
+    zoom_legend: 'The 96 fifteen-minute readings of the selected day (click a table row). The <b>area</b> = deviation from the <b>day</b> average (green above, red below) → the intraday shape. The <b>dashed line</b> = 7-day average, to place the day. Today <b>stops at now</b> (its average builds up as readings arrive).',
 
     // Notes
     limited_note: (n) => `limited history: ${n} tick${n > 1 ? 's' : ''} ok`,
     no_data_waiting: 'Waiting for collector (no ok tick yet).',
 
     // Distribution note
-    dist_note_usdc: 'xBull usually dominates; Comet only competes on USDC (backstop pool). Diversity = resilience to failures.',
-    dist_note_eurc: 'No deep BLND/EURC pool: the "BLND → EURC" rows are atomic swaps routed internally via USDC/XLM (Soroswap shows BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM; only xBull hides its path). The explicit via-USDC route (2 swaps) often beats them.',
+    dist_note_usdc: '<b>xBull</b> usually dominates; <b>Comet</b> only competes on USDC (backstop pool). <b>Diversity = resilience to failures.</b>',
+    dist_note_eurc: '<b>No deep BLND/EURC pool</b>: the "BLND → EURC" rows are <b>atomic swaps routed internally</b> via USDC/XLM (Soroswap shows BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM; <b>only xBull hides its path</b>). The explicit <b>via-USDC route (2 swaps) often beats them</b>.',
 
     // Divers
     loading: 'Loading…',
@@ -763,34 +770,28 @@ function distBars(winnerDist) {
 const hh2 = x => String(x).padStart(2, '0') + ' h';
 const pctTxt = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)} %`;
 
-// Dérive moyennes/jour normalisées du prix (eff × sonde × prix ACTUEL), écarts, meilleurs/pires.
-function timeModel(heatLocal, heatEffLocal, meta, pairUi) {
-  const probe = Math.max(...((meta && meta.sondes && meta.sondes.length) ? meta.sondes : [750]));
-  const blndUsd = (meta && meta.blndUsd) || 0;
-  const eurUsd = (meta && meta.eurUsd) || 0;
-  const spot = pairUi === 'EURC' ? (eurUsd > 0 ? blndUsd / eurUsd : 0) : blndUsd; // prix cible/BLND, fixe pour tous les jours
+function timeModel(heatEffLocal, weekAvg) {
+  const wk = (weekAvg && weekAvg > 0) ? weekAvg : null;
+  const cellPct = heatEffLocal.map(row => row.map(v => (v == null || !wk) ? null : (v / wk - 1) * 100));
   const dayEff = heatEffLocal.map(row => { const v = row.filter(x => x != null); return v.length ? v.reduce((a, x) => a + x, 0) / v.length : null; });
-  const effVals = dayEff.filter(x => x != null);
-  const weekEff = effVals.length ? effVals.reduce((a, x) => a + x, 0) / effVals.length : null;
-  const dayNet = dayEff.map(e => (e == null || spot <= 0) ? null : e * probe * spot);
-  const dayVs = dayEff.map(e => (e == null || !weekEff) ? null : (e / weekEff - 1) * 100);
+  const dayVs = dayEff.map(e => (e == null || !wk) ? null : (e / wk - 1) * 100);
   let bestDay = -1, worstDay = -1, bv = -Infinity, wv = Infinity;
   dayEff.forEach((e, i) => { if (e == null) return; if (e > bv) { bv = e; bestDay = i; } if (e < wv) { wv = e; worstDay = i; } });
   let bestCell = null, worstCell = null, bc = -Infinity, wc = Infinity;
-  heatLocal.forEach((row, d) => row.forEach((v, h) => { if (v == null) return; if (v > bc) { bc = v; bestCell = { d, h, v }; } if (v < wc) { wc = v; worstCell = { d, h, v }; } }));
-  return { probe, spot, dayEff, weekEff, dayNet, dayVs, bestDay, worstDay, bestCell, worstCell };
+  cellPct.forEach((row, d) => row.forEach((v, h) => { if (v == null) return; if (v > bc) { bc = v; bestCell = { d, h, v }; } if (v < wc) { wc = v; worstCell = { d, h, v }; } }));
+  return { cellPct, dayEff, dayVs, weekAvg: wk, bestDay, worstDay, bestCell, worstCell };
 }
 
-function encartHtml(m, heatLocal, today, nowHour) {
+function encartHtml(m, today, nowHour) {
   const days = t('days');
-  const nowVal = (heatLocal[today] && heatLocal[today][nowHour] != null) ? heatLocal[today][nowHour] : null;
+  const nowVal = (m.cellPct[today] && m.cellPct[today][nowHour] != null) ? m.cellPct[today][nowHour] : null;
   const slot = m.bestCell ? `
     <div class="enck"><div class="l">${t('slot_best')}</div>
       <div class="v g">${days[m.bestCell.d]} ${hh2(m.bestCell.h)}</div><div class="s">${pctTxt(m.bestCell.v)} ${t('vs_week')}</div>
       <div class="sub2">${t('slot_avoid')} : <span class="r">${days[m.worstCell.d]} ${hh2(m.worstCell.h)} · ${pctTxt(m.worstCell.v)}</span></div></div>` : '';
   const day = m.bestDay >= 0 ? `
     <div class="enck"><div class="l">${t('encart_best_day')}</div>
-      <div class="v g">${days[m.bestDay]}</div><div class="s">${fmt(m.dayNet[m.bestDay])} · ${pctTxt(m.dayVs[m.bestDay])} ${t('per_week')}</div>
+      <div class="v g">${days[m.bestDay]}</div><div class="s">${fmt(m.dayEff[m.bestDay] * 100)} % · ${pctTxt(m.dayVs[m.bestDay])} ${t('per_week')}</div>
       <div class="sub2">${t('slot_avoid')} : <span class="r">${days[m.worstDay]} · ${pctTxt(m.dayVs[m.worstDay])} ${t('per_week')}</span></div></div>` : '';
   const now = `
     <div class="enck"><div class="l">${t('encart_now')}</div>
@@ -799,18 +800,18 @@ function encartHtml(m, heatLocal, today, nowHour) {
   return `<div class="enc">${slot}${day}${now}</div>`;
 }
 
-function hebdoHtml(m, heatLocal, today, sel) {
+function hebdoHtml(m, today, sel) {
   const days = t('days');
-  const allv = []; for (const row of heatLocal) for (const v of row) if (v != null) allv.push(v);
+  const allv = []; for (const row of m.cellPct) for (const v of row) if (v != null) allv.push(v);
   if (allv.length === 0) return `<p class="help">${t('hmap_insufficient')}</p>`;
   const lo = Math.min(...allv), hi = Math.max(...allv), rg = (hi - lo) || 1;
   const col = x => `hsl(${Math.round(8 + (x - lo) / rg * 125)} 60% 46%)`;
   let html = '';
   for (let d = 0; d < 7; d++) {
-    const cells = (heatLocal[d] || []).map((v, h) => v == null
+    const cells = (m.cellPct[d] || []).map((v, h) => v == null
       ? `<span class="hc" style="background:var(--card-border)"></span>`
       : `<span class="hc" style="background:${col(v)}" title="${days[d]} ${hh2(h)} · ${v > 0 ? '+' : ''}${v.toFixed(2)} %"></span>`).join('');
-    const meanTxt = m.dayNet[d] == null ? '—' : `${fmt(m.dayNet[d])}<small>${m.dayVs[d] >= 0 ? '+' : ''}${m.dayVs[d].toFixed(2)} % ${t('per_week')}</small>`;
+    const meanTxt = m.dayEff[d] == null ? '—' : `${fmt(m.dayEff[d] * 100)} %<small>${m.dayVs[d] >= 0 ? '+' : ''}${m.dayVs[d].toFixed(2)} % ${t('per_week')}</small>`;
     html += `<div class="hrow${d === sel ? ' sel' : ''}" onclick="selectDay(${d})">
       <div class="hlbl${d === m.bestDay ? ' best' : ''}">
         <span class="hday">${days[d]}${d === m.bestDay ? ' ★' : ''}</span>
@@ -821,44 +822,56 @@ function hebdoHtml(m, heatLocal, today, sel) {
   return `<div class="heb">${html}</div>`;
 }
 
-function zoomHtml(m, heatEffLocal, sel, today, nowHour, u) {
+function zoomHtml(m, series, sel, today, nowSlot, u) {
   const days = t('days');
-  const de = m.dayEff[sel];
-  const meanLine = m.dayNet[sel] == null ? '—' : `${fmt(m.dayNet[sel])}<small style="font-size:12px;color:var(--sub)"> ${u}</small>`;
+  const meanLine = m.dayEff[sel] == null ? '—' : `${fmt(m.dayEff[sel] * 100)} %`;
   const vsLine = m.dayVs[sel] == null ? '' : `${m.dayVs[sel] >= 0 ? '+' : ''}${m.dayVs[sel].toFixed(2)} % ${t('vs_week')}`;
   const kpi = `<div class="zmk"><span class="k">${t('day_avg')} · ${days[sel]}</span><span class="v">${meanLine}</span><span class="s" style="color:${(m.dayVs[sel] || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${vsLine}</span></div>`;
-  const dev = (heatEffLocal[sel] || []).map(e => (e == null || !de) ? null : (e / de - 1) * 100);
-  zoomDev = dev;
+  zoomDev = series ? series.slice() : [];
   const axis = `<div class="zaxis"><span>00</span><span>03</span><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span></div>`;
-  if (dev.filter(x => x != null).length === 0) return `<div class="zm">${kpi}<div><p class="help">${t('hmap_insufficient')}</p></div></div>`;
-  const W = 520, H = 120, mid = H / 2, n = 24, sx = W / (n - 1), sc = 44 / 0.8;
-  const pts = dev.map((v, i) => [i * sx, mid - (v == null ? 0 : Math.max(-mid + 4, Math.min(mid - 4, v * sc)))]);
+  const present = (series || []).map((v, i) => (v == null ? null : { i, v })).filter(Boolean);
+  if (present.length === 0) return `<div class="zm">${kpi}<div><p class="help">${t('hmap_insufficient')}</p></div></div>`;
+  const wk = m.weekAvg;
+  const effv = present.map(p => p.v);
+  const dayMean = effv.reduce((a, x) => a + x, 0) / effv.length;
+  let lo = Math.min(...effv), hi = Math.max(...effv);
+  if (wk != null) { lo = Math.min(lo, wk); hi = Math.max(hi, wk); }
+  const pad = (hi - lo) * 0.18 || 0.001; lo -= pad; hi += pad;
+  const span = (hi - lo) || 1;
+  const W = 520, H = 120, n = 96, sx = W / (n - 1);
+  const yOf = v => H * (1 - (v - lo) / span);
+  const baseY = yOf(dayMean);
+  const pts = present.map(p => [p.i * sx, yOf(p.v)]);
   const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
-  const area = `M0,${mid} ` + pts.map(p => 'L' + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + ` L${W},${mid} Z`;
-  const showNow = sel === today && dev[nowHour] != null;
-  const nX = (nowHour * sx).toFixed(1), nY = pts[nowHour][1].toFixed(1);
-  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="120" preserveAspectRatio="none" style="overflow:visible">
-    <defs><clipPath id="zab"><rect x="0" y="0" width="${W}" height="${mid}"/></clipPath><clipPath id="zbe"><rect x="0" y="${mid}" width="${W}" height="${H - mid}"/></clipPath></defs>
-    <path d="${area}" fill="var(--green)" fill-opacity=".45" clip-path="url(#zab)"/>
-    <path d="${area}" fill="var(--red)" fill-opacity=".45" clip-path="url(#zbe)"/>
-    <line x1="0" y1="${mid}" x2="${W}" y2="${mid}" stroke="var(--sub)" stroke-dasharray="4 4"/>
-    <path d="${line}" fill="none" stroke="var(--heading)" stroke-width="2.5"/>
-    ${showNow ? `<circle class="pulse" cx="${nX}" cy="${nY}" r="6.5" fill="none" stroke="var(--val)" stroke-width="2"/><circle cx="${nX}" cy="${nY}" r="3" fill="var(--val)"/>` : ''}
+  const area = `M${pts[0][0].toFixed(1)},${baseY.toFixed(1)} ` + pts.map(p => 'L' + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + ` L${pts[pts.length - 1][0].toFixed(1)},${baseY.toFixed(1)} Z`;
+  const wkY = wk != null ? yOf(wk) : null;
+  const showNow = sel === today && series[nowSlot] != null;
+  const nowX = showNow ? (nowSlot / (n - 1) * 100).toFixed(2) : 0;
+  const nowY = showNow ? (yOf(series[nowSlot]) / H * 100).toFixed(2) : 0;
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="180" preserveAspectRatio="none" style="display:block;overflow:visible">
+    <defs><clipPath id="zab"><rect x="0" y="0" width="${W}" height="${baseY.toFixed(1)}"/></clipPath><clipPath id="zbe"><rect x="0" y="${baseY.toFixed(1)}" width="${W}" height="${(H - baseY).toFixed(1)}"/></clipPath></defs>
+    <path d="${area}" fill="var(--green)" fill-opacity=".4" clip-path="url(#zab)"/>
+    <path d="${area}" fill="var(--red)" fill-opacity=".4" clip-path="url(#zbe)"/>
+    ${wkY != null ? `<line x1="0" y1="${wkY.toFixed(1)}" x2="${W}" y2="${wkY.toFixed(1)}" stroke="var(--caption)" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"/>` : ''}
+    <path d="${line}" fill="none" stroke="var(--heading)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
   </svg>`;
-  return `<div class="zm">${kpi}<div><div class="zwrap" onmousemove="zoomMove(event,this)" onmouseleave="zoomLeave()">${svg}<div class="zcursor" id="zcur"></div><div class="ztip" id="ztip"></div></div>${axis}</div></div>`;
+  const nowDot = showNow ? `<span class="zdot pulse" style="left:${nowX}%;top:${nowY}%"></span>` : '';
+  const wkTag = wkY != null ? `<span style="position:absolute;right:3px;top:${(wkY / H * 100).toFixed(1)}%;transform:translateY(-50%);font-size:9px;font-weight:600;color:var(--caption);background:var(--card-bg);padding:0 3px;border-radius:3px">${t('vs_week_line')}</span>` : '';
+  return `<div class="zm">${kpi}<div><div class="zwrap" onmousemove="zoomMove(event,this)" onmouseleave="zoomLeave()">${svg}${nowDot}${wkTag}<div class="zcursor" id="zcur"></div><div class="ztip" id="ztip"></div></div>${axis}<p class="help" style="margin:.45rem 0 0;font-size:11px">${t('zoom_legend')}</p></div></div>`;
 }
 
 function selectDay(d) { selDay = d; renderApp(); }
 function zoomMove(e, el) {
   const r = el.getBoundingClientRect();
   const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-  const h = Math.round(frac * 23);
+  const s = Math.round(frac * 95);
   const cur = document.getElementById('zcur'), tip = document.getElementById('ztip');
-  if (!cur || !tip || zoomDev[h] == null) { if (cur) cur.style.display = 'none'; if (tip) tip.style.display = 'none'; return; }
-  const left = (h / 23 * 100) + '%';
+  if (!cur || !tip || zoomDev[s] == null) { if (cur) cur.style.display = 'none'; if (tip) tip.style.display = 'none'; return; }
+  const left = (s / 95 * 100) + '%';
   cur.style.left = left; cur.style.display = 'block';
   tip.style.left = left; tip.style.display = 'block';
-  tip.textContent = `${hh2(h)} · ${zoomDev[h] >= 0 ? '+' : ''}${zoomDev[h].toFixed(2)} %`;
+  const hh = String(Math.floor(s / 4)).padStart(2, '0'), mm = String((s % 4) * 15).padStart(2, '0');
+  tip.textContent = `${hh}:${mm} · ${zoomDev[s].toFixed(3)}`;
 }
 function zoomLeave() { const c = document.getElementById('zcur'), p = document.getElementById('ztip'); if (c) c.style.display = 'none'; if (p) p.style.display = 'none'; }
 
@@ -897,9 +910,6 @@ function buildPage() {
   const NOW_HOUR = nowLocalHour();
   const TODAY = todayLocalDow();
 
-  const heatLocal = overview ? rotateHeatUtc(overview.heatUtc, offsetH) : Array.from({length:7}, () => new Array(24).fill(null));
-  const heatEffLocal = overview ? rotateHeatUtc(overview.heatEffUtc, offsetH) : Array.from({length:7}, () => new Array(24).fill(null));
-  const tm = timeModel(heatLocal, heatEffLocal, meta, target);
   if (selDay < 0 || selDay > 6) selDay = TODAY;
 
   // Sondes dynamiques depuis meta (fallback [250,750] si pas encore chargé)
@@ -907,6 +917,15 @@ function buildPage() {
 
   // Réconcilier ladderSonde avec les sondes disponibles
   if (!sondes.includes(ladderSonde)) ladderSonde = sondes[0];
+
+  const NOW_SLOT = nowLocalHour() * 4 + Math.floor(new Date().getMinutes() / 15);
+  const sondeKey = String(ladderSonde);
+  const EMPTY24 = Array.from({length:7}, () => new Array(24).fill(null));
+  const EMPTY96 = Array.from({length:7}, () => new Array(96).fill(null));
+  const heatEffLocal = overview && overview.heatEffUtc && overview.heatEffUtc[sondeKey] ? rotateHeatUtc(overview.heatEffUtc[sondeKey], offsetH) : EMPTY24;
+  const intraday = overview && overview.intradayLocal && overview.intradayLocal[sondeKey] ? overview.intradayLocal[sondeKey] : EMPTY96;
+  const weekAvg = overview && overview.effWeekAvg ? overview.effWeekAvg[sondeKey] : null;
+  const tm = timeModel(heatEffLocal, weekAvg);
 
   // Échelle courante
   let ladderZoneTitle = t('section_ladder');
@@ -961,18 +980,18 @@ function buildPage() {
   <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
     <div class="ladder-wrap${simLoading || refreshing ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading || refreshing ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${simLoading ? t('sim_loading') : t('refresh_loading')}</div>` : ''}</div></div>
 
-  <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right muted" style="font-size:11px">${t('section_slots_note')}</span></div>
+  <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right"><span class="seg">${sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('')}</span></span></div>
     <div class="card">
-      ${noData || `${encartHtml(tm, heatLocal, TODAY, NOW_HOUR)}${hebdoHtml(tm, heatLocal, TODAY, selDay)}${limitedNote}`}
+      ${noData || `${encartHtml(tm, TODAY, NOW_HOUR)}${hebdoHtml(tm, TODAY, selDay)}<p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${t('slots_help')}</p>${limitedNote}`}
     </div></div>
 
   <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span></div>
-    <div class="card">${noData || zoomHtml(tm, heatEffLocal, selDay, TODAY, NOW_HOUR, u) + limitedNote}</div></div>
+    <div class="card">${noData || zoomHtml(tm, intraday[selDay], selDay, TODAY, NOW_SLOT, u) + limitedNote}</div></div>
 
   <div class="zone"><div class="zone-h">${t('section_routes')}</div>
     <div class="card">
       ${bestRoutesCard()}${limitedNote}
-      <p class="help" style="margin:.6rem 0 0">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p></div>
+      <p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p></div>
   </div>
 
   <div class="zone"><div class="zone-h">${t('section_who')}</div>
@@ -1006,6 +1025,7 @@ async function loadBalance() {
       walletConfigured = b.configured !== false;
     }
   } catch {}
+  renderApp();
 }
 
 // ─── Compte à rebours (setInterval unique) ───────────────────────────────────

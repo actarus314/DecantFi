@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { openDb, type TickInsert, type QuoteInsert } from '../db/index.js';
 import { toStroops } from '../core/amount.js';
 import { openReadOnly } from './read-db.js';
-import { overview, displayName, chipFor, noteFor } from './stats.js';
+import { overview, displayName, chipFor, noteFor, buildIntradayLocal } from './stats.js';
 import type { CollectorConfig } from '../collector/config.js';
 
 // ─── Config synthétique ────────────────────────────────────────────────────────
@@ -241,92 +241,100 @@ describe('bestRoutes', () => {
   });
 });
 
-// ─── Test 3 : hourlyUtc ─────────────────────────────────────────────────────
+// ─── Test 3 : heatEffUtc par sonde ──────────────────────────────────────────
 
-describe('hourlyUtc', () => {
-  it('heure 4 UTC ressort positive (meilleure)', () => {
-    const h = result_usdc.hourlyUtc;
-    // h[4] doit être la valeur positive max (exécution la meilleure à 4h UTC)
-    const nonNull = h.filter((v): v is number => v !== null);
-    expect(nonNull.length).toBeGreaterThan(0);
-    const h4 = h[BEST_HOUR_UTC];
-    expect(h4).not.toBeNull();
-    expect(h4).toBeGreaterThan(0);
+describe('heatEffUtc', () => {
+  it('présent pour les deux sondes (250 et 750)', () => {
+    expect(result_usdc.heatEffUtc['250']).toBeDefined();
+    expect(result_usdc.heatEffUtc['750']).toBeDefined();
   });
 
-  it('heure 14 UTC ressort négative (pire)', () => {
-    const h = result_usdc.hourlyUtc;
-    const h14 = h[WORST_HOUR_UTC];
-    expect(h14).not.toBeNull();
-    expect(h14).toBeLessThan(0);
-  });
-
-  it('bucket vide (heure 10 UTC → ok=0) = null', () => {
-    // h=10 → ok=0 toujours → aucune donnée valide
-    const h = result_usdc.hourlyUtc;
-    expect(h[10]).toBeNull();
-  });
-
-  it('signe cohérent : dérive de prix ne renverse pas h4 vs h14', () => {
-    const h = result_usdc.hourlyUtc;
-    const h4 = h[BEST_HOUR_UTC] ?? null;
-    const h14 = h[WORST_HOUR_UTC] ?? null;
-    if (h4 !== null && h14 !== null) {
-      expect(h4).toBeGreaterThan(h14);
-    }
-  });
-});
-
-// ─── Test 4 : heatUtc ──────────────────────────────────────────────────────
-
-describe('heatUtc', () => {
-  it('dimensions 7×24', () => {
-    const heat = result_usdc.heatUtc;
-    expect(heat.length).toBe(7);
-    for (const row of heat) {
-      expect(row.length).toBe(24);
-    }
-  });
-
-  it('meilleure colonne = BEST_HOUR_UTC dans au moins un jour', () => {
-    const heat = result_usdc.heatUtc;
-    let found = false;
-    for (const row of heat) {
-      const best4 = row[BEST_HOUR_UTC] ?? null;
-      const worst14 = row[WORST_HOUR_UTC] ?? null;
-      if (best4 !== null && worst14 !== null && best4 > worst14) {
-        found = true;
-        break;
+  it('dimensions 7×24 pour chaque sonde', () => {
+    for (const key of ['250', '750'] as const) {
+      const heat = result_usdc.heatEffUtc[key]!;
+      expect(heat.length).toBe(7);
+      for (const row of heat) {
+        expect(row.length).toBe(24);
       }
     }
-    expect(found).toBe(true);
+  });
+
+  it('efficience brute > 0 pour les slots avec données (heure 4 UTC, sonde 750)', () => {
+    const heat = result_usdc.heatEffUtc['750']!;
+    // Au moins un jour doit avoir une valeur non-nulle à BEST_HOUR_UTC
+    const hasData = heat.some(row => row[BEST_HOUR_UTC] !== null && (row[BEST_HOUR_UTC] as number) > 0);
+    expect(hasData).toBe(true);
+  });
+
+  it('heure 10 UTC (ok=0) = null pour la sonde 750', () => {
+    const heat = result_usdc.heatEffUtc['750']!;
+    // h=10 → ok=0 → tous les slots de l'heure 10 UTC doivent être null
+    for (const row of heat) {
+      expect(row[10]).toBeNull();
+    }
   });
 });
 
-// ─── Test 5 : ok=0 exclus + fenêtre 7 j ─────────────────────────────────────
+// ─── Test 4 : effWeekAvg par sonde ──────────────────────────────────────────
+
+describe('effWeekAvg', () => {
+  it('présent pour les deux sondes avec valeur non-nulle', () => {
+    expect(result_usdc.effWeekAvg['250']).not.toBeNull();
+    expect(result_usdc.effWeekAvg['750']).not.toBeNull();
+    expect(typeof result_usdc.effWeekAvg['250']).toBe('number');
+    expect(typeof result_usdc.effWeekAvg['750']).toBe('number');
+  });
+
+  it('valeur plausible (proche de 1 pour USDC ≈ USD)', () => {
+    const avg = result_usdc.effWeekAvg['750'] as number;
+    expect(avg).toBeGreaterThan(0.9);
+    expect(avg).toBeLessThan(1.1);
+  });
+});
+
+// ─── Test 5 : intradayLocal par sonde ────────────────────────────────────────
+
+describe('intradayLocal', () => {
+  it('présent pour les deux sondes', () => {
+    expect(result_usdc.intradayLocal['250']).toBeDefined();
+    expect(result_usdc.intradayLocal['750']).toBeDefined();
+  });
+
+  it('dimensions 7×96 pour chaque sonde', () => {
+    for (const key of ['250', '750'] as const) {
+      const intra = result_usdc.intradayLocal[key]!;
+      expect(intra.length).toBe(7);
+      for (const row of intra) {
+        expect(row.length).toBe(96);
+      }
+    }
+  });
+});
+
+// ─── Test 6 : champs supprimés absents du type ───────────────────────────────
+
+describe('champs supprimés', () => {
+  it('hourlyUtc absent de Overview', () => {
+    expect((result_usdc as unknown as Record<string, unknown>)['hourlyUtc']).toBeUndefined();
+  });
+
+  it('heatUtc absent de Overview', () => {
+    expect((result_usdc as unknown as Record<string, unknown>)['heatUtc']).toBeUndefined();
+  });
+});
+
+// ─── Test 7 : ok=0 exclus + fenêtre 7 j ─────────────────────────────────────
 
 describe('exclusions', () => {
   it('nTicksOk exclut les ticks ok=0', () => {
     const meta = result_usdc.meta;
-    // 8 jours × 12 ticks par jour (24h/2h) = 96 ticks ; mais jour -8 = hors fenêtre n'est pas compté ici
-    // ok=0 → heure 10 UTC : 8 jours × 1 = 8 ticks ok=0
-    // nTicks = 8 × 12 = 96 ; nTicksOk = 96 - 8 = 88
     expect(meta.nTicksOk).toBeLessThan(meta.nTicks);
   });
 
   it('tick à -8 jours ignoré (hors fenêtre 7 j) → winnerDist ne dépasse pas la fenêtre', () => {
-    // Le tick le plus ancien (dayOffset=-8) est hors fenêtre.
-    // On vérifie que les ticks dans la fenêtre = 7 × 12 = 84 ticks ok (sans les ok=0).
-    // nTicksOk total = 88 (toute la DB) mais winnerDist ne compte que 7 jours.
-    // On ne peut pas le vérifier directement par un chiffre fixe car la DB inclut day=-8,
-    // mais on vérifie que la somme des dist reste cohérente (≈ 100).
     const dist = result_usdc.winnerDist;
     const sum = dist.reduce((a, d) => a + d.pct, 0);
     expect(sum).toBeCloseTo(100, 0);
-  });
-
-  it('ticks ok=0 (h=10) → hourlyUtc[10] = null', () => {
-    expect(result_usdc.hourlyUtc[10]).toBeNull();
   });
 });
 
@@ -362,5 +370,125 @@ describe('helpers', () => {
     expect(noteFor('stellarbroker', false, null)).toBe('plancher (fee opaque)');
     expect(noteFor('horizon', false, null)).toBe('plancher DEX');
     expect(noteFor('soroswap', false, null)).toBe('');
+  });
+});
+
+// ─── Test 8 : buildIntradayLocal — anti-mélange + mapping 15 min ─────────────
+
+describe('buildIntradayLocal — anti-mélange', () => {
+  /**
+   * Scénario : même jour-de-semaine apparaît dans deux semaines différentes.
+   * now = mercredi 2025-03-12T10:00:00Z, offsetH = 0 (pour rendre le test déterministe,
+   * indépendant de la TZ machine).
+   *
+   * 2025-03-12 (mercredi) = dow 2 (0=Lun, 1=Mar, 2=Mer…)
+   * 2025-03-05 (mercredi précédent) = même dow = 2
+   *
+   * On insère :
+   *   - Tick A : 2025-03-12T08:00:00Z → slot 32 (8*4+0), eff=1.05
+   *   - Tick B : 2025-03-05T14:30:00Z → slot 58 (14*4+2), eff=0.95  (semaine d'avant)
+   *
+   * Avec offsetH=0, les dates locales = dates UTC.
+   * now - 0 j = 2025-03-12, dow=2 → c'est la date "actuelle" pour ce dow.
+   * now - 7 j = 2025-03-05, même dow → doit être ignoré (hors des 7 dates les plus récentes).
+   *
+   * Résultat attendu :
+   *   result[2][32] = 1.05   (slot de la date récente)
+   *   result[2][58] = null   (slot de la semaine d'avant, absent)
+   */
+  it('ne mélange pas deux occurrences du même dow — seule la date la plus récente compte', () => {
+    const now = new Date('2025-03-12T10:00:00Z');
+    const offsetH = 0;
+
+    // Tick A : mercredi 2025-03-12 à 08h00 UTC → slot 32
+    const tickA: Parameters<typeof buildIntradayLocal>[0][number] = {
+      hour_utc: 8,
+      dow_utc: 2, // mercredi
+      eff: 1.05,
+      startedAtMs: new Date('2025-03-12T08:00:00Z').getTime(),
+    };
+
+    // Tick B : mercredi précédent 2025-03-05 à 14h30 UTC → slot 58
+    const tickB: Parameters<typeof buildIntradayLocal>[0][number] = {
+      hour_utc: 14,
+      dow_utc: 2, // même dow
+      eff: 0.95,
+      startedAtMs: new Date('2025-03-05T14:30:00Z').getTime(),
+    };
+
+    const result = buildIntradayLocal([tickA, tickB], offsetH, now);
+
+    expect(result.length).toBe(7);
+    expect(result[0]!.length).toBe(96);
+
+    // dow=2 (mercredi) : seuls les slots de 2025-03-12 présents
+    const wedRow = result[2]!;
+
+    // Slot 32 = 08:00 UTC → doit être 1.05 (date récente)
+    expect(wedRow[32]).toBeCloseTo(1.05, 5);
+
+    // Slot 58 = 14:30 UTC → doit être null (semaine d'avant, hors des 7 dates)
+    expect(wedRow[58]).toBeNull();
+  });
+
+  it('mapping 15 min correct : HH:MM → slot = HH*4 + floor(MM/15)', () => {
+    const now = new Date('2025-03-12T10:00:00Z');
+    const offsetH = 0;
+
+    // Ticks à des minutes précises pour vérifier le découpage 15-min
+    const cases: Array<{ iso: string; expectedSlot: number; eff: number }> = [
+      { iso: '2025-03-12T00:00:00Z', expectedSlot: 0,  eff: 1.0  }, // 00:00 → slot 0
+      { iso: '2025-03-12T00:14:59Z', expectedSlot: 0,  eff: 1.01 }, // 00:14 → slot 0 (même quart)
+      { iso: '2025-03-12T00:15:00Z', expectedSlot: 1,  eff: 1.02 }, // 00:15 → slot 1
+      { iso: '2025-03-12T06:30:00Z', expectedSlot: 26, eff: 1.03 }, // 06:30 → slot 6*4+2=26
+      { iso: '2025-03-12T23:45:00Z', expectedSlot: 95, eff: 1.04 }, // 23:45 → slot 23*4+3=95
+    ];
+
+    const rows: Parameters<typeof buildIntradayLocal>[0] = cases.map(c => ({
+      hour_utc: new Date(c.iso).getUTCHours(),
+      dow_utc: 2,
+      eff: c.eff,
+      startedAtMs: new Date(c.iso).getTime(),
+    }));
+
+    const result = buildIntradayLocal(rows, offsetH, now);
+    const wedRow = result[2]!;
+
+    // slot 0 : deux ticks → moyenne de 1.0 et 1.01
+    expect(wedRow[0]).toBeCloseTo((1.0 + 1.01) / 2, 5);
+    // slot 1
+    expect(wedRow[1]).toBeCloseTo(1.02, 5);
+    // slot 26
+    expect(wedRow[26]).toBeCloseTo(1.03, 5);
+    // slot 95
+    expect(wedRow[95]).toBeCloseTo(1.04, 5);
+  });
+
+  it('avec offsetH non-nul : conversion locale correcte', () => {
+    // offsetH = 2 (simulant UTC+2)
+    // Tick UTC 22:00 le 2025-03-11 → heure locale = 00:00 le 2025-03-12
+    // now = 2025-03-12T10:00:00Z, offsetH=2
+    // Date locale de now = 2025-03-12 (12h UTC+2), dow=2 (mercredi)
+    const now = new Date('2025-03-12T10:00:00Z');
+    const offsetH = 2;
+
+    // UTC 22:00 le 2025-03-11 → local = 00:00 le 2025-03-12 → slot 0
+    const tickMs = new Date('2025-03-11T22:00:00Z').getTime();
+    const rows: Parameters<typeof buildIntradayLocal>[0] = [{
+      hour_utc: 22,
+      dow_utc: 1, // mardi UTC
+      eff: 1.07,
+      startedAtMs: tickMs,
+    }];
+
+    const result = buildIntradayLocal(rows, offsetH, now);
+
+    // En local, ce tick tombe le 2025-03-12, dow=2 (mercredi), slot 0
+    const wedRow = result[2]!;
+    expect(wedRow[0]).toBeCloseTo(1.07, 5);
+
+    // Le mardi local (dow=1) ne doit pas avoir ce tick
+    const tueRow = result[1]!;
+    expect(tueRow[0]).toBeNull();
   });
 });
