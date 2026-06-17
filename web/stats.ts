@@ -540,11 +540,13 @@ export function buildSourceHealth(
   // Sources connues : les clés de FULL_NAME (7 venues atomiques)
   const knownIds = Object.keys(FULL_NAME);
 
-  // Requête A : ticks ok=1 dans la fenêtre
+  // Requête A : ticks ok=1 AUTOMATIQUES (note IS NULL) dans la fenêtre.
+  // Les relevés manuels (note='manual') sont exclus des stats de stabilité — ils sont ponctuels
+  // et purgés par le poll programmé ; les compter biaiserait l'uptime.
   const tickStmt = prepBig(db, `
     SELECT id, started_at, source_errors
     FROM tick
-    WHERE ok = 1 AND started_at >= ?
+    WHERE ok = 1 AND note IS NULL AND started_at >= ?
     ORDER BY started_at
   `);
   const tickRows = tickStmt.all(windowStart) as Array<Record<string, unknown>>;
@@ -583,12 +585,13 @@ export function buildSourceHealth(
     acc.set(id, { responded: 0, failed: 0, bySize: new Map(), lastFailureAt: null, lastFailureReason: null, dayTicks: new Array(7).fill(0), dayFails: new Array(7).fill(0) });
   }
 
-  // Requête B : quotes (sources qui ont répondu) PAR TAILLE sur les ticks ok de la fenêtre
+  // Requête B : quotes (sources qui ont répondu) PAR TAILLE sur les ticks ok AUTOMATIQUES de la fenêtre
+  // (note IS NULL : cohérent avec la requête A — les relevés manuels n'entrent pas dans la stabilité).
   const quoteStmt = prepBig(db, `
     SELECT DISTINCT q.tick_id, q.source_id, q.amount_in
     FROM quote q
     JOIN tick t ON t.id = q.tick_id
-    WHERE t.ok = 1 AND t.started_at >= ?
+    WHERE t.ok = 1 AND t.note IS NULL AND t.started_at >= ?
   `);
   const quoteRows = quoteStmt.all(windowStart) as Array<Record<string, unknown>>;
 
