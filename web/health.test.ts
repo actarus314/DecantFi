@@ -1,0 +1,197 @@
+// Tests de web/stats.ts : buildSourceHealth — DB synthétique.
+// Miroir de web/stats.test.ts (même style openDb / openReadOnly).
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { openDb, type TickInsert, type QuoteInsert } from '../db/index.js';
+import { toStroops } from '../core/amount.js';
+import { openReadOnly } from './read-db.js';
+import { buildSourceHealth } from './stats.js';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const NOW = new Date('2025-06-01T12:00:00Z');
+const WINDOW_START = new Date(NOW.getTime() - 7 * 86_400_000).toISOString();
+
+let tmpDir: string;
+let dbPath: string;
+
+function mkTick(overrides: Partial<TickInsert> & { started_at: string }): TickInsert {
+  return {
+    finished_at: overrides.started_at,
+    cadence_sec: 900,
+    blnd_usd: 0.05,
+    xlm_usd: 0.12,
+    eur_usd: 1.08,
+    ok: true,
+    source_errors: null,
+    note: null,
+    ...overrides,
+  };
+}
+
+function mkQuote(sourceId: string, overrides: Partial<QuoteInsert> = {}): QuoteInsert {
+  return {
+    pair: 'BLND->USDC',
+    amount_in: toStroops(250),
+    source_id: sourceId,
+    net_out: BigInt(125_000_000),
+    net_confidence: 'exact',
+    price_impact_pct: 0.3,
+    gas_in_target: 0n,
+    fee_total: 0n,
+    route_summary: 'BLND->USDC',
+    is_winner: true,
+    eurc_path: null,
+    raw_json: null,
+    ...overrides,
+  };
+}
+
+// ─── Graine de test ───────────────────────────────────────────────────────────
+
+function buildTestDb(): void {
+  tmpDir = mkdtempSync(join(tmpdir(), 'stellarswap-health-test-'));
+  dbPath = join(tmpDir, 'test.db');
+  const db = openDb(dbPath);
+
+  // Tick 1 : ok=1, soroswap en échec dans source_errors
+  db.insertTickWithQuotes(
+    mkTick({ started_at: '2025-05-28T10:00:00Z', source_errors: 'soroswap' }),
+    [
+      mkQuote('xbull'),
+      mkQuote('aquarius'),
+      mkQuote('comet'),
+      mkQuote('ultrastellar'),
+      mkQuote('stellarbroker'),
+      mkQuote('horizon'),
+      // soroswap absent des quotes (en échec)
+    ],
+  );
+
+  // Tick 2 : ok=1, pas d'erreur, toutes les sources répondent
+  db.insertTickWithQuotes(
+    mkTick({ started_at: '2025-05-29T10:00:00Z', source_errors: null }),
+    [
+      mkQuote('xbull'),
+      mkQuote('soroswap'),
+      mkQuote('aquarius'),
+      mkQuote('comet'),
+      mkQuote('ultrastellar'),
+      mkQuote('stellarbroker'),
+      mkQuote('horizon'),
+    ],
+  );
+
+  // Tick 3 : ok=0 — ne doit PAS entrer dans le dénominateur
+  db.insertTickWithQuotes(
+    mkTick({ started_at: '2025-05-30T10:00:00Z', ok: false, source_errors: 'xbull, soroswap' }),
+    [],
+  );
+
+  // Tick 4 : ok=1, ID composite dans source_errors → doit être ignoré
+  db.insertTickWithQuotes(
+    mkTick({ started_at: '2025-05-31T10:00:00Z', source_errors: 'xbull+ultrastellar' }),
+    [
+      mkQuote('xbull'),
+      mkQuote('soroswap'),
+      mkQuote('aquarius'),
+      mkQuote('comet'),
+      mkQuote('ultrastellar'),
+      mkQuote('stellarbroker'),
+      mkQuote('horizon'),
+    ],
+  );
+
+  // Tick hors fenêtre (>7j avant NOW) → ignoré
+  db.insertTickWithQuotes(
+    mkTick({ started_at: '2025-05-01T10:00:00Z', source_errors: 'xbull' }),
+    [mkQuote('soroswap')],
+  );
+
+  db.close();
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+let result: ReturnType<typeof buildSourceHealth>;
+
+beforeAll(() => {
+  buildTestDb();
+  const db = openReadOnly(dbPath);
+  result = buildSourceHealth(db, WINDOW_START, NOW);
+  db.close();
+});
+
+afterAll(() => {
+  rmSync(tmpDir, { recursive: true, force: true });
+});
+
+describe('buildSourceHealth — totalTicks', () => {
+  it('ok=0 ticks exclus du dénominateur', () => {
+    // Ticks ok=1 dans la fenêtre : tick1, tick2, tick4 = 3 (tick3 ok=0, tick_hors_fenêtre ignoré)
+    expect(result.totalTicks).toBe(3);
+  });
+
+  it('windowDays = 7', () => {
+    expect(result.windowDays).toBe(7);
+  });
+});
+
+describe('buildSourceHealth — sources', () => {
+  it('7 sources (clés de FULL_NAME uniquement)', () => {
+    expect(result.sources.length).toBe(7);
+  });
+
+  it('IDs composites avec "+" ignorés', () => {
+    // 'xbull+ultrastellar' ne doit pas apparaître comme source
+    const hasComposite = result.sources.some(s => s.id.includes('+'));
+    expect(hasComposite).toBe(false);
+  });
+
+  it('xbull+ultrastellar dans source_errors ignoré → failedTicks xbull non impacté', () => {
+    // tick4 a source_errors='xbull+ultrastellar' → composite ignoré → xbull.failedTicks = 0
+    const xbull = result.sources.find(s => s.id === 'xbull');
+    expect(xbull).toBeDefined();
+    expect(xbull!.failedTicks).toBe(0);
+  });
+
+  it('soroswap : 1 échec sur 3 ticks ok → uptime < 100%', () => {
+    const soroswap = result.sources.find(s => s.id === 'soroswap');
+    expect(soroswap).toBeDefined();
+    expect(soroswap!.failedTicks).toBe(1);
+    expect(soroswap!.uptimePct).toBeLessThan(100);
+    // 1 - 1/3 = 66.7%
+    expect(soroswap!.uptimePct).toBeCloseTo(66.7, 0);
+  });
+
+  it('comet pairNote = "USDC uniquement"', () => {
+    const comet = result.sources.find(s => s.id === 'comet');
+    expect(comet).toBeDefined();
+    expect(comet!.pairNote).toBe('USDC uniquement');
+  });
+
+  it('autres sources : pairNote = null', () => {
+    const xbull = result.sources.find(s => s.id === 'xbull');
+    expect(xbull!.pairNote).toBeNull();
+  });
+
+  it('chaque source a 7 entrées de jours', () => {
+    for (const s of result.sources) {
+      expect(s.days.length).toBe(7);
+    }
+  });
+
+  it('tri : source avec uptime le plus élevé en premier', () => {
+    for (let i = 1; i < result.sources.length; i++) {
+      expect(result.sources[i]!.uptimePct).toBeLessThanOrEqual(result.sources[i - 1]!.uptimePct);
+    }
+  });
+
+  it('lastFailureAt de soroswap = ISO de tick1', () => {
+    const soroswap = result.sources.find(s => s.id === 'soroswap');
+    // La DB stocke le format ISO sans millisecondes (ex. '2025-05-28T10:00:00Z')
+    expect(soroswap!.lastFailureAt).toContain('2025-05-28T10:00:00');
+  });
+});

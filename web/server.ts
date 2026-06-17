@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadWebConfig } from './config.js';
 import { openReadOnly } from './read-db.js';
-import { overview } from './stats.js';
+import { overview, buildSourceHealth } from './stats.js';
 import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
 import { pickExecutableVenue, submit, ExecError } from './execute.js';
 import { manualRefresh, refreshBusy } from './refresh.js';
@@ -84,6 +84,14 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (req.method === 'GET' && path === '/walletkit.js') {
       res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end(walletkitJs);
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/api/health') {
+      const now = new Date();
+      const windowStart = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+      const result = buildSourceHealth(db, windowStart, now);
+      json(res, 200, { ...result, generatedAt: now.toISOString() });
       return;
     }
 

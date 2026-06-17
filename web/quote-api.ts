@@ -50,6 +50,8 @@ export interface LiveQuote {
     xlmUsd: number | null;
   };
   errors: string[];
+  // axe santé, distinct des chips de confiance — ponytail: health axis
+  downSources: string[];
 }
 
 // ─── Deep-links (pages réelles, sans prefill inventé) ────────────────────────
@@ -176,6 +178,7 @@ export async function liveQuote(
         xlmUsd: result.prices.xlmUsd,
       },
       errors: result.errors,
+      downSources: result.errors.map(displayName),
     };
   }
 
@@ -247,6 +250,7 @@ export async function liveQuote(
       xlmUsd: result.prices.xlmUsd,
     },
     errors: result.errors,
+    downSources: result.errors.map(displayName),
   };
 }
 

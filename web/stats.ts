@@ -355,7 +355,7 @@ function buildHeatEffUtc(rows: WinnerEffRow[]): (number | null)[][] {
 
 // ─── Offset Paris ─────────────────────────────────────────────────────────────
 
-function parisOffsetHours(now: Date): number {
+export function parisOffsetHours(now: Date): number {
   const paris = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
   const utc = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
   return Math.round((paris.getTime() - utc.getTime()) / 3600000);
@@ -482,6 +482,182 @@ function buildMeta(db: DatabaseSync, cadenceSec: number, sondes: number[]): Meta
     windowDays: 7,
     sondes,
   };
+}
+
+// ─── Santé des sources (7 j) ─────────────────────────────────────────────────
+
+export interface SourceHealth {
+  id: string;
+  display: string;
+  respondedTicks: number;
+  failedTicks: number;
+  uptimePct: number;    // arrondi à 1 décimale
+  lastFailureAt: string | null;  // ISO ou null
+  days: Array<'ok' | 'warn' | 'bad' | null>;  // 7 entrées, index 0 = le plus récent
+  pairNote: string | null;       // ex. 'USDC uniquement' pour comet
+}
+
+export interface SourceHealthResult {
+  totalTicks: number;
+  windowDays: 7;
+  sources: SourceHealth[];
+}
+
+/**
+ * Construit la santé par source sur la fenêtre [windowStart, now).
+ * Seuls les ticks ok=1 entrent dans le dénominateur.
+ * source_errors = CSV des IDs des sources en échec sur ce tick ok.
+ * Les IDs composites (avec '+') sont ignorés.
+ */
+export function buildSourceHealth(
+  db: DatabaseSync,
+  windowStart: string,
+  now: Date,
+): SourceHealthResult {
+  // Sources connues : les clés de FULL_NAME (7 venues atomiques)
+  const knownIds = Object.keys(FULL_NAME);
+
+  // Requête A : ticks ok=1 dans la fenêtre
+  const tickStmt = prepBig(db, `
+    SELECT id, started_at, source_errors
+    FROM tick
+    WHERE ok = 1 AND started_at >= ?
+    ORDER BY started_at
+  `);
+  const tickRows = tickStmt.all(windowStart) as Array<Record<string, unknown>>;
+
+  const totalTicks = tickRows.length;
+
+  // Offset Paris pour le bucketing journalier
+  const offsetH = parisOffsetHours(now);
+  const MS_PER_DAY = 86_400_000;
+  const nowMs = now.getTime();
+
+  // Dates locales des 7 derniers jours (index 0 = aujourd'hui)
+  const targetDates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const shiftedMs = nowMs - i * MS_PER_DAY + offsetH * 3_600_000;
+    const d = new Date(shiftedMs);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dy = String(d.getUTCDate()).padStart(2, '0');
+    targetDates.push(`${y}-${m}-${dy}`);
+  }
+
+  // Accumulateurs par source
+  type SrcAcc = {
+    responded: number;
+    failed: number;
+    lastFailureAt: string | null;
+    // dayTicks[i] = nb ticks dans le jour i (0=auj.), dayFails[i] = nb échecs dans le jour i
+    dayTicks: number[];
+    dayFails: number[];
+  };
+  const acc = new Map<string, SrcAcc>();
+  for (const id of knownIds) {
+    acc.set(id, { responded: 0, failed: 0, lastFailureAt: null, dayTicks: new Array(7).fill(0), dayFails: new Array(7).fill(0) });
+  }
+
+  // Requête B : quotes (sources qui ont répondu) sur les ticks ok de la fenêtre
+  const quoteStmt = prepBig(db, `
+    SELECT DISTINCT q.tick_id, q.source_id
+    FROM quote q
+    JOIN tick t ON t.id = q.tick_id
+    WHERE t.ok = 1 AND t.started_at >= ?
+  `);
+  const quoteRows = quoteStmt.all(windowStart) as Array<Record<string, unknown>>;
+
+  // Map tickId → Set<sourceId> (sources qui ont répondu)
+  const respondedByTick = new Map<string, Set<string>>();
+  for (const r of quoteRows) {
+    const tickId = String(r['tick_id']);
+    const srcId = String(r['source_id'] ?? '');
+    if (!srcId.includes('+') && knownIds.includes(srcId)) {
+      let s = respondedByTick.get(tickId);
+      if (!s) { s = new Set(); respondedByTick.set(tickId, s); }
+      s.add(srcId);
+    }
+  }
+
+  // Parcourir les ticks pour accumuler responded/failed/days
+  for (const row of tickRows) {
+    const startedAt = String(row['started_at'] ?? '');
+    const d = new Date(startedAt);
+    if (isNaN(d.getTime())) continue;
+
+    // Index du jour local (0 = aujourd'hui, 6 = il y a 6 j)
+    const localMs = d.getTime() + offsetH * 3_600_000;
+    const ld = new Date(localMs);
+    const y = ld.getUTCFullYear();
+    const m = String(ld.getUTCMonth() + 1).padStart(2, '0');
+    const dy = String(ld.getUTCDate()).padStart(2, '0');
+    const dateKey = `${y}-${m}-${dy}`;
+    const dayIdx = targetDates.indexOf(dateKey);
+
+    // Echecs sur ce tick : source_errors = CSV ou null
+    const errorsRaw = row['source_errors'];
+    const failedIds = new Set<string>(
+      errorsRaw
+        ? String(errorsRaw).split(',').map((s) => s.trim()).filter((s) => !s.includes('+') && knownIds.includes(s))
+        : [],
+    );
+
+    const tickId = String(row['id']);
+    const respondedIds = respondedByTick.get(tickId) ?? new Set<string>();
+
+    for (const id of knownIds) {
+      const a = acc.get(id)!;
+      // Répondu = ligne quote réelle (pas seulement tenté). uptime se calcule sur les échecs.
+      const responded = respondedIds.has(id);
+      const failed = failedIds.has(id);
+
+      if (responded) a.responded++;
+      if (failed) {
+        a.failed++;
+        if (!a.lastFailureAt || startedAt > a.lastFailureAt) a.lastFailureAt = startedAt;
+      }
+      if (dayIdx >= 0) {
+        a.dayTicks[dayIdx]! ++;
+        if (failed) a.dayFails[dayIdx]! ++;
+      }
+    }
+  }
+
+  // Construire SourceHealth par source
+  const sources: SourceHealth[] = knownIds.map((id) => {
+    const a = acc.get(id)!;
+    const uptimePct = totalTicks > 0
+      ? Math.round((1 - a.failed / totalTicks) * 1000) / 10
+      : 100;
+
+    const days = a.dayTicks.map((dt, i) => {
+      if (dt === 0) return null;
+      const df = a.dayFails[i]!;
+      if (df === 0) return 'ok' as const;
+      if (df / dt < 0.25) return 'warn' as const;
+      return 'bad' as const;
+    }) as Array<'ok' | 'warn' | 'bad' | null>;
+
+    return {
+      id,
+      display: displayName(id),
+      respondedTicks: a.responded,
+      failedTicks: a.failed,
+      uptimePct,
+      lastFailureAt: a.lastFailureAt,
+      days,
+      pairNote: id === 'comet' ? 'USDC uniquement' : null,
+    };
+  });
+
+  // Trier par uptimePct desc, tie-break failedTicks asc (nulls = 100% → en tête)
+  sources.sort((a, b) =>
+    b.uptimePct !== a.uptimePct
+      ? b.uptimePct - a.uptimePct
+      : a.failedTicks - b.failedTicks,
+  );
+
+  return { totalTicks, windowDays: 7, sources };
 }
 
 // ─── Point d'entrée public ────────────────────────────────────────────────────
