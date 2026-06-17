@@ -69,7 +69,7 @@ function isStellarPubkey(s: unknown): s is string { return typeof s === 'string'
 
 function execStatus(code: ExecError['code']): number { return code === 'down' ? 502 : 400; }
 
-const VENUES: readonly Venue[] = ['xbull', 'soroswap', 'horizon'];
+const VENUES: readonly Venue[] = ['xbull', 'soroswap', 'horizon', 'aquarius'];
 function isVenue(v: unknown): v is Venue { return typeof v === 'string' && (VENUES as readonly string[]).includes(v); }
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {

@@ -13,6 +13,8 @@ import {
   quoteHorizon,
   horizonPathSymbols,
   classifyHorizonSubmit,
+  quoteAquarius,
+  aquariusPathSymbols,
   type ExecDeps,
   type FetchResult,
   type SoroswapClient,
@@ -555,5 +557,46 @@ describe('classifyHorizonSubmit', () => {
   });
   it('code inconnu / pas de result_codes → down', () => {
     expect(classifyHorizonSubmit(new Error('boom'))).toBe('down');
+  });
+});
+
+describe('aquariusPathSymbols', () => {
+  it("mappe 'native' → XLM et CODE:ISSUER → CODE", () => {
+    expect(aquariusPathSymbols(['native', 'AQUA:GBNZILSTVQZ4R7IKQDGHYGY2QXL5QOFJYQMXPKWRRM5PAV7Y4M67AQUA'])).toEqual(['XLM', 'AQUA']);
+  });
+  it('route multi-hop BLND→sUSD→USDC', () => {
+    expect(aquariusPathSymbols(['BLND:GDJ', 'sUSD:GCH', 'USDC:GA5'])).toEqual(['BLND', 'sUSD', 'USDC']);
+  });
+  it('liste vide → []', () => {
+    expect(aquariusPathSymbols([])).toEqual([]);
+  });
+});
+
+describe('quoteAquarius', () => {
+  const depsFromBody = (body: unknown, ok = true): ExecDeps =>
+    ({ fetchJson: vi.fn(async () => ({ status: ok ? 200 : 500, ok, body })), makeSoroswap: vi.fn() }) as unknown as ExecDeps;
+
+  it('parse net (amount_with_fee stroops bruts) + swap_chain_xdr + tokens', async () => {
+    const body = { success: true, amount: 505220384, amount_with_fee: 505220384, swap_chain_xdr: 'AAAAE==', tokens: ['BLND:G', 'sUSD:G', 'USDC:G'] };
+    const q = await quoteAquarius(BLND.sac, USDC.sac, 1000_0000000n, depsFromBody(body));
+    expect(q).not.toBeNull();
+    expect(q!.netOut).toBe(505220384n);
+    expect(q!.swapChainXdr).toBe('AAAAE==');
+    expect(q!.tokens).toEqual(['BLND:G', 'sUSD:G', 'USDC:G']);
+  });
+
+  it('success:false → null', async () => {
+    const q = await quoteAquarius(BLND.sac, EURC.sac, 1n, depsFromBody({ success: false }));
+    expect(q).toBeNull();
+  });
+
+  it('swap_chain_xdr absent → null', async () => {
+    const q = await quoteAquarius(BLND.sac, USDC.sac, 1n, depsFromBody({ success: true, amount_with_fee: 100, tokens: [] }));
+    expect(q).toBeNull();
+  });
+
+  it('réponse non-ok → null', async () => {
+    const q = await quoteAquarius(BLND.sac, USDC.sac, 1n, depsFromBody({}, false));
+    expect(q).toBeNull();
   });
 });

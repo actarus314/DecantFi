@@ -1503,7 +1503,7 @@ function execModal() {
   let content = '';
   if (phase === 'review') {
     const rv = build.review;
-    const venueLabel = rv.venue === 'xbull' ? 'xBull' : rv.venue === 'soroswap' ? 'Soroswap' : rv.venue === 'horizon' ? 'Horizon' : rv.venue;
+    const venueLabel = rv.venue === 'xbull' ? 'xBull' : rv.venue === 'soroswap' ? 'Soroswap' : rv.venue === 'horizon' ? 'Horizon' : rv.venue === 'aquarius' ? 'Aquarius' : rv.venue;
     const fidelityNote = rv.fidelity
       ? `<p class="help" style="margin:.6rem 0 0">${t('review_fidelity', rv.fidelity.displayedWinner, fmt3(rv.fidelity.displayedWinnerNet))}</p>`
       : '';

@@ -1,17 +1,19 @@
-// Orchestrateur d'exécution : BLND → USDC/EURC via xBull, Soroswap ou Horizon.
+// Orchestrateur d'exécution : BLND → USDC/EURC via xBull, Soroswap, Horizon ou Aquarius.
 // Money-path : bigint stroops partout, jamais de float pour les calculs.
 import { BLND, USDC, EURC, bySac, classicColon, type Asset } from '../core/assets.js';
 import { toNumber, fromStroops } from '../core/amount.js';
-import { stroopsOrNull } from '../core/sources/util.js';
+import { stroopsOrNull, bigintOrNull } from '../core/sources/util.js';
 import { SoroswapSDK, SupportedNetworks, SupportedProtocols, TradeType } from '@soroswap/sdk';
 
 /** Venues d'exécution branchées. Ajouter une venue = étendre cette union (et son cas de build/submit). */
-export type Venue = 'xbull' | 'soroswap' | 'horizon';
+export type Venue = 'xbull' | 'soroswap' | 'horizon' | 'aquarius';
 
 // ─── User-Agent commun (xBull bloque l'UA Node par défaut) ──────────────────
 const XBULL_UA = 'Mozilla/5.0 (compatible; stellar-swap/0.1; +exec)';
 const XBULL_BASE = 'https://swap.apis.xbull.app';
 const HORIZON_BASE_DEFAULT = 'https://horizon.stellar.org';
+const AQUA_ROUTER = 'CBQDHNBFBZYE4MKPWBSJOPIYLW4SFSXAXUTSXJN76GNKYVYPCKWC6QUK';
+const AQUA_FINDPATH = 'https://amm-api.aqua.network/api/external/v1/find-path/';
 
 // ─── Erreur typée ────────────────────────────────────────────────────────────
 
@@ -418,6 +420,94 @@ export function classifyHorizonSubmit(e: unknown): ExecError['code'] {
   return classifyExecError(codes || (e instanceof Error ? e.message : String(e)));
 }
 
+// ─── Quote / build / submit — Aquarius (contrat Soroban swap_chained) ────────
+// find-path API rend swap_chain_xdr (= arg swaps_chain sérialisé, à décoder tel quel) +
+// amount_with_fee (net stroops bruts) + tokens (route). Build via stellar-sdk + prepareTransaction
+// (Soroban EST simulable, ≠ Horizon). Pré-flight trustline = message clair (la sim l'attraperait aussi).
+
+/** Symboles lisibles d'une route Aquarius. tokens find-path : 'native' (→XLM) ou 'CODE:ISSUER'. */
+export function aquariusPathSymbols(tokens: string[]): string[] {
+  return tokens.map((t) => (t === 'native' ? 'XLM' : t.split(':')[0] ?? t));
+}
+
+/** Re-cote live via Aquarius find-path : net (amount_with_fee) + swap_chain_xdr + route. */
+export async function quoteAquarius(
+  sellSac: string,
+  buySac: string,
+  fromAmount: bigint,
+  deps: ExecDeps,
+): Promise<{ venue: 'aquarius'; netOut: bigint; swapChainXdr: string; tokens: string[] } | null> {
+  const res = await deps.fetchJson(AQUA_FINDPATH, {
+    method: 'POST',
+    body: { token_in_address: sellSac, token_out_address: buySac, amount: fromAmount.toString() },
+  });
+  if (!res.ok) return null;
+  const b = res.body as
+    | { success?: boolean; amount?: string | number; amount_with_fee?: string | number; swap_chain_xdr?: string; tokens?: string[] }
+    | null;
+  if (!b || b.success === false) return null;
+  const netOut = bigintOrNull(b.amount_with_fee ?? b.amount);
+  if (netOut === null || netOut <= 0n) return null;
+  if (typeof b.swap_chain_xdr !== 'string' || b.swap_chain_xdr.length === 0) return null;
+  return { venue: 'aquarius', netOut, swapChainXdr: b.swap_chain_xdr, tokens: b.tokens ?? [] };
+}
+
+/** Construit + simule (prepareTransaction) l'appel swap_chained → XDR prêt à signer.
+ *  user == sender == source : l'auth Soroban du compte source est couverte par la signature de la tx. */
+export async function buildAquarius(
+  sender: string,
+  buy: Asset,
+  tokenInSac: string,
+  fromAmount: bigint,
+  outMin: bigint,
+  swapChainXdr: string,
+  cfg: { rpcUrl: string; horizonUrl?: string },
+): Promise<{ xdr: string }> {
+  const sdk = await import('@stellar/stellar-sdk');
+  const { Horizon, rpc, TransactionBuilder, Contract, Address, Networks, nativeToScVal, xdr } = sdk;
+  const horizon = new Horizon.Server((cfg.horizonUrl || HORIZON_BASE_DEFAULT).replace(/\/$/, ''));
+
+  let account: Awaited<ReturnType<typeof horizon.loadAccount>>;
+  try {
+    account = await horizon.loadAccount(sender);
+  } catch {
+    throw new ExecError('funds', `compte ${sender} introuvable ou non financé`);
+  }
+  if (!buy.native && !account.balances.some(
+    (b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer,
+  )) {
+    throw new ExecError('trustline', `trustline ${buy.code} absente sur ${sender}`);
+  }
+
+  let swapsChain: ReturnType<typeof xdr.ScVal.fromXDR>;
+  try {
+    swapsChain = xdr.ScVal.fromXDR(swapChainXdr, 'base64');
+  } catch {
+    throw new ExecError('no-route', 'swap_chain_xdr Aquarius non décodable');
+  }
+
+  const tx = new TransactionBuilder(account, { fee: '10000', networkPassphrase: Networks.PUBLIC })
+    .addOperation(new Contract(AQUA_ROUTER).call(
+      'swap_chained',
+      Address.fromString(sender).toScVal(),
+      swapsChain,
+      Address.fromString(tokenInSac).toScVal(),
+      nativeToScVal(fromAmount, { type: 'u128' }),
+      nativeToScVal(outMin, { type: 'u128' }),
+    ))
+    .setTimeout(180)
+    .build();
+
+  const server = new rpc.Server(cfg.rpcUrl.replace(/\/$/, ''));
+  try {
+    const prepared = await server.prepareTransaction(tx);
+    return { xdr: prepared.toXDR() };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new ExecError(classifyExecError(msg), msg);
+  }
+}
+
 // ─── Orchestrateur principal ─────────────────────────────────────────────────
 
 export async function pickExecutableVenue(
@@ -437,24 +527,27 @@ export async function pickExecutableVenue(
 
   // 1. Re-quote live en parallèle (tolérant : échec → null).
   const soroClient = cfg.soroswapApiKey ? deps.makeSoroswap(cfg.soroswapApiKey) : null;
-  const [xbullQ, soroQ, horizonQ] = await Promise.all([
+  const [xbullQ, soroQ, horizonQ, aquariusQ] = await Promise.all([
     quoteXbull(sellSac, buySac, amountStroops, deps),
     soroClient
       ? quoteSoroswap(soroClient, sellSac, buySac, amountStroops, slippageBps)
       : Promise.resolve(null),
     quoteHorizon(BLND, buyAsset, amountStroops, deps, cfg.horizonUrl),
+    quoteAquarius(sellSac, buySac, amountStroops, deps),
   ]);
 
   // 2. Trier les candidats non-null par netOut décroissant.
   type Candidate =
     | { venue: 'xbull'; netOut: bigint; route: string }
     | { venue: 'soroswap'; netOut: bigint; minOut: bigint; soroPath?: string[]; quote: unknown }
-    | { venue: 'horizon'; netOut: bigint; path: HorizonPathRecord[] };
+    | { venue: 'horizon'; netOut: bigint; path: HorizonPathRecord[] }
+    | { venue: 'aquarius'; netOut: bigint; swapChainXdr: string; tokens: string[] };
 
   let candidates: Candidate[] = [];
   if (xbullQ) candidates.push(xbullQ);
   if (soroQ) candidates.push(soroQ);
   if (horizonQ) candidates.push(horizonQ);
+  if (aquariusQ) candidates.push(aquariusQ);
   candidates.sort((a, b) => (a.netOut < b.netOut ? 1 : a.netOut > b.netOut ? -1 : 0));
 
   if (candidates.length === 0) {
@@ -511,6 +604,28 @@ export async function pickExecutableVenue(
           displayed,
         });
         return { venue: 'horizon', xdr: built.xdr, type: 'swap', review };
+      } catch (e) {
+        if (e instanceof ExecError) errors.push(e);
+        continue;
+      }
+    } else if (cand.venue === 'aquarius') {
+      try {
+        const outMin = minReceivedStroops(cand.netOut, slippageBps);
+        const built = await buildAquarius(sender, buyAsset, sellSac, amountStroops, outMin, cand.swapChainXdr, { rpcUrl: cfg.rpcUrl, horizonUrl: cfg.horizonUrl });
+        const syms = aquariusPathSymbols(cand.tokens);
+        const route = syms.length >= 2 ? syms.join(' → ') : `BLND → ${target}`;
+        const review = reviewData({
+          venue: 'aquarius',
+          target,
+          type: 'swap',
+          sendStroops: amountStroops,
+          netStroops: cand.netOut,
+          minReceivedStroops: outMin,
+          slippageBps,
+          route,
+          displayed,
+        });
+        return { venue: 'aquarius', xdr: built.xdr, type: 'swap', review };
       } catch (e) {
         if (e instanceof ExecError) errors.push(e);
         continue;
@@ -587,6 +702,29 @@ export async function submit(
       const codes = horizonResultCodes(e);
       const msg = codes.length ? `Horizon a rejeté la tx : ${codes.join(', ')}` : (e instanceof Error ? e.message : String(e));
       throw new ExecError(classifyHorizonSubmit(e), msg);
+    }
+  } else if (venue === 'aquarius') {
+    // Contrat Soroban → soumission RPC + poll jusqu'à résolution (parité avec xbull/soroswap qui confirment).
+    const sdk = await import('@stellar/stellar-sdk');
+    const { rpc, TransactionBuilder, Networks } = sdk;
+    const server = new rpc.Server(cfg.rpcUrl.replace(/\/$/, ''));
+    try {
+      const tx = TransactionBuilder.fromXDR(payload.signedXdr, Networks.PUBLIC);
+      const sent = await server.sendTransaction(tx);
+      if (sent.status === 'ERROR') {
+        throw new ExecError('down', `Soroban a rejeté la tx : ${JSON.stringify(sent.errorResult ?? sent)}`);
+      }
+      let got = await server.getTransaction(sent.hash);
+      for (let i = 0; i < 15 && got.status === 'NOT_FOUND'; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        got = await server.getTransaction(sent.hash);
+      }
+      if (got.status === 'SUCCESS') return { hash: sent.hash };
+      throw new ExecError('down', `tx Soroban non confirmée (${got.status}) : ${sent.hash}`);
+    } catch (e) {
+      if (e instanceof ExecError) throw e;
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new ExecError(classifyExecError(msg), msg);
     }
   } else {
     const client = deps.makeSoroswap(cfg.soroswapApiKey!);
