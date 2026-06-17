@@ -15,6 +15,7 @@ import {
   classifyHorizonSubmit,
   quoteAquarius,
   aquariusPathSymbols,
+  quoteComet,
   type ExecDeps,
   type FetchResult,
   type SoroswapClient,
@@ -212,6 +213,7 @@ function fakeDeps(opts: {
   soroQuote?: { amountOut: bigint; rawTrade: { amountOutMin: bigint }; routePlan: Array<{ swapInfo: { protocol: string; path: string[] } }> } | null;
   soroBuild?: { xdr: string } | Error | null;
   soroSend?: { txHash: string; success: boolean } | Error | null;
+  cometOut?: bigint | null;
 }): Partial<ExecDeps> {
   const fetchJson = vi.fn(async (url: string): Promise<FetchResult> => {
     if (url.includes('/swaps/accept-quote')) {
@@ -253,7 +255,7 @@ function fakeDeps(opts: {
     },
   }));
 
-  return { fetchJson, makeSoroswap };
+  return { fetchJson, makeSoroswap, simulateComet: vi.fn(async () => opts.cometOut ?? null) };
 }
 
 const CFG = { soroswapApiKey: 'test-key', rpcUrl: 'https://rpc.test', timeoutMs: 5000 };
@@ -455,6 +457,30 @@ describe('pickExecutableVenue', () => {
       ),
     ).rejects.toMatchObject({ code: 'no-route' });
   });
+
+  it('(g) comet coté pour USDC (gate ouvert) — simulateComet appelé', async () => {
+    const deps = fakeDeps({
+      xbullQuote: { toAmount: '5000000', route: 'r' },
+      xbullAccept: { id: 'i', xdr: 'x', type: 'full' },
+      soroQuote: null,
+      cometOut: 3000000n, // 0.3 USDC < xbull 0.5 → xbull gagne, buildComet jamais appelé
+    });
+    const result = await pickExecutableVenue('USDC', 10_0000000n, SENDER, 50, CFG, undefined, deps);
+    expect(result.venue).toBe('xbull');
+    expect((deps.simulateComet as any).mock.calls.length).toBe(1);
+  });
+
+  it('(h) comet jamais coté pour EURC (gate fermé) — simulateComet pas appelé', async () => {
+    const deps = fakeDeps({
+      xbullQuote: { toAmount: '5000000', route: 'r' },
+      xbullAccept: { id: 'i', xdr: 'x', type: 'full' },
+      soroQuote: null,
+      cometOut: 3000000n,
+    });
+    const result = await pickExecutableVenue('EURC', 10_0000000n, SENDER, 50, CFG, undefined, deps);
+    expect(result.venue).toBe('xbull');
+    expect((deps.simulateComet as any).mock.calls.length).toBe(0);
+  });
 });
 
 describe('submit', () => {
@@ -574,7 +600,7 @@ describe('aquariusPathSymbols', () => {
 
 describe('quoteAquarius', () => {
   const depsFromBody = (body: unknown, ok = true): ExecDeps =>
-    ({ fetchJson: vi.fn(async () => ({ status: ok ? 200 : 500, ok, body })), makeSoroswap: vi.fn() }) as unknown as ExecDeps;
+    ({ fetchJson: vi.fn(async () => ({ status: ok ? 200 : 500, ok, body })), makeSoroswap: vi.fn(), simulateComet: vi.fn(async () => null) }) as unknown as ExecDeps;
 
   it('parse net (amount_with_fee stroops bruts) + swap_chain_xdr + tokens', async () => {
     const body = { success: true, amount: 505220384, amount_with_fee: 505220384, swap_chain_xdr: 'AAAAE==', tokens: ['BLND:G', 'sUSD:G', 'USDC:G'] };
@@ -598,5 +624,21 @@ describe('quoteAquarius', () => {
   it('réponse non-ok → null', async () => {
     const q = await quoteAquarius(BLND.sac, USDC.sac, 1n, depsFromBody({}, false));
     expect(q).toBeNull();
+  });
+});
+
+describe('quoteComet', () => {
+  const depsSim = (out: bigint | null): ExecDeps =>
+    ({ fetchJson: vi.fn(), makeSoroswap: vi.fn(), simulateComet: vi.fn(async () => out) }) as unknown as ExecDeps;
+
+  it('sortie simulée > 0 → venue comet + netOut', async () => {
+    const q = await quoteComet(depsSim(33_0000000n), BLND.sac, USDC.sac, 750_0000000n, 'https://rpc.test');
+    expect(q).toEqual({ venue: 'comet', netOut: 33_0000000n });
+  });
+  it('simulation null → null', async () => {
+    expect(await quoteComet(depsSim(null), BLND.sac, USDC.sac, 1n, 'r')).toBeNull();
+  });
+  it('sortie 0 → null', async () => {
+    expect(await quoteComet(depsSim(0n), BLND.sac, USDC.sac, 1n, 'r')).toBeNull();
   });
 });

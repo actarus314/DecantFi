@@ -3,10 +3,12 @@
 import { BLND, USDC, EURC, bySac, classicColon, type Asset } from '../core/assets.js';
 import { toNumber, fromStroops } from '../core/amount.js';
 import { stroopsOrNull, bigintOrNull } from '../core/sources/util.js';
+import { COMET_POOL, COMET_PROBE, decodeCometOut } from '../core/sources/comet.js';
+import { parseBlndBalance } from '../core/balance.js';
 import { SoroswapSDK, SupportedNetworks, SupportedProtocols, TradeType } from '@soroswap/sdk';
 
 /** Venues d'exécution branchées. Ajouter une venue = étendre cette union (et son cas de build/submit). */
-export type Venue = 'xbull' | 'soroswap' | 'horizon' | 'aquarius';
+export type Venue = 'xbull' | 'soroswap' | 'horizon' | 'aquarius' | 'comet';
 
 // ─── User-Agent commun (xBull bloque l'UA Node par défaut) ──────────────────
 const XBULL_UA = 'Mozilla/5.0 (compatible; stellar-swap/0.1; +exec)';
@@ -14,6 +16,7 @@ const XBULL_BASE = 'https://swap.apis.xbull.app';
 const HORIZON_BASE_DEFAULT = 'https://horizon.stellar.org';
 const AQUA_ROUTER = 'CBQDHNBFBZYE4MKPWBSJOPIYLW4SFSXAXUTSXJN76GNKYVYPCKWC6QUK';
 const AQUA_FINDPATH = 'https://amm-api.aqua.network/api/external/v1/find-path/';
+const I128_MAX = 170141183460469231731687303715884105727n;
 
 // ─── Erreur typée ────────────────────────────────────────────────────────────
 
@@ -151,6 +154,8 @@ export interface SoroswapClient {
 export interface ExecDeps {
   fetchJson: (url: string, init?: { method?: string; body?: unknown }) => Promise<FetchResult>;
   makeSoroswap: (apiKey: string) => SoroswapClient;
+  /** Cotation Comet : simulation read-only de swap_exact_amount_in (sortie indépendante du user). Injectable → tests hermétiques. */
+  simulateComet: (a: { sellSac: string; buySac: string; amountIn: bigint; rpcUrl: string }) => Promise<bigint | null>;
 }
 
 /** Dépendances réelles avec fetch réseau.
@@ -189,7 +194,32 @@ export function defaultDeps(timeoutMs?: number): ExecDeps {
         defaultNetwork: SupportedNetworks.MAINNET,
       }) as unknown as SoroswapClient;
     },
+    simulateComet: simulateCometReal,
   };
+}
+
+/** Cotation Comet read-only : simule swap_exact_amount_in avec le témoin COMET_PROBE
+ *  (la sortie ne dépend QUE des réserves du pool, pas du user). null si pool absent / sim en erreur.
+ *  Calque core/sources/comet.ts (signature confirmée live). */
+async function simulateCometReal(a: { sellSac: string; buySac: string; amountIn: bigint; rpcUrl: string }): Promise<bigint | null> {
+  const sdk = await import('@stellar/stellar-sdk');
+  const { rpc, Address, TransactionBuilder, Networks, Account, Contract, scValToNative, nativeToScVal } = sdk;
+  const server = new rpc.Server((a.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
+  const args = [
+    new Address(a.sellSac).toScVal(),
+    nativeToScVal(a.amountIn, { type: 'i128' }),
+    new Address(a.buySac).toScVal(),
+    nativeToScVal(0n, { type: 'i128' }),
+    nativeToScVal(I128_MAX, { type: 'i128' }),
+    new Address(COMET_PROBE).toScVal(),
+  ];
+  const tx = new TransactionBuilder(new Account(COMET_PROBE, '0'), { fee: '100', networkPassphrase: Networks.PUBLIC })
+    .addOperation(new Contract(COMET_POOL).call('swap_exact_amount_in', ...args))
+    .setTimeout(30)
+    .build();
+  const sim = await server.simulateTransaction(tx);
+  if (rpc.Api.isSimulationError(sim) || !sim.result) return null;
+  return decodeCometOut(scValToNative(sim.result.retval));
 }
 
 // ─── Quote / build — xBull ───────────────────────────────────────────────────
@@ -508,6 +538,80 @@ export async function buildAquarius(
   }
 }
 
+// ─── Quote / build — Comet (contrat pool backstop swap_exact_amount_in) ──────
+// Pool Soroban BLND/USDC UNIQUEMENT (CAS3FL6T…). Cotation = simulation read-only avec COMET_PROBE
+// (sortie indépendante du user). Build avec le vrai sender : prepareTransaction enforce le
+// CAVEAT DUR = le sender doit détenir du BLND LIQUIDE (souvent staké dans le backstop → message clair).
+
+/** Re-cote Comet via simulation (deps.simulateComet, injectable). null si pool absent / sim KO. */
+export async function quoteComet(
+  deps: ExecDeps,
+  sellSac: string,
+  buySac: string,
+  amountIn: bigint,
+  rpcUrl: string,
+): Promise<{ venue: 'comet'; netOut: bigint } | null> {
+  const out = await deps.simulateComet({ sellSac, buySac, amountIn, rpcUrl });
+  if (out === null || out <= 0n) return null;
+  return { venue: 'comet', netOut: out };
+}
+
+/** Construit + simule (prepareTransaction) l'appel swap_exact_amount_in → XDR prêt à signer.
+ *  Pré-flight trustline USDC + BLND liquide (caveat backstop) pour des messages clairs.
+ *  user == sender == source : l'auth Soroban du transfer BLND est couverte par la signature de la tx. */
+export async function buildComet(
+  sender: string,
+  amountIn: bigint,
+  outMin: bigint,
+  cfg: { rpcUrl: string; horizonUrl?: string },
+): Promise<{ xdr: string }> {
+  const sdk = await import('@stellar/stellar-sdk');
+  const { Horizon, rpc, TransactionBuilder, Contract, Address, Networks, nativeToScVal } = sdk;
+  const horizon = new Horizon.Server((cfg.horizonUrl || HORIZON_BASE_DEFAULT).replace(/\/$/, ''));
+
+  let account: Awaited<ReturnType<typeof horizon.loadAccount>>;
+  try {
+    account = await horizon.loadAccount(sender);
+  } catch {
+    throw new ExecError('funds', `compte ${sender} introuvable ou non financé`);
+  }
+  // Trustline USDC de sortie (Comet = BLND→USDC uniquement).
+  if (!account.balances.some(
+    (b) => 'asset_code' in b && b.asset_code === USDC.code && b.asset_issuer === USDC.issuer,
+  )) {
+    throw new ExecError('trustline', `trustline USDC absente sur ${sender}`);
+  }
+  // CAVEAT DUR Comet : exige du BLND LIQUIDE. S'il est staké dans le backstop Blend, le retirer d'abord (hors périmètre).
+  const liquid = parseBlndBalance({ balances: account.balances });
+  if (liquid < amountIn) {
+    throw new ExecError('funds',
+      `BLND liquide insuffisant (${fromStroops(liquid)} dispo, ${fromStroops(amountIn)} requis) — ` +
+      `le BLND staké dans le backstop Blend doit d'abord être retiré (hors périmètre).`);
+  }
+
+  const tx = new TransactionBuilder(account, { fee: '10000', networkPassphrase: Networks.PUBLIC })
+    .addOperation(new Contract(COMET_POOL).call(
+      'swap_exact_amount_in',
+      new Address(BLND.sac).toScVal(),
+      nativeToScVal(amountIn, { type: 'i128' }),
+      new Address(USDC.sac).toScVal(),
+      nativeToScVal(outMin, { type: 'i128' }),
+      nativeToScVal(I128_MAX, { type: 'i128' }),
+      new Address(sender).toScVal(),
+    ))
+    .setTimeout(180)
+    .build();
+
+  const server = new rpc.Server(cfg.rpcUrl.replace(/\/$/, ''));
+  try {
+    const prepared = await server.prepareTransaction(tx);
+    return { xdr: prepared.toXDR() };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new ExecError(classifyExecError(msg), msg);
+  }
+}
+
 // ─── Orchestrateur principal ─────────────────────────────────────────────────
 
 export async function pickExecutableVenue(
@@ -527,13 +631,15 @@ export async function pickExecutableVenue(
 
   // 1. Re-quote live en parallèle (tolérant : échec → null).
   const soroClient = cfg.soroswapApiKey ? deps.makeSoroswap(cfg.soroswapApiKey) : null;
-  const [xbullQ, soroQ, horizonQ, aquariusQ] = await Promise.all([
+  const [xbullQ, soroQ, horizonQ, aquariusQ, cometQ] = await Promise.all([
     quoteXbull(sellSac, buySac, amountStroops, deps),
     soroClient
       ? quoteSoroswap(soroClient, sellSac, buySac, amountStroops, slippageBps)
       : Promise.resolve(null),
     quoteHorizon(BLND, buyAsset, amountStroops, deps, cfg.horizonUrl),
     quoteAquarius(sellSac, buySac, amountStroops, deps),
+    // Comet = pool BLND/USDC uniquement : pas de cotation pour EURC.
+    target === 'USDC' ? quoteComet(deps, sellSac, buySac, amountStroops, cfg.rpcUrl) : Promise.resolve(null),
   ]);
 
   // 2. Trier les candidats non-null par netOut décroissant.
@@ -541,13 +647,15 @@ export async function pickExecutableVenue(
     | { venue: 'xbull'; netOut: bigint; route: string }
     | { venue: 'soroswap'; netOut: bigint; minOut: bigint; soroPath?: string[]; quote: unknown }
     | { venue: 'horizon'; netOut: bigint; path: HorizonPathRecord[] }
-    | { venue: 'aquarius'; netOut: bigint; swapChainXdr: string; tokens: string[] };
+    | { venue: 'aquarius'; netOut: bigint; swapChainXdr: string; tokens: string[] }
+    | { venue: 'comet'; netOut: bigint };
 
   let candidates: Candidate[] = [];
   if (xbullQ) candidates.push(xbullQ);
   if (soroQ) candidates.push(soroQ);
   if (horizonQ) candidates.push(horizonQ);
   if (aquariusQ) candidates.push(aquariusQ);
+  if (cometQ) candidates.push(cometQ);
   candidates.sort((a, b) => (a.netOut < b.netOut ? 1 : a.netOut > b.netOut ? -1 : 0));
 
   if (candidates.length === 0) {
@@ -630,6 +738,27 @@ export async function pickExecutableVenue(
         if (e instanceof ExecError) errors.push(e);
         continue;
       }
+    } else if (cand.venue === 'comet') {
+      try {
+        const outMin = minReceivedStroops(cand.netOut, slippageBps);
+        const built = await buildComet(sender, amountStroops, outMin, { rpcUrl: cfg.rpcUrl, horizonUrl: cfg.horizonUrl });
+        const route = `BLND → ${target}`;
+        const review = reviewData({
+          venue: 'comet',
+          target,
+          type: 'swap',
+          sendStroops: amountStroops,
+          netStroops: cand.netOut,
+          minReceivedStroops: outMin,
+          slippageBps,
+          route,
+          displayed,
+        });
+        return { venue: 'comet', xdr: built.xdr, type: 'swap', review };
+      } catch (e) {
+        if (e instanceof ExecError) errors.push(e);
+        continue;
+      }
     } else {
       // soroswap
       if (!soroClient) continue;
@@ -703,8 +832,8 @@ export async function submit(
       const msg = codes.length ? `Horizon a rejeté la tx : ${codes.join(', ')}` : (e instanceof Error ? e.message : String(e));
       throw new ExecError(classifyHorizonSubmit(e), msg);
     }
-  } else if (venue === 'aquarius') {
-    // Contrat Soroban → soumission RPC + poll jusqu'à résolution (parité avec xbull/soroswap qui confirment).
+  } else if (venue === 'aquarius' || venue === 'comet') {
+    // Contrats Soroban (Aquarius swap_chained / Comet swap_exact_amount_in) → soumission RPC + poll jusqu'à résolution.
     const sdk = await import('@stellar/stellar-sdk');
     const { rpc, TransactionBuilder, Networks } = sdk;
     const server = new rpc.Server(cfg.rpcUrl.replace(/\/$/, ''));
