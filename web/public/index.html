@@ -8,11 +8,13 @@
 <style>
 :root{
   --bg:#f1f5f9; --card-bg:#ffffff; --card-border:#e2e8f0; --section-bg:#f8fafc;
+  --zone-tint:#e7edf4; --zone-tint-border:#dbe3ee;
   --val:#0f172a; --caption:#64748b; --sub:#94a3b8; --heading:#475569;
   --accent:#2563eb; --amber:#d97706; --green:#16a34a; --red:#dc2626; --tool:#ea580c; --select:#7c3aed;
 }
 :root.dark{
   --bg:#0f172a; --card-bg:#1e293b; --card-border:#334155; --section-bg:#0f172a;
+  --zone-tint:#172033; --zone-tint-border:#2a3850;
   --val:#f1f5f9; --caption:#94a3b8; --sub:#64748b; --heading:#cbd5e1;
   --accent:#3b82f6; --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --tool:#f97316; --select:#8b5cf6;
 }
@@ -45,6 +47,13 @@ body{margin:0; background:var(--bg); color:var(--val);
 .refresh-note{font-size:11px; color:var(--caption);}
 
 .zone{margin-bottom:2.2rem;}
+/* C2 : sur-bloc teinté — 3 niveaux de profondeur (page < zone < cartes) */
+.zone-group{background:var(--zone-tint); border:1px solid var(--zone-tint-border); border-radius:1rem; padding:1rem 1.1rem 1.2rem; margin-bottom:1.6rem;}
+.zone-group-h{font-size:14px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--heading); margin:0 0 .9rem;}
+.zone-group > .zone{margin-bottom:.85rem;}
+.zone-group > .zone:last-child{margin-bottom:0;}
+/* cartes en léger relief sur la teinte */
+.zone-group .card, .zone-group .sim{box-shadow:0 1px 2px rgba(15,23,42,.06);}
 .zone-h{font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--heading);
   margin:0 0 .55rem; display:flex; align-items:center; gap:.5rem;}
 .zone-h .right{margin-left:auto; font-weight:600; letter-spacing:0; text-transform:none;}
@@ -256,6 +265,11 @@ const STRINGS = {
     pair_usdc: 'USDC',
     pair_eurc: 'EURC',
 
+    // Groupes (sur-blocs)
+    group_swap: 'Swap',
+    group_history: 'Historique',
+    group_stats: 'Statistiques',
+
     // Sections
     section_sim: 'Simulateur',
     section_ladder: 'Échelle des sources',
@@ -447,6 +461,11 @@ const STRINGS = {
     // Paire / nav
     pair_usdc: 'USDC',
     pair_eurc: 'EURC',
+
+    // Groups (super-blocks)
+    group_swap: 'Swap',
+    group_history: 'History',
+    group_stats: 'Statistics',
 
     // Sections
     section_sim: 'Simulator',
@@ -1237,32 +1256,41 @@ function buildPage() {
 
   return `${topbarHtml}
 
-  <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}<span class="pagenav" style="margin-left:auto">
-      <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
-      <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
-    </span></div>${simCard()}</div>
+  <div class="zone-group">
+    <div class="zone-group-h">${t('group_swap')}</div>
+    <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}<span class="pagenav" style="margin-left:auto">
+        <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
+        <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
+      </span></div>${simCard()}</div>
 
-  <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
-    <div class="ladder-wrap${simLoading || refreshing ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading || refreshing ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${simLoading ? t('sim_loading') : t('refresh_loading')}</div>` : ''}</div>
-    ${simActive && simResult ? `<p class="help" style="margin:.5rem 0 0;font-size:11px">${t('ladder_pick_hint')}</p>` : ''}</div>
-
-  <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right"><span class="seg">${sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('')}</span></span></div>
-    <div class="card">
-      ${noData || `${encartHtml(tm, TODAY, NOW_HOUR)}${hebdoHtml(tm, TODAY, selDay)}<p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${t('slots_help')}</p>${limitedNote}`}
-    </div></div>
-
-  <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span></div>
-    <div class="card">${noData || zoomHtml(tm, intraday[selDay], selDay, TODAY, NOW_SLOT, u) + limitedNote}</div></div>
-
-  <div class="zone"><div class="zone-h">${t('section_routes')}</div>
-    <div class="card">
-      ${bestRoutesCard()}${limitedNote}
-      <p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p></div>
+    <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
+      <div class="ladder-wrap card${simLoading || refreshing ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading || refreshing ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${simLoading ? t('sim_loading') : t('refresh_loading')}</div>` : ''}</div>
+      ${simActive && simResult ? `<p class="help" style="margin:.5rem 0 0;font-size:11px">${t('ladder_pick_hint')}</p>` : ''}</div>
   </div>
 
-  <div class="zone"><div class="zone-h">${t('section_who')}</div>
-    <div class="card">
-      ${noData || distBars(dist) + limitedNote}
+  <div class="zone-group">
+    <div class="zone-group-h">${t('group_history')}</div>
+    <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right"><span class="seg">${sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('')}</span></span></div>
+      <div class="card">
+        ${noData || `${encartHtml(tm, TODAY, NOW_HOUR)}${hebdoHtml(tm, TODAY, selDay)}<p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${t('slots_help')}</p>${limitedNote}`}
+      </div></div>
+
+    <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span></div>
+      <div class="card">${noData || zoomHtml(tm, intraday[selDay], selDay, TODAY, NOW_SLOT, u) + limitedNote}</div></div>
+  </div>
+
+  <div class="zone-group">
+    <div class="zone-group-h">${t('group_stats')}</div>
+    <div class="zone"><div class="zone-h">${t('section_routes')}</div>
+      <div class="card">
+        ${bestRoutesCard()}${limitedNote}
+        <p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p></div>
+    </div>
+
+    <div class="zone"><div class="zone-h">${t('section_who')}</div>
+      <div class="card">
+        ${noData || distBars(dist) + limitedNote}
+      </div>
     </div>
   </div>
   ${footerHtml}
