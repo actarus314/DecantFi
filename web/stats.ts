@@ -621,12 +621,16 @@ export function buildSourceHealth(
 
     for (const id of knownIds) {
       const a = acc.get(id)!;
-      // Répondu = ligne quote réelle (pas seulement tenté). uptime se calcule sur les échecs.
       const responded = respondedIds.has(id);
-      const failed = failedIds.has(id);
+      // Vraie indispo = tentée (dans source_errors) MAIS aucune cotation produite ce tick.
+      // Une source qui répond sur une sonde mais échoue sur une autre (ex. 250 OK / 750 KO) reste
+      // DISPONIBLE — son estimation est bien dans le dashboard. source_errors étant dédupliqué au
+      // niveau du tick, on ne peut pas attribuer l'échec à une taille → on ne marque « panne » que
+      // l'absence TOTALE de cotation. ponytail: santé par-taille = stockage des erreurs par sonde (non fait).
+      const down = failedIds.has(id) && !responded;
 
       if (responded) a.responded++;
-      if (failed) {
+      if (down) {
         a.failed++;
         if (!a.lastFailureAt || startedAt > a.lastFailureAt) {
           a.lastFailureAt = startedAt;
@@ -635,7 +639,7 @@ export function buildSourceHealth(
       }
       if (dayIdx >= 0) {
         a.dayTicks[dayIdx]! ++;
-        if (failed) a.dayFails[dayIdx]! ++;
+        if (down) a.dayFails[dayIdx]! ++;
       }
     }
   }
@@ -643,8 +647,9 @@ export function buildSourceHealth(
   // Construire SourceHealth par source
   const sources: SourceHealth[] = knownIds.map((id) => {
     const a = acc.get(id)!;
+    // Disponibilité = fraction de ticks où la source a produit ≥1 cotation (pas « 1 − échecs »).
     const uptimePct = totalTicks > 0
-      ? Math.round((1 - a.failed / totalTicks) * 1000) / 10
+      ? Math.round((a.responded / totalTicks) * 1000) / 10
       : 100;
 
     const days = a.dayTicks.map((dt, i) => {
