@@ -237,3 +237,38 @@ describe('buildSourceHealth — cause JSON', () => {
     expect(res2.sources.find(s => s.id === 'comet')!.failedTicks).toBe(1);
   });
 });
+
+// ─── Régression : source en erreur sur UNE sonde mais cotant sur une autre = DISPONIBLE ─────────
+
+describe('buildSourceHealth — répond ET en erreur (ex. 250 OK / 750 KO)', () => {
+  let dir3: string;
+  let path3: string;
+  let res3: ReturnType<typeof buildSourceHealth>;
+
+  beforeAll(() => {
+    dir3 = mkdtempSync(join(tmpdir(), 'stellarswap-health-partial-'));
+    path3 = join(dir3, 'test.db');
+    const db = openDb(path3);
+    // 1 tick ok : soroswap est dans source_errors (échec d'une sonde) MAIS a produit une cotation
+    // → disponible, PAS « en panne » (le bug : il remontait indisponible alors qu'il cote).
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-28T10:00:00Z', source_errors: '[{"id":"soroswap","reason":"indisponible"}]' }),
+      [mkQuote('xbull'), mkQuote('soroswap'), mkQuote('horizon')],
+    );
+    db.close();
+    const rdb = openReadOnly(path3);
+    res3 = buildSourceHealth(rdb, WINDOW_START, NOW);
+    rdb.close();
+  });
+
+  afterAll(() => { rmSync(dir3, { recursive: true, force: true }); });
+
+  it('cote sur une sonde tout en étant dans source_errors → 100 %, 0 panne', () => {
+    const s = res3.sources.find(x => x.id === 'soroswap')!;
+    expect(s.respondedTicks).toBe(1);
+    expect(s.uptimePct).toBe(100);
+    expect(s.failedTicks).toBe(0);
+    expect(s.lastFailureAt).toBeNull();
+    expect(s.lastFailureReason).toBeNull();
+  });
+});
