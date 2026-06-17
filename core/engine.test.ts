@@ -118,3 +118,20 @@ describe('quote vers EURC', () => {
     expect(r.eurc!.winner).toBe('via-usdc');
   });
 });
+
+describe('errorReasons (③-bis)', () => {
+  it('null → indisponible, throw TimeoutError → timeout', async () => {
+    const empty: SourceAdapter = { id: 'empty', available: () => true, async quote() { return null; } };
+    const slow: SourceAdapter = {
+      id: 'slow', available: () => true,
+      async quote() { throw Object.assign(new Error('timed out'), { name: 'TimeoutError' }); },
+    };
+    const r = await quote({
+      sell: BLND, buy: USDC, amountIn: toStroops('1000'),
+      cfg: cfg([fakeAdapter('a', toStroops('50.5')), empty, slow]),
+    });
+    expect(r.errorReasons!['empty']).toBe('indisponible');
+    expect(r.errorReasons!['slow']).toBe('timeout');
+    expect(r.errorReasons!['a']).toBeUndefined(); // succès → pas de cause
+  });
+});

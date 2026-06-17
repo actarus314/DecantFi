@@ -76,6 +76,24 @@ body{margin:0; background:var(--bg); color:var(--val);
 .chip.obs{border-color:#4ade80; color:#15803d;} .dark .chip.obs{border-color:#15803d; color:#4ade80;}
 .chip.calc{border-color:#60a5fa; color:#1d4ed8;} .dark .chip.calc{border-color:#1d4ed8; color:#60a5fa;}
 .chip.est{border-color:#c4b5fd; color:#6d28d9;} .dark .chip.est{border-color:#6d28d9; color:#c4b5fd;}
+/* ponytail: health axis, distinct from confidence chips */
+.chip.down{border-color:var(--tool); color:var(--tool);}
+/* Santé des sources : barre de disponibilité + points journaliers */
+.ubar{display:inline-grid; grid-template-columns:1fr max-content; gap:.5rem; align-items:center; width:170px;}
+.ubar .track{height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden;}
+.ubar .track > span{display:block; height:100%; border-radius:9999px; background:var(--green);}
+.ubar .track.warn > span{background:var(--amber);}
+.ubar .track.bad > span{background:var(--tool);}
+.ubar .pct{font-size:12px; font-weight:600; color:var(--caption); text-align:right; white-space:nowrap;}
+.days{display:inline-flex; gap:4px;}
+.days i{width:11px; height:11px; border-radius:50%; display:inline-block; background:var(--green);}
+.days i.w{background:var(--amber);} .days i.b{background:var(--tool);} .days i.g{background:var(--card-border);}
+/* Ligne de bas de page ② */
+.page-footer{margin-top:2rem; padding-top:1rem; border-top:1px solid var(--card-border); font-size:11px; color:var(--sub); line-height:1.6;}
+.page-footer button{background:none; border:none; font-size:11px; color:var(--sub); cursor:pointer; padding:0; text-decoration:underline; text-underline-offset:2px;}
+.page-footer button:hover{color:var(--caption);}
+.backlink{background:none; border:none; font-size:12px; color:var(--caption); cursor:pointer; padding:0 0 .5rem; text-decoration:underline; text-underline-offset:2px;}
+.backlink:hover{color:var(--val);}
 .tag{font-size:11px; font-weight:600; color:var(--caption); background:var(--section-bg); border:1px solid var(--card-border); border-radius:6px; padding:1px 7px;}
 .pos{color:var(--green);} .neg{color:var(--red);}
 
@@ -344,6 +362,37 @@ const STRINGS = {
     err_slippage: 'Le prix a bougé au-delà de ta tolérance — réessaie ou augmente le slippage.',
     err_down: 'Source d\'exécution indisponible, réessaie.',
     err_noroute: 'Aucune route exécutable pour ce montant.',
+
+    // Navigation
+    nav_dashboard: 'Tableau de bord',
+    nav_health: 'Stabilité',
+
+    // Footer ②
+    footer_readings: (n, nOk, cadenceHuman, perDay, coverH) =>
+      `${n} relevés (${nOk} valides) · 1 toutes les ${cadenceHuman} ≈ ${perDay}/j · ~${coverH} h de couverture`,
+    footer_health_link: 'Stabilité des sources →',
+
+    // Page santé ④
+    health_title: 'Stabilité des sources — 7 derniers jours',
+    health_col_source: 'Source',
+    health_col_uptime: 'Disponibilité',
+    health_col_days: '7 jours',
+    health_col_fails: 'Échecs',
+    health_col_last: 'Dernière panne',
+    health_legend_ok: 'ok',
+    health_legend_warn: '< 25 % d\'échecs',
+    health_legend_bad: '≥ 25 % d\'échecs',
+    health_legend_null: 'aucun relevé',
+    health_never: '—',
+    health_ago_min: (n) => `il y a ${n} min`,
+    health_ago_h: (n) => `il y a ${n} h`,
+    health_ago_j: (n) => `il y a ${n} j`,
+    // Causes d'échec ③-bis
+    chip_down: 'échec',
+    reason_timeout: 'timeout',
+    reason_http: 'erreur HTTP',
+    reason_indisponible: 'indisponible',
+    nav_back: '← Tableau de bord',
   },
   en: {
     // Topbar / brand
@@ -490,6 +539,37 @@ const STRINGS = {
     err_slippage: 'Price moved beyond your tolerance — retry or raise slippage.',
     err_down: 'Execution source unavailable, try again.',
     err_noroute: 'No executable route for this amount.',
+
+    // Navigation
+    nav_dashboard: 'Dashboard',
+    nav_health: 'Stability',
+
+    // Footer ②
+    footer_readings: (n, nOk, cadenceHuman, perDay, coverH) =>
+      `${n} readings (${nOk} valid) · 1 every ${cadenceHuman} ≈ ${perDay}/d · ~${coverH} h coverage`,
+    footer_health_link: 'Source stability →',
+
+    // Health page ④
+    health_title: 'Source stability — last 7 days',
+    health_col_source: 'Source',
+    health_col_uptime: 'Availability',
+    health_col_days: '7 days',
+    health_col_fails: 'Failures',
+    health_col_last: 'Last failure',
+    health_legend_ok: 'ok',
+    health_legend_warn: '< 25% failures',
+    health_legend_bad: '≥ 25% failures',
+    health_legend_null: 'no readings',
+    health_never: '—',
+    health_ago_min: (n) => `${n} min ago`,
+    health_ago_h: (n) => `${n} h ago`,
+    health_ago_j: (n) => `${n} d ago`,
+    // Failure causes ③-bis
+    chip_down: 'failed',
+    reason_timeout: 'timeout',
+    reason_http: 'HTTP error',
+    reason_indisponible: 'unavailable',
+    nav_back: '← Dashboard',
   },
 };
 
@@ -511,6 +591,8 @@ async function ensureKit() {
 }
 
 // ─── État global ──────────────────────────────────────────────────────────────
+let view = 'dashboard'; // 'dashboard' | 'health'
+let health = null;      // données de /api/health
 let target = 'USDC';
 let lang = localStorage.getItem('lang') || 'fr';
 let ladderSonde = 250;
@@ -648,6 +730,30 @@ function routeSimple(sonde, netVal, src, pairUi, big) {
   return routeFromParts(hops, big);
 }
 
+// ─── Cadence lisible (② footer) ──────────────────────────────────────────────
+function cadenceHuman(sec) {
+  if (sec < 3600) return `${sec / 60} min`;
+  return `${sec / 3600} h`;
+}
+
+// ─── Temps relatif pour la page santé ④ ──────────────────────────────────────
+function healthAgo(isoStr) {
+  if (!isoStr) return t('health_never');
+  const diffMs = Date.now() - new Date(isoStr).getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  if (diffMin < 60) return t('health_ago_min', diffMin);
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return t('health_ago_h', diffH);
+  return t('health_ago_j', Math.round(diffH / 24));
+}
+
+// ─── Libellé d'une cause d'échec ③-bis (timeout/http/indisponible) ────────────
+function reasonLabel(code) {
+  if (!code) return '';
+  const lab = t('reason_' + code);
+  return lab === 'reason_' + code ? code : lab; // fallback : code brut si non mappé
+}
+
 // ─── Échelle de sources ───────────────────────────────────────────────────────
 function ladderHead(u) {
   return `<thead><tr>
@@ -670,9 +776,9 @@ function ladderHead(u) {
   </tr></thead>`;
 }
 
-function ladderRows(rows, u) {
+function ladderRows(rows, u, down) {
   if (!rows || rows.length === 0) return `<tr><td colspan="6" class="muted" style="text-align:center;padding:1.2rem">${t('ladder_empty')}</td></tr>`;
-  return rows.map(r => {
+  let html = rows.map(r => {
     const delta = r.deltaVsWinner === 0 ? '—' : `−${fmt3(Math.abs(r.deltaVsWinner))}`;
     const deltaClass = r.deltaVsWinner < 0 ? 'neg' : 'muted';
     const impact = r.impactPct != null ? fmt(r.impactPct) + ' %' : '—';
@@ -685,10 +791,22 @@ function ladderRows(rows, u) {
       <td>${impact}</td>
       <td class="left">${routeText}</td></tr>`;
   }).join('');
+  // Lignes de sources en échec (axe santé, distinct des chips confiance) — ponytail: health axis
+  if (down && down.length > 0) {
+    html += down.map(d =>
+      `<tr><td><span class="srcname muted">${d.display}</span></td>
+      <td class="muted">—</td>
+      <td class="muted">—</td>
+      <td><span class="chip down">${t('chip_down')} · ${reasonLabel(d.reason)}</span></td>
+      <td class="muted">—</td>
+      <td class="left muted">—</td></tr>`
+    ).join('');
+  }
+  return html;
 }
 
-function ladderTable(rows, u) {
-  return `<div style="overflow-x:auto"><table class="flt">${ladderHead(u)}<tbody>${ladderRows(rows, u)}</tbody></table></div>`;
+function ladderTable(rows, u, down) {
+  return `<div style="overflow-x:auto"><table class="flt">${ladderHead(u)}<tbody>${ladderRows(rows, u, down)}</tbody></table></div>`;
 }
 
 // ─── Carte "Meilleures routes (7 j)" ──────────────────────────────────────────
@@ -888,6 +1006,56 @@ function refreshHtml() {
   </span>`;
 }
 
+// ─── Page santé ④ ─────────────────────────────────────────────────────────────
+function buildHealthPage(topbarHtml) {
+  if (!health) {
+    return `${topbarHtml}<p class="help" style="margin:1rem 0">${t('loading')}</p>`;
+  }
+  const rows = health.sources || [];
+  // cause de panne (timeout/http/indisponible) capturée côté backend (③-bis) ; legacy = horodatage seul
+  const tableRows = rows.map(s => {
+    const trackCls = s.uptimePct >= 98 ? '' : s.uptimePct >= 90 ? ' warn' : ' bad';
+    const ubar = `<div class="ubar">
+      <div class="track${trackCls}"><span style="width:${s.uptimePct}%"></span></div>
+      <span class="pct">${s.uptimePct.toFixed(1)} %</span>
+    </div>`;
+    const dots = s.days.map(d => {
+      const cls = d === 'ok' ? '' : d === 'warn' ? ' w' : d === 'bad' ? ' b' : ' g';
+      return `<i class="${cls.trim()}"title="${d ?? t('health_legend_null')}"></i>`;
+    }).join('');
+    const pairNote = s.pairNote ? ` <span class="muted" style="font-size:11px">· ${s.pairNote}</span>` : '';
+    return `<tr>
+      <td><span class="srcname">${s.display}</span>${pairNote}</td>
+      <td>${ubar}</td>
+      <td><span class="days">${dots}</span></td>
+      <td>${s.failedTicks}</td>
+      <td class="muted">${healthAgo(s.lastFailureAt)}${s.lastFailureAt && s.lastFailureReason ? ' · ' + reasonLabel(s.lastFailureReason) : ''}</td>
+    </tr>`;
+  }).join('');
+
+  return `${topbarHtml}
+  <div class="zone">
+    <button class="backlink" onclick="setView('dashboard')">${t('nav_back')}</button>
+    <div class="zone-h">${t('health_title')}</div>
+    <div style="overflow-x:auto"><table class="flt">
+      <thead><tr>
+        <th>${t('health_col_source')}</th>
+        <th class="left">${t('health_col_uptime')}</th>
+        <th>${t('health_col_days')}</th>
+        <th>${t('health_col_fails')}</th>
+        <th>${t('health_col_last')}</th>
+      </tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table></div>
+    <p class="help" style="margin:.7rem 0 0;font-size:11px">
+      <span class="days" style="vertical-align:middle;margin-right:.3rem"><i></i></span>${t('health_legend_ok')} &nbsp;
+      <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="w"></i></span>${t('health_legend_warn')} &nbsp;
+      <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="b"></i></span>${t('health_legend_bad')} &nbsp;
+      <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="g"></i></span>${t('health_legend_null')}
+    </p>
+  </div>`;
+}
+
 // ─── Page principale ──────────────────────────────────────────────────────────
 function buildPage() {
   const u = target;
@@ -933,7 +1101,7 @@ function buildPage() {
   let ladderContent = '';
   if (simActive && simResult) {
     ladderZoneRight = `<span class="tag">${t('ladder_sim_tag', fmt0(simAmt), u)}</span>`;
-    ladderContent = ladderTable(simResult.ladder, u);
+    ladderContent = ladderTable(simResult.ladder, u, simResult.downSources);
   } else {
     ladderZoneRight = `<span class="seg">${sondes.map(n =>
       `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`
@@ -955,7 +1123,7 @@ function buildPage() {
   const langGlyph = lang === 'fr' ? t('lang_en') : t('lang_fr');
   const langTitle = lang === 'fr' ? t('lang_en_title') : t('lang_fr_title');
 
-  return `
+  const topbarHtml = `
   <div class="topbar">
     <span class="brand">stellarswap <span class="dim">· ${t('brand_dim')}</span></span>
     ${freshHtml}
@@ -970,7 +1138,19 @@ function buildPage() {
       <button class="ctrl-btn" onclick="toggleTheme()" title="${isDark ? t('theme_light') : t('theme_dark')}">${themeGlyph}</button>
       <button class="ctrl-btn" onclick="toggleLang()" title="${langTitle}" style="font-size:18px;line-height:1;padding:1px 7px">${langGlyph}</button>
     </span>
-  </div>
+  </div>`;
+
+  if (view === 'health') return buildHealthPage(topbarHtml);
+
+  // ② Footer : compute footer data from meta
+  const footerHtml = meta ? (() => {
+    const perDay = Math.round(86400 / meta.cadenceSec);
+    const coverH = Math.round(meta.nTicks * meta.cadenceSec / 3600);
+    const cadH = cadenceHuman(meta.cadenceSec);
+    return `<div class="page-footer">${t('footer_readings', meta.nTicks, meta.nTicksOk, cadH, perDay, coverH)} · <button onclick="setView('health')">${t('footer_health_link')}</button></div>`;
+  })() : '';
+
+  return `${topbarHtml}
 
   <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}<span class="pagenav" style="margin-left:auto">
       <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
@@ -999,11 +1179,28 @@ function buildPage() {
       ${noData || distBars(dist) + limitedNote}
     </div>
   </div>
+  ${footerHtml}
   ${execModal()}`;
 }
 
 function renderApp() {
   document.getElementById('app').innerHTML = buildPage();
+}
+
+// ─── Navigation vue ───────────────────────────────────────────────────────────
+function setView(v) {
+  view = v;
+  if (v === 'health' && !health) void loadHealth();
+  else renderApp();
+}
+
+async function loadHealth() {
+  renderApp(); // affiche "Chargement…" immédiatement
+  try {
+    const r = await fetch('/api/health');
+    if (r.ok) health = await r.json();
+  } catch {}
+  renderApp();
 }
 
 // ─── Chargement des données ───────────────────────────────────────────────────

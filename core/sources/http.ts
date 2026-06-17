@@ -1,5 +1,6 @@
 // Helpers HTTP tolerants aux pannes : rendent null (jamais d'exception) sur timeout / !ok / erreur reseau,
 // pour qu'une source indisponible ne bloque jamais le classement.
+import { diag } from './diag.js';
 
 const DEFAULT_TIMEOUT = 8000;
 // Certains endpoints (xBull) bloquent l'UA Node par defaut : on se presente comme un client navigateur.
@@ -15,9 +16,14 @@ export async function getJson(
       signal: AbortSignal.timeout(timeoutMs),
       headers: { 'User-Agent': UA, Accept: 'application/json', ...headers },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const st = diag.getStore(); if (st) st.reason = 'http';
+      return null;
+    }
     return await res.json();
-  } catch {
+  } catch (e) {
+    const st = diag.getStore();
+    if (st) st.reason = (e as Error)?.name === 'TimeoutError' ? 'timeout' : 'indisponible';
     return null;
   }
 }
@@ -35,9 +41,14 @@ export async function postJson(
       headers: { 'User-Agent': UA, 'Content-Type': 'application/json', Accept: 'application/json', ...headers },
       body: JSON.stringify(body),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const st = diag.getStore(); if (st) st.reason = 'http';
+      return null;
+    }
     return await res.json();
-  } catch {
+  } catch (e) {
+    const st = diag.getStore();
+    if (st) st.reason = (e as Error)?.name === 'TimeoutError' ? 'timeout' : 'indisponible';
     return null;
   }
 }
