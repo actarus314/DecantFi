@@ -1190,6 +1190,8 @@ function renderApp() {
 // ─── Navigation vue ───────────────────────────────────────────────────────────
 function setView(v) {
   view = v;
+  // URL propre & partageable : ?view=health pour le status, ?pair=… pour le dashboard
+  history.replaceState(null, '', v === 'health' ? '?view=health' : '?pair=' + target);
   if (v === 'health' && !health) void loadHealth();
   else renderApp();
 }
@@ -1493,9 +1495,15 @@ if (savedLang === 'en' || savedLang === 'fr') lang = savedLang;
   if (p === 'EURC' || p === 'USDC') target = p;
 })();
 
+// Deep-link vers la page status (?view=health)
+(function() {
+  if (new URLSearchParams(location.search).get('view') === 'health') view = 'health';
+})();
+
 renderApp();
 startCountdownTick();
 void Promise.all([loadOverview(), loadBalance()]);
+if (view === 'health') void loadHealth();
 </script>
 </body>
 </html>
