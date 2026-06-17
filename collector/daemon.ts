@@ -71,6 +71,9 @@ async function main(): Promise<void> {
   process.on('SIGINT', shutdown);
 
   process.stdout.write(`[daemon] démarré · cadence=${cfg.cadenceSec}s · sondes=${probes.length} · db=${cfg.dbPath}\n`);
+  // Tick au boot AVANT la boucle (runLoop dort d'abord) : sinon aucun relevé pendant ~1 cadence (15 min)
+  // après chaque (re)démarrage → compte à rebours figé sur « imminent », point pulsant absent, données périmées.
+  if (!stopping) await tickAndStore();
   await runLoop({
     delayMs: () => jitteredDelayMs(cfg.cadenceSec, cfg.jitterSec),
     sleep: (ms) => interruptibleSleep(ms, abort.signal),
