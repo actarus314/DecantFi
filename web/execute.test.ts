@@ -403,6 +403,53 @@ describe('pickExecutableVenue', () => {
     expect(result.review.netOut).toBeCloseTo(5.2, 5);
     expect(result.review.minReceived).toBeCloseTo(5.174, 5);
   });
+
+  // ─── forceVenue (click-to-select) ────────────────────────────────────────────
+
+  it('(h) forceVenue:soroswap → seul soroswap buildé, même si xbull net plus élevé', async () => {
+    const netXbull = 6_0000000n;
+    const netSoro = 5_0000000n;
+    const result = await pickExecutableVenue(
+      'USDC',
+      10_0000000n,
+      SENDER,
+      50,
+      CFG,
+      undefined,
+      fakeDeps({
+        xbullQuote: { toAmount: netXbull.toString(), route: 'uuid-xbull' },
+        xbullAccept: { id: 'id1', xdr: 'xdr-xbull', type: 'full' },
+        soroQuote: {
+          amountOut: netSoro,
+          rawTrade: { amountOutMin: minReceivedStroops(netSoro, 50) },
+          routePlan: [{ swapInfo: { protocol: 'soroswap', path: [BLND.sac, USDC.sac] } }],
+        },
+        soroBuild: { xdr: 'xdr-soro-forced' },
+      }),
+      'soroswap',
+    );
+    expect(result.venue).toBe('soroswap');
+    expect(result.xdr).toBe('xdr-soro-forced');
+  });
+
+  it('(i) forceVenue:soroswap mais soroswap indisponible → ExecError no-route', async () => {
+    await expect(
+      pickExecutableVenue(
+        'USDC',
+        10_0000000n,
+        SENDER,
+        50,
+        CFG,
+        undefined,
+        fakeDeps({
+          xbullQuote: { toAmount: '5000000', route: 'uuid-xbull' },
+          xbullAccept: { id: 'id1', xdr: 'xdr-xbull', type: 'full' },
+          soroQuote: null, // soroswap indisponible
+        }),
+        'soroswap',
+      ),
+    ).rejects.toMatchObject({ code: 'no-route' });
+  });
 });
 
 describe('submit', () => {

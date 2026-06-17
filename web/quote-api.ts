@@ -25,6 +25,10 @@ export interface LiveLadderRow {
   chip: Chip;
   impactPct: number | null;
   winner: boolean;
+  // click-to-select : identifiant source brut, deep-link et capacité d'exécution intégrée
+  sourceId: string;
+  deepLink: string | null;
+  executable: boolean;
 }
 
 /** Route lisible depuis les hops d'une cotation : "BLND→XLM→USDC" (ou "BLND→<cible>" si pas de hop). */
@@ -234,6 +238,9 @@ export async function liveQuote(
     chip: r.eurcPath === 'via-usdc' ? 'calc' : chipFor(r.conf, r.source, r.eurcPath),
     impactPct: r.impactPct,
     winner: i === 0,
+    sourceId: r.source,
+    deepLink: deepLink(r.source, pairUi),
+    executable: ['xbull', 'soroswap'].includes(r.source.split('+')[0]?.trim() ?? ''),
   }));
 
   return {

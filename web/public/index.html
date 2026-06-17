@@ -142,6 +142,7 @@ table.flt td:first-child{text-align:left;}
 table.flt td.left{text-align:left; color:var(--caption);}
 table.flt tr:last-child td{border-bottom:0;}
 table.flt tr.win td{background:color-mix(in srgb, var(--green) 9%, transparent); font-weight:600;}
+table.flt tr.sel td{background:color-mix(in srgb, var(--select) 10%, transparent); outline:2px solid color-mix(in srgb, var(--select) 45%, transparent); outline-offset:-2px;}
 .srcname{font-weight:600;} .muted{color:var(--caption);}
 .ladder-wrap{position:relative;}
 .ladder-wrap.refreshing .ladder-inner{opacity:.4; filter:blur(2px); pointer-events:none; transition:opacity .15s;}
@@ -399,6 +400,11 @@ const STRINGS = {
     reason_simulation: 'simulation',
     health_col_sizes: 'Disponibilité par sonde',
     nav_back: '← Tableau de bord',
+    // click-to-select
+    exec_via: (tool) => 'Exécuter via ' + tool,
+    exec_open_tool: (tool) => 'Ouvrir ' + tool + ' ↗',
+    exec_integrated_soon: 'Exécution intégrée à venir — ouvrez l\'outil pour finaliser le swap.',
+    ladder_pick_hint: 'Cliquez une ligne pour exécuter via cet outil (re-clic = retour au choix auto).',
   },
   en: {
     // Topbar / brand
@@ -580,6 +586,11 @@ const STRINGS = {
     reason_simulation: 'simulation',
     health_col_sizes: 'Availability by probe',
     nav_back: '← Dashboard',
+    // click-to-select
+    exec_via: (tool) => 'Execute via ' + tool,
+    exec_open_tool: (tool) => 'Open ' + tool + ' ↗',
+    exec_integrated_soon: 'Integrated execution coming soon — open the tool to complete the swap.',
+    ladder_pick_hint: 'Click a row to execute via that tool (click again to revert to auto).',
   },
 };
 
@@ -623,6 +634,13 @@ let walletAddress = localStorage.getItem('walletAddress') || null;
 // Exécution swap
 let execState = null; // null | { phase:'review'|'signing'|'submitting'|'done'|'error', build?, hash?, venue?, errorMsg? }
 let execSlippagePct = 0.5; // UI %, → bps = Math.round(execSlippagePct*100)
+// click-to-select : sourceId sélectionné (null = auto)
+let selectedSource = null;
+
+function selectSource(id) {
+  selectedSource = (selectedSource === id) ? null : id; // re-clic = désélection
+  renderApp();
+}
 
 // Compte à rebours : nextTickAt en ms depuis epoch (null = inconnu)
 let nextTickAt = null;
@@ -793,7 +811,10 @@ function ladderRows(rows, u, down) {
     const deltaClass = r.deltaVsWinner < 0 ? 'neg' : 'muted';
     const impact = r.impactPct != null ? fmt(r.impactPct) + ' %' : '—';
     const routeText = renderRoute(r.route);
-    return `<tr class="${r.winner ? 'win' : ''}">
+    const isSel = r.sourceId && r.sourceId === selectedSource;
+    const trClass = [r.winner ? 'win' : '', isSel ? 'sel' : ''].filter(Boolean).join(' ');
+    const sid = r.sourceId ? r.sourceId.replace(/'/g, "\\'") : '';
+    return `<tr class="${trClass}" style="cursor:pointer" onclick="selectSource('${sid}')">
       <td><span class="srcname">${r.display}</span>${r.note ? ` <span class="muted">· ${noteLabel(r.note)}</span>` : ''}</td>
       <td>${fmt3(r.net)}</td>
       <td class="${deltaClass}">${delta}</td>
@@ -860,16 +881,30 @@ function simCard() {
     if (simResult.errors && simResult.errors.length > 0) {
       resultHtml += `<p class="help" style="margin:.4rem 0 0">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
     }
-    // Exec row
-    resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-      <span style="font-size:11px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
-      <input id="execSlippage" type="number" min="0" max="50" step="0.1" value="${execSlippagePct}"
-        style="width:70px;font-size:13px;padding:.35rem .5rem;border-radius:.4rem;border:1px solid var(--card-border);background:var(--section-bg);color:var(--val)"
-        onchange="onExecSlippage(this.value)">
-      <span class="suffix">%</span>
-      <button class="btn primary" onclick="doExecute()">${t('exec_btn')}</button>
-      ${b.deepLink ? openLink(b.deepLink, true) : ''}
-    </div>`;
+    // Exec row — click-to-select : si une ligne non-exécutable est sélectionnée → deep-link seul
+    const selRow = selectedSource
+      ? (simResult.ladder || []).find(r => r.sourceId === selectedSource)
+      : null;
+    if (selRow && !selRow.executable) {
+      // Venue non intégré : deep-link uniquement, pas de bouton Execute
+      resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+        ${selRow.deepLink
+          ? `<a class="btn primary openlink btnlike" href="${selRow.deepLink}" target="_blank" rel="noopener">${t('exec_open_tool', selRow.display)}</a>`
+          : ''}
+        <span style="font-size:11px;color:var(--caption)">${t('exec_integrated_soon')}</span>
+      </div>`;
+    } else {
+      const execLabel = selRow ? t('exec_via', selRow.display) : t('exec_btn');
+      resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
+        <input id="execSlippage" type="number" min="0" max="50" step="0.1" value="${execSlippagePct}"
+          style="width:70px;font-size:13px;padding:.35rem .5rem;border-radius:.4rem;border:1px solid var(--card-border);background:var(--section-bg);color:var(--val)"
+          onchange="onExecSlippage(this.value)">
+        <span class="suffix">%</span>
+        <button class="btn primary" onclick="doExecute()">${execLabel}</button>
+        ${!selRow && b.deepLink ? openLink(b.deepLink, true) : ''}
+      </div>`;
+    }
   }
 
   return `<div class="sim">
@@ -1168,7 +1203,8 @@ function buildPage() {
     </span></div>${simCard()}</div>
 
   <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
-    <div class="ladder-wrap${simLoading || refreshing ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading || refreshing ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${simLoading ? t('sim_loading') : t('refresh_loading')}</div>` : ''}</div></div>
+    <div class="ladder-wrap${simLoading || refreshing ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading || refreshing ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${simLoading ? t('sim_loading') : t('refresh_loading')}</div>` : ''}</div>
+    ${simActive && simResult ? `<p class="help" style="margin:.5rem 0 0;font-size:11px">${t('ladder_pick_hint')}</p>` : ''}</div>
 
   <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right"><span class="seg">${sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('')}</span></span></div>
     <div class="card">
@@ -1256,6 +1292,7 @@ function startCountdownTick() {
 function setTarget(t2) {
   target = t2;
   simResult = null;
+  selectedSource = null;
   overview = null;
   refreshMsg = '';
   history.replaceState(null, '', '?pair=' + target);
@@ -1271,12 +1308,13 @@ function setSonde(n) {
 function onAmt(v) {
   const n = parseFloat(String(v).replace(/\s| /g,'').replace(',','.'));
   if (!isNaN(n) && n > 0) { simAmt = n; simActive = true; }
-  else { simActive = false; }
+  else { simActive = false; selectedSource = null; }
 }
 
 function clearSim() {
   simActive = false;
   simResult = null;
+  selectedSource = null;
   renderApp();
 }
 
@@ -1292,6 +1330,7 @@ async function doSim() {
   if (!simActive || simAmt <= 0) return;
   simLoading = true;
   simResult = null;
+  selectedSource = null;
   renderApp();
   try {
     const r = await fetch(`/api/quote?pair=${target}&amount=${simAmt}`);
@@ -1372,12 +1411,17 @@ async function doExecute() {
     renderApp();
     return;
   }
+  // Si une source exécutable est sélectionnée, forcer ce venue côté serveur
+  const selRow = selectedSource
+    ? (simResult.ladder || []).find(r => r.sourceId === selectedSource)
+    : null;
   const body = {
     pair: target,
     amount: simAmt,
     sender: walletAddress,
     slippageBps: Math.round(execSlippagePct * 100),
     displayed: simResult.best ? { winner: simResult.best.display, net: simResult.best.net } : undefined,
+    ...(selRow && selRow.executable ? { venue: selRow.sourceId.split('+')[0].trim() } : {}),
   };
   try {
     const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
