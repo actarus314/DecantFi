@@ -28,3 +28,4 @@ data/
 
 # local-only docker override (Mac dev) — ne pas déployer
 docker-compose.override.yaml
+.playwright-mcp/

@@ -73,6 +73,9 @@ body{margin:0; background:var(--bg); color:var(--val);
 .kpi .v.green{color:var(--green);}
 .kpi .c{font-size:12px; font-weight:600; color:var(--caption);}
 .kpi .sub{font-size:11px; color:var(--sub); font-variant-numeric:tabular-nums;}
+.kpi-row{display:flex; gap:.6rem; flex-wrap:wrap; margin:.8rem 0 0;}
+.kpi-row .kpi{flex:1 1 0; min-width:120px;}
+.health-info{font-size:14px; color:var(--val); line-height:1.5; margin:.7rem 0 0;}
 
 .chip{display:inline-block; border:1px solid; background:transparent; border-radius:9999px; font-weight:600; font-size:11px; padding:0 7px; line-height:1.6; vertical-align:middle;}
 .chip.obs{border-color:#4ade80; color:#15803d;} .dark .chip.obs{border-color:#15803d; color:#4ade80;}
@@ -390,6 +393,11 @@ const STRINGS = {
     health_legend_bad: '≥ 25 % d\'échecs',
     health_legend_null: 'aucun relevé',
     health_auto_only: 'Seuls les relevés automatiques (1 toutes les 15 min) sont pris en compte ici — les rafraîchissements manuels sont exclus du calcul de stabilité.',
+    health_kpi_readings: 'Relevés',
+    health_kpi_valid: (n) => `${n} valides`,
+    health_kpi_cadence: 'Cadence',
+    health_kpi_perday: (n) => `≈ ${n}/j`,
+    health_kpi_coverage: 'Couverture',
     health_never: '—',
     health_ago_min: (n) => `il y a ${n} min`,
     health_ago_h: (n) => `il y a ${n} h`,
@@ -577,6 +585,11 @@ const STRINGS = {
     health_legend_bad: '≥ 25% failures',
     health_legend_null: 'no readings',
     health_auto_only: 'Only automatic measurements (one every 15 min) are counted here — manual refreshes are excluded from the stability stats.',
+    health_kpi_readings: 'Readings',
+    health_kpi_valid: (n) => `${n} valid`,
+    health_kpi_cadence: 'Cadence',
+    health_kpi_perday: (n) => `≈ ${n}/d`,
+    health_kpi_coverage: 'Coverage',
     health_never: '—',
     health_ago_min: (n) => `${n} min ago`,
     health_ago_h: (n) => `${n} h ago`,
@@ -1062,6 +1075,18 @@ function buildHealthPage(topbarHtml) {
     return `${topbarHtml}<p class="help" style="margin:1rem 0">${t('loading')}</p>`;
   }
   const rows = health.sources || [];
+  // KPI repris du pied de page du tableau de bord (mêmes chiffres, depuis meta)
+  const meta = overview ? overview.meta : null;
+  const kpiHtml = meta ? (() => {
+    const perDay = Math.round(86400 / meta.cadenceSec);
+    const coverH = Math.round(meta.nTicks * meta.cadenceSec / 3600);
+    const cadH = cadenceHuman(meta.cadenceSec);
+    return `<div class="kpi-row">
+      <div class="kpi"><span class="c">${t('health_kpi_readings')}</span><span class="v">${meta.nTicks}</span><span class="sub">${t('health_kpi_valid', meta.nTicksOk)}</span></div>
+      <div class="kpi"><span class="c">${t('health_kpi_cadence')}</span><span class="v">${cadH}</span><span class="sub">${t('health_kpi_perday', perDay)}</span></div>
+      <div class="kpi"><span class="c">${t('health_kpi_coverage')}</span><span class="v">${coverH}<span class="u">h</span></span></div>
+    </div>`;
+  })() : '';
   // cause de panne (timeout/http/indisponible) capturée côté backend (③-bis) ; legacy = horodatage seul
   const tableRows = rows.map(s => {
     // Granularité : une barre par sonde (taille). Couleur selon la dispo de CETTE taille.
@@ -1087,6 +1112,8 @@ function buildHealthPage(topbarHtml) {
   <div class="zone">
     <button class="backlink" onclick="setView('dashboard')">${t('nav_back')}</button>
     <div class="zone-h">${t('health_title')}</div>
+    <p class="health-info">${t('health_auto_only')}</p>
+    ${kpiHtml}
     <div style="overflow-x:auto"><table class="flt">
       <thead><tr>
         <th>${t('health_col_source')}</th>
@@ -1103,7 +1130,6 @@ function buildHealthPage(topbarHtml) {
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="b"></i></span>${t('health_legend_bad')} &nbsp;
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="g"></i></span>${t('health_legend_null')}
     </p>
-    <p class="help" style="margin:.4rem 0 0;font-size:11px">${t('health_auto_only')}</p>
   </div>`;
 }
 
