@@ -1,12 +1,17 @@
-// Orchestrateur d'exécution : BLND → USDC/EURC via xBull ou Soroswap.
+// Orchestrateur d'exécution : BLND → USDC/EURC via xBull, Soroswap ou Horizon.
 // Money-path : bigint stroops partout, jamais de float pour les calculs.
-import { BLND, USDC, EURC, bySac } from '../core/assets.js';
-import { toNumber } from '../core/amount.js';
+import { BLND, USDC, EURC, bySac, classicColon, type Asset } from '../core/assets.js';
+import { toNumber, fromStroops } from '../core/amount.js';
+import { stroopsOrNull } from '../core/sources/util.js';
 import { SoroswapSDK, SupportedNetworks, SupportedProtocols, TradeType } from '@soroswap/sdk';
+
+/** Venues d'exécution branchées. Ajouter une venue = étendre cette union (et son cas de build/submit). */
+export type Venue = 'xbull' | 'soroswap' | 'horizon';
 
 // ─── User-Agent commun (xBull bloque l'UA Node par défaut) ──────────────────
 const XBULL_UA = 'Mozilla/5.0 (compatible; stellar-swap/0.1; +exec)';
 const XBULL_BASE = 'https://swap.apis.xbull.app';
+const HORIZON_BASE_DEFAULT = 'https://horizon.stellar.org';
 
 // ─── Erreur typée ────────────────────────────────────────────────────────────
 
@@ -81,7 +86,7 @@ export function routeLabel(
 // ─── ReviewData ───────────────────────────────────────────────────────────────
 
 export interface ReviewData {
-  venue: 'xbull' | 'soroswap';
+  venue: Venue;
   target: 'USDC' | 'EURC';
   type: 'full' | 'restore' | 'swap';
   sendAmount: number;
@@ -94,7 +99,7 @@ export interface ReviewData {
 }
 
 export function reviewData(args: {
-  venue: 'xbull' | 'soroswap';
+  venue: Venue;
   target: 'USDC' | 'EURC';
   type: 'full' | 'restore' | 'swap';
   sendStroops: bigint;
@@ -296,6 +301,123 @@ export async function buildSoroswap(
   }
 }
 
+// ─── Quote / build / submit — Horizon (op native PathPaymentStrictSend) ──────
+// Pas d'API d'agrégation : on construit le XDR nous-mêmes avec stellar-sdk depuis le
+// chemin renvoyé par /paths/strict-send. Une tx classique ne se simule pas (≠ Soroban),
+// donc le garde-fou pré-signature = vérif trustline de sortie sur le compte chargé.
+
+interface HorizonPathRecord { asset_type?: string; asset_code?: string; asset_issuer?: string }
+interface HorizonRecord { destination_amount?: string; path?: HorizonPathRecord[] }
+
+/** Symboles lisibles des actifs intermédiaires d'un chemin Horizon (native → XLM). */
+export function horizonPathSymbols(records: HorizonPathRecord[]): string[] {
+  return records.map((r) => (r.asset_type === 'native' ? 'XLM' : r.asset_code ?? '?'));
+}
+
+function horizonSourceParams(a: Asset): Record<string, string> {
+  if (a.native) return { source_asset_type: 'native' };
+  return {
+    source_asset_type: a.code.length <= 4 ? 'credit_alphanum4' : 'credit_alphanum12',
+    source_asset_code: a.code,
+    source_asset_issuer: a.issuer as string,
+  };
+}
+
+/** Re-cote live via Horizon strict-send : meilleur destination_amount + chemin structuré (pour le build). */
+export async function quoteHorizon(
+  sell: Asset,
+  buy: Asset,
+  fromAmount: bigint,
+  deps: ExecDeps,
+  horizonUrl?: string,
+): Promise<{ venue: 'horizon'; netOut: bigint; path: HorizonPathRecord[] } | null> {
+  const base = (horizonUrl || HORIZON_BASE_DEFAULT).replace(/\/$/, '');
+  const sp = new URLSearchParams({
+    ...horizonSourceParams(sell),
+    source_amount: fromStroops(fromAmount),
+    destination_assets: classicColon(buy),
+  });
+  const res = await deps.fetchJson(`${base}/paths/strict-send?${sp.toString()}`);
+  if (!res.ok) return null;
+  const records = (res.body as { _embedded?: { records?: HorizonRecord[] } } | null)?._embedded?.records;
+  if (!Array.isArray(records) || records.length === 0) return null;
+  let best: HorizonRecord | null = null;
+  let bestNum = -1;
+  for (const r of records) {
+    const n = Number(r?.destination_amount);
+    if (Number.isFinite(n) && n > bestNum) { best = r; bestNum = n; }
+  }
+  const netOut = stroopsOrNull(best?.destination_amount);
+  if (netOut === null || netOut <= 0n) return null;
+  return { venue: 'horizon', netOut, path: best?.path ?? [] };
+}
+
+/** Construit le XDR PathPaymentStrictSend (non signé). Pré-flight trustline → ExecError clair. */
+export async function buildHorizon(
+  sender: string,
+  sell: Asset,
+  buy: Asset,
+  fromAmount: bigint,
+  destMin: bigint,
+  path: HorizonPathRecord[],
+  horizonUrl?: string,
+): Promise<{ xdr: string }> {
+  const sdk = await import('@stellar/stellar-sdk');
+  const { Horizon, TransactionBuilder, Operation, Asset: SdkAsset, Networks, BASE_FEE } = sdk;
+  const server = new Horizon.Server((horizonUrl || HORIZON_BASE_DEFAULT).replace(/\/$/, ''));
+
+  let account: Awaited<ReturnType<typeof server.loadAccount>>;
+  try {
+    account = await server.loadAccount(sender);
+  } catch {
+    throw new ExecError('funds', `compte ${sender} introuvable ou non financé`);
+  }
+
+  // Trustline de sortie présente ? (USDC/EURC ne sont jamais natifs)
+  if (!buy.native && !account.balances.some(
+    (b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer,
+  )) {
+    throw new ExecError('trustline', `trustline ${buy.code} absente sur ${sender}`);
+  }
+
+  const toSdk = (a: Asset) => (a.native ? SdkAsset.native() : new SdkAsset(a.code, a.issuer as string));
+  const pathAssets = path.map((r) =>
+    r.asset_type === 'native' ? SdkAsset.native() : new SdkAsset(r.asset_code as string, r.asset_issuer as string),
+  );
+
+  const tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: Networks.PUBLIC })
+    .addOperation(Operation.pathPaymentStrictSend({
+      sendAsset: toSdk(sell),
+      sendAmount: fromStroops(fromAmount),
+      destination: sender,
+      destAsset: toSdk(buy),
+      destMin: fromStroops(destMin),
+      path: pathAssets,
+    }))
+    .setTimeout(180)
+    .build();
+
+  return { xdr: tx.toXDR() };
+}
+
+/** Codes d'erreur Horizon (extras.result_codes) → message lisible. */
+function horizonResultCodes(e: unknown): string[] {
+  const rc = (e as { response?: { data?: { extras?: { result_codes?: { transaction?: string; operations?: string[] } } } } })
+    ?.response?.data?.extras?.result_codes;
+  if (!rc) return [];
+  const ops = Array.isArray(rc.operations) ? rc.operations : [];
+  return [rc.transaction ?? '', ...ops].filter(Boolean);
+}
+
+export function classifyHorizonSubmit(e: unknown): ExecError['code'] {
+  const codes = horizonResultCodes(e).join(' ').toLowerCase();
+  // Route consommée / prix bougé depuis la cote → re-coter (slippage, HTTP 400) et pas « indisponible » (502).
+  if (codes.includes('under_dest_min') || codes.includes('too_few_offers') || codes.includes('cross_self')) return 'slippage';
+  if (codes.includes('no_trust') || codes.includes('no_destination') || codes.includes('not_authorized')) return 'trustline';
+  if (codes.includes('underfunded') || codes.includes('insufficient') || codes.includes('line_full')) return 'funds';
+  return classifyExecError(codes || (e instanceof Error ? e.message : String(e)));
+}
+
 // ─── Orchestrateur principal ─────────────────────────────────────────────────
 
 export async function pickExecutableVenue(
@@ -303,11 +425,11 @@ export async function pickExecutableVenue(
   amountStroops: bigint,
   sender: string,
   slippageBps: number,
-  cfg: { soroswapApiKey?: string; rpcUrl: string; timeoutMs?: number },
+  cfg: { soroswapApiKey?: string; rpcUrl: string; horizonUrl?: string; timeoutMs?: number },
   displayed?: { winner?: string; net?: number },
   depsOverride?: Partial<ExecDeps>,
-  forceVenue?: 'xbull' | 'soroswap',
-): Promise<{ venue: 'xbull' | 'soroswap'; xdr: string; id?: string; type: 'full' | 'restore' | 'swap'; review: ReviewData }> {
+  forceVenue?: Venue,
+): Promise<{ venue: Venue; xdr: string; id?: string; type: 'full' | 'restore' | 'swap'; review: ReviewData }> {
   const deps: ExecDeps = { ...defaultDeps(cfg.timeoutMs), ...depsOverride };
   const buyAsset = target === 'EURC' ? EURC : USDC;
   const sellSac = BLND.sac;
@@ -315,21 +437,24 @@ export async function pickExecutableVenue(
 
   // 1. Re-quote live en parallèle (tolérant : échec → null).
   const soroClient = cfg.soroswapApiKey ? deps.makeSoroswap(cfg.soroswapApiKey) : null;
-  const [xbullQ, soroQ] = await Promise.all([
+  const [xbullQ, soroQ, horizonQ] = await Promise.all([
     quoteXbull(sellSac, buySac, amountStroops, deps),
     soroClient
       ? quoteSoroswap(soroClient, sellSac, buySac, amountStroops, slippageBps)
       : Promise.resolve(null),
+    quoteHorizon(BLND, buyAsset, amountStroops, deps, cfg.horizonUrl),
   ]);
 
   // 2. Trier les candidats non-null par netOut décroissant.
   type Candidate =
     | { venue: 'xbull'; netOut: bigint; route: string }
-    | { venue: 'soroswap'; netOut: bigint; minOut: bigint; soroPath?: string[]; quote: unknown };
+    | { venue: 'soroswap'; netOut: bigint; minOut: bigint; soroPath?: string[]; quote: unknown }
+    | { venue: 'horizon'; netOut: bigint; path: HorizonPathRecord[] };
 
   let candidates: Candidate[] = [];
   if (xbullQ) candidates.push(xbullQ);
   if (soroQ) candidates.push(soroQ);
+  if (horizonQ) candidates.push(horizonQ);
   candidates.sort((a, b) => (a.netOut < b.netOut ? 1 : a.netOut > b.netOut ? -1 : 0));
 
   if (candidates.length === 0) {
@@ -365,6 +490,27 @@ export async function pickExecutableVenue(
           displayed,
         });
         return { venue: 'xbull', xdr: built.xdr, id: built.id, type: built.type, review };
+      } catch (e) {
+        if (e instanceof ExecError) errors.push(e);
+        continue;
+      }
+    } else if (cand.venue === 'horizon') {
+      try {
+        const destMin = minReceivedStroops(cand.netOut, slippageBps);
+        const built = await buildHorizon(sender, BLND, buyAsset, amountStroops, destMin, cand.path, cfg.horizonUrl);
+        const route = ['BLND', ...horizonPathSymbols(cand.path), target].join(' → ');
+        const review = reviewData({
+          venue: 'horizon',
+          target,
+          type: 'swap',
+          sendStroops: amountStroops,
+          netStroops: cand.netOut,
+          minReceivedStroops: destMin,
+          slippageBps,
+          route,
+          displayed,
+        });
+        return { venue: 'horizon', xdr: built.xdr, type: 'swap', review };
       } catch (e) {
         if (e instanceof ExecError) errors.push(e);
         continue;
@@ -406,9 +552,9 @@ export async function pickExecutableVenue(
 // ─── Submit ───────────────────────────────────────────────────────────────────
 
 export async function submit(
-  venue: 'xbull' | 'soroswap',
+  venue: Venue,
   payload: { id?: string; signedXdr: string },
-  cfg: { rpcUrl: string; soroswapApiKey?: string; timeoutMs?: number },
+  cfg: { rpcUrl: string; horizonUrl?: string; soroswapApiKey?: string; timeoutMs?: number },
   depsOverride?: Partial<ExecDeps>,
 ): Promise<{ hash: string }> {
   const deps: ExecDeps = { ...defaultDeps(cfg.timeoutMs), ...depsOverride };
@@ -427,6 +573,21 @@ export async function submit(
       throw new ExecError('down', msg);
     }
     return { hash: body['hash'] as string };
+  } else if (venue === 'horizon') {
+    // tx classique → soumission Horizon (gère l'encodage form + extraction d'erreur).
+    const sdk = await import('@stellar/stellar-sdk');
+    const { Horizon, TransactionBuilder, Networks } = sdk;
+    const server = new Horizon.Server((cfg.horizonUrl || HORIZON_BASE_DEFAULT).replace(/\/$/, ''));
+    try {
+      const tx = TransactionBuilder.fromXDR(payload.signedXdr, Networks.PUBLIC);
+      const r = await server.submitTransaction(tx as Parameters<typeof server.submitTransaction>[0]);
+      return { hash: r.hash };
+    } catch (e) {
+      if (e instanceof ExecError) throw e;
+      const codes = horizonResultCodes(e);
+      const msg = codes.length ? `Horizon a rejeté la tx : ${codes.join(', ')}` : (e instanceof Error ? e.message : String(e));
+      throw new ExecError(classifyHorizonSubmit(e), msg);
+    }
   } else {
     const client = deps.makeSoroswap(cfg.soroswapApiKey!);
     try {
