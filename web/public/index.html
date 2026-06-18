@@ -326,6 +326,7 @@ const STRINGS = {
     sim_loading: 'Cotation en cours…',
     sim_errors: 'Sources en échec :',
     sim_open: 'Ouvrir ↗',
+    sim_min: (u) => `Reçu min (${u})`,
 
     // Tableau ladder
     ladder_col_tool: 'Outil de swap',
@@ -374,7 +375,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: '<b>xBull</b> domine habituellement ; <b>Comet</b> ne concourt que sur USDC (pool backstop). <b>Diversité = robustesse aux pannes.</b>',
-    dist_note_eurc: '<b>Pas de pool BLND/EURC profond</b> : les lignes « BLND → EURC » sont des <b>swaps atomiques routés en interne</b> via USDC/XLM (Soroswap affiche BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM ; <b>seul xBull masque son chemin</b>). La route <b>via-USDC explicite (2 swaps) les bat souvent</b>.',
+    dist_note_eurc: '<b>Pas de pool BLND/EURC profond</b> : les lignes « BLND → EURC » sont des <b>swaps atomiques routés en interne</b> via USDC/XLM (Soroswap affiche BLND → USDC → EURC, Aquarius via sUSD, Ultra Stellar via XLM ; <b>seul xBull masque son chemin</b>). La route <b>via-USDC explicite (2 swaps) les bat souvent</b>.',
 
     // Divers
     loading: 'Chargement…',
@@ -415,7 +416,7 @@ const STRINGS = {
     exec_failed: 'Échec',
 
     // Erreurs exec
-    err_trustline: 'Trustline de sortie manquante sur ton compte (ajoute la trustline de la devise cible).',
+    err_trustline: (tgt, issuer) => `Trustline ${tgt} absente. Pour la recevoir : dans ton wallet, ajoute l'actif ${tgt} (émetteur ${issuer}) — opération changeTrust, ~0,5 XLM de réserve. Puis relance.`,
     err_funds: 'Solde BLND liquide insuffisant (ton BLND est peut-être staké dans Blend — retire-le d\'abord).',
     err_slippage: 'Le prix a bougé au-delà de ta tolérance — réessaie ou augmente le slippage.',
     err_down: 'Source d\'exécution indisponible, réessaie.',
@@ -518,6 +519,7 @@ const STRINGS = {
     sim_loading: 'Fetching quote…',
     sim_errors: 'Failed sources:',
     sim_open: 'Open ↗',
+    sim_min: (u) => `Min received (${u})`,
 
     // Tableau ladder
     ladder_col_tool: 'Swap tool',
@@ -566,7 +568,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: '<b>xBull</b> usually dominates; <b>Comet</b> only competes on USDC (backstop pool). <b>Diversity = resilience to failures.</b>',
-    dist_note_eurc: '<b>No deep BLND/EURC pool</b>: the "BLND → EURC" rows are <b>atomic swaps routed internally</b> via USDC/XLM (Soroswap shows BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM; <b>only xBull hides its path</b>). The explicit <b>via-USDC route (2 swaps) often beats them</b>.',
+    dist_note_eurc: '<b>No deep BLND/EURC pool</b>: the "BLND → EURC" rows are <b>atomic swaps routed internally</b> via USDC/XLM (Soroswap shows BLND → USDC → EURC, Aquarius via sUSD, Ultra Stellar via XLM; <b>only xBull hides its path</b>). The explicit <b>via-USDC route (2 swaps) often beats them</b>.',
 
     // Divers
     loading: 'Loading…',
@@ -607,7 +609,7 @@ const STRINGS = {
     exec_failed: 'Failed',
 
     // Exec errors
-    err_trustline: 'Missing destination trustline on your account (add the target asset trustline).',
+    err_trustline: (tgt, issuer) => `${tgt} trustline missing. To receive it: in your wallet, add the ${tgt} asset (issuer ${issuer}) — changeTrust operation, ~0.5 XLM reserve. Then retry.`,
     err_funds: 'Insufficient liquid BLND (your BLND may be staked in Blend — withdraw it first).',
     err_slippage: 'Price moved beyond your tolerance — retry or raise slippage.',
     err_down: 'Execution source unavailable, try again.',
@@ -706,7 +708,7 @@ let refreshMsg = '';
 let walletAddress = localStorage.getItem('walletAddress') || null;
 // Exécution swap
 let execState = null; // null | { phase:'review'|'signing'|'submitting'|'done'|'error', build?, hash?, venue?, errorMsg? }
-let execSlippagePct = 0.5; // UI %, → bps = Math.round(execSlippagePct*100)
+let execSlippagePct = (() => { const s = parseFloat(localStorage.getItem('slippagePct')); return (!isNaN(s) && s >= 0 && s <= 50) ? s : 0.5; })(); // UI %, → bps = Math.round(execSlippagePct*100)
 // click-to-select : sourceId sélectionné (null = auto)
 let selectedSource = null;
 
@@ -947,9 +949,12 @@ function simCard() {
       : routeSimple(fmt3(simAmt), b.net, b.display, target, true);
     const rateStr = b.rate > 0 ? b.rate.toFixed(6) + ' ' + target + '/BLND' : '';
     const impactStr = b.impactPct != null ? ` · impact ${fmt(b.impactPct)} %` : '';
+    const minReceived = b.net * (1 - execSlippagePct / 100);
+    const minStr = `<span style="color:var(--caption)">${t('sim_min', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(minReceived)} ${target}</span>`;
     resultHtml = `<div class="result">
       <div style="flex:1 1 100%">${route}</div>
       <span class="meta" style="flex:1 1 100%; margin-top:.4rem">${rateStr}${impactStr}</span>
+      <span class="meta" style="flex:1 1 100%; margin-top:.2rem">${minStr}</span>
     </div>`;
     if (simResult.errors && simResult.errors.length > 0) {
       resultHtml += `<p class="help" style="margin:.4rem 0 0">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
@@ -969,11 +974,6 @@ function simCard() {
     } else {
       const execLabel = selRow ? t('exec_via', selRow.display) : t('exec_btn');
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
-        <input id="execSlippage" type="number" min="0" max="50" step="0.1" value="${execSlippagePct}"
-          style="width:70px;font-size:13px;padding:.35rem .5rem;border-radius:.4rem;border:1px solid var(--card-border);background:var(--section-bg);color:var(--val)"
-          onchange="onExecSlippage(this.value)">
-        <span class="suffix">%</span>
         <button class="btn primary" onclick="doExecute()">${execLabel}</button>
         ${!selRow && b.deepLink ? openLink(b.deepLink, true) : ''}
       </div>`;
@@ -987,6 +987,11 @@ function simCard() {
       <button class="btn" onclick="useWallet()" ${!walletConfigured ? 'disabled' : ''}>${walletLabel}</button>
       <button class="btn primary" onclick="doSim()">${t('sim_btn_simulate')}</button>
       <button class="btn" onclick="clearSim()">${t('sim_btn_clear')}</button>
+      <span style="font-size:11px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
+      <input id="execSlippage" type="number" min="0" max="50" step="0.1" value="${execSlippagePct}"
+        style="width:70px;font-size:13px;padding:.35rem .5rem;border-radius:.4rem;border:1px solid var(--card-border);background:var(--section-bg);color:var(--val)"
+        onchange="onExecSlippage(this.value)">
+      <span class="suffix">%</span>
     </div>
     <div id="simOut">${resultHtml}</div></div>`;
 }
@@ -1479,7 +1484,13 @@ function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+const TRUSTLINE_ISSUERS = {
+  USDC: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
+  EURC: 'GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2',
+};
+
 function mapExecError(code, fallback) {
+  if (code === 'trustline') return t('err_trustline', target, TRUSTLINE_ISSUERS[target] || target);
   const key = 'err_' + String(code).replace('-', ''); // 'no-route' → clé 'err_noroute'
   const s = STRINGS[lang];
   if (s && s[key] !== undefined) return t(key);
@@ -1563,6 +1574,8 @@ function cancelExecute() {
 function onExecSlippage(v) {
   const n = parseFloat(String(v).replace(',', '.'));
   execSlippagePct = isNaN(n) ? 0.5 : Math.max(0, Math.min(50, n));
+  localStorage.setItem('slippagePct', execSlippagePct);
+  renderApp();
 }
 
 // ─── Modal d'exécution ────────────────────────────────────────────────────────

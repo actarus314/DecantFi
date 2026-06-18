@@ -78,7 +78,7 @@ export function deepLink(sourceId: string, _pairUi: string): string | null {
 // Nom d'affichage du venue (cartouche outil = info la + importante du design). Fallback : capitalise.
 const VENUE_LABEL: Record<string, string> = {
   xbull: 'xBull', soroswap: 'Soroswap', aquarius: 'Aquarius', aqua: 'Aquarius',
-  comet: 'Comet', ultrastellar: 'Ultra', stellarbroker: 'StellarBroker',
+  comet: 'Comet', ultrastellar: 'Ultra Stellar', stellarbroker: 'StellarBroker',
   horizon: 'Horizon', sdex: 'SDEX', phoenix: 'Phoenix',
 };
 function prettyVenue(v: string): string {
