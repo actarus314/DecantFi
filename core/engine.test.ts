@@ -25,11 +25,11 @@ function fakeAdapter(id: string, net: bigint, available = true): SourceAdapter {
 const cfg = (adapters: SourceAdapter[]): EngineConfig => ({ rpcUrl: '', horizonUrl: '', prices, adapters });
 
 describe('finalize', () => {
-  it('soustrait le gas et calcule l impact vs spot', () => {
+  it('net = brut (gas NON deduit, juste estime) + impact vs spot', () => {
     const q = mk('x', toStroops('50.9'), { grossOut: toStroops('50.9'), gasXlm: 450_000n }) as NormalizedQuote;
     const f = finalize(q, prices);
-    expect(f.gasInTarget).toBeGreaterThan(0n);
-    expect(f.netOut).toBeLessThan(toStroops('50.9'));
+    expect(f.gasInTarget).toBeGreaterThan(0n);        // gas toujours estime (informatif)
+    expect(f.netOut).toBe(toStroops('50.9'));          // mais net == brut (plus deduit)
     expect(f.priceImpactPct).toBeDefined();
   });
 });

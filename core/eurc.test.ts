@@ -29,8 +29,8 @@ describe('compareEurc', () => {
     expect(r.viaUsdcAdvantage).toBe(toStroops('46.736') - toStroops('43.6'));
   });
 
-  it('via-USDC deduit le gas du leg 1 (sinon biais vs direct)', async () => {
-    // leg1 BLND->USDC : 50.8 USDC recus, gas leg1 = 0.1 USDC ; leg2 USDC->EURC @ 0.92.
+  it('via-USDC = brut leg 2 (gas leg 1 NON deduit : paye en XLM, a part)', async () => {
+    // leg1 BLND->USDC : 50.8 USDC recus (gas leg1 estime 0.1 USDC mais NON deduit) ; leg2 @ 0.92.
     const qs: EurcQuoters = {
       blndToEurc: async () => [quote('xbull', toStroops('43'), { buyAsset: EURC })],
       blndToUsdc: async () => [quote('xbull', toStroops('50.8'), { gasInTarget: toStroops('0.1') })],
@@ -41,8 +41,8 @@ describe('compareEurc', () => {
     };
     const r = await compareEurc(toStroops('1000'), qs);
     expect(r.winner).toBe('via-usdc');
-    // leg2 = 50.8*0.92 = 46.736 ; gas leg1 reconverti = 0.1 * 46.736/50.8 = 0.092 → net 46.644
-    expect(r.bestNetEurc).toBe(toStroops('46.644'));
+    // leg2 = 50.8*0.92 = 46.736 ; le gas leg1 n'est PLUS deduit → net = brut 46.736.
+    expect(r.bestNetEurc).toBe(toStroops('46.736'));
   });
 
   it('direct gagne quand il est meilleur', async () => {

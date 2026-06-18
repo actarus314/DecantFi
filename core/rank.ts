@@ -1,6 +1,6 @@
-// Classement des cotations par net reel (netOut). Strictement comparable : chaque adapter a deja
-// ramene netOut au "montant cible recu, net de tous frais + gas". StellarBroker est classe sur son
-// plancher (son adapter met netOut = plancher), donc un simple tri descendant suffit.
+// Classement des cotations par netOut = BRUT (montant cible recu, net des frais de swap + impact ;
+// le gas XLM n'est PAS deduit, paye a part). Strictement comparable entre sources. StellarBroker est
+// classe sur son plancher (son adapter met netOut = plancher), donc un simple tri descendant suffit.
 import type { NormalizedQuote } from './sources/types.js';
 import { toNumber } from './amount.js';
 

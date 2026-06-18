@@ -71,9 +71,10 @@ export interface NormalizedQuote {
   feeBreakdown: FeeItem[];
   /** Cout reseau estime, en stroops XLM. */
   gasXlm: Stroops;
-  /** Gas converti dans l'asset cible (buyAsset), en stroops. */
+  /** Gas estimé converti dans l'asset cible (buyAsset), en stroops. INFORMATIF : plus déduit du net
+   *  (le gas Soroban est payé en XLM, à part, variable par tx — affiché séparément par wallet/explorer). */
   gasInTarget: Stroops;
-  /** grossOut - gasInTarget : LE montant comparable entre sources. */
+  /** = grossOut : montant cible reçu, comparable entre sources. Le gas n'est PAS déduit (payé en XLM). */
   netOut: Stroops;
   netConfidence: NetConfidence;
   /** Fourchette quand netOut est incertain (ex. StellarBroker : [plancher directTrade, pre-fee]). */
