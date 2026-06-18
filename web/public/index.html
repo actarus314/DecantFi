@@ -32,7 +32,8 @@ body{margin:0; background:var(--bg); color:var(--val);
 .pagenav button.active{background:#1e293b; color:#fff;}
 .dark .pagenav button.active{background:#e2e8f0; color:#0f172a;}
 .fresh{display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--caption);
-  background:var(--card-bg); border:1px solid var(--card-border); border-radius:9999px; padding:2px 9px;}
+  background:var(--card-bg); border:1px solid var(--card-border); border-radius:9999px; padding:2px 9px; cursor:pointer;}
+.fresh:hover::after{content:' ↻'; font-size:11px; color:var(--caption);}
 .fresh .dot{width:7px; height:7px; border-radius:9999px; background:var(--green);}
 .tznote{font-size:11px; color:var(--sub);}
 
@@ -76,6 +77,8 @@ body{margin:0; background:var(--bg); color:var(--val);
 .btn{font-size:12px; font-weight:600; padding:.52rem .9rem; border-radius:.5rem; border:1px solid var(--card-border);
   background:var(--section-bg); color:var(--val); cursor:pointer; transition:transform .08s;}
 .btn:active{transform:translateY(1px) scale(.985);}
+.btn:disabled,.btn.primary:disabled{opacity:.5; cursor:not-allowed;}
+.btn:disabled:active,.btn.primary:disabled:active{transform:none;}
 .btn.primary{background:#0d9488; border-color:#0d9488; color:#fff;}
 .dark .btn.primary{background:#14b8a6; border-color:#14b8a6; color:#04201d;}
 .sim .result{margin-top:.9rem; padding-top:.9rem; border-top:1px solid var(--card-border);
@@ -294,9 +297,9 @@ const STRINGS = {
     fresh_h: (n) => `il y a ${n} h`,
     countdown_label: (m, s) => `prochain relevé dans ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'imminent',
+    countdown_refresh_hint: 'Cliquer pour forcer un relevé maintenant',
 
     // Refresh
-    refresh_btn: 'Rafraîchir',
     refresh_loading: 'Relevé en cours…',
     refresh_429: 'Relevé déjà en cours, veuillez patienter.',
     refresh_note: 'Rafraîchissement manuel provisoire — remplacé au prochain relevé programmé.',
@@ -347,7 +350,7 @@ const STRINGS = {
     chip_obs: 'observé',
     chip_calc: 'calculé',
     chip_est: 'estimé',
-    hops_hidden: 'Hops internes masqués par xBull',
+    hops_hidden: 'Chemin non communiqué par xBull',
 
     // Heatmap / profil
     hmap_insufficient: 'Données insuffisantes',
@@ -498,9 +501,9 @@ const STRINGS = {
     fresh_h: (n) => `${n} h ago`,
     countdown_label: (m, s) => `next update in ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'imminent',
+    countdown_refresh_hint: 'Click to force a reading now',
 
     // Refresh
-    refresh_btn: 'Refresh',
     refresh_loading: 'Fetching…',
     refresh_429: 'Fetch already in progress, please wait.',
     refresh_note: 'Manual refresh is provisional — replaced at next scheduled tick.',
@@ -551,7 +554,7 @@ const STRINGS = {
     chip_obs: 'observed',
     chip_calc: 'calculated',
     chip_est: 'estimated',
-    hops_hidden: 'Internal hops hidden by xBull',
+    hops_hidden: 'Path not disclosed by xBull',
 
     // Heatmap / profil
     hmap_insufficient: 'Insufficient data',
@@ -809,11 +812,12 @@ const fmt3 = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumF
 const fmt0 = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
 
 function freshLabel(lastTickAt) {
-  if (!lastTickAt) return `<span class="fresh"><span class="dot" style="background:var(--amber)"></span>${t('fresh_none')}</span>`;
+  const hint = t('countdown_refresh_hint');
+  if (!lastTickAt) return `<span class="fresh" onclick="doRefresh()" title="${hint}"><span class="dot" style="background:var(--amber)"></span>${t('fresh_none')}</span>`;
   const diff = (Date.now() - new Date(lastTickAt).getTime()) / 60000;
   const color = diff < 30 ? 'var(--green)' : diff < 120 ? 'var(--amber)' : 'var(--red)';
   // Countdown text — rendered in a placeholder updated by setInterval
-  return `<span class="fresh"><span class="dot" style="background:${color}"></span><span id="countdown">${computeCountdownText()}</span></span>`;
+  return `<span class="fresh" onclick="doRefresh()" title="${hint}"><span class="dot" style="background:${color}"></span><span id="countdown">${computeCountdownText()}</span></span>`;
 }
 
 function computeCountdownText() {
@@ -1164,19 +1168,6 @@ function zoomMove(e, el) {
 }
 function zoomLeave() { const c = document.getElementById('zcur'), p = document.getElementById('ztip'); if (c) c.style.display = 'none'; if (p) p.style.display = 'none'; }
 
-// ─── Bouton Rafraîchir (helper plus bas) ────────────────────────────────────────
-
-// ─── Bouton Rafraîchir ────────────────────────────────────────────────────────
-function refreshHtml() {
-  const disabled = refreshing ? 'disabled' : '';
-  const label = refreshing ? t('refresh_loading') : t('refresh_btn');
-  const msg = refreshMsg ? `<span class="refresh-note">${refreshMsg}</span>` : '';
-  return `<span class="refresh-wrap">
-    <button class="btn" onclick="doRefresh()" ${disabled} title="${t('refresh_note')}">${label}</button>
-    ${msg}
-  </span>`;
-}
-
 // ─── Page santé ④ ─────────────────────────────────────────────────────────────
 function buildHealthPage(topbarHtml) {
   if (!health) {
@@ -1243,7 +1234,6 @@ function buildHealthPage(topbarHtml) {
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="b"></i></span>${t('health_legend_bad')} &nbsp;
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="g"></i></span>${t('health_legend_null')}
     </p>
-    <p class="health-info">${t('health_auto_only')}</p>
   </div>`;
 }
 
@@ -1582,12 +1572,14 @@ async function doExecute() {
   const selRow = selectedSource
     ? (simResult.ladder || []).find(r => r.sourceId === selectedSource)
     : null;
+  const winRow = (simResult.ladder || []).find(r => r.winner);
+  const isComposite = !!(winRow && winRow.sourceId && winRow.sourceId.includes('+'));
   const body = {
     pair: target,
     amount: simAmt,
     sender: walletAddress,
     slippageBps: Math.round(execSlippagePct * 100),
-    displayed: simResult.best ? { winner: simResult.best.display, net: simResult.best.net } : undefined,
+    displayed: isComposite && simResult.best ? { winner: simResult.best.display, net: simResult.best.net } : undefined,
     ...(selRow && selRow.executable ? { venue: selRow.sourceId.split('+')[0].trim() } : {}),
   };
   try {
