@@ -54,10 +54,15 @@ export function parseAssetBalance(raw: unknown, asset: Asset): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Lit la balance d'un actif classique live de `address` via Horizon. Tolérant : Horizon KO → 0. */
-export async function readAssetBalance(address: string, asset: Asset, deps: BalanceDeps): Promise<number> {
+/**
+ * Lit la balance d'un actif classique live de `address` via Horizon.
+ * **Distingue échec de lecture (→ null) de trustline absente (→ 0)** : sinon un delta « reçu »
+ * post-swap serait calculé contre 0 (= solde total, faux). Le client traite null = « lecture KO ».
+ */
+export async function readAssetBalance(address: string, asset: Asset, deps: BalanceDeps): Promise<number | null> {
   const getJson = deps.getJson ?? defaultGetJson;
   const base = (deps.horizonUrl || 'https://horizon.stellar.org').replace(/\/$/, '');
   const raw = await getJson(`${base}/accounts/${address}`, deps.timeoutMs);
+  if (raw == null) return null; // Horizon KO → null (≠ 0 = trustline absente)
   return parseAssetBalance(raw, asset);
 }
