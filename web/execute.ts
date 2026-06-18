@@ -3,7 +3,7 @@
 import { BLND, USDC, EURC, bySac, classicColon, type Asset } from '../core/assets.js';
 import { toNumber, fromStroops, toStroops } from '../core/amount.js';
 import { stroopsOrNull, bigintOrNull } from '../core/sources/util.js';
-import { COMET_POOL, COMET_PROBE, decodeCometOut } from '../core/sources/comet.js';
+import { COMET_POOL, COMET_WITNESSES, decodeCometOut } from '../core/sources/comet.js';
 import { parseBlndBalance } from '../core/balance.js';
 import { SoroswapSDK, SupportedNetworks, SupportedProtocols, TradeType } from '@soroswap/sdk';
 
@@ -209,28 +209,31 @@ export function defaultDeps(timeoutMs?: number): ExecDeps {
   };
 }
 
-/** Cotation Comet read-only : simule swap_exact_amount_in avec le témoin COMET_PROBE
- *  (la sortie ne dépend QUE des réserves du pool, pas du user). null si pool absent / sim en erreur.
- *  Calque core/sources/comet.ts (signature confirmée live). */
+/** Cotation Comet read-only : simule swap_exact_amount_in avec la liste de témoins COMET_WITNESSES
+ *  (la sortie ne dépend QUE des réserves du pool, pas du user). Prend le 1er témoin dont la sim passe.
+ *  null si tous les témoins échouent ou si le pool est absent. Calque core/sources/comet.ts. */
 async function simulateCometReal(a: { sellSac: string; buySac: string; amountIn: bigint; rpcUrl: string }): Promise<bigint | null> {
   const sdk = await import('@stellar/stellar-sdk');
   const { rpc, Address, TransactionBuilder, Networks, Account, Contract, scValToNative, nativeToScVal } = sdk;
   const server = new rpc.Server((a.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
-  const args = [
-    new Address(a.sellSac).toScVal(),
-    nativeToScVal(a.amountIn, { type: 'i128' }),
-    new Address(a.buySac).toScVal(),
-    nativeToScVal(0n, { type: 'i128' }),
-    nativeToScVal(I128_MAX, { type: 'i128' }),
-    new Address(COMET_PROBE).toScVal(),
-  ];
-  const tx = new TransactionBuilder(new Account(COMET_PROBE, '0'), { fee: '100', networkPassphrase: Networks.PUBLIC })
-    .addOperation(new Contract(COMET_POOL).call('swap_exact_amount_in', ...args))
-    .setTimeout(30)
-    .build();
-  const sim = await server.simulateTransaction(tx);
-  if (rpc.Api.isSimulationError(sim) || !sim.result) return null;
-  return decodeCometOut(scValToNative(sim.result.retval));
+  for (const user of COMET_WITNESSES) {
+    const args = [
+      new Address(a.sellSac).toScVal(),
+      nativeToScVal(a.amountIn, { type: 'i128' }),
+      new Address(a.buySac).toScVal(),
+      nativeToScVal(0n, { type: 'i128' }),
+      nativeToScVal(I128_MAX, { type: 'i128' }),
+      new Address(user).toScVal(),
+    ];
+    const tx = new TransactionBuilder(new Account(user, '0'), { fee: '100', networkPassphrase: Networks.PUBLIC })
+      .addOperation(new Contract(COMET_POOL).call('swap_exact_amount_in', ...args))
+      .setTimeout(30)
+      .build();
+    const sim = await server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationError(sim) || !sim.result) continue;
+    return decodeCometOut(scValToNative(sim.result.retval));
+  }
+  return null;
 }
 
 // ─── Quote / build — xBull ───────────────────────────────────────────────────
@@ -557,7 +560,7 @@ export async function buildAquarius(
 }
 
 // ─── Quote / build — Comet (contrat pool backstop swap_exact_amount_in) ──────
-// Pool Soroban BLND/USDC UNIQUEMENT (CAS3FL6T…). Cotation = simulation read-only avec COMET_PROBE
+// Pool Soroban BLND/USDC UNIQUEMENT (CAS3FL6T…). Cotation = simulation read-only avec COMET_WITNESSES
 // (sortie indépendante du user). Build avec le vrai sender : prepareTransaction enforce le
 // CAVEAT DUR = le sender doit détenir du BLND LIQUIDE (souvent staké dans le backstop → message clair).
 
