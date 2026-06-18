@@ -16,12 +16,15 @@ import {
   quoteAquarius,
   aquariusPathSymbols,
   quoteComet,
+  parseUltraQuote,
+  quoteUltra,
+  reconcileLegSends,
   type ExecDeps,
   type FetchResult,
   type SoroswapClient,
 } from './execute.js';
 import { BLND, USDC, EURC } from '../core/assets.js';
-import { toNumber } from '../core/amount.js';
+import { toNumber, toStroops } from '../core/amount.js';
 
 // ─── minReceivedStroops ──────────────────────────────────────────────────────
 
@@ -663,5 +666,71 @@ describe('quoteComet', () => {
   });
   it('sortie 0 → null', async () => {
     expect(await quoteComet(depsSim(0n), BLND.sac, USDC.sac, 1n, 'r')).toBeNull();
+  });
+});
+
+describe('Ultra Stellar', () => {
+  const CANNED = {
+    optimized_sum: '46.7638929',
+    extended_paths: [
+      { percent: 90, sourceAmount: 900, destinationAmount: '42.0', path: [{ asset_type: 'credit_alphanum4', asset_code: 'AQUA', asset_issuer: 'GBNZILSTVQZ4R7IKQDGHYGY2QXL5QOFJYQMXPKWRRM5PAV7Y4M67AQUA' }] },
+      { percent: 10, sourceAmount: 100, destinationAmount: '4.7638929', path: [] },
+    ],
+  };
+
+  it('parseUltraQuote → net + jambes en stroops, path conservé', () => {
+    const r = parseUltraQuote(CANNED)!;
+    expect(r.netOut).toBe(toStroops('46.7638929'));
+    expect(r.legs).toHaveLength(2);
+    expect(r.legs[0]!.sendStroops).toBe(toStroops(900));
+    expect(r.legs[0]!.destStroops).toBe(toStroops('42.0'));
+    expect(r.legs[0]!.path).toHaveLength(1);
+    expect(r.legs[1]!.path).toHaveLength(0); // jambe directe
+  });
+
+  it('parseUltraQuote → null si aucune jambe valide', () => {
+    expect(parseUltraQuote({ extended_paths: [] })).toBeNull();
+    expect(parseUltraQuote({})).toBeNull();
+    // jambes nulles (arrondies à 0) → droppées → aucune jambe valide → null
+    expect(parseUltraQuote({ optimized_sum: '46', extended_paths: [{ sourceAmount: 0, destinationAmount: 0 }] })).toBeNull();
+  });
+
+  it('parseUltraQuote → net = Σ jambes RETENUES (ignore optimized_sum, anti-inflation si jambe droppée)', () => {
+    // optimized_sum prétend 99 mais une jambe est malformée (non parseable) → droppée.
+    // Le net doit refléter la SEULE jambe retenue (10), pas le total Ultra (sinon affiché > exécuté).
+    const r = parseUltraQuote({
+      optimized_sum: '99',
+      extended_paths: [
+        { sourceAmount: 200, destinationAmount: '10.0', path: [] },
+        { sourceAmount: 'pas-un-nombre', destinationAmount: '89.0', path: [] },
+      ],
+    })!;
+    expect(r.legs).toHaveLength(1);
+    expect(r.netOut).toBe(toStroops('10.0'));
+  });
+
+  it('quoteUltra → parse via fetchJson injecté', async () => {
+    const deps = { fetchJson: async () => ({ status: 200, ok: true, body: CANNED }) } as unknown as Parameters<typeof quoteUltra>[3];
+    const q = (await quoteUltra(BLND, USDC, toStroops(1000), deps))!;
+    expect(q.venue).toBe('ultrastellar');
+    expect(q.netOut).toBe(toStroops('46.7638929'));
+    expect(q.legs).toHaveLength(2);
+  });
+
+  it('quoteUltra → null si fetch !ok', async () => {
+    const deps = { fetchJson: async () => ({ status: 502, ok: false, body: {} }) } as unknown as Parameters<typeof quoteUltra>[3];
+    expect(await quoteUltra(BLND, USDC, toStroops(1000), deps)).toBeNull();
+  });
+
+  it('reconcileLegSends → résidu positif ajouté à la plus grande jambe, Σ == total', () => {
+    const out = reconcileLegSends([toStroops(900), toStroops(99)], toStroops(1000));
+    expect(out.reduce((a, b) => a + b, 0n)).toBe(toStroops(1000));
+    expect(out[0]).toBe(toStroops(900) + toStroops(1)); // +1 BLND résiduel sur la plus grande
+    expect(out[1]).toBe(toStroops(99));
+  });
+
+  it('reconcileLegSends → résidu nul = passthrough', () => {
+    const sends = [toStroops(400), toStroops(600)];
+    expect(reconcileLegSends(sends, toStroops(1000))).toEqual(sends);
   });
 });

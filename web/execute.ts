@@ -1,14 +1,14 @@
 // Orchestrateur d'exécution : BLND → USDC/EURC via xBull, Soroswap, Horizon ou Aquarius.
 // Money-path : bigint stroops partout, jamais de float pour les calculs.
 import { BLND, USDC, EURC, bySac, classicColon, type Asset } from '../core/assets.js';
-import { toNumber, fromStroops } from '../core/amount.js';
+import { toNumber, fromStroops, toStroops } from '../core/amount.js';
 import { stroopsOrNull, bigintOrNull } from '../core/sources/util.js';
 import { COMET_POOL, COMET_PROBE, decodeCometOut } from '../core/sources/comet.js';
 import { parseBlndBalance } from '../core/balance.js';
 import { SoroswapSDK, SupportedNetworks, SupportedProtocols, TradeType } from '@soroswap/sdk';
 
 /** Venues d'exécution branchées. Ajouter une venue = étendre cette union (et son cas de build/submit). */
-export type Venue = 'xbull' | 'soroswap' | 'horizon' | 'aquarius' | 'comet';
+export type Venue = 'xbull' | 'soroswap' | 'horizon' | 'aquarius' | 'comet' | 'ultrastellar';
 
 // ─── User-Agent commun (xBull bloque l'UA Node par défaut) ──────────────────
 const XBULL_UA = 'Mozilla/5.0 (compatible; stellar-swap/0.1; +exec)';
@@ -616,6 +616,128 @@ export async function buildComet(
   }
 }
 
+// ─── Quote / build / submit — Ultra Stellar (split SDEX multi-op classique) ──
+// Ultra ne rend PAS de build : on construit nous-mêmes N PathPaymentStrictSend (1 par jambe du split
+// extended_paths[]) dans UNE tx classique atomique (1 signature). SDEX only (pas de liquidité Soroban)
+// → perd quasi toujours la sélection compétitive ; venue de complétude (click-to-select). Les actifs
+// intermédiaires (AQUA/yXLM/…) n'exigent PAS de trustline (path payment) ; seule la sortie en exige une.
+// Submit = identique à Horizon (tx classique).
+
+const ULTRA_ROUTING = 'https://routing.ultrastellar.com/.netlify/functions/v1/smart-routing';
+
+export interface UltraLeg {
+  sendStroops: bigint;       // sourceAmount (BLND) en stroops
+  destStroops: bigint;       // destinationAmount (cible) en stroops
+  path: HorizonPathRecord[]; // intermédiaires (réutilise le type Horizon)
+}
+
+function ultraAssetParam(a: Asset): string {
+  return a.native ? 'native' : classicColon(a);
+}
+
+/** Parse la réponse smart-routing → jambes + net. null si aucune jambe valide. */
+export function parseUltraQuote(raw: unknown): { netOut: bigint; legs: UltraLeg[] } | null {
+  const j = raw as { optimized_sum?: string | number; extended_paths?: Array<{ sourceAmount?: string | number; destinationAmount?: string | number; path?: HorizonPathRecord[] }> } | null;
+  const legs: UltraLeg[] = [];
+  for (const p of j?.extended_paths ?? []) {
+    try {
+      const sendStroops = toStroops(p?.sourceAmount ?? '');
+      const destStroops = toStroops(p?.destinationAmount ?? '');
+      if (sendStroops > 0n && destStroops > 0n) {
+        legs.push({ sendStroops, destStroops, path: Array.isArray(p?.path) ? p.path : [] });
+      }
+    } catch { /* jambe malformée → ignorée */ }
+  }
+  if (legs.length === 0) return null;
+  // net = Σ des sorties par jambe RETENUE (≡ optimized_sum quand rien n'est droppé, vérifié live).
+  // On ne lit PAS optimized_sum : si une jambe est ignorée (malformée / arrondie à 0), le net affiché
+  // doit refléter ce qu'on construit réellement — sinon net inflaté vs exécuté = « mensonge » non signalé.
+  const netOut = legs.reduce((s, l) => s + l.destStroops, 0n);
+  return { netOut, legs };
+}
+
+/** Re-cote live via Ultra smart-routing (param 'fee' OMIS volontairement : fee=0 rejeté = la brute). */
+export async function quoteUltra(
+  sell: Asset,
+  buy: Asset,
+  fromAmount: bigint,
+  deps: ExecDeps,
+): Promise<{ venue: 'ultrastellar'; netOut: bigint; legs: UltraLeg[] } | null> {
+  const sp = new URLSearchParams({
+    source: ultraAssetParam(sell),
+    destination: ultraAssetParam(buy),
+    amount: fromStroops(fromAmount),
+    type: 'send',
+  });
+  const res = await deps.fetchJson(`${ULTRA_ROUTING}?${sp.toString()}`);
+  if (!res.ok) return null;
+  const parsed = parseUltraQuote(res.body);
+  if (!parsed) return null;
+  return { venue: 'ultrastellar', netOut: parsed.netOut, legs: parsed.legs };
+}
+
+/** Ajuste les jambes pour que Σ sendStroops == total exact (résidu → plus grande jambe).
+ *  Garde-fou money-path : la conversion float→stroops peut dériver ; on n'envoie jamais un total ≠ l'input. */
+export function reconcileLegSends(sends: bigint[], total: bigint): bigint[] {
+  if (sends.length === 0) return sends;
+  const sum = sends.reduce((a, b) => a + b, 0n);
+  const residual = total - sum;
+  if (residual === 0n) return sends.slice();
+  let maxI = 0;
+  for (let i = 1; i < sends.length; i++) if (sends[i]! > sends[maxI]!) maxI = i;
+  const out = sends.slice();
+  out[maxI] = out[maxI]! + residual;
+  if (out[maxI]! <= 0n) throw new ExecError('no-route', 'jambe Ultra négative après réconciliation');
+  return out;
+}
+
+/** Construit la tx classique multi-op (N PathPaymentStrictSend). Pré-flight trustline de sortie
+ *  (tx classique non simulable, comme Horizon). destMin par jambe = floor slippage de leg.destStroops. */
+export async function buildUltra(
+  sender: string,
+  sell: Asset,
+  buy: Asset,
+  legs: UltraLeg[],
+  fromAmount: bigint,
+  slippageBps: number,
+  horizonUrl?: string,
+): Promise<{ xdr: string }> {
+  const sdk = await import('@stellar/stellar-sdk');
+  const { Horizon, TransactionBuilder, Operation, Asset: SdkAsset, Networks, BASE_FEE } = sdk;
+  const server = new Horizon.Server((horizonUrl || HORIZON_BASE_DEFAULT).replace(/\/$/, ''));
+
+  let account: Awaited<ReturnType<typeof server.loadAccount>>;
+  try {
+    account = await server.loadAccount(sender);
+  } catch {
+    throw new ExecError('funds', `compte ${sender} introuvable ou non financé`);
+  }
+  if (!buy.native && !account.balances.some(
+    (b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer,
+  )) {
+    throw new ExecError('trustline', `trustline ${buy.code} absente sur ${sender}`);
+  }
+
+  const sends = reconcileLegSends(legs.map((l) => l.sendStroops), fromAmount);
+  const toSdk = (a: Asset) => (a.native ? SdkAsset.native() : new SdkAsset(a.code, a.issuer as string));
+  const pathAssets = (recs: HorizonPathRecord[]) =>
+    recs.map((r) => (r.asset_type === 'native' ? SdkAsset.native() : new SdkAsset(r.asset_code as string, r.asset_issuer as string)));
+
+  const builder = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: Networks.PUBLIC });
+  legs.forEach((leg, i) => {
+    builder.addOperation(Operation.pathPaymentStrictSend({
+      sendAsset: toSdk(sell),
+      sendAmount: fromStroops(sends[i]!),
+      destination: sender,
+      destAsset: toSdk(buy),
+      destMin: fromStroops(minReceivedStroops(leg.destStroops, slippageBps)),
+      path: pathAssets(leg.path),
+    }));
+  });
+  const tx = builder.setTimeout(180).build();
+  return { xdr: tx.toXDR() };
+}
+
 // ─── Orchestrateur principal ─────────────────────────────────────────────────
 
 export async function pickExecutableVenue(
@@ -635,7 +757,7 @@ export async function pickExecutableVenue(
 
   // 1. Re-quote live en parallèle (tolérant : échec → null).
   const soroClient = cfg.soroswapApiKey ? deps.makeSoroswap(cfg.soroswapApiKey) : null;
-  const [xbullQ, soroQ, horizonQ, aquariusQ, cometQ] = await Promise.all([
+  const [xbullQ, soroQ, horizonQ, aquariusQ, cometQ, ultraQ] = await Promise.all([
     quoteXbull(sellSac, buySac, amountStroops, deps),
     soroClient
       ? quoteSoroswap(soroClient, sellSac, buySac, amountStroops, slippageBps)
@@ -644,6 +766,7 @@ export async function pickExecutableVenue(
     quoteAquarius(sellSac, buySac, amountStroops, deps),
     // Comet = pool BLND/USDC uniquement : pas de cotation pour EURC.
     target === 'USDC' ? quoteComet(deps, sellSac, buySac, amountStroops, cfg.rpcUrl) : Promise.resolve(null),
+    quoteUltra(BLND, buyAsset, amountStroops, deps),
   ]);
 
   // 2. Trier les candidats non-null par netOut décroissant.
@@ -652,7 +775,8 @@ export async function pickExecutableVenue(
     | { venue: 'soroswap'; netOut: bigint; minOut: bigint; soroPath?: string[]; quote: unknown }
     | { venue: 'horizon'; netOut: bigint; path: HorizonPathRecord[] }
     | { venue: 'aquarius'; netOut: bigint; swapChainXdr: string; tokens: string[] }
-    | { venue: 'comet'; netOut: bigint };
+    | { venue: 'comet'; netOut: bigint }
+    | { venue: 'ultrastellar'; netOut: bigint; legs: UltraLeg[] };
 
   let candidates: Candidate[] = [];
   if (xbullQ) candidates.push(xbullQ);
@@ -660,6 +784,7 @@ export async function pickExecutableVenue(
   if (horizonQ) candidates.push(horizonQ);
   if (aquariusQ) candidates.push(aquariusQ);
   if (cometQ) candidates.push(cometQ);
+  if (ultraQ) candidates.push(ultraQ);
   candidates.sort((a, b) => (a.netOut < b.netOut ? 1 : a.netOut > b.netOut ? -1 : 0));
 
   if (candidates.length === 0) {
@@ -763,6 +888,27 @@ export async function pickExecutableVenue(
         if (e instanceof ExecError) errors.push(e);
         continue;
       }
+    } else if (cand.venue === 'ultrastellar') {
+      try {
+        const built = await buildUltra(sender, BLND, buyAsset, cand.legs, amountStroops, slippageBps, cfg.horizonUrl);
+        const outMin = cand.legs.reduce((s, l) => s + minReceivedStroops(l.destStroops, slippageBps), 0n);
+        const route = `BLND → ${target} · split SDEX ×${cand.legs.length}`;
+        const review = reviewData({
+          venue: 'ultrastellar',
+          target,
+          type: 'swap',
+          sendStroops: amountStroops,
+          netStroops: cand.netOut,
+          minReceivedStroops: outMin,
+          slippageBps,
+          route,
+          displayed,
+        });
+        return { venue: 'ultrastellar', xdr: built.xdr, type: 'swap', review };
+      } catch (e) {
+        if (e instanceof ExecError) errors.push(e);
+        continue;
+      }
     } else {
       // soroswap
       if (!soroClient) continue;
@@ -821,7 +967,7 @@ export async function submit(
       throw new ExecError('down', msg);
     }
     return { hash: body['hash'] as string };
-  } else if (venue === 'horizon') {
+  } else if (venue === 'horizon' || venue === 'ultrastellar') {
     // tx classique → soumission Horizon (gère l'encodage form + extraction d'erreur).
     const sdk = await import('@stellar/stellar-sdk');
     const { Horizon, TransactionBuilder, Networks } = sdk;
