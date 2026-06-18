@@ -1352,14 +1352,16 @@ function startCountdownTick() {
 
 // ─── Actions utilisateur ──────────────────────────────────────────────────────
 function setTarget(t2) {
+  if (t2 === target) return;
+  const y = window.scrollY; // rester au même endroit (cf. thème/langue) : on garde overview pour ne pas réduire la page
   target = t2;
   simResult = null;
   selectedSource = null;
-  overview = null;
   refreshMsg = '';
   history.replaceState(null, '', '?pair=' + target);
   renderApp();
-  void loadOverview();
+  window.scrollTo(0, y);
+  void loadOverview().then(() => window.scrollTo(0, y));
 }
 
 function setSonde(n) {
