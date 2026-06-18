@@ -104,9 +104,9 @@ function buildTestDb(): void {
     ],
   );
 
-  // Tick MANUEL (note='manual') : refresh ponctuel → EXCLU des stats de stabilité.
-  // Toutes les sources répondent ici, dont soroswap : s'il était compté, l'uptime soroswap
-  // passerait de 2/3 à 3/4 et totalTicks de 3 à 4. Les assertions ci-dessous le verrouillent.
+  // Tick MANUEL (note='manual') : refresh ponctuel — désormais INCLUS dans les stats de stabilité.
+  // Toutes les sources répondent ici, dont soroswap : en le comptant, l'uptime soroswap
+  // passe de 2/3 à 3/4 et totalTicks de 3 à 4. Les assertions ci-dessous le vérifient.
   db.insertTickWithQuotes(
     mkTick({ started_at: '2025-05-31T18:00:00Z', note: 'manual', source_errors: null }),
     [
@@ -146,8 +146,8 @@ afterAll(() => {
 
 describe('buildSourceHealth — totalTicks', () => {
   it('ok=0 ticks exclus du dénominateur', () => {
-    // Ticks ok=1 dans la fenêtre : tick1, tick2, tick4 = 3 (tick3 ok=0, tick_hors_fenêtre ignoré)
-    expect(result.totalTicks).toBe(3);
+    // Ticks ok=1 dans la fenêtre : tick1, tick2, tick4, tick_manuel = 4 (tick3 ok=0, tick_hors_fenêtre ignoré)
+    expect(result.totalTicks).toBe(4);
   });
 
   it('windowDays = 7', () => {
@@ -173,21 +173,21 @@ describe('buildSourceHealth — sources', () => {
     expect(xbull!.failedTicks).toBe(0);
   });
 
-  it('soroswap : 1 échec sur 3 ticks ok → uptime < 100%', () => {
+  it('soroswap : 1 échec sur 4 ticks ok → uptime < 100%', () => {
     const soroswap = result.sources.find(s => s.id === 'soroswap');
     expect(soroswap).toBeDefined();
     expect(soroswap!.failedTicks).toBe(1);
     expect(soroswap!.uptimePct).toBeLessThan(100);
-    // 1 - 1/3 = 66.7%
-    expect(soroswap!.uptimePct).toBeCloseTo(66.7, 0);
+    // responded=3 sur totalTicks=4 : 3/4 = 75%
+    expect(soroswap!.uptimePct).toBeCloseTo(75, 0);
   });
 
-  it('relevés manuels (note=manual) exclus du calcul de stabilité', () => {
-    // Le seed contient un tick note='manual' (2025-05-31T18:00) où soroswap répond.
-    // S'il était compté : totalTicks=4 et soroswap=3/4=75%. L'exclusion le garde à 3 et 66.7%.
-    expect(result.totalTicks).toBe(3);
+  it('relevés manuels (note=manual) inclus dans le calcul de stabilité', () => {
+    // Le seed contient un tick note='manual' (2025-05-31T18:00) où toutes les sources répondent.
+    // Depuis l'inclusion des manuels : totalTicks=4 et soroswap=3/4=75%.
+    expect(result.totalTicks).toBe(4);
     const soroswap = result.sources.find(s => s.id === 'soroswap');
-    expect(soroswap!.uptimePct).toBeCloseTo(66.7, 0);
+    expect(soroswap!.uptimePct).toBeCloseTo(75, 0);
   });
 
   it('comet pairNote = "USDC uniquement"', () => {

@@ -32,10 +32,13 @@ export interface LiveLadderRow {
   executable: boolean;
 }
 
+/** Normalise les symboles d'actifs : 'native' → 'XLM', tout le reste inchangé. */
+const sym = (s: string): string => s === 'native' ? 'XLM' : s;
+
 /** Route lisible depuis les hops d'une cotation : "BLND→XLM→USDC" (ou "BLND→<cible>" si pas de hop). */
 function routeStr(hops: RouteHop[], sell: string, buy: string): string {
-  if (hops.length === 0) return `${sell} → ${buy}`;
-  return [hops[0]!.sell, ...hops.map((h) => h.buy)].join(' → ');
+  if (hops.length === 0) return `${sym(sell)} → ${sym(buy)}`;
+  return [hops[0]!.sell, ...hops.map((h) => h.buy)].map(sym).join(' → ');
 }
 
 export interface LiveQuote {
@@ -101,15 +104,17 @@ function buildRoute(hops: RouteHop[], amountIn: bigint, netOut: bigint, pairUi: 
   }
 
   // Premier asset (BLND) avec quantité
-  parts.push({ asset: hops[0]?.sell ?? 'BLND', qty: `${amtStr} BLND` });
+  const firstSell = sym(hops[0]?.sell ?? 'BLND');
+  parts.push({ asset: firstSell, qty: `${amtStr} ${firstSell}` });
 
   for (const hop of hops) {
     parts.push({ tool: prettyVenue(hop.venue) });
     // Asset de sortie du hop — si c'est le dernier hop, marquer out
     const isLast = hop === hops[hops.length - 1];
+    const buySymbol = sym(hop.buy);
     parts.push({
-      asset: hop.buy,
-      qty: isLast ? `${netStr} ${hop.buy}` : undefined,
+      asset: buySymbol,
+      qty: isLast ? `${netStr} ${buySymbol}` : undefined,
       out: isLast,
     });
   }
