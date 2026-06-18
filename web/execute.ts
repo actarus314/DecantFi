@@ -296,6 +296,48 @@ export async function simulateAquariusNet(
   return null;
 }
 
+/** Simule xBull via accept-quote (minToGet='0') pour obtenir le vrai fill net (sans le skim de 0,1 %).
+ *  Réutilise AQUARIUS_WITNESSES : comptes témoins communs (BLND + USDC + EURC trustlines, grands soldes).
+ *  null si tous les témoins échouent ou si le XDR n'est pas simulable. */
+export async function simulateXbullNet(
+  route: string,
+  amountIn: bigint,
+  cfg: { rpcUrl: string },
+): Promise<bigint | null> {
+  for (const witness of AQUARIUS_WITNESSES) {
+    let xdr: string;
+    try {
+      const res = await fetch(`${XBULL_BASE}/swaps/accept-quote`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': XBULL_UA,
+        },
+        body: JSON.stringify({ sender: witness, recipient: witness, fromAmount: amountIn.toString(), minToGet: '0', route }),
+      });
+      if (!res.ok) continue;
+      const body = (await res.json()) as Record<string, unknown>;
+      if (typeof body['xdr'] !== 'string') continue;
+      xdr = body['xdr'];
+    } catch {
+      continue;
+    }
+    try {
+      const sdk = await import('@stellar/stellar-sdk');
+      const { rpc, TransactionBuilder, Networks, scValToNative } = sdk;
+      const server = new rpc.Server((cfg.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
+      const tx = TransactionBuilder.fromXDR(xdr, Networks.PUBLIC);
+      const sim = await server.simulateTransaction(tx);
+      if (rpc.Api.isSimulationError(sim) || !sim.result) continue;
+      const rv = scValToNative(sim.result.retval);
+      if (Array.isArray(rv) && rv.length >= 2) return BigInt(rv[1]);
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 // ─── Quote / build — xBull ───────────────────────────────────────────────────
 
 export async function quoteXbull(
@@ -925,7 +967,10 @@ export async function pickExecutableVenue(
   for (const cand of candidates) {
     if (cand.venue === 'xbull') {
       try {
-        const minToGet = minReceivedStroops(cand.netOut, slippageBps);
+        // Utilise le vrai fill simulé pour le plancher (skim xBull ~0,1 % non divulgué).
+        // Si la sim échoue → fallback sur cand.netOut (plancher conservateur).
+        const realNet = (await simulateXbullNet(cand.route, amountStroops, { rpcUrl: cfg.rpcUrl })) ?? cand.netOut;
+        const minToGet = minReceivedStroops(realNet, slippageBps);
         const built = await buildXbull(cand.route, sender, amountStroops, minToGet, deps);
         const route = routeLabel('xbull', target);
         const review = reviewData({
@@ -933,7 +978,7 @@ export async function pickExecutableVenue(
           target,
           type: built.type,
           sendStroops: amountStroops,
-          netStroops: cand.netOut,
+          netStroops: realNet,
           minReceivedStroops: minToGet,
           slippageBps,
           route,

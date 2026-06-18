@@ -2,7 +2,7 @@
 // ponytail: Number = affichage, jamais règlement.
 import { quote as engineQuote } from '../core/engine.js';
 import { rankQuotes } from '../core/rank.js';
-import { simulateAquariusNet } from './execute.js';
+import { simulateAquariusNet, simulateXbullNet } from './execute.js';
 import { readBlndBalance } from '../core/balance.js';
 import { BLND, USDC, EURC } from '../core/assets.js';
 import { toStroops, toNumber } from '../core/amount.js';
@@ -130,7 +130,7 @@ export async function liveQuote(
   pairUi: string,
   amountStroops: bigint,
   cfg: WebConfig,
-  deps?: { simulateAquariusNet?: typeof simulateAquariusNet },
+  deps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet },
 ): Promise<LiveQuote> {
   const buyAsset = pairUi === 'EURC' ? EURC : USDC;
 
@@ -150,40 +150,59 @@ export async function liveQuote(
     },
   });
 
-  // ─── Re-simulation Aquarius : remplace le net find-path (sur-coté) par le vrai net simulé ───
-  // Aquarius find-path sur-cote ~0,2 % sur les routes via-XLM → fait gagner Aquarius à tort.
-  // On simule swap_chained avec out_min=0 pour récupérer le vrai fill sans revert de slippage.
+  // ─── Re-simulation Aquarius + xBull : remplace les nets sur-cotés par les vrais fills simulés ───
+  // Aquarius find-path sur-cote ~0,2 % sur les routes via-XLM.
+  // xBull /swaps/quote sur-cote ~0,1 % (skim routeur non divulgué).
+  // On simule avec out_min=0 / minToGet='0' → vrai fill sans revert de slippage.
   let aquariusSimNet: bigint | undefined;
+  let xbullSimNet: bigint | undefined;
   {
-    const simFn = deps?.simulateAquariusNet ?? simulateAquariusNet;
+    const simFnAq = deps?.simulateAquariusNet ?? simulateAquariusNet;
+    const simFnXb = deps?.simulateXbullNet ?? simulateXbullNet;
+
     const aqRanked = result.ranking.ranked.find((q) => q.source === 'aquarius');
     const rawXdr = (aqRanked?.raw as { swap_chain_xdr?: unknown } | undefined)?.swap_chain_xdr;
     if (aqRanked && rawXdr) {
-      const simNet = await simFn(String(rawXdr), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null);
-      if (simNet !== null && simNet > 0n && simNet !== aqRanked.netOut) {
-        const newQuotes = result.ranking.ranked.map((q) =>
-          q.source === 'aquarius' ? { ...q, netOut: simNet, grossOut: simNet } : q,
-        );
-        result.ranking = rankQuotes(newQuotes);
-        aquariusSimNet = simNet;
-      }
+      const simNet = await simFnAq(String(rawXdr), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null);
+      if (simNet !== null && simNet > 0n && simNet !== aqRanked.netOut) aquariusSimNet = simNet;
     }
-    // EURC direct via Aquarius : mettre à jour netOut et recalculer winner/bestNetEurc
-    if (pairUi === 'EURC' && result.eurc?.direct?.source === 'aquarius' && aquariusSimNet !== undefined) {
-      const eurc = result.eurc;
-      const simNet = aquariusSimNet;
-      const prevDirect = eurc.direct!;
-      eurc.direct = { ...prevDirect, netOut: simNet, grossOut: simNet };
-      const directNet = simNet;
-      const viaNet = eurc.viaUsdc?.netEurc;
-      if (viaNet !== undefined) {
-        eurc.winner = viaNet > directNet ? 'via-usdc' : 'direct';
-        eurc.bestNetEurc = eurc.winner === 'via-usdc' ? viaNet : directNet;
-        eurc.viaUsdcAdvantage = viaNet - directNet;
-      } else {
-        eurc.winner = 'direct';
-        eurc.bestNetEurc = directNet;
-        eurc.viaUsdcAdvantage = undefined;
+
+    const xbRanked = result.ranking.ranked.find((q) => q.source === 'xbull');
+    const route = (xbRanked?.raw as { route?: unknown } | undefined)?.route;
+    if (xbRanked && route) {
+      const simNet = await simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null);
+      if (simNet !== null && simNet > 0n && simNet !== xbRanked.netOut) xbullSimNet = simNet;
+    }
+
+    if (aquariusSimNet !== undefined || xbullSimNet !== undefined) {
+      const newQuotes = result.ranking.ranked.map((q) => {
+        if (q.source === 'aquarius' && aquariusSimNet !== undefined)
+          return { ...q, netOut: aquariusSimNet, grossOut: aquariusSimNet };
+        if (q.source === 'xbull' && xbullSimNet !== undefined)
+          return { ...q, netOut: xbullSimNet, grossOut: xbullSimNet };
+        return q;
+      });
+      result.ranking = rankQuotes(newQuotes);
+    }
+
+    // EURC direct via Aquarius ou xBull : mettre à jour netOut et recalculer winner/bestNetEurc
+    if (pairUi === 'EURC' && result.eurc?.direct) {
+      const directSrc = result.eurc.direct.source;
+      const simNet = directSrc === 'aquarius' ? aquariusSimNet : directSrc === 'xbull' ? xbullSimNet : undefined;
+      if (simNet !== undefined) {
+        const eurc = result.eurc;
+        eurc.direct = { ...eurc.direct!, netOut: simNet, grossOut: simNet };
+        const directNet = simNet;
+        const viaNet = eurc.viaUsdc?.netEurc;
+        if (viaNet !== undefined) {
+          eurc.winner = viaNet > directNet ? 'via-usdc' : 'direct';
+          eurc.bestNetEurc = eurc.winner === 'via-usdc' ? viaNet : directNet;
+          eurc.viaUsdcAdvantage = viaNet - directNet;
+        } else {
+          eurc.winner = 'direct';
+          eurc.bestNetEurc = directNet;
+          eurc.viaUsdcAdvantage = undefined;
+        }
       }
     }
   }
