@@ -23,7 +23,7 @@ body{margin:0; background:var(--bg); color:var(--val);
   font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; -webkit-font-smoothing:antialiased;}
 .page{max-width:1180px; margin:0 auto; padding:1.1rem 1.25rem 5rem;}
 
-.topbar{display:flex; align-items:center; gap:.7rem; margin-bottom:1rem; flex-wrap:wrap;}
+.topbar{display:flex; align-items:center; gap:.7rem; margin-bottom:1rem; flex-wrap:wrap; position:sticky; top:0; z-index:50; background:var(--bg); border-bottom:1px solid var(--card-border); padding:.55rem 0;}
 .brand{font-size:15px; font-weight:700; letter-spacing:-.01em;}
 .brand .dim{color:var(--caption); font-weight:600;}
 .brand-logo{border-radius:5px; display:block; flex:none; margin-right:-.3rem;}
@@ -1226,6 +1226,10 @@ function buildPage() {
   <div class="topbar">
     <img class="brand-logo" src="/favicon.svg" width="22" height="22" alt="">
     <span class="brand">stellarswap <span class="dim">· ${t('brand_dim')}</span></span>
+    ${view === 'dashboard' ? `<span class="pagenav" style="margin-left:.3rem">
+      <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
+      <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
+    </span>` : ''}
     ${freshHtml}
     ${refreshHtml()}
     <span class="topbar-right">
@@ -1253,10 +1257,7 @@ function buildPage() {
   return `${topbarHtml}
 
   <div class="zone-group">
-    <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}<span class="pagenav" style="margin-left:auto">
-        <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
-        <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
-      </span></div>${simCard()}</div>
+    <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}</div>${simCard()}</div>
 
     <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
       <div class="ladder-wrap${simLoading || refreshing ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading || refreshing ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${simLoading ? t('sim_loading') : t('refresh_loading')}</div>` : ''}</div>
