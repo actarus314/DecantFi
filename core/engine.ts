@@ -34,21 +34,16 @@ export interface QuoteResult {
   errorReasons?: Record<string, string>;
 }
 
-function clampSub(a: Stroops, b: Stroops): Stroops {
-  const r = a - b;
-  return r < 0n ? 0n : r;
-}
-
-/** Convertit le gas dans la cible, recalcule netOut et l'impact vs spot (uniforme entre sources). */
+/** net = BRUT (montant cible reçu). Le gas Soroban se paie en XLM, à PART — variable par tx,
+ *  affiché séparément par le wallet/explorer → on ne le déduit PLUS du net cible (alignement
+ *  wallet/explorer). gasInTarget reste calculé à titre INFORMATIF (estimation, non déduite ;
+ *  le CLI l'affiche en colonne séparée). L'impact vs spot est calculé sur le brut. */
 export function finalize(q: NormalizedQuote, prices: Prices): NormalizedQuote {
   const tUsd = targetUsdPerUnit(q.buyAsset.symbol, prices);
   const gasInTarget = convertXlmToTarget(q.gasXlm, prices.xlmUsd, tUsd);
-  const netOut = clampSub(q.grossOut, gasInTarget);
+  const netOut = q.grossOut;
   const impact = priceImpactPct(q.amountIn, netOut, prices.blndUsd, tUsd);
-  const netRange = q.netRange
-    ? { low: clampSub(q.netRange.low, gasInTarget), high: clampSub(q.netRange.high, gasInTarget) }
-    : undefined;
-  return { ...q, gasInTarget, netOut, priceImpactPct: impact ?? q.priceImpactPct, netRange };
+  return { ...q, gasInTarget, netOut, priceImpactPct: impact ?? q.priceImpactPct, netRange: q.netRange };
 }
 
 export async function quoteAll(
