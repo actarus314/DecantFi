@@ -60,9 +60,9 @@ describe('readAssetBalance', () => {
     });
     expect(bal).toBe(42);
   });
-  it('Horizon indisponible (null) → 0', async () => {
+  it('Horizon indisponible (null) → null (≠ 0 = trustline absente : pas de delta faux post-swap)', async () => {
     const bal = await readAssetBalance('GC43...', USDC, { horizonUrl: 'h', getJson: async () => null });
-    expect(bal).toBe(0);
+    expect(bal).toBeNull();
   });
 });
 
