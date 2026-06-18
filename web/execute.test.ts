@@ -139,6 +139,7 @@ describe('reviewData', () => {
     minReceivedStroops: 4_9750000n,
     slippageBps: 50,
     route: 'BLND → ☁ → USDC',
+    gasFeeXlm: 0,
   };
 
   it('minReceived affiché correctement', () => {

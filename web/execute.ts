@@ -110,8 +110,20 @@ export interface ReviewData {
   minReceived: number;
   slippageBps: number;
   route: string;
+  /** Frais réseau estimés (fee du XDR en XLM). Plafond affiché par le wallet ; la part non utilisée est remboursée. */
+  gasFeeXlm: number;
   /** Présent seulement si le net affiché au meta-agrégateur était supérieur à ce qu'on exécute. */
   fidelity?: { displayedWinner: string; displayedWinnerNet: number };
+}
+
+/** Parse le fee du XDR assemblé et le convertit en XLM. Retourne 0 si le XDR est invalide. */
+export async function xdrFeeXlm(xdr: string): Promise<number> {
+  try {
+    const { TransactionBuilder, Networks } = await import('@stellar/stellar-sdk');
+    return Number(TransactionBuilder.fromXDR(xdr, Networks.PUBLIC).fee) / 1e7;
+  } catch {
+    return 0;
+  }
 }
 
 export function reviewData(args: {
@@ -123,6 +135,7 @@ export function reviewData(args: {
   minReceivedStroops: bigint;
   slippageBps: number;
   route: string;
+  gasFeeXlm: number;
   displayed?: { winner?: string; net?: number };
 }): ReviewData {
   const r: ReviewData = {
@@ -134,6 +147,7 @@ export function reviewData(args: {
     minReceived: toNumber(args.minReceivedStroops),
     slippageBps: args.slippageBps,
     route: args.route,
+    gasFeeXlm: args.gasFeeXlm,
   };
 
   // Fidelity : écart entre ce qui était affiché et ce qu'on exécute réellement.
@@ -923,6 +937,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: minToGet,
           slippageBps,
           route,
+          gasFeeXlm: await xdrFeeXlm(built.xdr),
           displayed,
         });
         return { venue: 'xbull', xdr: built.xdr, id: built.id, type: built.type, review };
@@ -944,6 +959,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: destMin,
           slippageBps,
           route,
+          gasFeeXlm: await xdrFeeXlm(built.xdr),
           displayed,
         });
         return { venue: 'horizon', xdr: built.xdr, type: 'swap', review };
@@ -966,6 +982,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: outMin,
           slippageBps,
           route,
+          gasFeeXlm: await xdrFeeXlm(built.xdr),
           displayed,
         });
         return { venue: 'aquarius', xdr: built.xdr, type: 'swap', review };
@@ -987,6 +1004,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: outMin,
           slippageBps,
           route,
+          gasFeeXlm: await xdrFeeXlm(built.xdr),
           displayed,
         });
         return { venue: 'comet', xdr: built.xdr, type: 'swap', review };
@@ -1008,6 +1026,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: outMin,
           slippageBps,
           route,
+          gasFeeXlm: await xdrFeeXlm(built.xdr),
           displayed,
         });
         return { venue: 'ultrastellar', xdr: built.xdr, type: 'swap', review };
@@ -1030,6 +1049,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: cand.minOut,
           slippageBps,
           route,
+          gasFeeXlm: await xdrFeeXlm(built.xdr),
           displayed,
         });
         return { venue: 'soroswap', xdr: built.xdr, type: 'swap', review };

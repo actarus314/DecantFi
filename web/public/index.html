@@ -410,6 +410,8 @@ const STRINGS = {
     review_route: 'Route',
     review_slippage: 'Tolérance slippage',
     review_fidelity: (winner, net) => `Le meilleur affiché était ${winner} (net ${net}) — non exécutable en 1 clic ; on exécute la meilleure route exécutable.`,
+    review_network_fee: 'Frais réseau (max)',
+    review_network_fee_note: 'Plafond affiché par le wallet ; la part de loyer (rent) non consommée est remboursée.',
     review_confirm: 'Confirmer & signer',
     review_cancel: 'Annuler',
 
@@ -420,7 +422,7 @@ const STRINGS = {
     exec_signing: 'Signature dans le wallet…',
     exec_signing_wallet: 'Signature dans le wallet…',
     exec_submitting: 'Soumission…',
-    exec_restore: 'Étape de restauration requise — signe-la, puis on reconstruit le swap.',
+    exec_restore: 'Étape de restauration d\'état requise (coût de stockage ponctuel) — signe-la, puis on reconstruit le swap.',
     exec_success: 'Swap soumis',
     exec_view: 'Voir sur stellar.expert ↗',
     exec_close: 'Fermer',
@@ -622,6 +624,8 @@ const STRINGS = {
     review_route: 'Route',
     review_slippage: 'Slippage tolerance',
     review_fidelity: (winner, net) => `The best displayed was ${winner} (net ${net}) — not executable in 1 click; we execute the best executable route.`,
+    review_network_fee: 'Network fee (max)',
+    review_network_fee_note: 'Cap shown by the wallet; unused rent is refunded.',
     review_confirm: 'Confirm & sign',
     review_cancel: 'Cancel',
 
@@ -632,7 +636,7 @@ const STRINGS = {
     exec_signing: 'Signing in wallet…',
     exec_signing_wallet: 'Signing in your wallet…',
     exec_submitting: 'Submitting…',
-    exec_restore: 'A restore step is required — sign it, then we rebuild the swap.',
+    exec_restore: 'A state restore step is required (one-time storage cost) — sign it, then we rebuild the swap.',
     exec_success: 'Swap submitted',
     exec_view: 'View on stellar.expert ↗',
     exec_close: 'Close',
@@ -1777,14 +1781,18 @@ function reviewTableHtml(rv, tgt, showSimDelta) {
       simDeltaHtml = ` <span style="color:${col};font-weight:700">${arrow}</span> <span style="color:var(--caption);font-size:11px">(${t('review_sim_was')} ${fmt3(simNet)})</span>`;
     }
   }
-  return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.8rem">
+  const feeXlm = rv.gasFeeXlm ?? 0;
+  const feeStr = feeXlm.toLocaleString('fr-FR', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
+  return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.4rem">
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} BLND</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${tgt}${simDeltaHtml}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt3(rv.minReceived)} ${tgt}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_network_fee')}</td><td style="padding:4px 0;text-align:right;color:var(--caption);font-variant-numeric:tabular-nums">${feeStr} XLM</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${vl}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
-  </table>`;
+  </table>
+  <p class="help" style="margin:0 0 .8rem;font-size:11px;color:var(--caption)">${t('review_network_fee_note')}</p>`;
 }
 
 // ─── Modal d'exécution ────────────────────────────────────────────────────────
@@ -1843,9 +1851,12 @@ function execModal() {
         const sign = d >= 0 ? '+' : '';
         deltaChip = `<div style="display:inline-flex;align-items:center;gap:.3rem;background:${col}22;color:${col};border:1px solid ${col}55;border-radius:999px;padding:.2rem .75rem;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:.5rem">${sign}${fmt3(d)} ${target} ${t('exec_delta')}</div>`;
       }
+      const doneFeeXlm = rv.gasFeeXlm ?? 0;
+      const doneFeeStr = doneFeeXlm.toLocaleString('fr-FR', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
       compBlock = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:.9rem 0 .3rem">
         <tr><td style="padding:5px 0;color:var(--caption)">${t('exec_quoted')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.netOut)} ${target}</td></tr>
         <tr><td style="padding:5px 0;color:var(--caption)">${t('review_receive_min')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.minReceived)} ${target}</td></tr>
+        <tr><td style="padding:5px 0;color:var(--caption)">${t('review_network_fee')}</td><td style="padding:5px 0;text-align:right;color:var(--caption);font-variant-numeric:tabular-nums">${doneFeeStr} XLM</td></tr>
         <tr style="border-top:1px solid var(--card-border)"><td style="padding:6px 0;color:var(--heading);font-weight:600">${t('exec_executed')}</td><td style="padding:6px 0;text-align:right">${execVal}</td></tr>
       </table>${deltaChip}`;
     }
