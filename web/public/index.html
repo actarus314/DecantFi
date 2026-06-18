@@ -139,6 +139,9 @@ body{margin:0; background:var(--bg); color:var(--val);
 .seg button{border:0; background:transparent; color:var(--caption); font-size:11px; font-weight:600; padding:3px 11px; border-radius:9999px; cursor:pointer;}
 .seg button.active{background:var(--accent); color:#fff;}
 
+/* Barre de fraîcheur simulateur (#5) */
+#simFreshBar{height:3px;border-radius:3px;transition:background-color .3s;margin-top:.5rem;}
+
 .card{border:1px solid var(--card-border); background:var(--card-bg); border-radius:.7rem; padding:.9rem 1rem;}
 
 /* Tooltip CSS — positionné en dessous pour éviter le clipping overflow de la table */
@@ -407,6 +410,9 @@ const STRINGS = {
     review_confirm: 'Confirmer & signer',
     review_cancel: 'Annuler',
 
+    // Revue sim-delta
+    review_sim_was: 'sim',
+
     // États d'exécution
     exec_signing: 'Signature dans le wallet…',
     exec_signing_wallet: 'Signature dans le wallet…',
@@ -606,6 +612,9 @@ const STRINGS = {
     review_confirm: 'Confirm & sign',
     review_cancel: 'Cancel',
 
+    // Review sim-delta
+    review_sim_was: 'sim',
+
     // Execution states
     exec_signing: 'Signing in wallet…',
     exec_signing_wallet: 'Signing in your wallet…',
@@ -734,6 +743,14 @@ function selectSource(id) {
 let nextTickAt = null;
 let countdownInterval = null;
 let lastImminentPollAt = 0;
+
+// Auto-refresh simulateur (#5)
+const AUTO_REFRESH_MS = 10000;
+let autoRefreshTimer = null;   // setInterval handle
+let autoRefreshStart = null;   // timestamp du début du cycle courant
+let autoRefreshPaused = 0;     // temps (ms) déjà écoulé quand on a mis en pause (onglet caché)
+let autoRefreshCycles = 0;     // nb de cycles auto effectués depuis la dernière sim manuelle
+let autoRefreshFrac = 0;       // fraction [0,1] pour la barre (persiste aux re-renders)
 
 function t(key, ...args) {
   const s = STRINGS[lang];
@@ -965,8 +982,10 @@ function simCard() {
     const displayRow = selRow && !selRow.winner ? selRow : null; // non-gagnant sélectionné → détail spécifique
     let route, rateStr, impactStr, minReceived;
     if (displayRow) {
-      // selRow est une ligne ladder : route est une STRING (pas des RibbonPart[])
-      route = renderRoute(displayRow.route);
+      // #7 — harmonise le rendu de la ligne non-gagnante avec le gagnant
+      route = displayRow.routeParts && displayRow.routeParts.length > 0
+        ? routeFromParts(displayRow.routeParts, true)
+        : renderRoute(displayRow.route);
       const rowRate = simAmt > 0 ? displayRow.net / simAmt : 0;
       rateStr = rowRate > 0 ? rowRate.toFixed(6) + ' ' + target + '/BLND' : '';
       impactStr = displayRow.impactPct != null ? ` · impact ${fmt(displayRow.impactPct)} %` : '';
@@ -1008,19 +1027,30 @@ function simCard() {
     }
   }
 
+  // Barre de fraîcheur (#5) : initialisée depuis la fraction courante pour survivre aux re-renders
+  const freshBarStyle = simActive && simResult ? (() => {
+    const frac = autoRefreshFrac;
+    const r = Math.round(22 + frac * (220 - 22)); // 22 → 220  (hex: #16a34a vert → #dc2626 rouge)
+    const g = Math.round(163 - frac * (163 - 38));
+    const b2 = Math.round(74 - frac * (74 - 38));
+    return `width:${(frac * 100).toFixed(1)}%;background:rgb(${r},${g},${b2})`;
+  })() : 'width:0%;background:var(--green)';
+
   return `<div class="sim">
     <div class="controls">
-      <input id="simAmt" type="text" value="${simInput}" placeholder="${t('sim_placeholder')}" oninput="onAmt(this.value)">
+      <input id="simAmt" type="text" value="${simInput}" placeholder="${t('sim_placeholder')}" oninput="onAmt(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();doSim();}">
       <span class="suffix">BLND</span>
       <button class="btn" onclick="useWallet()" ${!walletConfigured ? 'disabled' : ''}>${walletLabel}</button>
       <button class="btn primary" onclick="doSim()">${t('sim_btn_simulate')}</button>
       <button class="btn" onclick="clearSim()">${t('sim_btn_clear')}</button>
+      <span style="color:var(--card-border);margin:0 .4rem;user-select:none">—</span>
       <span style="font-size:11px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
       <input id="execSlippage" type="number" min="0" max="50" step="0.1" value="${execSlippagePct}"
         style="width:70px;font-size:13px;padding:.35rem .5rem;border-radius:.4rem;border:1px solid var(--card-border);background:var(--section-bg);color:var(--val)"
         onchange="onExecSlippage(this.value)">
       <span class="suffix">%</span>
     </div>
+    ${simActive && simResult ? `<div id="simFreshBar" style="${freshBarStyle}"></div>` : ''}
     <div id="simOut">${resultHtml}</div></div>`;
 }
 
@@ -1303,7 +1333,6 @@ function buildPage() {
       <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
     </span>` : ''}
     ${freshHtml}
-    ${refreshHtml()}
     <span class="topbar-right">
       ${walletAddress
         ? `<span style="display:inline-flex;align-items:center;gap:.35rem">
@@ -1451,6 +1480,7 @@ function clearSim() {
   simActive = false;
   simResult = null;
   selectedSource = null;
+  stopFreshBar();
   renderApp();
 }
 
@@ -1462,11 +1492,17 @@ function useWallet() {
   void doSim();
 }
 
-async function doSim() {
+async function doSim(opts) {
   if (!simActive || simAmt <= 0) return;
+  // Sim manuelle : reset compteur de cycles, désélection, (re)démarre la barre.
+  // Auto-refresh : on GARDE la source sélectionnée (sinon l'outil regardé saute au gagnant toutes les 10 s).
+  if (!opts || !opts.auto) {
+    autoRefreshCycles = 0;
+    selectedSource = null;
+    stopFreshBar(); // sera redémarré après la sim
+  }
   simLoading = true;
   simResult = null;
-  selectedSource = null;
   renderApp();
   try {
     const r = await fetch(`/api/quote?pair=${target}&amount=${simAmt}`);
@@ -1474,6 +1510,12 @@ async function doSim() {
   } catch {}
   simLoading = false;
   renderApp();
+  // Démarrer / redémarrer la barre après la sim (si elle a réussi)
+  if (simActive && simResult) {
+    startFreshBar();
+  } else {
+    stopFreshBar();
+  }
 }
 
 async function doRefresh() {
@@ -1636,6 +1678,58 @@ function cancelExecute() {
   renderApp();
 }
 
+function onModalBackdrop(e) {
+  if (e.target === e.currentTarget && execState && (execState.phase === 'done' || execState.phase === 'error')) {
+    cancelExecute();
+  }
+}
+
+// ─── Auto-refresh barre de fraîcheur simulateur (#5) ─────────────────────────
+function stopFreshBar() {
+  if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+  autoRefreshStart = null;
+  autoRefreshPaused = 0;
+  autoRefreshFrac = 0;
+}
+
+function startFreshBar() {
+  stopFreshBar(); // un seul interval, nettoie l'ancien
+  autoRefreshStart = Date.now();
+  autoRefreshFrac = 0;
+  autoRefreshTimer = setInterval(() => {
+    // Calcule l'élapsé en tenant compte des pauses
+    const elapsed = autoRefreshPaused + (autoRefreshStart ? Date.now() - autoRefreshStart : 0);
+    autoRefreshFrac = Math.min(elapsed / AUTO_REFRESH_MS, 1);
+    // Met à jour la barre directement (sans renderApp pour ne pas écraser le curseur)
+    const bar = document.getElementById('simFreshBar');
+    if (bar) {
+      const frac = autoRefreshFrac;
+      const r = Math.round(22 + frac * (220 - 22));
+      const g = Math.round(163 - frac * (163 - 38));
+      const b2 = Math.round(74 - frac * (74 - 38));
+      bar.style.width = (frac * 100).toFixed(1) + '%';
+      bar.style.backgroundColor = `rgb(${r},${g},${b2})`;
+    }
+    if (elapsed < AUTO_REFRESH_MS) return;
+    // Durée écoulée — doit-on rafraîchir ?
+    if (document.visibilityState !== 'visible' || execState != null || !simActive) {
+      // Pause : laisser la barre pleine, ne pas consommer de cycle
+      return;
+    }
+    if (autoRefreshCycles < 3) {
+      autoRefreshCycles++;
+      stopFreshBar();
+      void doSim({ auto: true });
+    } else {
+      // 3 cycles atteints : arrêter
+      stopFreshBar();
+      autoRefreshFrac = 1; // barre reste pleine/rouge
+      const bar2 = document.getElementById('simFreshBar');
+      if (bar2) { bar2.style.width = '100%'; bar2.style.backgroundColor = 'rgb(220,38,38)'; }
+    }
+  }, 150);
+}
+
 function onExecSlippage(v) {
   const n = parseFloat(String(v).replace(',', '.'));
   execSlippagePct = isNaN(n) ? 0.5 : Math.max(0, Math.min(50, n));
@@ -1648,12 +1742,25 @@ function venueDisplay(id) {
   return id === 'xbull' ? 'xBull' : id === 'soroswap' ? 'Soroswap' : id === 'horizon' ? 'Horizon' : id === 'aquarius' ? 'Aquarius' : id === 'comet' ? 'Comet' : id === 'ultrastellar' ? 'Ultra Stellar' : id;
 }
 
-function reviewTableHtml(rv, tgt) {
+function reviewTableHtml(rv, tgt, showSimDelta) {
   const vl = venueDisplay(rv.venue);
+  // #3 — indicateur sim→build : compare le build (re-coté) au simulateur de la même venue
+  let simDeltaHtml = '';
+  if (showSimDelta) {
+    const simRow = (simResult && simResult.ladder) ? simResult.ladder.find(r => r.sourceId === rv.venue) : null;
+    const simNet = simRow ? simRow.net : null;
+    if (simNet != null) {
+      let arrow, col;
+      if (rv.netOut > simNet + 1e-6) { arrow = '↗'; col = 'var(--green)'; }
+      else if (rv.netOut < simNet - 1e-6) { arrow = '↘'; col = 'var(--red)'; }
+      else { arrow = '='; col = 'var(--caption)'; }
+      simDeltaHtml = ` <span style="color:${col};font-weight:700">${arrow}</span> <span style="color:var(--caption);font-size:11px">(${t('review_sim_was')} ${fmt3(simNet)})</span>`;
+    }
+  }
   return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.8rem">
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} BLND</td></tr>
-    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${tgt}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${tgt}${simDeltaHtml}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt3(rv.minReceived)} ${tgt}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${vl}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
@@ -1677,7 +1784,7 @@ function execModal() {
       : '';
     content = `
       <div style="font-size:14px;font-weight:700;margin-bottom:.9rem">${t('review_title')}</div>
-      ${reviewTableHtml(rv, target)}
+      ${reviewTableHtml(rv, target, true)}
       ${fidelityNote}
       ${restoreNote}
       <div style="display:flex;gap:.55rem;margin-top:.9rem;justify-content:flex-end">
@@ -1702,29 +1809,35 @@ function execModal() {
       ${dimTable}`;
   } else if (phase === 'done') {
     const rv = build && build.review;
-    let compTable = '';
+    let compBlock = '';
     if (rv) {
+      // Ligne "Reçu" : pulse si lecture en cours, valeur colorée si reçu
       const execVal = executed != null
-        ? `<span style="font-weight:700;color:${executed >= rv.netOut ? 'var(--green)' : 'var(--red)'}">${fmt3(executed)} ${target}</span>`
-        : `<span style="color:var(--caption)">${t('exec_reading')}</span>`;
-      const deltaRow = executed != null ? (() => {
+        ? `<span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;color:${executed >= rv.netOut ? 'var(--green)' : 'var(--red)'}">${fmt3(executed)} ${target}</span>`
+        : `<span class="pulse" style="color:var(--caption);font-size:13px">${t('exec_reading')}</span>`;
+      // Chip d'écart proéminent (seulement quand reçu connu)
+      let deltaChip = '';
+      if (executed != null) {
         const d = executed - rv.netOut;
         const col = d >= 0 ? 'var(--green)' : 'var(--red)';
-        return `<tr><td style="padding:4px 0;color:var(--caption)">${t('exec_delta')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:${col}">${d >= 0 ? '+' : ''}${fmt3(d)} ${target}</td></tr>`;
-      })() : '';
-      compTable = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:.7rem 0 .5rem">
-        <tr><td style="padding:4px 0;color:var(--caption)">${t('exec_quoted')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${target}</td></tr>
-        <tr><td style="padding:4px 0;color:var(--caption)">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.minReceived)} ${target}</td></tr>
-        <tr><td style="padding:4px 0;color:var(--caption)">${t('exec_executed')}</td><td style="padding:4px 0;text-align:right">${execVal}</td></tr>
-        ${deltaRow}
-      </table>`;
+        const sign = d >= 0 ? '+' : '';
+        deltaChip = `<div style="display:inline-flex;align-items:center;gap:.3rem;background:${col}22;color:${col};border:1px solid ${col}55;border-radius:999px;padding:.2rem .75rem;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:.5rem">${sign}${fmt3(d)} ${target} ${t('exec_delta')}</div>`;
+      }
+      compBlock = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:.9rem 0 .3rem">
+        <tr><td style="padding:5px 0;color:var(--caption)">${t('exec_quoted')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.netOut)} ${target}</td></tr>
+        <tr><td style="padding:5px 0;color:var(--caption)">${t('review_receive_min')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.minReceived)} ${target}</td></tr>
+        <tr style="border-top:1px solid var(--card-border)"><td style="padding:6px 0;color:var(--heading);font-weight:600">${t('exec_executed')}</td><td style="padding:6px 0;text-align:right">${execVal}</td></tr>
+      </table>${deltaChip}`;
     }
     content = `
-      <p style="font-size:14px;font-weight:700;color:var(--green);margin:0 0 .6rem">${t('exec_success')}</p>
-      <a class="openlink" href="https://stellar.expert/explorer/public/tx/${hash}" target="_blank" rel="noopener">${t('exec_view')}</a>
-      ${compTable}
-      <div style="margin-top:.9rem;text-align:right">
-        <button class="btn" onclick="cancelExecute()">${t('exec_close')}</button>
+      <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.8rem">
+        <span style="font-size:22px;color:var(--green);line-height:1">✓</span>
+        <span style="font-size:15px;font-weight:700;color:var(--green)">${t('exec_success')}</span>
+      </div>
+      ${compBlock}
+      <div style="display:flex;gap:.55rem;margin-top:1rem;align-items:center;justify-content:flex-end;flex-wrap:wrap">
+        <a class="btn openlink" href="https://stellar.expert/explorer/public/tx/${hash}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:.3rem">${t('exec_view')}</a>
+        <button class="btn primary" onclick="cancelExecute()">${t('exec_close')}</button>
       </div>`;
   } else if (phase === 'error') {
     content = `
@@ -1735,7 +1848,7 @@ function execModal() {
       </div>`;
   }
 
-  return `<div class="modal-overlay"><div class="modal-card">${content}</div></div>`;
+  return `<div class="modal-overlay" onclick="onModalBackdrop(event)"><div class="modal-card">${content}</div></div>`;
 }
 
 function toggleTheme() {
@@ -1772,6 +1885,23 @@ renderApp();
 startCountdownTick();
 void Promise.all([loadOverview(), loadBalance()]);
 if (view === 'health') void loadHealth();
+
+// #5 — Pause/reprise de la barre lors des changements de visibilité de l'onglet
+document.addEventListener('visibilitychange', () => {
+  if (!autoRefreshTimer && autoRefreshFrac <= 0) return; // barre inactive
+  if (document.visibilityState === 'hidden') {
+    // Geler : mémoriser l'élapsé accumulé et mettre en pause l'interval
+    if (autoRefreshStart) {
+      autoRefreshPaused += Date.now() - autoRefreshStart;
+      autoRefreshStart = null;
+    }
+  } else {
+    // Reprendre : décaler l'origine
+    if (autoRefreshTimer && autoRefreshStart === null && autoRefreshFrac < 1) {
+      autoRefreshStart = Date.now();
+    }
+  }
+});
 
 // ─── Easter egg : scam-coin GeoCities derrière le konami code (↑↑↓↓←→←→ B A) ───
 function openScamEgg() {
