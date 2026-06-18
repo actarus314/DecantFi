@@ -299,6 +299,10 @@ export async function quoteSoroswap(
       tradeType: TradeType.EXACT_IN,
       protocols: [SupportedProtocols.SOROSWAP],
       slippageBps,
+      // ponytail: parité avec le collecteur (core/sources/soroswap.ts maxHops:2). No-op aujourd'hui
+      // (l'API route déjà BLND→USDC→EURC) mais épingle le multi-hop : empêche une dégradation
+      // silencieuse vers le pool direct BLND/EURC minuscule si le défaut de l'API changeait.
+      maxHops: 2,
     });
     // Le SDK type ces champs en bigint mais renvoie des NUMBER au runtime (pas de transformResponse)
     // → coercition explicite. BigInt() accepte number entier ET bigint, et lance sur un float (fail fast).

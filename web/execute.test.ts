@@ -458,6 +458,29 @@ describe('pickExecutableVenue', () => {
     ).rejects.toMatchObject({ code: 'no-route' });
   });
 
+  it('(j) soroswap multi-hop EURC (path 3 nœuds) → review.route = BLND → USDC → EURC', async () => {
+    const net = 4_1000000n;
+    const result = await pickExecutableVenue(
+      'EURC',
+      1000_0000000n,
+      SENDER,
+      50,
+      CFG,
+      undefined,
+      fakeDeps({
+        xbullQuote: null,
+        soroQuote: {
+          amountOut: net,
+          rawTrade: { amountOutMin: minReceivedStroops(net, 50) },
+          routePlan: [{ swapInfo: { protocol: 'soroswap', path: [BLND.sac, USDC.sac, EURC.sac] } }],
+        },
+        soroBuild: { xdr: 'xdr-soro-multihop' },
+      }),
+    );
+    expect(result.venue).toBe('soroswap');
+    expect(result.review.route).toBe('BLND → USDC → EURC');
+  });
+
   it('(g) comet coté pour USDC (gate ouvert) — simulateComet appelé', async () => {
     const deps = fakeDeps({
       xbullQuote: { toAmount: '5000000', route: 'r' },
