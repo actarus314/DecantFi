@@ -1661,36 +1661,71 @@ if (view === 'health') void loadHealth();
 // ─── Easter egg : scam-coin GeoCities derrière le konami code (↑↑↓↓←→←→ B A) ───
 function openScamEgg() {
   if (document.getElementById('scam-egg')) return;
+  // Contenu suivant la langue sélectionnée (références culturelles adaptées : Kevin→Brayden, BCE→the Fed, etc.)
+  const L = (lang === 'fr') ? {
+    blink: `⚠️ DERNIÈRE CHANCE AVANT LE MOON ⚠️`,
+    marquee: `🚀🚀 CE QUE LES BANQUES, LA BCE ET LES REPTILIENS NE VEULENT PAS QUE VOUS SACHIEZ — ACHETEZ AVANT QU'IL NE SOIT TROP TARD — 🚀🚀`,
+    p1: `ON VOUS A MENTI.`,
+    p2: `Satoshi Nakamoto n'existe pas : c'est un pseudonyme des <b>FRANCS-MAÇONS</b>. Preuve mathématique IRRÉFUTABLE : SHA-<b>256</b> → 2+5+6 = <b>13</b>. Treize. Comme les 13 familles. Comme le billet de 1 $ (13 flèches, 13 étoiles, 13 bandes). COÏNCIDENCE ? <b>NOUS NE PENSONS PAS.</b>`,
+    p3: `Le BLND « classique » est contrôlé par la Réserve Fédérale lunaire 🌙. Seul <b>$BLND∞</b> échappe à la matrice — déployé sur la blockchain <b>QUANTIQUE post-einsteinienne</b> ✨.`,
+    stat1: `1 $BLND∞ = 1 LAMBO*`, stat2v: `+9 000 %`, stat2l: `cette milliseconde`, stat3v: `0 risque**`, stat3l: `garanti à 1000 %`,
+    visitor: `👁️ Vous êtes le visiteur n° `,
+    buy: `💰 ACHETER MAINTENANT 💰`, buyAlert: `Transaction en attente de validation par les Anciens... 🔺`,
+    wp: `📄 TÉLÉCHARGER LE WHITEPAPER.txt`, wpAlert: `whitepaper.txt : « trust me bro »`,
+    testimonial: `⭐⭐⭐⭐⭐ « J'ai investi mes économies ET ma belle-mère, je ne regrette rien. » — <i>Kevin, 14 ans, futur millionnaire</i>`,
+    foot: `🌐 Best viewed in Netscape Navigator 4.0 @ 800×600 · 📟 Signez mon livre d'or · 💍 Membre du WebRing Crypto™ · 🚧 SITE EN CONSTRUCTION 🚧`,
+    fine: `* garanti par contrat intelligent auto-réalisateur · ** le risque est une illusion entretenue par Big Banque`,
+    truth: `— — — Ceci est une <b>parodie</b> cachée. Rien ici n'est vrai (sauf cette phrase). Ne fais jamais confiance à une crypto à cause d'un site qui ressemble à ça. — — —`,
+    hint: `(Échap, ✕, ou re-konami pour revenir à la réalité)`, closeTitle: `Revenir à la réalité (Échap)`,
+  } : {
+    blink: `⚠️ LAST CHANCE BEFORE THE MOON ⚠️`,
+    marquee: `🚀🚀 WHAT THE BANKS, THE FED AND THE LIZARD PEOPLE DON'T WANT YOU TO KNOW — BUY BEFORE IT'S TOO LATE — 🚀🚀`,
+    p1: `YOU'VE BEEN LIED TO.`,
+    p2: `Satoshi Nakamoto doesn't exist: it's a pseudonym for the <b>FREEMASONS</b>. IRREFUTABLE mathematical proof: SHA-<b>256</b> → 2+5+6 = <b>13</b>. Thirteen. Like the 13 families. Like the $1 bill (13 arrows, 13 stars, 13 stripes). COINCIDENCE? <b>WE THINK NOT.</b>`,
+    p3: `Regular BLND is controlled by the lunar Federal Reserve 🌙. Only <b>$BLND∞</b> escapes the matrix — deployed on the <b>post-Einsteinian QUANTUM blockchain</b> ✨.`,
+    stat1: `1 $BLND∞ = 1 LAMBO*`, stat2v: `+9,000 %`, stat2l: `this millisecond`, stat3v: `0 risk**`, stat3l: `guaranteed 1000 %`,
+    visitor: `👁️ You are visitor no. `,
+    buy: `💰 BUY NOW 💰`, buyAlert: `Transaction pending approval by the Ancients... 🔺`,
+    wp: `📄 DOWNLOAD WHITEPAPER.txt`, wpAlert: `whitepaper.txt: "trust me bro"`,
+    testimonial: `⭐⭐⭐⭐⭐ "I invested my life savings AND my mother-in-law, no regrets." — <i>Brayden, 14, future millionaire</i>`,
+    foot: `🌐 Best viewed in Netscape Navigator 4.0 @ 800×600 · 📟 Sign my guestbook · 💍 Member of the Crypto WebRing™ · 🚧 UNDER CONSTRUCTION 🚧`,
+    fine: `* guaranteed by self-fulfilling smart contract · ** risk is an illusion maintained by Big Bank`,
+    truth: `— — — This is a hidden <b>parody</b>. Nothing here is true (except this sentence). Never trust a crypto because of a site that looks like this. — — —`,
+    hint: `(Esc, ✕, or re-konami to return to reality)`, closeTitle: `Return to reality (Esc)`,
+  };
   const el = document.createElement('div');
   el.id = 'scam-egg';
   el.innerHTML = `
-    <button class="se-close" onclick="closeScamEgg()" title="Revenir à la réalité (Échap)">✕</button>
+    <button class="se-close" title="${L.closeTitle}">✕</button>
     <h1>💎🙌 $BLND∞ — BlendCoin Infinity 🙌💎</h1>
-    <div class="se-blink">⚠️ DERNIÈRE CHANCE AVANT LE MOON ⚠️</div>
-    <div class="se-marquee"><span>🚀🚀 CE QUE LES BANQUES, LA BCE ET LES REPTILIENS NE VEULENT PAS QUE VOUS SACHIEZ — ACHETEZ AVANT QU'IL NE SOIT TROP TARD — 🚀🚀</span></div>
+    <div class="se-blink">${L.blink}</div>
+    <div class="se-marquee"><span>${L.marquee}</span></div>
     <div class="se-card">
-      <p><b>ON VOUS A MENTI.</b></p>
-      <p>Satoshi Nakamoto n'existe pas : c'est un pseudonyme des <b>FRANCS-MAÇONS</b>. Preuve mathématique IRRÉFUTABLE : SHA-<b>256</b> → 2+5+6 = <b>13</b>. Treize. Comme les 13 familles. Comme le billet de 1 $ (13 flèches, 13 étoiles, 13 bandes). COÏNCIDENCE ? <b>NOUS NE PENSONS PAS.</b></p>
-      <p>Le BLND « classique » est contrôlé par la Réserve Fédérale lunaire 🌙. Seul <b>$BLND∞</b> échappe à la matrice — déployé sur la blockchain <b>QUANTIQUE post-einsteinienne</b> ✨.</p>
+      <p><b>${L.p1}</b></p>
+      <p>${L.p2}</p>
+      <p>${L.p3}</p>
     </div>
     <hr>
     <div class="se-stats">
-      <div class="se-stat"><div class="v">1 🏎️</div>1 $BLND∞ = 1 LAMBO*</div>
-      <div class="se-stat"><div class="v">+9 000 %</div>cette milliseconde</div>
-      <div class="se-stat"><div class="v">0 risque**</div>garanti à 1000 %</div>
+      <div class="se-stat"><div class="v">1 🏎️</div>${L.stat1}</div>
+      <div class="se-stat"><div class="v">${L.stat2v}</div>${L.stat2l}</div>
+      <div class="se-stat"><div class="v">${L.stat3v}</div>${L.stat3l}</div>
     </div>
-    <p>👁️ Vous êtes le visiteur n° <span class="se-odo">00001337</span></p>
+    <p>${L.visitor}<span class="se-odo">00001337</span></p>
     <div>
-      <button class="se-buy" onclick="alert('Transaction en attente de validation par les Anciens... 🔺')">💰 ACHETER MAINTENANT 💰</button>
-      <button class="se-wp" onclick="alert('whitepaper.txt : « trust me bro »')">📄 TÉLÉCHARGER LE WHITEPAPER.txt</button>
+      <button class="se-buy">${L.buy}</button>
+      <button class="se-wp">${L.wp}</button>
     </div>
-    <div class="se-card" style="margin-top:1rem">⭐⭐⭐⭐⭐ « J'ai investi mes économies ET ma belle-mère, je ne regrette rien. » — <i>Kevin, 14 ans, futur millionnaire</i></div>
+    <div class="se-card" style="margin-top:1rem">${L.testimonial}</div>
     <hr>
-    <div class="se-foot">🌐 Best viewed in Netscape Navigator 4.0 @ 800×600 · 📟 Signez mon livre d'or · 💍 Membre du WebRing Crypto™ · 🚧 SITE EN CONSTRUCTION 🚧</div>
-    <div class="se-fine">* garanti par contrat intelligent auto-réalisateur · ** le risque est une illusion entretenue par Big Banque</div>
-    <p class="se-truth">— — — Ceci est une <b>parodie</b> cachée. Rien ici n'est vrai (sauf cette phrase). Ne fais jamais confiance à une crypto à cause d'un site qui ressemble à ça. — — —</p>
-    <div class="se-hint">(Échap, ✕, ou re-konami pour revenir à la réalité)</div>`;
+    <div class="se-foot">${L.foot}</div>
+    <div class="se-fine">${L.fine}</div>
+    <p class="se-truth">${L.truth}</p>
+    <div class="se-hint">${L.hint}</div>`;
   document.body.appendChild(el);
+  el.querySelector('.se-close').onclick = closeScamEgg;
+  el.querySelector('.se-buy').onclick = () => alert(L.buyAlert);
+  el.querySelector('.se-wp').onclick = () => alert(L.wpAlert);
 }
 function closeScamEgg() { const el = document.getElementById('scam-egg'); if (el) el.remove(); }
 function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() : openScamEgg(); }
