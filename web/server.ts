@@ -7,7 +7,7 @@ import { loadWebConfig } from './config.js';
 import { openReadOnly } from './read-db.js';
 import { overview, buildSourceHealth } from './stats.js';
 import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
-import { pickExecutableVenue, submit, ExecError, type Venue } from './execute.js';
+import { pickExecutableVenue, submit, buildChangeTrust, ExecError, type Venue } from './execute.js';
 import { manualRefresh, refreshBusy } from './refresh.js';
 import { toStroops, toNumber } from '../core/amount.js';
 import { readBlndBalance, readAssetBalance } from '../core/balance.js';
@@ -219,6 +219,22 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       } catch (e) {
         if (e instanceof ExecError) { json(res, execStatus(e.code), { error: e.message, code: e.code }); return; }
         throw e; // → 500 via handle()
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && path === '/api/build-trustline') {
+      const raw = await readJsonBody(req);
+      const b = (raw ?? {}) as Record<string, unknown>;
+      const pair = parsePair(typeof b.pair === 'string' ? b.pair : null);
+      if (!pair) { json(res, 400, { error: 'pair invalide' }); return; }
+      if (!isStellarPubkey(b.sender)) { json(res, 400, { error: 'sender invalide (adresse G… requise)' }); return; }
+      try {
+        const result = await buildChangeTrust(b.sender, TARGETS[pair], cfg.horizonUrl);
+        json(res, 200, result);
+      } catch (e) {
+        if (e instanceof ExecError) { json(res, execStatus(e.code), { error: e.message, code: e.code }); return; }
+        throw e;
       }
       return;
     }

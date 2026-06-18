@@ -752,6 +752,43 @@ export async function buildUltra(
   return { xdr: tx.toXDR() };
 }
 
+// ─── Trustline (pré-flight + ajout in-app) ───────────────────────────────────
+
+/** Le sender détient-il la trustline de l'actif d'achat ? true/false, ou null si lecture impossible
+ *  (compte introuvable / Horizon en panne → on laisse les builds gérer, pas de faux « trustline absente »). */
+async function senderHasTrustline(sender: string, buy: Asset, horizonUrl?: string): Promise<boolean | null> {
+  if (buy.native) return true;
+  try {
+    const sdk = await import('@stellar/stellar-sdk');
+    const { Horizon } = sdk;
+    const server = new Horizon.Server((horizonUrl || HORIZON_BASE_DEFAULT).replace(/\/$/, ''));
+    const account = await server.loadAccount(sender);
+    return account.balances.some((b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer);
+  } catch {
+    return null;
+  }
+}
+
+/** Construit le XDR changeTrust (non signé) pour ajouter la trustline de l'actif d'achat.
+ *  Limite par défaut = max (réception illimitée). Soumis ensuite via la voie classique Horizon (submit horizon). */
+export async function buildChangeTrust(sender: string, buy: Asset, horizonUrl?: string): Promise<{ xdr: string }> {
+  if (buy.native) throw new ExecError('no-route', 'actif natif : aucune trustline requise');
+  const sdk = await import('@stellar/stellar-sdk');
+  const { Horizon, TransactionBuilder, Operation, Asset: SdkAsset, Networks, BASE_FEE } = sdk;
+  const server = new Horizon.Server((horizonUrl || HORIZON_BASE_DEFAULT).replace(/\/$/, ''));
+  let account: Awaited<ReturnType<typeof server.loadAccount>>;
+  try {
+    account = await server.loadAccount(sender);
+  } catch {
+    throw new ExecError('funds', `compte ${sender} introuvable ou non financé`);
+  }
+  const tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: Networks.PUBLIC })
+    .addOperation(Operation.changeTrust({ asset: new SdkAsset(buy.code, buy.issuer as string) }))
+    .setTimeout(180)
+    .build();
+  return { xdr: tx.toXDR() };
+}
+
 // ─── Orchestrateur principal ─────────────────────────────────────────────────
 
 export async function pickExecutableVenue(
@@ -769,9 +806,10 @@ export async function pickExecutableVenue(
   const sellSac = BLND.sac;
   const buySac = buyAsset.sac;
 
-  // 1. Re-quote live en parallèle (tolérant : échec → null).
+  // 1. Re-quote live en parallèle (tolérant : échec → null) + pré-flight trustline (parallèle → zéro latence ajoutée).
   const soroClient = cfg.soroswapApiKey ? deps.makeSoroswap(cfg.soroswapApiKey) : null;
-  const [xbullQ, soroQ, horizonQ, aquariusQ, cometQ, ultraQ] = await Promise.all([
+  const [trust, xbullQ, soroQ, horizonQ, aquariusQ, cometQ, ultraQ] = await Promise.all([
+    senderHasTrustline(sender, buyAsset, cfg.horizonUrl),
     quoteXbull(sellSac, buySac, amountStroops, deps),
     soroClient
       ? quoteSoroswap(soroClient, sellSac, buySac, amountStroops, slippageBps)
@@ -782,6 +820,11 @@ export async function pickExecutableVenue(
     target === 'USDC' ? quoteComet(deps, sellSac, buySac, amountStroops, cfg.rpcUrl) : Promise.resolve(null),
     quoteUltra(BLND, buyAsset, amountStroops, deps),
   ]);
+
+  // Pré-flight trustline UNIVERSEL : si le sender n'a pas la trustline de l'actif d'achat, échouer
+  // clairement ICI (avant tout build) → couvre AUSSI les venues turnkey xBull/Soroswap dont l'erreur
+  // trustline ne remontait pas classée (« source indisponible » trompeur). null = lecture KO → builds gèrent.
+  if (trust === false) throw trustlineMissingError(buyAsset, sender);
 
   // 2. Trier les candidats non-null par netOut décroissant.
   type Candidate =

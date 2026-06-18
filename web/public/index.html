@@ -437,6 +437,13 @@ const STRINGS = {
     err_slippage: 'Le prix a bougé au-delà de ta tolérance — réessaie ou augmente le slippage.',
     err_down: 'Source d\'exécution indisponible, réessaie.',
     err_noroute: 'Aucune route exécutable pour ce montant.',
+    // Trustline in-app
+    trustline_title: 'Trustline requise',
+    trustline_need: (tgt) => `Ton compte n'a pas de trustline ${tgt} — obligatoire pour recevoir l'${tgt}. Ajoute-la en un clic ci-dessous (~0,5 XLM de réserve immobilisée, récupérable si tu la retires plus tard).`,
+    trustline_add_btn: (tgt) => `Ajouter la trustline ${tgt}`,
+    trustline_adding: 'Ajout de la trustline…',
+    trustline_added: (tgt) => `Trustline ${tgt} ajoutée ✓`,
+    trustline_added_hint: 'Tu peux maintenant lancer le swap.',
 
     // Navigation
     nav_dashboard: 'Tableau de bord',
@@ -642,6 +649,13 @@ const STRINGS = {
     err_slippage: 'Price moved beyond your tolerance — retry or raise slippage.',
     err_down: 'Execution source unavailable, try again.',
     err_noroute: 'No executable route for this amount.',
+    // In-app trustline
+    trustline_title: 'Trustline required',
+    trustline_need: (tgt) => `Your account has no ${tgt} trustline — required to receive ${tgt}. Add it in one click below (~0.5 XLM reserve locked, refundable if you remove it later).`,
+    trustline_add_btn: (tgt) => `Add ${tgt} trustline`,
+    trustline_adding: 'Adding trustline…',
+    trustline_added: (tgt) => `${tgt} trustline added ✓`,
+    trustline_added_hint: 'You can now run the swap.',
 
     // Navigation
     nav_dashboard: 'Dashboard',
@@ -1608,7 +1622,7 @@ async function doExecute() {
   try {
     const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const j = await r.json();
-    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error) }; }
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code }; }
     else { execState = { phase: 'review', build: j }; }
   } catch (e) { execState = { phase: 'error', errorMsg: t('err_down') }; }
   renderApp();
@@ -1633,7 +1647,7 @@ async function confirmExecute() {
     const r = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ venue: build.venue, id: build.id, signedXdr: signedTxXdr }) });
     const j = await r.json();
-    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error) }; renderApp(); return; }
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code }; renderApp(); return; }
     if (build.type === 'restore') {
       // la tx restore est soumise ; reconstruire le vrai swap puis revenir à la revue.
       // ponytail: branche restore best-effort, non testée en live (nécessite un contrat archivé).
@@ -1668,6 +1682,30 @@ async function confirmExecute() {
     const msg = (e && e.message) || '';
     const errorMsg = /reject/i.test(msg) ? t('exec_rejected') : (msg || t('exec_failed'));
     execState = { phase: 'error', errorMsg }; renderApp();
+  }
+}
+
+// Ajout de la trustline de sortie DEPUIS l'app : build changeTrust → signature wallet → submit Horizon.
+// Pas d'auto-retry du swap (read-after-write Horizon) : on revient à un clic d'exécution → quelques
+// secondes passent (lecture du succès + clic) = buffer de propagation, pas de faux « trustline absente ».
+async function addTrustline() {
+  if (!walletAddress) { execState = { phase: 'error', errorMsg: t('exec_connect_first') }; renderApp(); return; }
+  try {
+    execState = { phase: 'trustline_adding' }; renderApp();
+    const r = await fetch('/api/build-trustline', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pair: target, sender: walletAddress }) });
+    const j = await r.json();
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code }; renderApp(); return; }
+    await ensureKit();
+    const { signedTxXdr } = await SWK.signTransaction(j.xdr, { address: walletAddress, networkPassphrase: KIT_NET });
+    const sr = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ venue: 'horizon', signedXdr: signedTxXdr }) });
+    const sj = await sr.json();
+    if (!sr.ok) { execState = { phase: 'error', errorMsg: mapExecError(sj.code, sj.error), code: sj.code }; renderApp(); return; }
+    execState = { phase: 'trustline_added' }; renderApp();
+  } catch (e) {
+    const msg = (e && e.message) || '';
+    execState = { phase: 'error', errorMsg: /reject/i.test(msg) ? t('exec_rejected') : (msg || t('exec_failed')) }; renderApp();
   }
 }
 
@@ -1821,12 +1859,32 @@ function execModal() {
         <a class="btn openlink" href="https://stellar.expert/explorer/public/tx/${hash}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:.3rem">${t('exec_view')}</a>
         <button class="btn primary" onclick="cancelExecute()">${t('exec_close')}</button>
       </div>`;
-  } else if (phase === 'error') {
+  } else if (phase === 'trustline_adding') {
+    content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0">${t('trustline_adding')}</p>`;
+  } else if (phase === 'trustline_added') {
     content = `
-      <p style="font-size:14px;font-weight:700;color:var(--red);margin:0 0 .5rem">${t('exec_failed')}</p>
-      <p class="help" style="margin:0 0 .8rem">${escapeHtml(errorMsg)}</p>
-      <div style="text-align:right">
+      <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.5rem">
+        <span style="font-size:20px;color:var(--green);line-height:1">✓</span>
+        <span style="font-size:14px;font-weight:700;color:var(--green)">${t('trustline_added', target)}</span>
+      </div>
+      <p class="help" style="margin:0 0 .9rem">${t('trustline_added_hint')}</p>
+      <div style="display:flex;gap:.55rem;justify-content:flex-end;flex-wrap:wrap">
         <button class="btn" onclick="cancelExecute()">${t('exec_close')}</button>
+        <button class="btn primary" onclick="doExecute()">${t('exec_btn')}</button>
+      </div>`;
+  } else if (phase === 'error') {
+    // Cas trustline absente : message clair + bouton d'ajout in-app (≠ « échec » dur).
+    const isTrust = execState.code === 'trustline';
+    const title = isTrust ? t('trustline_title') : t('exec_failed');
+    const titleColor = isTrust ? 'var(--amber)' : 'var(--red)';
+    const msg = isTrust ? t('trustline_need', target) : escapeHtml(errorMsg);
+    const trustBtn = isTrust ? `<button class="btn primary" onclick="addTrustline()">${t('trustline_add_btn', target)}</button>` : '';
+    content = `
+      <p style="font-size:14px;font-weight:700;color:${titleColor};margin:0 0 .5rem">${title}</p>
+      <p class="help" style="margin:0 0 .9rem;overflow-wrap:anywhere">${msg}</p>
+      <div style="display:flex;gap:.55rem;justify-content:flex-end;flex-wrap:wrap">
+        <button class="btn" onclick="cancelExecute()">${t('exec_close')}</button>
+        ${trustBtn}
       </div>`;
   }
 
