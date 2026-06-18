@@ -10,7 +10,8 @@ import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
 import { pickExecutableVenue, submit, ExecError, type Venue } from './execute.js';
 import { manualRefresh, refreshBusy } from './refresh.js';
 import { toStroops, toNumber } from '../core/amount.js';
-import { readBlndBalance } from '../core/balance.js';
+import { readBlndBalance, readAssetBalance } from '../core/balance.js';
+import { TARGETS } from '../core/assets.js';
 
 const cfg = loadWebConfig();
 const db = openReadOnly(cfg.dbPath);
@@ -161,6 +162,18 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         const result = await walletBalance(cfg);
         json(res, 200, result);
       }
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/api/asset-balance') {
+      const address = query['address'];
+      if (!isStellarPubkey(address)) { json(res, 400, { error: 'adresse invalide' }); return; }
+      const assetKey = query['asset'];
+      const pair = parsePair(assetKey ?? null);
+      if (!pair) { json(res, 400, { error: `asset invalide: ${assetKey ?? '(absent)'}` }); return; }
+      const asset = TARGETS[pair];
+      const balance = await readAssetBalance(address, asset, { horizonUrl: cfg.horizonUrl, timeoutMs: cfg.timeoutMs });
+      json(res, 200, { balance });
       return;
     }
 
