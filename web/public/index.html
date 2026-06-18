@@ -9,13 +9,13 @@
 :root{
   --bg:#f1f5f9; --card-bg:#ffffff; --card-border:#e2e8f0; --section-bg:#f8fafc;
   --val:#0f172a; --caption:#64748b; --sub:#94a3b8; --heading:#475569;
-  --accent:#2563eb; --amber:#d97706; --green:#16a34a; --red:#dc2626; --tool:#ea580c; --select:#7c3aed;
+  --accent:#2563eb; --amber:#d97706; --green:#16a34a; --red:#dc2626; --tool:#ea580c; --select:#7c3aed; --teal:#0d9488;
   --zone-wash:30,41,59; /* slate-800 : assombrit le fond clair (texture de zone) */
 }
 :root.dark{
   --bg:#0f172a; --card-bg:#1e293b; --card-border:#334155; --section-bg:#0f172a;
   --val:#f1f5f9; --caption:#94a3b8; --sub:#64748b; --heading:#cbd5e1;
-  --accent:#3b82f6; --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --tool:#f97316; --select:#8b5cf6;
+  --accent:#3b82f6; --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --tool:#f97316; --select:#8b5cf6; --teal:#14b8a6;
   --zone-wash:148,163,184; /* slate-400 : éclaircit le fond sombre (texture de zone) */
 }
 *{box-sizing:border-box;}
@@ -138,9 +138,6 @@ body{margin:0; background:var(--bg); color:var(--val);
 .seg{display:inline-flex; gap:2px; background:var(--section-bg); border:1px solid var(--card-border); border-radius:9999px; padding:2px; vertical-align:middle;}
 .seg button{border:0; background:transparent; color:var(--caption); font-size:11px; font-weight:600; padding:3px 11px; border-radius:9999px; cursor:pointer;}
 .seg button.active{background:var(--accent); color:#fff;}
-
-/* Barre de fraîcheur simulateur (#5) */
-#simFreshBar{height:3px;border-radius:3px;transition:background-color .3s;margin-top:.5rem;}
 
 .card{border:1px solid var(--card-border); background:var(--card-bg); border-radius:.7rem; padding:.9rem 1rem;}
 
@@ -326,6 +323,8 @@ const STRINGS = {
     sim_wallet_ok: (n) => `Solde wallet (${n} BLND)`,
     sim_wallet_ko: 'Solde wallet (non configuré)',
     sim_btn_simulate: 'Simuler',
+    sim_btn_refresh: 'Rafraîchir',
+    sim_btn_refresh_wait: (s) => `Rafraîchir (${s}s)`,
     sim_btn_clear: 'Vider',
     sim_loading: 'Cotation en cours…',
     sim_errors: 'Sources en échec :',
@@ -528,6 +527,8 @@ const STRINGS = {
     sim_wallet_ok: (n) => `Wallet balance (${n} BLND)`,
     sim_wallet_ko: 'Wallet balance (not configured)',
     sim_btn_simulate: 'Simulate',
+    sim_btn_refresh: 'Refresh',
+    sim_btn_refresh_wait: (s) => `Refresh (${s}s)`,
     sim_btn_clear: 'Clear',
     sim_loading: 'Fetching quote…',
     sim_errors: 'Failed sources:',
@@ -744,13 +745,9 @@ let nextTickAt = null;
 let countdownInterval = null;
 let lastImminentPollAt = 0;
 
-// Auto-refresh simulateur (#5)
-const AUTO_REFRESH_MS = 10000;
-let autoRefreshTimer = null;   // setInterval handle
-let autoRefreshStart = null;   // timestamp du début du cycle courant
-let autoRefreshPaused = 0;     // temps (ms) déjà écoulé quand on a mis en pause (onglet caché)
-let autoRefreshCycles = 0;     // nb de cycles auto effectués depuis la dernière sim manuelle
-let autoRefreshFrac = 0;       // fraction [0,1] pour la barre (persiste aux re-renders)
+// Cooldown bouton Rafraîchir (10 s après une sim réussie)
+let refreshCooldown = 0;   // secondes restantes ; 0 = bouton actif
+let refreshTimer = null;   // setInterval handle
 
 function t(key, ...args) {
   const s = STRINGS[lang];
@@ -1027,21 +1024,15 @@ function simCard() {
     }
   }
 
-  // Barre de fraîcheur (#5) : initialisée depuis la fraction courante pour survivre aux re-renders
-  const freshBarStyle = simActive && simResult ? (() => {
-    const frac = autoRefreshFrac;
-    const r = Math.round(22 + frac * (220 - 22)); // 22 → 220  (hex: #16a34a vert → #dc2626 rouge)
-    const g = Math.round(163 - frac * (163 - 38));
-    const b2 = Math.round(74 - frac * (74 - 38));
-    return `width:${(frac * 100).toFixed(1)}%;background:rgb(${r},${g},${b2})`;
-  })() : 'width:0%;background:var(--green)';
+  // Bouton Simuler / Rafraîchir selon l'état
+  const { label: simBtnLabel, disabled: simBtnDisabled } = simBtnState();
 
   return `<div class="sim">
     <div class="controls">
       <input id="simAmt" type="text" value="${simInput}" placeholder="${t('sim_placeholder')}" oninput="onAmt(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();doSim();}">
       <span class="suffix">BLND</span>
       <button class="btn" onclick="useWallet()" ${!walletConfigured ? 'disabled' : ''}>${walletLabel}</button>
-      <button class="btn primary" onclick="doSim()">${t('sim_btn_simulate')}</button>
+      <button id="simBtn" class="btn primary" onclick="doSim()" ${simBtnDisabled ? 'disabled' : ''}>${simBtnLabel}</button>
       <button class="btn" onclick="clearSim()">${t('sim_btn_clear')}</button>
       <span style="color:var(--card-border);margin:0 .4rem;user-select:none">—</span>
       <span style="font-size:11px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
@@ -1050,7 +1041,6 @@ function simCard() {
         onchange="onExecSlippage(this.value)">
       <span class="suffix">%</span>
     </div>
-    ${simActive && simResult ? `<div id="simFreshBar" style="${freshBarStyle}"></div>` : ''}
     <div id="simOut">${resultHtml}</div></div>`;
 }
 
@@ -1480,7 +1470,7 @@ function clearSim() {
   simActive = false;
   simResult = null;
   selectedSource = null;
-  stopFreshBar();
+  clearInterval(refreshTimer); refreshTimer = null; refreshCooldown = 0;
   renderApp();
 }
 
@@ -1492,15 +1482,10 @@ function useWallet() {
   void doSim();
 }
 
-async function doSim(opts) {
+async function doSim() {
   if (!simActive || simAmt <= 0) return;
-  // Sim manuelle : reset compteur de cycles, désélection, (re)démarre la barre.
-  // Auto-refresh : on GARDE la source sélectionnée (sinon l'outil regardé saute au gagnant toutes les 10 s).
-  if (!opts || !opts.auto) {
-    autoRefreshCycles = 0;
-    selectedSource = null;
-    stopFreshBar(); // sera redémarré après la sim
-  }
+  if (simActive && refreshCooldown > 0) return; // cooldown actif (Enter ou clic parasite)
+  selectedSource = null;
   simLoading = true;
   simResult = null;
   renderApp();
@@ -1510,11 +1495,9 @@ async function doSim(opts) {
   } catch {}
   simLoading = false;
   renderApp();
-  // Démarrer / redémarrer la barre après la sim (si elle a réussi)
+  // Démarrer le cooldown bouton si la sim a réussi
   if (simActive && simResult) {
-    startFreshBar();
-  } else {
-    stopFreshBar();
+    startRefreshCooldown();
   }
 }
 
@@ -1684,50 +1667,34 @@ function onModalBackdrop(e) {
   }
 }
 
-// ─── Auto-refresh barre de fraîcheur simulateur (#5) ─────────────────────────
-function stopFreshBar() {
-  if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
-  autoRefreshStart = null;
-  autoRefreshPaused = 0;
-  autoRefreshFrac = 0;
+// ─── Cooldown bouton Rafraîchir ───────────────────────────────────────────────
+function simBtnState() {
+  if (!simActive) return { label: t('sim_btn_simulate'), disabled: false };
+  if (refreshCooldown > 0) return { label: t('sim_btn_refresh_wait', refreshCooldown), disabled: true };
+  return { label: t('sim_btn_refresh'), disabled: false };
 }
 
-function startFreshBar() {
-  stopFreshBar(); // un seul interval, nettoie l'ancien
-  autoRefreshStart = Date.now();
-  autoRefreshFrac = 0;
-  autoRefreshTimer = setInterval(() => {
-    // Calcule l'élapsé en tenant compte des pauses
-    const elapsed = autoRefreshPaused + (autoRefreshStart ? Date.now() - autoRefreshStart : 0);
-    autoRefreshFrac = Math.min(elapsed / AUTO_REFRESH_MS, 1);
-    // Met à jour la barre directement (sans renderApp pour ne pas écraser le curseur)
-    const bar = document.getElementById('simFreshBar');
-    if (bar) {
-      const frac = autoRefreshFrac;
-      const r = Math.round(22 + frac * (220 - 22));
-      const g = Math.round(163 - frac * (163 - 38));
-      const b2 = Math.round(74 - frac * (74 - 38));
-      bar.style.width = (frac * 100).toFixed(1) + '%';
-      bar.style.backgroundColor = `rgb(${r},${g},${b2})`;
+function updateSimBtn() {
+  const b = document.getElementById('simBtn');
+  if (!b) return;
+  const { label, disabled } = simBtnState();
+  b.textContent = label;
+  b.disabled = disabled;
+}
+
+function startRefreshCooldown() {
+  clearInterval(refreshTimer);
+  refreshCooldown = 10;
+  updateSimBtn();
+  refreshTimer = setInterval(() => {
+    refreshCooldown--;
+    if (refreshCooldown <= 0) {
+      refreshCooldown = 0;
+      clearInterval(refreshTimer);
+      refreshTimer = null;
     }
-    if (elapsed < AUTO_REFRESH_MS) return;
-    // Durée écoulée — doit-on rafraîchir ?
-    if (document.visibilityState !== 'visible' || execState != null || !simActive) {
-      // Pause : laisser la barre pleine, ne pas consommer de cycle
-      return;
-    }
-    if (autoRefreshCycles < 3) {
-      autoRefreshCycles++;
-      stopFreshBar();
-      void doSim({ auto: true });
-    } else {
-      // 3 cycles atteints : arrêter
-      stopFreshBar();
-      autoRefreshFrac = 1; // barre reste pleine/rouge
-      const bar2 = document.getElementById('simFreshBar');
-      if (bar2) { bar2.style.width = '100%'; bar2.style.backgroundColor = 'rgb(220,38,38)'; }
-    }
-  }, 150);
+    updateSimBtn();
+  }, 1000);
 }
 
 function onExecSlippage(v) {
@@ -1795,7 +1762,7 @@ function execModal() {
     const rv = build && build.review;
     const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, target)}</div>` : '';
     content = `
-      <p style="font-size:14px;font-weight:700;color:var(--accent);margin:0 0 .5rem">${t('exec_signing_wallet')}</p>
+      <p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem">${t('exec_signing_wallet')}</p>
       ${dimTable}`;
   } else if (phase === 'submitting') {
     const rv = build && build.review;
@@ -1804,7 +1771,7 @@ function execModal() {
       ? `<p class="help" style="margin:.5rem 0 0">${t('exec_restore')}</p>`
       : '';
     content = `
-      <p style="font-size:14px;font-weight:700;color:var(--accent);margin:0 0 .5rem">${t('exec_submitting')}</p>
+      <p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem">${t('exec_submitting')}</p>
       ${restoreNote}
       ${dimTable}`;
   } else if (phase === 'done') {
@@ -1885,23 +1852,6 @@ renderApp();
 startCountdownTick();
 void Promise.all([loadOverview(), loadBalance()]);
 if (view === 'health') void loadHealth();
-
-// #5 — Pause/reprise de la barre lors des changements de visibilité de l'onglet
-document.addEventListener('visibilitychange', () => {
-  if (!autoRefreshTimer && autoRefreshFrac <= 0) return; // barre inactive
-  if (document.visibilityState === 'hidden') {
-    // Geler : mémoriser l'élapsé accumulé et mettre en pause l'interval
-    if (autoRefreshStart) {
-      autoRefreshPaused += Date.now() - autoRefreshStart;
-      autoRefreshStart = null;
-    }
-  } else {
-    // Reprendre : décaler l'origine
-    if (autoRefreshTimer && autoRefreshStart === null && autoRefreshFrac < 1) {
-      autoRefreshStart = Date.now();
-    }
-  }
-});
 
 // ─── Easter egg : scam-coin GeoCities derrière le konami code (↑↑↓↓←→←→ B A) ───
 function openScamEgg() {
