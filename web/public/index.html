@@ -1003,9 +1003,8 @@ function simCard() {
       minReceived = b.net * (1 - execSlippagePct / 100);
     }
     const minStr = `<span style="color:var(--caption)">${t('sim_min', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(minReceived)} ${target}</span>`;
-    const sourceLabel = displayRow ? `<span style="font-size:11px;color:var(--caption);margin-bottom:.15rem">${displayRow.display}</span>` : '';
+    // Nom de l'outil retiré ici : il est désormais porté par le bouton « Exécuter via [outil] ».
     resultHtml = `<div class="result">
-      ${sourceLabel ? `<div style="flex:1 1 100%">${sourceLabel}</div>` : ''}
       <div style="flex:1 1 100%">${route}</div>
       <span class="meta" style="flex:1 1 100%; margin-top:.4rem">${rateStr}${impactStr}</span>
       <span class="meta" style="flex:1 1 100%; margin-top:.2rem">${minStr}</span>
