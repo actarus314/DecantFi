@@ -399,6 +399,7 @@ const STRINGS = {
     exec_btn: 'Exécuter le swap',
     exec_connect_first: 'Connecte ton wallet pour exécuter',
     slippage_label: 'Slippage',
+    slip_risk: (winner, floor, alt, sym, slip) => `⚠ ${winner} sur-cote : à ${slip} % de slippage, le plancher exigé (${floor} ${sym}) dépasse ce que les autres routes offrent (${alt} ${sym}) — risque de revert à l'exécution. Augmente le slippage ou choisis une autre route.`,
 
     // Revue avant signature
     review_title: 'Vérifier avant signature',
@@ -603,6 +604,7 @@ const STRINGS = {
     exec_btn: 'Execute swap',
     exec_connect_first: 'Connect your wallet to execute',
     slippage_label: 'Slippage',
+    slip_risk: (winner, floor, alt, sym, slip) => `⚠ ${winner} over-quotes: at ${slip}% slippage, the required floor (${floor} ${sym}) exceeds what other routes offer (${alt} ${sym}) — execution may revert. Raise the slippage or pick another route.`,
 
     // Review before signing
     review_title: 'Review before signing',
@@ -981,6 +983,7 @@ function simCard() {
       ? (simResult.ladder || []).find(r => r.sourceId === selectedSource)
       : null;
     const displayRow = selRow && !selRow.winner ? selRow : null; // non-gagnant sélectionné → détail spécifique
+    const winRow = (simResult.ladder || []).find(r => r.winner);
     let route, rateStr, impactStr, minReceived;
     if (displayRow) {
       // #7 — harmonise le rendu de la ligne non-gagnante avec le gagnant
@@ -1010,6 +1013,17 @@ function simCard() {
     if (simResult.errors && simResult.errors.length > 0) {
       resultHtml += `<p class="help" style="margin:.4rem 0 0">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
     }
+    // Alerte AU QUOTE : le gagnant sur-cote vs le cluster exécutable → son plancher (net − slippage)
+    // dépasse ce que la meilleure AUTRE route exécutable offre ⇒ revert probable à l'exécution.
+    // Purement client (aucun appel réseau), recalculé quand le slippage change.
+    if (winRow && winRow.executable) {
+      const floor = winRow.net * (1 - execSlippagePct / 100);
+      const alts = (simResult.ladder || []).filter(r => r.executable && r.sourceId !== winRow.sourceId).map(r => r.net);
+      const bestAlt = alts.length ? Math.max(...alts) : null;
+      if (bestAlt != null && floor > bestAlt + 1e-7) {
+        resultHtml += `<p class="help" style="margin:.5rem 0 0;color:var(--amber);font-weight:600">${t('slip_risk', winRow.display, fmt3(floor), fmt3(bestAlt), target, execSlippagePct)}</p>`;
+      }
+    }
     // Exec row
     if (selRow && !selRow.executable) {
       // Venue non intégré : deep-link uniquement, pas de bouton Execute
@@ -1020,7 +1034,8 @@ function simCard() {
         <span style="font-size:11px;color:var(--caption)">${t('exec_integrated_soon')}</span>
       </div>`;
     } else {
-      const execLabel = selRow ? t('exec_via', selRow.display) : t('exec_btn');
+      const execLabel = selRow ? t('exec_via', selRow.display)
+        : (winRow && winRow.executable && !winRow.sourceId.includes('+') ? t('exec_via', winRow.display) : t('exec_btn'));
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
         <button class="btn primary" onclick="doExecute()">${execLabel}</button>
         ${!selRow && b.deepLink ? openLink(b.deepLink, true) : ''}
@@ -1574,13 +1589,18 @@ async function doExecute() {
     : null;
   const winRow = (simResult.ladder || []).find(r => r.winner);
   const isComposite = !!(winRow && winRow.sourceId && winRow.sourceId.includes('+'));
+  // Venue à forcer : la ligne sélectionnée si exécutable, sinon le GAGNANT affiché s'il est exécutable.
+  // Fini la bascule silencieuse vers une autre venue : le bouton dit « via [gagnant] », on exécute [gagnant]
+  // (l'alerte au quote prévient en amont s'il sur-cote). Gagnant composite/non-exécutable → repli serveur.
+  const forceRow = (selRow && selRow.executable) ? selRow
+    : (winRow && winRow.executable && !isComposite ? winRow : null);
   const body = {
     pair: target,
     amount: simAmt,
     sender: walletAddress,
     slippageBps: Math.round(execSlippagePct * 100),
     displayed: isComposite && simResult.best ? { winner: simResult.best.display, net: simResult.best.net } : undefined,
-    ...(selRow && selRow.executable ? { venue: selRow.sourceId.split('+')[0].trim() } : {}),
+    ...(forceRow ? { venue: forceRow.sourceId.split('+')[0].trim() } : {}),
   };
   try {
     const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

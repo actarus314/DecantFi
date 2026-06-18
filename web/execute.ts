@@ -549,6 +549,9 @@ export async function buildAquarius(
     return { xdr: prepared.toXDR() };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    // #2006 = revert du routeur Aquarius quand la sortie simulée < out_min : la route find-path a
+    // sur-coté, elle ne tient pas au slippage demandé (≠ panne, ≠ fonds). Classer en slippage → message actionnable.
+    if (msg.includes('#2006')) throw new ExecError('slippage', msg);
     throw new ExecError(classifyExecError(msg), msg);
   }
 }
