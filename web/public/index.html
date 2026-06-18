@@ -1152,9 +1152,13 @@ function zoomHtml(m, series, sel, today, nowSlot, u) {
   const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
   const area = `M${pts[0][0].toFixed(1)},${baseY.toFixed(1)} ` + pts.map(p => 'L' + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + ` L${pts[pts.length - 1][0].toFixed(1)},${baseY.toFixed(1)} Z`;
   const wkY = wk != null ? yOf(wk) : null;
-  const showNow = sel === today && series[nowSlot] != null;
-  const nowX = showNow ? (nowSlot / (n - 1) * 100).toFixed(2) : 0;
-  const nowY = showNow ? (yOf(series[nowSlot]) / H * 100).toFixed(2) : 0;
+  // Point pulsant ancré sur le DERNIER relevé du jour ≤ créneau courant (et non le créneau courant
+  // EXACT, vide entre deux relevés de 15 min → le point disparaissait par intermittence). present est
+  // trié ascendant : le dernier p.i ≤ nowSlot est le relevé le plus récent à ne pas dépasser maintenant.
+  const nowIdx = sel === today ? present.reduce((acc, p) => (p.i <= nowSlot ? p.i : acc), -1) : -1;
+  const showNow = nowIdx >= 0;
+  const nowX = showNow ? (nowIdx / (n - 1) * 100).toFixed(2) : 0;
+  const nowY = showNow ? (yOf(series[nowIdx]) / H * 100).toFixed(2) : 0;
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="180" preserveAspectRatio="none" style="display:block;overflow:visible">
     <defs><clipPath id="zab"><rect x="0" y="0" width="${W}" height="${baseY.toFixed(1)}"/></clipPath><clipPath id="zbe"><rect x="0" y="${baseY.toFixed(1)}" width="${W}" height="${(H - baseY).toFixed(1)}"/></clipPath></defs>
     <path d="${area}" fill="var(--green)" fill-opacity=".4" clip-path="url(#zab)"/>
