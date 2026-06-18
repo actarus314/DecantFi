@@ -649,7 +649,13 @@ async function ensureKit() {
 let view = 'dashboard'; // 'dashboard' | 'health'
 let health = null;      // données de /api/health
 let target = 'USDC';
-let lang = localStorage.getItem('lang') || 'fr';
+// Langue par défaut = navigateur (FR si la préférence commence par "fr", sinon EN) ; un choix explicite reste persisté
+let lang = (() => {
+  const saved = localStorage.getItem('lang');
+  if (saved === 'fr' || saved === 'en') return saved;
+  const nav = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+  return nav.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+})();
 let ladderSonde = 250;
 let selDay = -1;       // jour affiché dans le zoom (init = aujourd'hui au 1er rendu)
 let zoomDev = [];      // écarts horaires du jour affiché (pour le survol)
@@ -1602,10 +1608,6 @@ const savedTheme = localStorage.getItem('theme');
 if (savedTheme === 'dark' || (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
   document.documentElement.classList.add('dark');
 }
-
-// Restitue la langue persistée
-const savedLang = localStorage.getItem('lang');
-if (savedLang === 'en' || savedLang === 'fr') lang = savedLang;
 
 // P1 : lire la paire depuis l'URL (?pair=EURC)
 (function() {
