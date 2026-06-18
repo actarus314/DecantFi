@@ -64,7 +64,7 @@ const SHORT_NAME: Record<string, string> = {
   soroswap: 'Soroswap',
   aquarius: 'Aquarius',
   comet: 'Comet',
-  ultrastellar: 'Ultra',
+  ultrastellar: 'Ultra Stellar',
   stellarbroker: 'StellarBroker',
   horizon: 'Horizon',
 };

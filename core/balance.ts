@@ -1,6 +1,6 @@
 // Lecture read-only de la balance BLND classique d'un compte via Horizon. Stroops exacts ; 0 si absente.
 // Partagé : CLI (--balance) et future UI web. JAMAIS de clé privée.
-import { BLND } from './assets.js';
+import { BLND, type Asset } from './assets.js';
 import { toStroops } from './amount.js';
 import { getJson as defaultGetJson } from './sources/http.js';
 
@@ -39,4 +39,25 @@ export async function readBlndBalance(address: string, deps: BalanceDeps): Promi
   const base = (deps.horizonUrl || 'https://horizon.stellar.org').replace(/\/$/, '');
   const raw = await getJson(`${base}/accounts/${address}`, deps.timeoutMs);
   return parseBlndBalance(raw);
+}
+
+/**
+ * Extrait la balance d'un actif classique (USDC/EURC) en unités (number).
+ * 0 si la trustline est absente ou si la réponse Horizon est inattendue.
+ */
+export function parseAssetBalance(raw: unknown, asset: Asset): number {
+  const balances = (raw as HorizonAccount | null)?.balances;
+  if (!Array.isArray(balances)) return 0;
+  const b = balances.find((x) => x.asset_code === asset.code && x.asset_issuer === asset.issuer);
+  if (!b || typeof b.balance !== 'string') return 0;
+  const n = Number(b.balance);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Lit la balance d'un actif classique live de `address` via Horizon. Tolérant : Horizon KO → 0. */
+export async function readAssetBalance(address: string, asset: Asset, deps: BalanceDeps): Promise<number> {
+  const getJson = deps.getJson ?? defaultGetJson;
+  const base = (deps.horizonUrl || 'https://horizon.stellar.org').replace(/\/$/, '');
+  const raw = await getJson(`${base}/accounts/${address}`, deps.timeoutMs);
+  return parseAssetBalance(raw, asset);
 }

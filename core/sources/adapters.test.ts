@@ -24,6 +24,14 @@ describe('xbull', () => {
     expect(q.netConfidence).toBe('exact');
     expect(q.feeBreakdown[0]?.amount).toBe(509187n);
   });
+  it('shape .app (fee = string ratio) : netOut exact, feeBreakdown vide', () => {
+    // Shape renvoyée par swap.apis.xbull.app (endpoint exécutable, vérité actuelle)
+    const raw = { route: 'abc123', fromAmount: '300000000', fromAsset: 'C...', toAsset: 'C...', toAmount: '14493322', fee: '0.001' };
+    const q = parseXbull(raw, req)!;
+    expect(q.netOut).toBe(14493322n);
+    expect(q.netConfidence).toBe('exact');
+    expect(q.feeBreakdown).toHaveLength(0);
+  });
   it('null si toAmount absent', () => {
     expect(parseXbull({}, req)).toBeNull();
   });

@@ -30,6 +30,17 @@ export class ExecError extends Error {
   }
 }
 
+/** Message d'erreur trustline actionnable : indique comment ajouter la trustline dans le wallet.
+ *  Utiliser à la place de `new ExecError('trustline', ...)` partout où la trustline de sortie est absente. */
+function trustlineMissingError(buy: Asset, sender: string): ExecError {
+  return new ExecError(
+    'trustline',
+    `Trustline ${buy.code} (émetteur : ${buy.issuer}) absente sur le compte ${sender}. ` +
+    `Pour l'ajouter : dans votre wallet (Freighter / LOBSTR), allez dans « Manage Assets » ` +
+    `et ajoutez l'actif ${buy.code}. Coût : ~0,5 XLM de réserve immobilisée (opération changeTrust).`,
+  );
+}
+
 // ─── Helpers purs exportés ───────────────────────────────────────────────────
 
 /** Floor-division : net * (10000-bps) / 10000. Lance si bps invalide. */
@@ -413,7 +424,7 @@ export async function buildHorizon(
   if (!buy.native && !account.balances.some(
     (b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer,
   )) {
-    throw new ExecError('trustline', `trustline ${buy.code} absente sur ${sender}`);
+    throw trustlineMissingError(buy, sender);
   }
 
   const toSdk = (a: Asset) => (a.native ? SdkAsset.native() : new SdkAsset(a.code, a.issuer as string));
@@ -510,7 +521,7 @@ export async function buildAquarius(
   if (!buy.native && !account.balances.some(
     (b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer,
   )) {
-    throw new ExecError('trustline', `trustline ${buy.code} absente sur ${sender}`);
+    throw trustlineMissingError(buy, sender);
   }
 
   let swapsChain: ReturnType<typeof xdr.ScVal.fromXDR>;
@@ -583,7 +594,7 @@ export async function buildComet(
   if (!account.balances.some(
     (b) => 'asset_code' in b && b.asset_code === USDC.code && b.asset_issuer === USDC.issuer,
   )) {
-    throw new ExecError('trustline', `trustline USDC absente sur ${sender}`);
+    throw trustlineMissingError(USDC, sender);
   }
   // CAVEAT DUR Comet : exige du BLND LIQUIDE. S'il est staké dans le backstop Blend, le retirer d'abord (hors périmètre).
   const liquid = parseBlndBalance({ balances: account.balances });
@@ -715,7 +726,7 @@ export async function buildUltra(
   if (!buy.native && !account.balances.some(
     (b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer,
   )) {
-    throw new ExecError('trustline', `trustline ${buy.code} absente sur ${sender}`);
+    throw trustlineMissingError(buy, sender);
   }
 
   const sends = reconcileLegSends(legs.map((l) => l.sendStroops), fromAmount);

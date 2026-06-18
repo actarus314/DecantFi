@@ -74,7 +74,8 @@ body{margin:0; background:var(--bg); color:var(--val);
   background:var(--section-bg); color:var(--val); width:150px; font-variant-numeric:tabular-nums;}
 .suffix{font-size:13px; color:var(--sub); font-weight:600;}
 .btn{font-size:12px; font-weight:600; padding:.52rem .9rem; border-radius:.5rem; border:1px solid var(--card-border);
-  background:var(--section-bg); color:var(--val); cursor:pointer;}
+  background:var(--section-bg); color:var(--val); cursor:pointer; transition:transform .08s;}
+.btn:active{transform:translateY(1px) scale(.985);}
 .btn.primary{background:#0d9488; border-color:#0d9488; color:#fff;}
 .dark .btn.primary{background:#14b8a6; border-color:#14b8a6; color:#04201d;}
 .sim .result{margin-top:.9rem; padding-top:.9rem; border-top:1px solid var(--card-border);
@@ -326,6 +327,7 @@ const STRINGS = {
     sim_loading: 'Cotation en cours…',
     sim_errors: 'Sources en échec :',
     sim_open: 'Ouvrir ↗',
+    sim_min: (u) => `Reçu min (${u})`,
 
     // Tableau ladder
     ladder_col_tool: 'Outil de swap',
@@ -374,7 +376,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: '<b>xBull</b> domine habituellement ; <b>Comet</b> ne concourt que sur USDC (pool backstop). <b>Diversité = robustesse aux pannes.</b>',
-    dist_note_eurc: '<b>Pas de pool BLND/EURC profond</b> : les lignes « BLND → EURC » sont des <b>swaps atomiques routés en interne</b> via USDC/XLM (Soroswap affiche BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM ; <b>seul xBull masque son chemin</b>). La route <b>via-USDC explicite (2 swaps) les bat souvent</b>.',
+    dist_note_eurc: '<b>Pas de pool BLND/EURC profond</b> : les lignes « BLND → EURC » sont des <b>swaps atomiques routés en interne</b> via USDC/XLM (Soroswap affiche BLND → USDC → EURC, Aquarius via sUSD, Ultra Stellar via XLM ; <b>seul xBull masque son chemin</b>). La route <b>via-USDC explicite (2 swaps) les bat souvent</b>.',
 
     // Divers
     loading: 'Chargement…',
@@ -407,15 +409,21 @@ const STRINGS = {
 
     // États d'exécution
     exec_signing: 'Signature dans le wallet…',
+    exec_signing_wallet: 'Signature dans le wallet…',
     exec_submitting: 'Soumission…',
     exec_restore: 'Étape de restauration requise — signe-la, puis on reconstruit le swap.',
     exec_success: 'Swap soumis ✓',
     exec_view: 'Voir sur stellar.expert ↗',
     exec_close: 'Fermer',
     exec_failed: 'Échec',
+    exec_rejected: 'Signature refusée dans le wallet.',
+    exec_quoted: 'Attendu (coté)',
+    exec_executed: 'Reçu (exécuté)',
+    exec_reading: 'lecture en cours…',
+    exec_delta: 'écart',
 
     // Erreurs exec
-    err_trustline: 'Trustline de sortie manquante sur ton compte (ajoute la trustline de la devise cible).',
+    err_trustline: (tgt, issuer) => `Trustline ${tgt} absente. Pour la recevoir : dans ton wallet, ajoute l'actif ${tgt} (émetteur ${issuer}) — opération changeTrust, ~0,5 XLM de réserve. Puis relance.`,
     err_funds: 'Solde BLND liquide insuffisant (ton BLND est peut-être staké dans Blend — retire-le d\'abord).',
     err_slippage: 'Le prix a bougé au-delà de ta tolérance — réessaie ou augmente le slippage.',
     err_down: 'Source d\'exécution indisponible, réessaie.',
@@ -518,6 +526,7 @@ const STRINGS = {
     sim_loading: 'Fetching quote…',
     sim_errors: 'Failed sources:',
     sim_open: 'Open ↗',
+    sim_min: (u) => `Min received (${u})`,
 
     // Tableau ladder
     ladder_col_tool: 'Swap tool',
@@ -566,7 +575,7 @@ const STRINGS = {
 
     // Distribution note
     dist_note_usdc: '<b>xBull</b> usually dominates; <b>Comet</b> only competes on USDC (backstop pool). <b>Diversity = resilience to failures.</b>',
-    dist_note_eurc: '<b>No deep BLND/EURC pool</b>: the "BLND → EURC" rows are <b>atomic swaps routed internally</b> via USDC/XLM (Soroswap shows BLND → USDC → EURC, Aquarius via sUSD, Ultra via XLM; <b>only xBull hides its path</b>). The explicit <b>via-USDC route (2 swaps) often beats them</b>.',
+    dist_note_eurc: '<b>No deep BLND/EURC pool</b>: the "BLND → EURC" rows are <b>atomic swaps routed internally</b> via USDC/XLM (Soroswap shows BLND → USDC → EURC, Aquarius via sUSD, Ultra Stellar via XLM; <b>only xBull hides its path</b>). The explicit <b>via-USDC route (2 swaps) often beats them</b>.',
 
     // Divers
     loading: 'Loading…',
@@ -599,15 +608,21 @@ const STRINGS = {
 
     // Execution states
     exec_signing: 'Signing in wallet…',
+    exec_signing_wallet: 'Signing in your wallet…',
     exec_submitting: 'Submitting…',
     exec_restore: 'A restore step is required — sign it, then we rebuild the swap.',
     exec_success: 'Swap submitted ✓',
     exec_view: 'View on stellar.expert ↗',
     exec_close: 'Close',
     exec_failed: 'Failed',
+    exec_rejected: 'Signature rejected in the wallet.',
+    exec_quoted: 'Expected (quoted)',
+    exec_executed: 'Received (executed)',
+    exec_reading: 'reading…',
+    exec_delta: 'delta',
 
     // Exec errors
-    err_trustline: 'Missing destination trustline on your account (add the target asset trustline).',
+    err_trustline: (tgt, issuer) => `${tgt} trustline missing. To receive it: in your wallet, add the ${tgt} asset (issuer ${issuer}) — changeTrust operation, ~0.5 XLM reserve. Then retry.`,
     err_funds: 'Insufficient liquid BLND (your BLND may be staked in Blend — withdraw it first).',
     err_slippage: 'Price moved beyond your tolerance — retry or raise slippage.',
     err_down: 'Execution source unavailable, try again.',
@@ -706,7 +721,7 @@ let refreshMsg = '';
 let walletAddress = localStorage.getItem('walletAddress') || null;
 // Exécution swap
 let execState = null; // null | { phase:'review'|'signing'|'submitting'|'done'|'error', build?, hash?, venue?, errorMsg? }
-let execSlippagePct = 0.5; // UI %, → bps = Math.round(execSlippagePct*100)
+let execSlippagePct = (() => { const s = parseFloat(localStorage.getItem('slippagePct')); return (!isNaN(s) && s >= 0 && s <= 50) ? s : 0.5; })(); // UI %, → bps = Math.round(execSlippagePct*100)
 // click-to-select : sourceId sélectionné (null = auto)
 let selectedSource = null;
 
@@ -942,22 +957,40 @@ function simCard() {
     resultHtml = `<p class="help" style="margin:.7rem 0 0">${t('sim_loading')}</p>`;
   } else if (simResult && simActive) {
     const b = simResult.best;
-    const route = b.route && b.route.length > 0
-      ? routeFromParts(b.route, true)
-      : routeSimple(fmt3(simAmt), b.net, b.display, target, true);
-    const rateStr = b.rate > 0 ? b.rate.toFixed(6) + ' ' + target + '/BLND' : '';
-    const impactStr = b.impactPct != null ? ` · impact ${fmt(b.impactPct)} %` : '';
+    // #5 — sélection dans le ladder : si une ligne non-gagnante est sélectionnée,
+    // afficher le détail de CETTE source (route + net + impact) et non ceux du gagnant.
+    const selRow = selectedSource
+      ? (simResult.ladder || []).find(r => r.sourceId === selectedSource)
+      : null;
+    const displayRow = selRow && !selRow.winner ? selRow : null; // non-gagnant sélectionné → détail spécifique
+    let route, rateStr, impactStr, minReceived;
+    if (displayRow) {
+      // selRow est une ligne ladder : route est une STRING (pas des RibbonPart[])
+      route = renderRoute(displayRow.route);
+      const rowRate = simAmt > 0 ? displayRow.net / simAmt : 0;
+      rateStr = rowRate > 0 ? rowRate.toFixed(6) + ' ' + target + '/BLND' : '';
+      impactStr = displayRow.impactPct != null ? ` · impact ${fmt(displayRow.impactPct)} %` : '';
+      minReceived = displayRow.net * (1 - execSlippagePct / 100);
+    } else {
+      route = b.route && b.route.length > 0
+        ? routeFromParts(b.route, true)
+        : routeSimple(fmt3(simAmt), b.net, b.display, target, true);
+      rateStr = b.rate > 0 ? b.rate.toFixed(6) + ' ' + target + '/BLND' : '';
+      impactStr = b.impactPct != null ? ` · impact ${fmt(b.impactPct)} %` : '';
+      minReceived = b.net * (1 - execSlippagePct / 100);
+    }
+    const minStr = `<span style="color:var(--caption)">${t('sim_min', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(minReceived)} ${target}</span>`;
+    const sourceLabel = displayRow ? `<span style="font-size:11px;color:var(--caption);margin-bottom:.15rem">${displayRow.display}</span>` : '';
     resultHtml = `<div class="result">
+      ${sourceLabel ? `<div style="flex:1 1 100%">${sourceLabel}</div>` : ''}
       <div style="flex:1 1 100%">${route}</div>
       <span class="meta" style="flex:1 1 100%; margin-top:.4rem">${rateStr}${impactStr}</span>
+      <span class="meta" style="flex:1 1 100%; margin-top:.2rem">${minStr}</span>
     </div>`;
     if (simResult.errors && simResult.errors.length > 0) {
       resultHtml += `<p class="help" style="margin:.4rem 0 0">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
     }
-    // Exec row — click-to-select : si une ligne non-exécutable est sélectionnée → deep-link seul
-    const selRow = selectedSource
-      ? (simResult.ladder || []).find(r => r.sourceId === selectedSource)
-      : null;
+    // Exec row
     if (selRow && !selRow.executable) {
       // Venue non intégré : deep-link uniquement, pas de bouton Execute
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
@@ -969,11 +1002,6 @@ function simCard() {
     } else {
       const execLabel = selRow ? t('exec_via', selRow.display) : t('exec_btn');
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
-        <input id="execSlippage" type="number" min="0" max="50" step="0.1" value="${execSlippagePct}"
-          style="width:70px;font-size:13px;padding:.35rem .5rem;border-radius:.4rem;border:1px solid var(--card-border);background:var(--section-bg);color:var(--val)"
-          onchange="onExecSlippage(this.value)">
-        <span class="suffix">%</span>
         <button class="btn primary" onclick="doExecute()">${execLabel}</button>
         ${!selRow && b.deepLink ? openLink(b.deepLink, true) : ''}
       </div>`;
@@ -987,6 +1015,11 @@ function simCard() {
       <button class="btn" onclick="useWallet()" ${!walletConfigured ? 'disabled' : ''}>${walletLabel}</button>
       <button class="btn primary" onclick="doSim()">${t('sim_btn_simulate')}</button>
       <button class="btn" onclick="clearSim()">${t('sim_btn_clear')}</button>
+      <span style="font-size:11px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
+      <input id="execSlippage" type="number" min="0" max="50" step="0.1" value="${execSlippagePct}"
+        style="width:70px;font-size:13px;padding:.35rem .5rem;border-radius:.4rem;border:1px solid var(--card-border);background:var(--section-bg);color:var(--val)"
+        onchange="onExecSlippage(this.value)">
+      <span class="suffix">%</span>
     </div>
     <div id="simOut">${resultHtml}</div></div>`;
 }
@@ -1479,7 +1512,13 @@ function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+const TRUSTLINE_ISSUERS = {
+  USDC: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
+  EURC: 'GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2',
+};
+
 function mapExecError(code, fallback) {
+  if (code === 'trustline') return t('err_trustline', target, TRUSTLINE_ISSUERS[target] || target);
   const key = 'err_' + String(code).replace('-', ''); // 'no-route' → clé 'err_noroute'
   const s = STRINGS[lang];
   if (s && s[key] !== undefined) return t(key);
@@ -1539,6 +1578,15 @@ async function confirmExecute() {
   const build = execState && execState.build; if (!build) return;
   execState = { phase: 'signing', build }; renderApp();
   try {
+    // Lire le solde cible AVANT signature pour comparer après exécution (#3)
+    const asset = target;
+    let destBefore = null;
+    if (walletAddress) {
+      try {
+        const br = await fetch(`/api/asset-balance?address=${walletAddress}&asset=${asset}`);
+        if (br.ok) { const bj = await br.json(); destBefore = typeof bj.balance === 'number' ? bj.balance : null; }
+      } catch (_) { /* non bloquant */ }
+    }
     await ensureKit();
     const { signedTxXdr } = await SWK.signTransaction(build.xdr, { address: walletAddress, networkPassphrase: KIT_NET });
     execState = { phase: 'submitting', build }; renderApp();
@@ -1551,8 +1599,36 @@ async function confirmExecute() {
       // ponytail: branche restore best-effort, non testée en live (nécessite un contrat archivé).
       await doExecute(); return;
     }
-    execState = { phase: 'done', hash: j.hash, venue: build.venue }; renderApp();
-  } catch (e) { execState = { phase: 'error', errorMsg: (e && e.message) || t('exec_failed') }; renderApp(); }
+    const doneHash = j.hash;
+    execState = { phase: 'done', hash: doneHash, venue: build.venue, build }; renderApp();
+    // Poll du solde cible pour afficher le reçu on-chain (#3)
+    if (destBefore != null && walletAddress) {
+      (async () => {
+        for (let i = 0; i < 10; i++) {
+          await new Promise(res => setTimeout(res, 1500));
+          // Abandon si le modal a été fermé ou la phase a changé
+          if (!execState || execState.phase !== 'done' || execState.hash !== doneHash) return;
+          try {
+            const pr = await fetch(`/api/asset-balance?address=${walletAddress}&asset=${asset}`);
+            if (!pr.ok) continue;
+            const pj = await pr.json();
+            const bal = typeof pj.balance === 'number' ? pj.balance : null;
+            if (bal != null && bal > destBefore + 1e-7) {
+              if (execState && execState.phase === 'done' && execState.hash === doneHash) {
+                execState = { ...execState, executed: bal - destBefore };
+                renderApp();
+              }
+              return;
+            }
+          } catch (_) { /* continuer */ }
+        }
+      })();
+    }
+  } catch (e) {
+    const msg = (e && e.message) || '';
+    const errorMsg = /reject/i.test(msg) ? t('exec_rejected') : (msg || t('exec_failed'));
+    execState = { phase: 'error', errorMsg }; renderApp();
+  }
 }
 
 function cancelExecute() {
@@ -1563,17 +1639,35 @@ function cancelExecute() {
 function onExecSlippage(v) {
   const n = parseFloat(String(v).replace(',', '.'));
   execSlippagePct = isNaN(n) ? 0.5 : Math.max(0, Math.min(50, n));
+  localStorage.setItem('slippagePct', execSlippagePct);
+  renderApp();
+}
+
+// ─── Helper : table de revue (partagée review / signing / submitting) ─────────
+function venueDisplay(id) {
+  return id === 'xbull' ? 'xBull' : id === 'soroswap' ? 'Soroswap' : id === 'horizon' ? 'Horizon' : id === 'aquarius' ? 'Aquarius' : id === 'comet' ? 'Comet' : id === 'ultrastellar' ? 'Ultra Stellar' : id;
+}
+
+function reviewTableHtml(rv, tgt) {
+  const vl = venueDisplay(rv.venue);
+  return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.8rem">
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} BLND</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${tgt}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt3(rv.minReceived)} ${tgt}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${vl}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
+  </table>`;
 }
 
 // ─── Modal d'exécution ────────────────────────────────────────────────────────
 function execModal() {
   if (!execState) return '';
-  const { phase, build, hash, errorMsg } = execState;
+  const { phase, build, hash, errorMsg, executed } = execState;
 
   let content = '';
   if (phase === 'review') {
     const rv = build.review;
-    const venueLabel = rv.venue === 'xbull' ? 'xBull' : rv.venue === 'soroswap' ? 'Soroswap' : rv.venue === 'horizon' ? 'Horizon' : rv.venue === 'aquarius' ? 'Aquarius' : rv.venue === 'comet' ? 'Comet' : rv.venue === 'ultrastellar' ? 'Ultra' : rv.venue;
     const fidelityNote = rv.fidelity
       ? `<p class="help" style="margin:.6rem 0 0">${t('review_fidelity', rv.fidelity.displayedWinner, fmt3(rv.fidelity.displayedWinnerNet))}</p>`
       : '';
@@ -1583,14 +1677,7 @@ function execModal() {
       : '';
     content = `
       <div style="font-size:14px;font-weight:700;margin-bottom:.9rem">${t('review_title')}</div>
-      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.8rem">
-        <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
-        <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} BLND</td></tr>
-        <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${target}</td></tr>
-        <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt3(rv.minReceived)} ${target}</td></tr>
-        <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${venueLabel}</td></tr>
-        <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
-      </table>
+      ${reviewTableHtml(rv, target)}
       ${fidelityNote}
       ${restoreNote}
       <div style="display:flex;gap:.55rem;margin-top:.9rem;justify-content:flex-end">
@@ -1598,16 +1685,44 @@ function execModal() {
         <button class="btn primary" onclick="confirmExecute()">${t('review_confirm')}</button>
       </div>`;
   } else if (phase === 'signing') {
-    content = `<p class="help" style="margin:0">${t('exec_signing')}</p>`;
+    const rv = build && build.review;
+    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, target)}</div>` : '';
+    content = `
+      <p style="font-size:14px;font-weight:700;color:var(--accent);margin:0 0 .5rem">${t('exec_signing_wallet')}</p>
+      ${dimTable}`;
   } else if (phase === 'submitting') {
+    const rv = build && build.review;
+    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, target)}</div>` : '';
     const restoreNote = build && build.type === 'restore'
       ? `<p class="help" style="margin:.5rem 0 0">${t('exec_restore')}</p>`
       : '';
-    content = `<p class="help" style="margin:0">${t('exec_submitting')}</p>${restoreNote}`;
+    content = `
+      <p style="font-size:14px;font-weight:700;color:var(--accent);margin:0 0 .5rem">${t('exec_submitting')}</p>
+      ${restoreNote}
+      ${dimTable}`;
   } else if (phase === 'done') {
+    const rv = build && build.review;
+    let compTable = '';
+    if (rv) {
+      const execVal = executed != null
+        ? `<span style="font-weight:700;color:${executed >= rv.netOut ? 'var(--green)' : 'var(--red)'}">${fmt3(executed)} ${target}</span>`
+        : `<span style="color:var(--caption)">${t('exec_reading')}</span>`;
+      const deltaRow = executed != null ? (() => {
+        const d = executed - rv.netOut;
+        const col = d >= 0 ? 'var(--green)' : 'var(--red)';
+        return `<tr><td style="padding:4px 0;color:var(--caption)">${t('exec_delta')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:${col}">${d >= 0 ? '+' : ''}${fmt3(d)} ${target}</td></tr>`;
+      })() : '';
+      compTable = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:.7rem 0 .5rem">
+        <tr><td style="padding:4px 0;color:var(--caption)">${t('exec_quoted')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${target}</td></tr>
+        <tr><td style="padding:4px 0;color:var(--caption)">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.minReceived)} ${target}</td></tr>
+        <tr><td style="padding:4px 0;color:var(--caption)">${t('exec_executed')}</td><td style="padding:4px 0;text-align:right">${execVal}</td></tr>
+        ${deltaRow}
+      </table>`;
+    }
     content = `
       <p style="font-size:14px;font-weight:700;color:var(--green);margin:0 0 .6rem">${t('exec_success')}</p>
       <a class="openlink" href="https://stellar.expert/explorer/public/tx/${hash}" target="_blank" rel="noopener">${t('exec_view')}</a>
+      ${compTable}
       <div style="margin-top:.9rem;text-align:right">
         <button class="btn" onclick="cancelExecute()">${t('exec_close')}</button>
       </div>`;
