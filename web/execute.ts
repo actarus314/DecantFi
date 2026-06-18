@@ -236,6 +236,52 @@ async function simulateCometReal(a: { sellSac: string; buySac: string; amountIn:
   return null;
 }
 
+// ─── Simulation Aquarius read-only ───────────────────────────────────────────
+
+/** Témoins BLND ayant assez de liquidité pour simuler swap_chained (le solde n'est pas touché). */
+export const AQUARIUS_WITNESSES = [
+  'GCA34HBKNLWN3AOXWBRW5Y3HSGHCWF3UDBRJ5YHGU6HWGJZEPO2NSXI3',
+  'GBBF7X4FQ3HGRIDSNQ2HOPS6BP7ZERJN22Y54O5WAOAK4CAA4FV3K3G2',
+  'GC7IUIQ7R6NOIFNB4PYFNVYVNHSLJIULSWQTXG7UK33UTIC6NSZIW2BC',
+];
+
+/** Simule swap_chained Aquarius avec out_min=0 pour obtenir le net réel (sans revert de slippage).
+ *  null si tous les témoins échouent ou si le XDR n'est pas décodable. */
+export async function simulateAquariusNet(
+  swapChainXdr: string,
+  amountIn: bigint,
+  cfg: { rpcUrl: string },
+): Promise<bigint | null> {
+  const sdk = await import('@stellar/stellar-sdk');
+  const { rpc, Address, TransactionBuilder, Networks, Account, Contract, scValToNative, nativeToScVal, xdr } = sdk;
+
+  let swapsChain: ReturnType<typeof xdr.ScVal.fromXDR>;
+  try {
+    swapsChain = xdr.ScVal.fromXDR(swapChainXdr, 'base64');
+  } catch {
+    return null;
+  }
+
+  const server = new rpc.Server((cfg.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
+  for (const witness of AQUARIUS_WITNESSES) {
+    const args = [
+      Address.fromString(witness).toScVal(),
+      swapsChain,
+      Address.fromString(BLND.sac!).toScVal(),
+      nativeToScVal(amountIn, { type: 'u128' }),
+      nativeToScVal(0n, { type: 'u128' }),
+    ];
+    const tx = new TransactionBuilder(new Account(witness, '0'), { fee: '10000', networkPassphrase: Networks.PUBLIC })
+      .addOperation(new Contract(AQUA_ROUTER).call('swap_chained', ...args))
+      .setTimeout(180)
+      .build();
+    const sim = await server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationError(sim) || !sim.result) continue;
+    try { return BigInt(scValToNative(sim.result.retval)); } catch { return null; }
+  }
+  return null;
+}
+
 // ─── Quote / build — xBull ───────────────────────────────────────────────────
 
 export async function quoteXbull(

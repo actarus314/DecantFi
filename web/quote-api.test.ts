@@ -118,6 +118,29 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
     expect(horizonRow!.deepLink).toBeNull(); // exécution intégrée → pas de page de swap dédiée
   });
 
+  it('re-classe Aquarius sur le net simulé (plus bas que find-path) → Aquarius perd contre xBull', async () => {
+    // find-path Aquarius sur-cote (4.02 > 4.00 xBull) → doit gagner SANS la sim
+    // avec la sim (retourne 3.90 < 4.00), xBull doit être le winner
+    const xbullQ = { ...makeQuote('xbull', 4_0000000n) };
+    const aquaQ = { ...makeQuote('aquarius', 4_0200000n), raw: { swap_chain_xdr: 'AAAA' } };
+    vi.mocked(engineQuote).mockResolvedValue({
+      request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
+      prices: { blndUsd: 0.05, eurUsd: 1.08, xlmUsd: 0.12 },
+      ranking: { ranked: [aquaQ, xbullQ], best: aquaQ },
+      errors: [],
+    } as any);
+
+    const fakeSim = vi.fn(async () => 3_9000000n); // net simulé < xBull
+    const result = await liveQuote('USDC', AMT, FAKE_CFG as any, { simulateAquariusNet: fakeSim });
+
+    expect(fakeSim).toHaveBeenCalledOnce();
+    // xBull doit être winner (index 0), aquarius doit être non-winner
+    expect(result.best.display).not.toContain('Aquarius');
+    const aquaRow = result.ladder.find((r) => r.sourceId === 'aquarius');
+    expect(aquaRow?.winner).toBe(false);
+    expect(result.ladder[0]?.sourceId).toBe('xbull');
+  });
+
   it('id composite (leg1+leg2) → NON exécutable (2 tx non atomiques), deepLink = base', async () => {
     const compositeQ = makeQuote('xbull+ultrastellar', 5_3000000n);
 
