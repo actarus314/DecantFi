@@ -1,6 +1,8 @@
 // Cotation live et balance wallet pour l'UI web.
 // ponytail: Number = affichage, jamais règlement.
 import { quote as engineQuote } from '../core/engine.js';
+import { rankQuotes } from '../core/rank.js';
+import { simulateAquariusNet } from './execute.js';
 import { readBlndBalance } from '../core/balance.js';
 import { BLND, USDC, EURC } from '../core/assets.js';
 import { toStroops, toNumber } from '../core/amount.js';
@@ -128,6 +130,7 @@ export async function liveQuote(
   pairUi: string,
   amountStroops: bigint,
   cfg: WebConfig,
+  deps?: { simulateAquariusNet?: typeof simulateAquariusNet },
 ): Promise<LiveQuote> {
   const buyAsset = pairUi === 'EURC' ? EURC : USDC;
 
@@ -146,6 +149,44 @@ export async function liveQuote(
       rpcCache: new Map(),
     },
   });
+
+  // ─── Re-simulation Aquarius : remplace le net find-path (sur-coté) par le vrai net simulé ───
+  // Aquarius find-path sur-cote ~0,2 % sur les routes via-XLM → fait gagner Aquarius à tort.
+  // On simule swap_chained avec out_min=0 pour récupérer le vrai fill sans revert de slippage.
+  let aquariusSimNet: bigint | undefined;
+  {
+    const simFn = deps?.simulateAquariusNet ?? simulateAquariusNet;
+    const aqRanked = result.ranking.ranked.find((q) => q.source === 'aquarius');
+    const rawXdr = (aqRanked?.raw as { swap_chain_xdr?: unknown } | undefined)?.swap_chain_xdr;
+    if (aqRanked && rawXdr) {
+      const simNet = await simFn(String(rawXdr), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null);
+      if (simNet !== null && simNet > 0n && simNet !== aqRanked.netOut) {
+        const newQuotes = result.ranking.ranked.map((q) =>
+          q.source === 'aquarius' ? { ...q, netOut: simNet, grossOut: simNet } : q,
+        );
+        result.ranking = rankQuotes(newQuotes);
+        aquariusSimNet = simNet;
+      }
+    }
+    // EURC direct via Aquarius : mettre à jour netOut et recalculer winner/bestNetEurc
+    if (pairUi === 'EURC' && result.eurc?.direct?.source === 'aquarius' && aquariusSimNet !== undefined) {
+      const eurc = result.eurc;
+      const simNet = aquariusSimNet;
+      const prevDirect = eurc.direct!;
+      eurc.direct = { ...prevDirect, netOut: simNet, grossOut: simNet };
+      const directNet = simNet;
+      const viaNet = eurc.viaUsdc?.netEurc;
+      if (viaNet !== undefined) {
+        eurc.winner = viaNet > directNet ? 'via-usdc' : 'direct';
+        eurc.bestNetEurc = eurc.winner === 'via-usdc' ? viaNet : directNet;
+        eurc.viaUsdcAdvantage = viaNet - directNet;
+      } else {
+        eurc.winner = 'direct';
+        eurc.bestNetEurc = directNet;
+        eurc.viaUsdcAdvantage = undefined;
+      }
+    }
+  }
 
   // Pour EURC : si le gagnant est via-usdc, utiliser result.eurc
   let bestQuote: import('../core/sources/types.js').NormalizedQuote | undefined = result.ranking.best;
