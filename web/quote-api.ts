@@ -20,6 +20,7 @@ export interface LiveLadderRow {
   display: string;
   note: string;
   route: string;
+  routeParts: RibbonPart[] | null;
   net: number;
   deltaVsWinner: number;
   chip: Chip;
@@ -205,12 +206,13 @@ export async function liveQuote(
   // Échelle complète : ranking direct + (EURC) ligne composite via-USDC, triée par net.
   // Le composite est TOUJOURS listé quand il existe (comme le stockage collecteur) → le tableau
   // colle au simulateur (le gagnant peut être le composite, pas le meilleur direct).
-  const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; eurcPath: string | null; impactPct: number | null }> =
+  const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; hops: RouteHop[] | null; eurcPath: string | null; impactPct: number | null }> =
     result.ranking.ranked.map((rq) => ({
       source: rq.source,
       netOut: rq.netOut,
       conf: rq.netConfidence,
       route: routeStr(rq.route, rq.sellAsset.symbol, rq.buyAsset.symbol),
+      hops: rq.route,
       eurcPath: null,
       impactPct: rq.priceImpactPct ?? null,
     }));
@@ -223,6 +225,7 @@ export async function liveQuote(
       netOut: v.netEurc,
       conf: 'estimate',
       route: `${r1} → ${r2.split(' → ').slice(1).join(' → ')}`, // fusionne le nœud USDC partagé
+      hops: null, // composite EURC via-USDC : pas de RouteHop[] structuré unique
       eurcPath: 'via-usdc',
       impactPct: priceImpactPct(amountStroops, v.netEurc, result.prices.blndUsd, targetUsdPerUnit('EURC', result.prices)) ?? null,
     });
@@ -233,6 +236,7 @@ export async function liveQuote(
     display: displayName(r.source),
     note: noteFor(r.source, i === 0, r.eurcPath),
     route: maskedRoute(r.route, r.source),
+    routeParts: r.hops !== null ? buildRoute(r.hops, amountStroops, r.netOut, pairUi) : null,
     net: toNumber(r.netOut),
     deltaVsWinner: toNumber(r.netOut) - topNetNum,
     chip: r.eurcPath === 'via-usdc' ? 'calc' : chipFor(r.conf, r.source, r.eurcPath),
