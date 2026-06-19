@@ -740,14 +740,6 @@ export async function buildComet(
   )) {
     throw trustlineMissingError(USDC, sender);
   }
-  // CAVEAT DUR Comet : exige du BLND LIQUIDE. S'il est staké dans le backstop Blend, le retirer d'abord (hors périmètre).
-  const liquid = parseBlndBalance({ balances: account.balances });
-  if (liquid < amountIn) {
-    throw new ExecError('funds',
-      `BLND liquide insuffisant (${fromStroops(liquid)} dispo, ${fromStroops(amountIn)} requis) — ` +
-      `le BLND staké dans le backstop Blend doit d'abord être retiré (hors périmètre).`);
-  }
-
   const tx = new TransactionBuilder(account, { fee: '10000', networkPassphrase: Networks.PUBLIC })
     .addOperation(new Contract(COMET_POOL).call(
       'swap_exact_amount_in',
@@ -895,18 +887,27 @@ export async function buildUltra(
 
 // ─── Trustline (pré-flight + ajout in-app) ───────────────────────────────────
 
-/** Le sender détient-il la trustline de l'actif d'achat ? true/false, ou null si lecture impossible
- *  (compte introuvable / Horizon en panne → on laisse les builds gérer, pas de faux « trustline absente »). */
-async function senderHasTrustline(sender: string, buy: Asset, horizonUrl?: string): Promise<boolean | null> {
-  if (buy.native) return true;
+/** Pré-flight : charge le compte une seule fois pour vérifier la trustline ET le solde BLND liquide.
+ *  trustline : true/false ou null si lecture impossible (compte introuvable / Horizon en panne).
+ *  liquid    : solde BLND liquide en stroops, ou null si lecture impossible.
+ *  → null = on laisse les builds gérer, pas de faux-positif. */
+async function senderPreflight(
+  sender: string,
+  buy: Asset,
+  horizonUrl?: string,
+): Promise<{ trustline: boolean | null; liquid: bigint | null }> {
   try {
     const sdk = await import('@stellar/stellar-sdk');
     const { Horizon } = sdk;
     const server = new Horizon.Server((horizonUrl || HORIZON_BASE_DEFAULT).replace(/\/$/, ''));
     const account = await server.loadAccount(sender);
-    return account.balances.some((b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer);
+    const trustline = buy.native
+      ? true
+      : account.balances.some((b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer);
+    const liquid = parseBlndBalance({ balances: account.balances });
+    return { trustline, liquid };
   } catch {
-    return null;
+    return { trustline: null, liquid: null };
   }
 }
 
@@ -949,8 +950,8 @@ export async function pickExecutableVenue(
 
   // 1. Re-quote live en parallèle (tolérant : échec → null) + pré-flight trustline (parallèle → zéro latence ajoutée).
   const soroClient = cfg.soroswapApiKey ? deps.makeSoroswap(cfg.soroswapApiKey) : null;
-  const [trust, xbullQ, soroQ, horizonQ, aquariusQ, cometQ, ultraQ] = await Promise.all([
-    senderHasTrustline(sender, buyAsset, cfg.horizonUrl),
+  const [preflight, xbullQ, soroQ, horizonQ, aquariusQ, cometQ, ultraQ] = await Promise.all([
+    senderPreflight(sender, buyAsset, cfg.horizonUrl),
     quoteXbull(sellSac, buySac, amountStroops, deps),
     soroClient
       ? quoteSoroswap(soroClient, sellSac, buySac, amountStroops, slippageBps)
@@ -962,10 +963,21 @@ export async function pickExecutableVenue(
     quoteUltra(BLND, buyAsset, amountStroops, deps),
   ]);
 
+  const { trustline, liquid } = preflight;
+
   // Pré-flight trustline UNIVERSEL : si le sender n'a pas la trustline de l'actif d'achat, échouer
   // clairement ICI (avant tout build) → couvre AUSSI les venues turnkey xBull/Soroswap dont l'erreur
   // trustline ne remontait pas classée (« source indisponible » trompeur). null = lecture KO → builds gèrent.
-  if (trust === false) throw trustlineMissingError(buyAsset, sender);
+  if (trustline === false) throw trustlineMissingError(buyAsset, sender);
+
+  // Pré-flight solde UNIVERSEL : si le BLND liquide est insuffisant, échouer ICI (avant tout build/popup)
+  // → comportement uniforme pour toutes les venues (les classiques Horizon/Ultra n'atteignent plus Freighter
+  //   pour échouer ensuite à la soumission). liquid null = lecture KO → on laisse les builds gérer.
+  if (liquid !== null && liquid < amountStroops) {
+    throw new ExecError('funds',
+      `BLND liquide insuffisant (${fromStroops(liquid)} dispo, ${fromStroops(amountStroops)} requis) — ` +
+      `ton BLND est peut-être staké dans le backstop Blend (retire-le d'abord).`);
+  }
 
   // 2. Trier les candidats non-null par netOut décroissant.
   type Candidate =
