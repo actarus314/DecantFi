@@ -491,20 +491,12 @@ function buildMeta(db: DatabaseSync, cadenceSec: number, sondes: number[]): Meta
 
 // ─── Santé des sources (7 j) ─────────────────────────────────────────────────
 
-/** Disponibilité d'une source pour une taille de sonde donnée (ex. 250 / 750 BLND). */
-export interface SizeHealth {
-  size: number;          // BLND entiers (sonde)
-  respondedTicks: number;
-  uptimePct: number;     // % ticks où la source a coté À CETTE taille
-}
-
 export interface SourceHealth {
   id: string;
   display: string;
   respondedTicks: number;        // ticks avec ≥1 cotation (toutes tailles)
   failedTicks: number;           // ticks où ≥1 sonde de la source a échoué (présence dans source_errors)
   uptimePct: number;             // global : % ticks avec ≥1 cotation
-  bySize: SizeHealth[];          // dispo par taille, triée croissante — la granularité demandée
   lastFailureAt: string | null;  // ISO ou null
   lastFailureReason: string | null; // rate-limit / timeout / rpc / simulation / http / null
   days: Array<'ok' | 'warn' | 'bad' | null>;  // 7 entrées, index 0 = le plus récent
@@ -838,7 +830,6 @@ export function buildSourceHealth(
   type SrcAcc = {
     responded: number;
     failed: number;
-    bySize: Map<number, number>; // taille → nb ticks où la source a coté à cette taille
     lastFailureAt: string | null;
     lastFailureReason: string | null;
     // dayTicks[i] = nb ticks dans le jour i (0=auj.), dayFails[i] = nb d'échecs dans le jour i
@@ -847,38 +838,29 @@ export function buildSourceHealth(
   };
   const acc = new Map<string, SrcAcc>();
   for (const id of knownIds) {
-    acc.set(id, { responded: 0, failed: 0, bySize: new Map(), lastFailureAt: null, lastFailureReason: null, dayTicks: new Array(7).fill(0), dayFails: new Array(7).fill(0) });
+    acc.set(id, { responded: 0, failed: 0, lastFailureAt: null, lastFailureReason: null, dayTicks: new Array(7).fill(0), dayFails: new Array(7).fill(0) });
   }
 
-  // Requête B : quotes (sources qui ont répondu) PAR TAILLE sur les ticks ok de la fenêtre — TOUS (auto ET manuels).
+  // Requête B : quotes (sources qui ont répondu) sur les ticks ok de la fenêtre — TOUS (auto ET manuels).
   // Cohérent avec la requête A : les relevés manuels sont désormais inclus dans les stats de stabilité.
   const quoteStmt = prepBig(db, `
-    SELECT DISTINCT q.tick_id, q.source_id, q.amount_in
+    SELECT DISTINCT q.tick_id, q.source_id
     FROM quote q
     JOIN tick t ON t.id = q.tick_id
     WHERE t.ok = 1 AND t.started_at >= ?
   `);
   const quoteRows = quoteStmt.all(windowStart) as Array<Record<string, unknown>>;
 
-  // Tailles observées (sondes), en BLND entiers, triées croissant.
-  const sizeSet = new Set<number>();
-  // Map tickId → Set<sourceId> (toutes tailles) et Set<`sourceId|size`> (par taille).
+  // Map tickId → Set<sourceId>
   const respondedByTick = new Map<string, Set<string>>();
-  const respondedSizeByTick = new Map<string, Set<string>>();
   for (const r of quoteRows) {
     const srcId = String(r['source_id'] ?? '');
     if (srcId.includes('+') || !knownIds.includes(srcId)) continue;
     const tickId = String(r['tick_id']);
-    const size = Math.round(Number(r['amount_in'] as bigint) / 1e7);
-    sizeSet.add(size);
     let s = respondedByTick.get(tickId);
     if (!s) { s = new Set(); respondedByTick.set(tickId, s); }
     s.add(srcId);
-    let ss = respondedSizeByTick.get(tickId);
-    if (!ss) { ss = new Set(); respondedSizeByTick.set(tickId, ss); }
-    ss.add(`${srcId}|${size}`);
   }
-  const sizes = [...sizeSet].sort((a, b) => a - b);
 
   // Parcourir les ticks pour accumuler responded/failed/days
   for (const row of tickRows) {
@@ -903,19 +885,14 @@ export function buildSourceHealth(
 
     const tickId = String(row['id']);
     const respondedIds = respondedByTick.get(tickId) ?? new Set<string>();
-    const respondedSizes = respondedSizeByTick.get(tickId) ?? new Set<string>();
 
     for (const id of knownIds) {
       const a = acc.get(id)!;
       const responded = respondedIds.has(id);
-      // failed = ≥1 sonde de cette source a échoué ce tick (présence dans source_errors). La granularité
-      // par taille (bySize) montre QUELLE taille — plus besoin de masquer l'info derrière « down total ».
+      // failed = ≥1 sonde de cette source a échoué ce tick (présence dans source_errors).
       const failed = failedIds.has(id);
 
       if (responded) a.responded++;
-      for (const size of sizes) {
-        if (respondedSizes.has(`${id}|${size}`)) a.bySize.set(size, (a.bySize.get(size) ?? 0) + 1);
-      }
       if (failed) {
         a.failed++;
         if (!a.lastFailureAt || startedAt > a.lastFailureAt) {
@@ -946,13 +923,6 @@ export function buildSourceHealth(
       return 'bad' as const;
     }) as Array<'ok' | 'warn' | 'bad' | null>;
 
-    // Dispo par taille (sonde) : la granularité — ex. Comet 250:100 % / 750:12 % rend visible
-    // qu'une seule taille flanche, sans faire passer toute la source pour indisponible.
-    const bySize: SizeHealth[] = sizes.map((size) => {
-      const r = a.bySize.get(size) ?? 0;
-      return { size, respondedTicks: r, uptimePct: totalTicks > 0 ? Math.round((r / totalTicks) * 1000) / 10 : 100 };
-    });
-
     // Tendance : comparaison fenêtre courante vs précédente.
     // Pas de base de comparaison (fenêtre précédente sans relevé, ex. < 14 j de données) → 'flat'
     // (évite un faux 'down' au démarrage pour une source à dispo courante basse).
@@ -972,7 +942,6 @@ export function buildSourceHealth(
       respondedTicks: a.responded,
       failedTicks: a.failed,
       uptimePct,
-      bySize,
       lastFailureAt: a.lastFailureAt,
       lastFailureReason: a.lastFailureReason,
       days,

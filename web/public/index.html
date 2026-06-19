@@ -105,15 +105,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 .chip.est{border-color:#c4b5fd; color:#6d28d9;} .dark .chip.est{border-color:#6d28d9; color:#c4b5fd;}
 /* ponytail: health axis, distinct from confidence chips */
 .chip.down{border-color:var(--tool); color:var(--tool);}
-/* Santé des sources : barre de disponibilité + points journaliers */
-.ubar{display:grid; grid-template-columns:max-content 1fr max-content; gap:.45rem; align-items:center; width:190px;}
-.ubar + .ubar{margin-top:4px;}
-.ubar .sz{font-size:11px; color:var(--caption); font-weight:600; font-variant-numeric:tabular-nums; min-width:30px; text-align:right;}
-.ubar .track{height:9px; border-radius:9999px; background:var(--section-bg); overflow:hidden;}
-.ubar .track > span{display:block; height:100%; border-radius:9999px; background:var(--green);}
-.ubar .track.warn > span{background:var(--amber);}
-.ubar .track.bad > span{background:var(--tool);}
-.ubar .pct{font-size:12px; font-weight:600; color:var(--caption); text-align:right; white-space:nowrap; min-width:38px;}
+/* Santé des sources : points journaliers */
 .days{display:inline-flex; gap:4px; align-items:center;}
 .days i{width:11px; height:11px; border-radius:50%; display:inline-block; background:var(--green);}
 .days i.w{background:var(--amber);} .days i.b{background:var(--tool);} .days i.g{background:var(--card-border);}
@@ -486,7 +478,26 @@ const STRINGS = {
     'reason_rate-limit': 'RPC saturé (429)',
     reason_rpc: 'erreur RPC',
     reason_simulation: 'simulation',
-    health_col_sizes: 'Disponibilité par sonde',
+    // Colonnes Cohérence / Exécution + modal trace
+    health_col_coherence: 'Cohérence',
+    health_col_exec: 'Exécution',
+    health_total: 'Total (tick)',
+    health_coh_none: 'aucune sonde',
+    health_coh_ok: (n) => `${n} sondes, toutes cohérentes`,
+    health_coh_suspect: (s, t) => `${s} suspecte(s) sur ${t}`,
+    health_coh_modal_title: (d) => `Sondes de cohérence — ${d}`,
+    health_coh_modal_recap: (n, s) => `${n} sonde(s) sur 7 j, ${s} suspecte(s)`,
+    health_coh_modal_none: 'Aucune sonde suspecte sur la période.',
+    health_coh_modal_loading: 'Chargement…',
+    health_coh_col_date: 'Date',
+    health_coh_col_pair: 'Paire',
+    health_coh_col_amount: 'Montant',
+    health_coh_col_reason: 'Raison',
+    health_coh_col_route: 'Route',
+    health_coh_col_delta: 'Écart',
+    health_coh_col_quoted: 'Coté',
+    health_coh_col_simulated: 'Simulé',
+    health_coh_close: 'Fermer',
     // RPC health
     health_rpc_title: 'Santé des RPC Soroban — 7 derniers jours',
     health_rpc_col_rpc: 'RPC',
@@ -715,7 +726,26 @@ const STRINGS = {
     'reason_rate-limit': 'RPC throttled (429)',
     reason_rpc: 'RPC error',
     reason_simulation: 'simulation',
-    health_col_sizes: 'Availability by probe',
+    // Coherence / Execution columns + trace modal
+    health_col_coherence: 'Coherence',
+    health_col_exec: 'Execution',
+    health_total: 'Total (tick)',
+    health_coh_none: 'no probes',
+    health_coh_ok: (n) => `${n} probes, all coherent`,
+    health_coh_suspect: (s, t) => `${s} suspect(s) out of ${t}`,
+    health_coh_modal_title: (d) => `Coherence probes — ${d}`,
+    health_coh_modal_recap: (n, s) => `${n} probe(s) over 7 d, ${s} suspect(s)`,
+    health_coh_modal_none: 'No suspect probes in the period.',
+    health_coh_modal_loading: 'Loading…',
+    health_coh_col_date: 'Date',
+    health_coh_col_pair: 'Pair',
+    health_coh_col_amount: 'Amount',
+    health_coh_col_reason: 'Reason',
+    health_coh_col_route: 'Route',
+    health_coh_col_delta: 'Delta',
+    health_coh_col_quoted: 'Quoted',
+    health_coh_col_simulated: 'Simulated',
+    health_coh_close: 'Close',
     // RPC health
     health_rpc_title: 'Soroban RPC health — last 7 days',
     health_rpc_col_rpc: 'RPC',
@@ -789,6 +819,8 @@ let execState = null; // null | { phase:'review'|'signing'|'submitting'|'done'|'
 let execSlippagePct = (() => { const s = parseFloat(localStorage.getItem('slippagePct')); return (!isNaN(s) && s >= 0 && s <= 50) ? s : 0.5; })(); // UI %, → bps = Math.round(execSlippagePct*100)
 // click-to-select : sourceId sélectionné (null = auto)
 let selectedSource = null;
+// Modal cohérence : null = fermée, sinon { venue, loading, data }
+let coherenceModal = null;
 
 function selectSource(id) {
   selectedSource = (selectedSource === id) ? null : id; // re-clic = désélection
@@ -1238,11 +1270,6 @@ function buildHealthPage(topbarHtml) {
   })() : '';
   // cause de panne (timeout/http/indisponible) capturée côté backend (③-bis) ; legacy = horodatage seul
   const tableRows = rows.map(s => {
-    // Granularité : une barre par sonde (taille). Couleur selon la dispo de CETTE taille.
-    const bars = (s.bySize || []).map(b => {
-      const cls = b.uptimePct >= 98 ? '' : b.uptimePct >= 90 ? ' warn' : ' bad';
-      return `<div class="ubar"><span class="sz">${b.size}</span><div class="track${cls}"><span style="width:${b.uptimePct}%"></span></div><span class="pct">${b.uptimePct.toFixed(0)} %</span></div>`;
-    }).join('');
     const elH = (health && health.todayElapsedH) || 0;
     // Vue semaine Lun→Dim : passé (disques pleins) | aujourd'hui (pie) | futur (gris)
     // todayLocalDow() = 0=Lun … 6=Dim ; s.days[0]=aujourd'hui, s.days[1]=hier, etc.
@@ -1272,11 +1299,44 @@ function buildHealthPage(topbarHtml) {
       if (d === todayDow) return todayDot;
       return `<i class="g" title="${t('health_legend_null')}"></i>`;  // futur
     }).join('');
+    // Colonne Cohérence
+    const coh = s.coherence || { tests: 0, suspects: 0, lastSuspectAt: null };
+    let cohCell;
+    if (coh.tests === 0) {
+      cohCell = `<span style="color:var(--caption)" title="${t('health_coh_none')}">—</span>`;
+    } else if (coh.suspects === 0) {
+      cohCell = `<span style="color:var(--green)" title="${t('health_coh_ok', coh.tests)}">✓ ${coh.tests}</span>`;
+    } else {
+      // Rouge si > 25 % de suspectes, sinon ambre
+      const ratio = coh.suspects / coh.tests;
+      const col = ratio > 0.25 ? 'var(--red)' : 'var(--amber)';
+      cohCell = `<span style="color:${col};cursor:pointer" title="${t('health_coh_suspect', coh.suspects, coh.tests)}" onclick="openCoherence('${s.id}')">⚠ ${coh.suspects}/${coh.tests}</span>`;
+    }
+
+    // Colonne Exécution (durée médiane)
+    const execMs = s.execMs;
+    let execCell;
+    if (execMs == null) {
+      execCell = '<span style="color:var(--caption)">—</span>';
+    } else if (execMs < 1000) {
+      execCell = `${execMs} ms`;
+    } else {
+      execCell = `${(execMs / 1000).toFixed(1)} s`;
+    }
+
+    // Flèche de tendance pour la colonne 7 jours
+    const trend = s.uptimeTrend || 'flat';
+    let trendArrow;
+    if (trend === 'up') trendArrow = `<span style="color:var(--green);font-weight:700">↗</span>`;
+    else if (trend === 'down') trendArrow = `<span style="color:var(--red);font-weight:700">↘</span>`;
+    else trendArrow = `<span style="color:var(--caption)">&#61;</span>`;
+
     const pairNote = s.pairNote ? ` <span class="muted" style="font-size:11px">· ${s.pairNote}</span>` : '';
     return `<tr>
       <td><span class="srcname">${s.display}</span>${pairNote}</td>
-      <td>${bars}</td>
-      <td><span class="days">${dots}</span></td>
+      <td>${cohCell}</td>
+      <td style="color:var(--caption);font-variant-numeric:tabular-nums">${execCell}</td>
+      <td><span class="days">${dots}</span> <span style="font-size:11px;color:var(--caption);font-variant-numeric:tabular-nums;white-space:nowrap">${s.uptimePct.toFixed(0)} % ${trendArrow}</span></td>
       <td>${s.failedTicks}</td>
       <td class="muted">${healthAgo(s.lastFailureAt)}${s.lastFailureAt && s.lastFailureReason ? ' · ' + reasonLabel(s.lastFailureReason) : ''}</td>
     </tr>`;
@@ -1290,12 +1350,23 @@ function buildHealthPage(topbarHtml) {
     <div style="overflow-x:auto"><table class="flt">
       <thead><tr>
         <th>${t('health_col_source')}</th>
-        <th class="left">${t('health_col_sizes')}</th>
+        <th>${t('health_col_coherence')}</th>
+        <th>${t('health_col_exec')}</th>
         <th>${t('health_col_days')}</th>
         <th>${t('health_col_fails')}</th>
         <th>${t('health_col_last')}</th>
       </tr></thead>
       <tbody>${tableRows}</tbody>
+      <tfoot><tr>
+        <td style="color:var(--caption);font-size:12px">${t('health_total')}</td>
+        <td></td>
+        <td style="color:var(--caption);font-variant-numeric:tabular-nums;font-size:12px">${(() => {
+          const ms = health && health.execTotalMs;
+          if (ms == null) return '—';
+          return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
+        })()}</td>
+        <td colspan="3"></td>
+      </tr></tfoot>
     </table></div>
     <p style="margin:.6rem 0 0">${t('health_sources_scope')}</p>
     <p class="help" style="margin:.7rem 0 0;font-size:11px">
@@ -1350,7 +1421,8 @@ function buildHealthPage(topbarHtml) {
     <p class="help" style="margin:.7rem 0 0;font-size:11px">${t('health_rpc_note')}</p>
     <p style="margin:.6rem 0 0">${t('health_rpc_scope')}</p>
   </div></div>`;
-  })()}`;
+  })()}
+  ${coherenceModalHtml()}`;
 }
 
 // ─── Page principale ──────────────────────────────────────────────────────────
@@ -1877,6 +1949,86 @@ function reviewTableHtml(rv, tgt, showSimDelta) {
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
   </table>
   <p class="help" style="margin:0 0 .8rem;font-size:11px;color:var(--caption)">${t('review_network_fee_note')}</p>`;
+}
+
+// ─── Modal cohérence (sondes suspectes) ──────────────────────────────────────
+async function openCoherence(venue) {
+  coherenceModal = { venue, loading: true, data: null };
+  renderApp();
+  try {
+    const r = await fetch('/api/coherence?venue=' + venue);
+    coherenceModal.data = await r.json();
+  } catch {
+    coherenceModal.data = { venue, probes: [] };
+  }
+  coherenceModal.loading = false;
+  renderApp();
+}
+
+function closeCoherence() {
+  coherenceModal = null;
+  renderApp();
+}
+
+function coherenceModalHtml() {
+  if (!coherenceModal) return '';
+  const { venue, loading, data } = coherenceModal;
+  // Nom d'affichage de la venue
+  const dName = venue === 'xbull' ? 'xBull' : venue === 'soroswap' ? 'Soroswap' : venue === 'horizon' ? 'Horizon' : venue === 'aquarius' ? 'Aquarius' : venue === 'comet' ? 'Comet' : venue === 'ultrastellar' ? 'Ultra Stellar' : venue;
+
+  let body;
+  if (loading) {
+    body = `<p class="help">${t('health_coh_modal_loading')}</p>`;
+  } else {
+    const probes = (data && data.probes) || [];
+    const suspects = probes.filter(p => p.incoherent);
+    body = `<p style="margin:0 0 .7rem;font-size:13px">${t('health_coh_modal_recap', probes.length, suspects.length)}</p>`;
+    if (suspects.length === 0) {
+      body += `<p class="help">${t('health_coh_modal_none')}</p>`;
+    } else {
+      const suspectRows = suspects.map(p => {
+        // Montant : amount_in est en stroops (entier), /1e7 → BLND
+        const amtBlnd = p.amount_in != null ? (Number(p.amount_in) / 1e7).toFixed(0) + ' BLND' : '—';
+        const dateStr = p.created_at ? p.created_at.replace('T', ' ').slice(0, 16) : '—';
+        const route = (p.route && p.route.length > 0) ? p.route.join(' → ') : '—';
+        const delta = p.delta_bps != null ? `${p.delta_bps} bps` : '—';
+        const quoted = p.net_quoted != null ? (Number(p.net_quoted) / 1e7).toFixed(4) : '—';
+        const simulated = p.net_simulated != null ? (Number(p.net_simulated) / 1e7).toFixed(4) : '—';
+        const reason = p.reason || '—';
+        return `<tr>
+          <td style="white-space:nowrap;font-size:11px;color:var(--caption)">${dateStr}</td>
+          <td>${p.pair || '—'}</td>
+          <td style="font-variant-numeric:tabular-nums">${amtBlnd}</td>
+          <td style="font-size:11px;color:var(--amber)">${reason}</td>
+          <td style="font-size:11px">${route}</td>
+          <td style="font-variant-numeric:tabular-nums;color:var(--red)">${delta}</td>
+          <td style="font-variant-numeric:tabular-nums">${quoted}</td>
+          <td style="font-variant-numeric:tabular-nums">${simulated}</td>
+        </tr>`;
+      }).join('');
+      body += `<div style="overflow-x:auto"><table class="flt" style="font-size:12px">
+        <thead><tr>
+          <th>${t('health_coh_col_date')}</th>
+          <th>${t('health_coh_col_pair')}</th>
+          <th>${t('health_coh_col_amount')}</th>
+          <th>${t('health_coh_col_reason')}</th>
+          <th>${t('health_coh_col_route')}</th>
+          <th>${t('health_coh_col_delta')}</th>
+          <th>${t('health_coh_col_quoted')}</th>
+          <th>${t('health_coh_col_simulated')}</th>
+        </tr></thead>
+        <tbody>${suspectRows}</tbody>
+      </table></div>`;
+    }
+  }
+
+  return `<div class="modal-overlay" onclick="if(event.target===this)closeCoherence()"><div class="modal-card" style="max-width:780px;width:95vw">
+    <div style="font-size:14px;font-weight:700;margin-bottom:.8rem">${t('health_coh_modal_title', dName)}</div>
+    ${body}
+    <div style="display:flex;justify-content:flex-end;margin-top:.9rem">
+      <button class="btn" onclick="closeCoherence()">${t('health_coh_close')}</button>
+    </div>
+  </div></div>`;
 }
 
 // ─── Modal d'exécution ────────────────────────────────────────────────────────

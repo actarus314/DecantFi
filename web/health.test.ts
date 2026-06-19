@@ -263,60 +263,6 @@ describe('buildSourceHealth — cause JSON', () => {
   });
 });
 
-// ─── Granularité par taille : 250 OK / 750 KO sur une même source ───────────────────────────────
-
-describe('buildSourceHealth — dispo par taille (bySize)', () => {
-  let dir3: string;
-  let path3: string;
-  let res3: ReturnType<typeof buildSourceHealth>;
-
-  beforeAll(() => {
-    dir3 = mkdtempSync(join(tmpdir(), 'stellarswap-health-bysize-'));
-    path3 = join(dir3, 'test.db');
-    const db = openDb(path3);
-    // 1 tick ok : xbull cote 250 ET 750 ; soroswap cote 250 mais PAS 750 (échec 750 dans source_errors).
-    db.insertTickWithQuotes(
-      mkTick({ started_at: '2025-05-28T10:00:00Z', source_errors: '[{"id":"soroswap","reason":"rate-limit"}]' }),
-      [
-        mkQuote('xbull', { amount_in: toStroops(250) }),
-        mkQuote('xbull', { amount_in: toStroops(750) }),
-        mkQuote('soroswap', { amount_in: toStroops(250) }),
-        // soroswap absent à 750
-      ],
-    );
-    db.close();
-    const rdb = openReadOnly(path3);
-    res3 = buildSourceHealth(rdb, WINDOW_START, NOW);
-    rdb.close();
-  });
-
-  afterAll(() => { rmSync(dir3, { recursive: true, force: true }); });
-
-  const find = (id: string) => res3.sources.find((x) => x.id === id)!;
-  const size = (id: string, sz: number) => find(id).bySize.find((b) => b.size === sz)!;
-
-  it('expose les 2 tailles observées', () => {
-    expect(find('xbull').bySize.map((b) => b.size)).toEqual([250, 750]);
-  });
-
-  it('xbull cote 250 et 750 → 100 % aux deux', () => {
-    expect(size('xbull', 250).uptimePct).toBe(100);
-    expect(size('xbull', 750).uptimePct).toBe(100);
-  });
-
-  it('soroswap : 250 = 100 %, 750 = 0 % (granularité)', () => {
-    expect(size('soroswap', 250).uptimePct).toBe(100);
-    expect(size('soroswap', 750).uptimePct).toBe(0);
-  });
-
-  it('soroswap reste globalement disponible (a coté) mais avec 1 échec + cause', () => {
-    const s = find('soroswap');
-    expect(s.uptimePct).toBe(100);        // a produit ≥1 cotation
-    expect(s.failedTicks).toBe(1);        // une sonde a échoué (source_errors)
-    expect(s.lastFailureReason).toBe('rate-limit');
-  });
-});
-
 // ─── buildRpcHealth — reqTotal / reqPerSec depuis rpc_call_log ────────────────
 
 describe('buildRpcHealth — reqTotal/reqPerSec depuis rpc_call_log', () => {
