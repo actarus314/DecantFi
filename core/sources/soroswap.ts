@@ -9,6 +9,7 @@ import { DEFAULT_GAS_XLM } from '../gas.js';
 import { USDC, XLM, bySac } from '../assets.js';
 import { bigintOrNull, hops, cached } from './util.js';
 import { setReason, rpcReason } from './diag.js';
+import { bumpRpc } from '../rpc-meter.js';
 
 const FACTORY = 'CA4HEQTL2WPEUYKYKCDOHCDNIV4QHNJ7EL4J4NQ6VADP7SYHVRYZ7AW2'; // mainnet, keyless
 
@@ -78,6 +79,7 @@ async function liveRoute(req: QuoteRequest, cfg: SourceConfig): Promise<Normaliz
       .addOperation(new Contract(contract).call(method, ...args))
       .setTimeout(30)
       .build();
+    bumpRpc();
     const sim = await server.simulateTransaction(tx);
     if (rpc.Api.isSimulationError(sim)) throw new Error(`${method}: ${sim.error}`);
     return scValToNative(sim.result!.retval);

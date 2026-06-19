@@ -7,6 +7,7 @@ import type { SourceAdapter, NormalizedQuote, QuoteRequest, SourceConfig } from 
 import { DEFAULT_GAS_XLM } from '../gas.js';
 import { hops, cached } from './util.js';
 import { setReason, rpcReason } from './diag.js';
+import { bumpRpc } from '../rpc-meter.js';
 
 // Pool backstop Blend 80/20 BLND/USDC (resolu on-chain ; design tronquait en CAS3FL6T...VEAM).
 export const COMET_POOL = 'CAS3FL6TLZKDGGSISDBWGGPXT3NRR4DYTZD7YOD3HMYO6LTJUVGRVEAM';
@@ -80,6 +81,7 @@ async function liveComet(req: QuoteRequest, cfg: SourceConfig): Promise<Normaliz
       .setTimeout(30)
       .build();
 
+    bumpRpc();
     const sim = await server.simulateTransaction(tx);
     if (rpc.Api.isSimulationError(sim) || !sim.result) continue;
     const grossOut = decodeCometOut(scValToNative(sim.result.retval));

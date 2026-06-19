@@ -17,7 +17,7 @@ export interface QuoteInsert {
 
 export interface RpcProbeInsert {
   url: string; ok: boolean; latency_ms: number | null;
-  ledger: number | null; chosen: boolean; sim_errors: number; error: string | null;
+  ledger: number | null; chosen: boolean; sim_errors: number; rpc_calls: number; error: string | null;
 }
 
 export class Db {
@@ -36,8 +36,8 @@ export class Db {
     );
     const insRaw = this.db.prepare(`INSERT INTO quote_raw (quote_id, raw_json) VALUES (?, ?)`);
     const insRpc = this.db.prepare(
-      `INSERT INTO rpc_probe (tick_id, url, ok, latency_ms, ledger, chosen, sim_errors, error)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO rpc_probe (tick_id, url, ok, latency_ms, ledger, chosen, sim_errors, rpc_calls, error)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     this.db.exec('BEGIN');
@@ -55,7 +55,7 @@ export class Db {
         if (q.raw_json !== null) insRaw.run(quoteId, q.raw_json);
       }
       for (const p of rpcProbes) {
-        insRpc.run(tickId, p.url, p.ok ? 1 : 0, p.latency_ms, p.ledger, p.chosen ? 1 : 0, p.sim_errors, p.error);
+        insRpc.run(tickId, p.url, p.ok ? 1 : 0, p.latency_ms, p.ledger, p.chosen ? 1 : 0, p.sim_errors, p.rpc_calls, p.error);
       }
       this.db.exec('COMMIT');
       return tickId;

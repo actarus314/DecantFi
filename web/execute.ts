@@ -1,6 +1,7 @@
 // Orchestrateur d'exécution : BLND → USDC/EURC via xBull, Soroswap, Horizon ou Aquarius.
 // Money-path : bigint stroops partout, jamais de float pour les calculs.
 import { BLND, USDC, EURC, bySac, classicColon, type Asset } from '../core/assets.js';
+import { bumpRpc } from '../core/rpc-meter.js';
 import { toNumber, fromStroops, toStroops } from '../core/amount.js';
 import { stroopsOrNull, bigintOrNull } from '../core/sources/util.js';
 import { COMET_POOL, COMET_WITNESSES, decodeCometOut } from '../core/sources/comet.js';
@@ -258,6 +259,7 @@ async function simulateCometReal(a: { sellSac: string; buySac: string; amountIn:
       .addOperation(new Contract(COMET_POOL).call('swap_exact_amount_in', ...args))
       .setTimeout(30)
       .build();
+    bumpRpc();
     const sim = await server.simulateTransaction(tx);
     if (rpc.Api.isSimulationError(sim) || !sim.result) continue;
     return decodeCometOut(scValToNative(sim.result.retval));
@@ -304,6 +306,7 @@ export async function simulateAquariusNet(
       .addOperation(new Contract(AQUA_ROUTER).call('swap_chained', ...args))
       .setTimeout(180)
       .build();
+    bumpRpc();
     const sim = await server.simulateTransaction(tx);
     if (rpc.Api.isSimulationError(sim) || !sim.result) continue;
     try { return BigInt(scValToNative(sim.result.retval)); } catch { return null; }
@@ -343,6 +346,7 @@ export async function simulateXbullNet(
       const { rpc, TransactionBuilder, Networks, scValToNative, StrKey, xdr } = sdk;
       const server = new rpc.Server((cfg.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
       const tx = TransactionBuilder.fromXDR(xdrStr, Networks.PUBLIC);
+      bumpRpc();
       const sim = await server.simulateTransaction(tx);
       if (rpc.Api.isSimulationError(sim) || !sim.result) continue;
       const rv = scValToNative(sim.result.retval);

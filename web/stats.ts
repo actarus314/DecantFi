@@ -517,6 +517,7 @@ export interface SourceHealthResult {
   /** Heures écoulées dans la journée locale courante (0..24), pour le rendu du cercle partiel. */
   todayElapsedH: number;
   rpcs: RpcHealth[];
+  rpcLoad: { reqPerTick: number; reqPerSec: number } | null;
 }
 
 /** Parse source_errors : JSON ([{id,reason}]) ou CSV legacy ("soroswap, comet"). */
@@ -609,6 +610,39 @@ export function buildRpcHealth(db: DatabaseSync, windowStart: string): RpcHealth
     return b.uptimePct - a.uptimePct;
   });
   return result;
+}
+
+/** Charge RPC moyenne sur les 7 derniers jours : req/tick et req/s calculés sur les sondes chosen=1. */
+export function buildRpcLoad(db: DatabaseSync, windowStart: string): { reqPerTick: number; reqPerSec: number } | null {
+  const stmt = prepBig(db, `
+    SELECT r.rpc_calls, t.started_at, t.finished_at
+    FROM rpc_probe r
+    JOIN tick t ON t.id = r.tick_id
+    WHERE r.chosen = 1 AND t.started_at >= ?
+  `);
+  const rows = stmt.all(windowStart) as Array<Record<string, unknown>>;
+  if (rows.length === 0) return null;
+
+  let totalCalls = 0;
+  let totalSec = 0;
+  let validCount = 0;
+
+  for (const r of rows) {
+    const calls = r['rpc_calls'] != null ? Number(r['rpc_calls']) : 0;
+    totalCalls += calls;
+    validCount++;
+    // Dates are ISO TEXT strings — parse in JS (SQL arithmetic coerces wrongly)
+    if (r['finished_at'] != null && r['started_at'] != null) {
+      const dur = (new Date(String(r['finished_at'])).getTime() - new Date(String(r['started_at'])).getTime()) / 1000;
+      if (dur > 0) totalSec += dur;
+    }
+  }
+
+  if (validCount === 0) return null;
+  const reqPerTick = Math.round(totalCalls / validCount);
+  const reqPerSec = totalSec > 0 ? Math.round(totalCalls / totalSec) : null;
+  if (reqPerSec === null) return null;
+  return { reqPerTick, reqPerSec };
 }
 
 /** URL du RPC choisi dans le dernier tick ayant des probes, ou null. */
@@ -812,7 +846,8 @@ export function buildSourceHealth(
   const todayElapsedH = localNow.getUTCHours() + localNow.getUTCMinutes() / 60;
 
   const rpcs = buildRpcHealth(db, windowStart);
-  return { totalTicks, windowDays: 7, sources, todayElapsedH, rpcs };
+  const rpcLoad = buildRpcLoad(db, windowStart);
+  return { totalTicks, windowDays: 7, sources, todayElapsedH, rpcs, rpcLoad };
 }
 
 // ─── Point d'entrée public ────────────────────────────────────────────────────

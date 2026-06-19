@@ -1,6 +1,7 @@
 // Sélection du meilleur RPC au démarrage d'un tick : sonde tous les endpoints en parallèle,
 // choisit le plus rapide non-retardé, repli sur le moins mauvais, best-effort sur urls[0].
 import { rpc } from '@stellar/stellar-sdk';
+import { bumpRpc } from './rpc-meter.js';
 
 export interface RpcProbe {
   url: string;
@@ -31,6 +32,7 @@ export async function probeRpc(
     if (deps?.getLatestLedger) {
       ledger = await deps.getLatestLedger(url);
     } else {
+      bumpRpc();
       const server = new rpc.Server(url.replace(/\/$/, ''));
       const timer = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('timeout')), timeoutMs),

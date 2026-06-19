@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS rpc_probe (
   ledger     INTEGER,
   chosen     INTEGER NOT NULL,
   sim_errors INTEGER NOT NULL DEFAULT 0,
+  rpc_calls  INTEGER NOT NULL DEFAULT 0,
   error      TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_rpc_probe_tick ON rpc_probe(tick_id);

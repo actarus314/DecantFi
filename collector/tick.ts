@@ -10,6 +10,7 @@ import type { Probe } from './probes.js';
 import { resimAquariusXbull } from '../web/quote-api.js';
 import type { simulateAquariusNet, simulateXbullNet } from '../web/execute.js';
 import { selectRpc, type RpcSelection } from '../core/rpc-select.js';
+import { resetRpc, readRpc } from '../core/rpc-meter.js';
 
 export interface TickDeps {
   probes: Probe[];
@@ -90,6 +91,7 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
 
   // Sélection du meilleur RPC : best-effort, un échec ne casse jamais le tick.
   let sel: RpcSelection = { chosen: deps.cfg.rpcUrl, probes: [] };
+  resetRpc();
   try {
     sel = await (deps.selectRpc ?? selectRpc)(deps.cfg.rpcUrls, deps.cfg.timeoutMs);
   } catch { /* repli silencieux : rpcUrl par défaut */ }
@@ -126,6 +128,7 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     quotes.push(...rowsForProbe(probe, result, prices));
   }
 
+  const rpcCalls = readRpc();
   const finishedAt = deps.now();
   const tick: TickInsert = {
     started_at: startedAt.toISOString(), finished_at: finishedAt.toISOString(), cadence_sec: deps.cfg.cadenceSec,
@@ -144,6 +147,7 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     url: p.url, ok: p.ok, latency_ms: p.latencyMs, ledger: p.ledger,
     chosen: p.url === rpcUrl,
     sim_errors: p.url === rpcUrl ? simErrorCount : 0,
+    rpc_calls: p.url === rpcUrl ? rpcCalls : 0,
     error: p.error,
   }));
 
