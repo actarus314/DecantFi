@@ -138,7 +138,7 @@ export async function xdrGasBreakdown(xdr: string): Promise<{ real: number; max:
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const env = (tx as any).toEnvelope?.();
       const extVal = env?.v1?.()?.tx?.()?.ext?.();
-      if (extVal?.switch?.()?.value === 1) {
+      if (extVal?.switch?.() === 1) {
         const resourceFee = extVal?.sorobanData?.()?.resourceFee?.();
         if (resourceFee != null) return { real: Number(resourceFee) / 1e7, max };
       }
