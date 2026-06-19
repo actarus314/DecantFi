@@ -55,7 +55,16 @@ export const XLM: Asset = {
   native: true,
 };
 
-export const ASSETS: Asset[] = [BLND, USDC, EURC, XLM];
+/** AQUA (Aquarius) — intermediaire de routage xBull ; resolution d'affichage uniquement, pas une cible de swap. */
+export const AQUA: Asset = {
+  symbol: 'AQUA',
+  code: 'AQUA',
+  issuer: 'GBNZILSTVQZ4R7IKQDGHYGY2QXL5QOFJYQMXPKWRRM5PAV7Y4M67AQUA',
+  sac: 'CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK',
+  decimals: 7,
+};
+
+export const ASSETS: Asset[] = [BLND, USDC, EURC, XLM, AQUA];
 
 /** Cibles de swap de premier rang (USDC et EURC). */
 export const TARGETS: Record<'USDC' | 'EURC', Asset> = { USDC, EURC };
