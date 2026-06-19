@@ -954,8 +954,8 @@ function ladderTable(rows, u, down) {
 }
 
 // ─── Carte "Meilleures routes (7 j)" ──────────────────────────────────────────
-function bestRoutesCard() {
-  const routes = overview && overview.bestRoutes ? (overview.bestRoutes[sondeKey] || []) : [];
+function bestRoutesCard(sk) {
+  const routes = overview && overview.bestRoutes ? (overview.bestRoutes[sk] || []) : [];
   if (routes.length === 0) {
     return `<p class="help">${t('routes_empty')}</p>`;
   }
@@ -1386,7 +1386,7 @@ function buildPage() {
   <div class="zone-group">
     <div class="zone"><div class="zone-h">${t('section_routes')}</div>
       <div class="card">
-        ${bestRoutesCard()}${limitedNote}
+        ${bestRoutesCard(sondeKey)}${limitedNote}
         ${u!=='USDC'?`<p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${t('dist_note_eurc')}</p>`:''}</div>
     </div>
 

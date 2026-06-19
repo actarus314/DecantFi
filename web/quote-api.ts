@@ -85,7 +85,7 @@ export function deepLink(sourceId: string, _pairUi: string): string | null {
 const VENUE_LABEL: Record<string, string> = {
   xbull: 'xBull', soroswap: 'Soroswap', aquarius: 'Aquarius', aqua: 'Aquarius',
   comet: 'Comet', ultrastellar: 'Ultra Stellar', stellarbroker: 'StellarBroker',
-  horizon: 'Horizon', sdex: 'SDEX', 'sdex-split': 'SDEX', phoenix: 'Phoenix',
+  horizon: 'Horizon', phoenix: 'Phoenix',
 };
 function prettyVenue(v: string): string {
   return VENUE_LABEL[v] ?? (v ? v[0]!.toUpperCase() + v.slice(1) : v);

@@ -33,7 +33,7 @@ export function parseUltrastellar(raw: unknown, req: QuoteRequest): NormalizedQu
     Array.isArray(top?.readablePath) && top!.readablePath!.length >= 2
       ? top!.readablePath!
       : [req.sellAsset.symbol, req.buyAsset.symbol];
-  const venue = paths.length > 1 ? 'sdex-split' : 'sdex';
+  const venue = 'ultrastellar';
 
   return {
     source: 'ultrastellar',
