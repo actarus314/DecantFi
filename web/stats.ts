@@ -102,7 +102,7 @@ export function displayName(sourceId: string): string {
 
 export function noteFor(_sourceId: string, _winner: boolean, eurcPath: string | null): string {
   // Seule annotation conservée : la route composite EURC via-USDC.
-  return eurcPath === 'via-usdc' ? 'via-USDC' : '';
+  return eurcPath === 'via-usdc' ? 'multi-tx' : '';
 }
 
 export function chipFor(netConfidence: string, sourceId: string, eurcPath: string | null): Chip {
@@ -528,7 +528,7 @@ export function buildSourceHealth(
   db: DatabaseSync,
   windowStart: string,
   now: Date,
-  offsetH: number = 0,
+  _offsetH: number = 0,
 ): SourceHealthResult {
   // Sources connues : les clés de FULL_NAME (7 venues atomiques)
   const knownIds = Object.keys(FULL_NAME);
@@ -546,7 +546,8 @@ export function buildSourceHealth(
 
   const totalTicks = tickRows.length;
 
-  // offsetH fourni par le client (UTC+offsetH) — remplace l'offset Paris figé.
+  // Stabilité : toujours calé sur Paris (repère stable pour les opérateurs).
+  const offsetH = parisOffsetHours(now);
   const MS_PER_DAY = 86_400_000;
   const nowMs = now.getTime();
 

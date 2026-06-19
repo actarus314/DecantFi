@@ -198,7 +198,7 @@ describe('ladders', () => {
   it('EURC note via-USDC sur le gagnant', () => {
     const rows = result_eurc.ladders['250']!;
     const winner = rows.find(r => r.winner);
-    expect(winner?.note).toContain('via-USDC');
+    expect(winner?.note).toContain('multi-tx');
   });
 });
 
@@ -358,7 +358,7 @@ describe('helpers', () => {
 
   it('noteFor: vide sauf via-usdc', () => {
     expect(noteFor('xbull', true, null)).toBe('');
-    expect(noteFor('xbull', true, 'via-usdc')).toBe('via-USDC');
+    expect(noteFor('xbull', true, 'via-usdc')).toBe('multi-tx');
     expect(noteFor('comet', false, null)).toBe('');
     expect(noteFor('ultrastellar', false, null)).toBe('');
     expect(noteFor('stellarbroker', false, null)).toBe('');

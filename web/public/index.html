@@ -1212,18 +1212,24 @@ function buildHealthPage(topbarHtml) {
       return `<div class="ubar"><span class="sz">${b.size}</span><div class="track${cls}"><span style="width:${b.uptimePct}%"></span></div><span class="pct">${b.uptimePct.toFixed(0)} %</span></div>`;
     }).join('');
     const elH = (health && health.todayElapsedH) || 0;
-    const dots = s.days.map((d, i) => {
-      if (i === 0) {
-        // Aujourd'hui : cercle partiel par incréments de 6h (1/4 de tour)
+    // Secteurs pie pour le disque partiel (1/4 de cercle par incrément de 6h)
+    const PIE = [
+      '',  // Q=0 : fond gris seul
+      'M 6 6 L 6 1 A 5 5 0 0 1 11 6 Z',  // Q=1 : 90°
+      'M 6 6 L 6 1 A 5 5 0 0 1 11 6 A 5 5 0 0 1 6 11 Z',  // Q=2 : 180°
+      'M 6 6 L 6 1 A 5 5 0 0 1 11 6 A 5 5 0 0 1 6 11 A 5 5 0 0 1 1 6 Z',  // Q=3 : 270°
+    ];
+    // Ordre : passé (oldest first) → aujourd'hui (dernier)
+    const reversedDays = s.days.slice().reverse();
+    const dots = reversedDays.map((d, i) => {
+      if (i === reversedDays.length - 1) {
+        // Aujourd'hui : disque pie qui se remplit par 1/4 de journée
         const quarters = Math.min(Math.floor(elH / 6), 4);
-        const frac = quarters / 4;
-        const r = 5, circ = 2 * Math.PI * r;
         const color = d === 'ok' ? 'var(--green)' : d === 'warn' ? 'var(--amber)' : d === 'bad' ? 'var(--tool)' : 'var(--card-border)';
+        if (quarters === 4) return `<i class="${d === 'ok' ? '' : d === 'warn' ? 'w' : d === 'bad' ? 'b' : 'g'}" title="${d ?? t('health_legend_null')}"></i>`;
         return `<svg width="13" height="13" viewBox="-1 -1 14 14" title="${d ?? t('health_legend_null')}">
-          <circle cx="6" cy="6" r="${r}" fill="none" stroke="var(--card-border)" stroke-width="2.5"/>
-          <circle cx="6" cy="6" r="${r}" fill="none" stroke="${color}" stroke-width="2.5"
-            stroke-dasharray="${(frac * circ).toFixed(2)} ${circ.toFixed(2)}"
-            transform="rotate(-90 6 6)"/>
+          <circle cx="6" cy="6" r="5" fill="var(--card-border)"/>
+          ${PIE[quarters] ? `<path d="${PIE[quarters]}" fill="${color}"/>` : ''}
         </svg>`;
       }
       const cls = d === 'ok' ? '' : d === 'warn' ? ' w' : d === 'bad' ? ' b' : ' g';
