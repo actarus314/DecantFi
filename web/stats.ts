@@ -58,6 +58,12 @@ export interface Overview {
   intradayLocal: Record<string, (number | null)[][]>;
   /** Moyenne plate 7 j de l'efficience par sonde. */
   effWeekAvg: Record<string, number | null>;
+  /** Série Stellar (oracle = eurc_stellar_mid) — même structure que heatEffUtc ; null si mid absent. */
+  heatEffUtcStellar: Record<string, (number | null)[][]>;
+  /** Série Stellar intraday 15 min — même structure que intradayLocal ; trous honnêtes où mid absent. */
+  intradayStellar: Record<string, (number | null)[][]>;
+  /** Moyenne plate 7 j de l'efficience Stellar par sonde ; null si aucune donnée mid. */
+  effWeekAvgStellar: Record<string, number | null>;
 }
 
 // ─── Mappings display / note / chip ──────────────────────────────────────────
@@ -309,6 +315,7 @@ interface WinnerEffRow {
   hour_utc: number;     // 0-23
   dow_utc: number;      // 0=Lun … 6=Dim
   eff: number;
+  effStellar: number | null;  // oracle Stellar (eurc_stellar_mid) ; null si mid absent
   startedAtMs: number;  // ms epoch UTC
 }
 
@@ -321,7 +328,7 @@ function fetchWinnerEffRows(
   pairUi: string,
 ): WinnerEffRow[] {
   const stmt = prepBig(db, `
-    SELECT t.started_at, t.blnd_usd, t.eurc_usd, q.net_out, q.amount_in as q_amount_in
+    SELECT t.started_at, t.blnd_usd, t.eurc_usd, t.eurc_stellar_mid, q.net_out, q.amount_in as q_amount_in
     FROM quote q JOIN tick t ON t.id = q.tick_id
     WHERE q.is_winner = 1 AND q.pair = ? AND q.amount_in = ?
       AND t.ok = 1 AND t.started_at >= ?
@@ -341,26 +348,37 @@ function fetchWinnerEffRows(
     const qAmountIn = r['q_amount_in'] as bigint;
     const blndUsd = r['blnd_usd'] != null ? Number(r['blnd_usd']) : null;
     const eurcUsd = r['eurc_usd'] != null ? Number(r['eurc_usd']) : null;
+    const eurcStellarMid = r['eurc_stellar_mid'] != null ? Number(r['eurc_stellar_mid']) : null;
 
     if (!netOut || netOut <= 0n || qAmountIn <= 0n) continue;
     const eff = effOf(netOut, qAmountIn, pairUi, { blnd_usd: blndUsd, eurc_usd: eurcUsd });
     if (eff === null) continue;
 
-    result.push({ hour_utc: hourUtc, dow_utc: dowUtc, eff, startedAtMs: d.getTime() });
+    // Série Stellar : oracle = eurc_stellar_mid (null si mid absent → trou honnête)
+    const effStellar = effOf(netOut, qAmountIn, pairUi, { blnd_usd: blndUsd, eurc_usd: eurcStellarMid });
+
+    result.push({ hour_utc: hourUtc, dow_utc: dowUtc, eff, effStellar, startedAtMs: d.getTime() });
   }
   return result;
 }
 
-/** 7×24 efficience moyenne brute par (dow, hour) UTC — sert la moyenne/jour normalisée du prix. */
-function buildHeatEffUtc(rows: WinnerEffRow[]): (number | null)[][] {
+/** 7×24 efficience moyenne brute par (dow, hour) UTC — sert la moyenne/jour normalisée du prix.
+ *  @param pick  accesseur de la valeur à agréger ; les valeurs null/undefined sont ignorées (trou honnête).
+ */
+function buildHeatEffUtc(
+  rows: WinnerEffRow[],
+  pick: (r: WinnerEffRow) => number | null | undefined = (r) => r.eff,
+): (number | null)[][] {
   const buckets: number[][][] = Array.from({ length: 7 }, () =>
     Array.from({ length: 24 }, () => []),
   );
   for (const r of rows) {
+    const val = pick(r);
+    if (val == null || !Number.isFinite(val)) continue;
     const dayBucket = buckets[r.dow_utc];
     if (dayBucket) {
       const hourBucket = dayBucket[r.hour_utc];
-      if (hourBucket) hourBucket.push(r.eff);
+      if (hourBucket) hourBucket.push(val);
     }
   }
   return buckets.map((day) =>
@@ -392,6 +410,7 @@ export function buildIntradayLocal(
   rows: WinnerEffRow[],
   offsetH: number,
   now: Date,
+  pick: (r: WinnerEffRow) => number | null | undefined = (r) => r.eff,
 ): (number | null)[][] {
   // Étape 1 : déterminer les 7 dates locales les plus récentes (i=0 = aujourd'hui, i=6 = il y a 6 j)
   // Pour obtenir l'heure/date locale : localMs = utcMs + offsetH*3_600_000, puis getUTC* sur ce Date.
@@ -452,7 +471,9 @@ export function buildIntradayLocal(
       slotArr = [];
       slotMap.set(slot, slotArr);
     }
-    slotArr.push(row.eff);
+    const val = pick(row);
+    if (val == null || !Number.isFinite(val)) continue;
+    slotArr.push(val);
   }
 
   // Étape 3 : construire la grille résultat 7×96 (indexée par dow)
@@ -1011,16 +1032,32 @@ export function overview(
   const heatEffUtc: Record<string, (number | null)[][]> = {};
   const intradayLocal: Record<string, (number | null)[][]> = {};
   const effWeekAvg: Record<string, number | null> = {};
+  const heatEffUtcStellar: Record<string, (number | null)[][]> = {};
+  const intradayStellar: Record<string, (number | null)[][]> = {};
+  const effWeekAvgStellar: Record<string, number | null> = {};
 
   for (const size of sizes) {
     const key = String(toNumber(size));
     const effRows = fetchWinnerEffRows(db, pair, size, windowStart, pairUi);
+
     heatEffUtc[key] = buildHeatEffUtc(effRows);
     effWeekAvg[key] = effRows.length === 0
       ? null
       : effRows.reduce((a, r) => a + r.eff, 0) / effRows.length;
     intradayLocal[key] = buildIntradayLocal(effRows, offsetH, nowDate);
+
+    // Série Stellar : oracle = eurc_stellar_mid (trous honnêtes où mid absent)
+    heatEffUtcStellar[key] = buildHeatEffUtc(effRows, (r) => r.effStellar);
+    intradayStellar[key] = buildIntradayLocal(effRows, offsetH, nowDate, (r) => r.effStellar);
+    const stellarRows = effRows.filter((r) => r.effStellar != null);
+    effWeekAvgStellar[key] = stellarRows.length === 0
+      ? null
+      : stellarRows.reduce((a, r) => a + (r.effStellar as number), 0) / stellarRows.length;
   }
 
-  return { meta, ladders, winnerDist, bestRoutes, heatEffUtc, intradayLocal, effWeekAvg };
+  return {
+    meta, ladders, winnerDist, bestRoutes,
+    heatEffUtc, intradayLocal, effWeekAvg,
+    heatEffUtcStellar, intradayStellar, effWeekAvgStellar,
+  };
 }

@@ -1557,9 +1557,16 @@ function buildPage() {
   const sondeSeg = sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('');
   const EMPTY24 = Array.from({length:7}, () => new Array(24).fill(null));
   const EMPTY96 = Array.from({length:7}, () => new Array(96).fill(null));
-  const heatEffLocal = overview && overview.heatEffUtc && overview.heatEffUtc[sondeKey] ? rotateHeatUtc(overview.heatEffUtc[sondeKey], offsetH) : EMPTY24;
-  const intraday = overview && overview.intradayLocal && overview.intradayLocal[sondeKey] ? overview.intradayLocal[sondeKey] : EMPTY96;
-  const weekAvg = overview && overview.effWeekAvg ? overview.effWeekAvg[sondeKey] : null;
+  const useStellar = (typeof impactMode !== 'undefined' && impactMode === 'local');
+  const heatEffLocal = useStellar
+    ? rotateHeatUtc((overview && overview.heatEffUtcStellar && overview.heatEffUtcStellar[sondeKey]) || EMPTY24, offsetH)
+    : rotateHeatUtc((overview && overview.heatEffUtc && overview.heatEffUtc[sondeKey]) || EMPTY24, offsetH);
+  const intraday = useStellar
+    ? ((overview && overview.intradayStellar && overview.intradayStellar[sondeKey]) || EMPTY96)
+    : ((overview && overview.intradayLocal && overview.intradayLocal[sondeKey]) || EMPTY96);
+  const weekAvg = useStellar
+    ? (overview && overview.effWeekAvgStellar ? overview.effWeekAvgStellar[sondeKey] : null)
+    : (overview && overview.effWeekAvg ? overview.effWeekAvg[sondeKey] : null);
   const tm = timeModel(heatEffLocal, weekAvg);
 
   // Échelle courante

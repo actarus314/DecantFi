@@ -521,6 +521,7 @@ describe('buildIntradayLocal — anti-mélange', () => {
       hour_utc: 8,
       dow_utc: 2, // mercredi
       eff: 1.05,
+      effStellar: null,
       startedAtMs: new Date('2025-03-12T08:00:00Z').getTime(),
     };
 
@@ -529,6 +530,7 @@ describe('buildIntradayLocal — anti-mélange', () => {
       hour_utc: 14,
       dow_utc: 2, // même dow
       eff: 0.95,
+      effStellar: null,
       startedAtMs: new Date('2025-03-05T14:30:00Z').getTime(),
     };
 
@@ -564,6 +566,7 @@ describe('buildIntradayLocal — anti-mélange', () => {
       hour_utc: new Date(c.iso).getUTCHours(),
       dow_utc: 2,
       eff: c.eff,
+      effStellar: null,
       startedAtMs: new Date(c.iso).getTime(),
     }));
 
@@ -594,6 +597,7 @@ describe('buildIntradayLocal — anti-mélange', () => {
       hour_utc: 22,
       dow_utc: 1, // mardi UTC
       eff: 1.07,
+      effStellar: null,
       startedAtMs: tickMs,
     }];
 
@@ -606,5 +610,91 @@ describe('buildIntradayLocal — anti-mélange', () => {
     // Le mardi local (dow=1) ne doit pas avoir ce tick
     const tueRow = result[1]!;
     expect(tueRow[0]).toBeNull();
+  });
+});
+
+// ─── Tests séries Stellar ─────────────────────────────────────────────────────
+
+describe('séries Stellar — champs Overview', () => {
+  // Réutilise result_eurc_mid (DB avec eurc_stellar_mid=1.05, eurc_usd=1.08)
+  // et result_usdc / result_eurc (DB principale avec eurc_stellar_mid=null)
+
+  it('USDC : effWeekAvgStellar === effWeekAvg (eurc_usd non utilisé pour USDC)', () => {
+    // Pour USDC, effOf ignore eurc_usd → eff et effStellar sont identiques
+    expect(result_usdc.effWeekAvgStellar['250']).toBeCloseTo(result_usdc.effWeekAvg['250'] as number, 5);
+    expect(result_usdc.effWeekAvgStellar['750']).toBeCloseTo(result_usdc.effWeekAvg['750'] as number, 5);
+  });
+
+  it('USDC : heatEffUtcStellar === heatEffUtc (toutes cellules identiques)', () => {
+    const heat = result_usdc.heatEffUtc['250']!;
+    const heatStellar = result_usdc.heatEffUtcStellar['250']!;
+    expect(heatStellar.length).toBe(7);
+    for (let d = 0; d < 7; d++) {
+      for (let h = 0; h < 24; h++) {
+        expect(heatStellar[d]![h]).toBe(heat[d]![h]);
+      }
+    }
+  });
+
+  it('EURC sans mid (fixture principale) : effWeekAvgStellar === null (trou honnête)', () => {
+    // eurc_stellar_mid=null sur tous les ticks → effStellar=null → aucune donnée
+    expect(result_eurc.effWeekAvgStellar['250']).toBeNull();
+    expect(result_eurc.effWeekAvgStellar['750']).toBeNull();
+  });
+
+  it('EURC sans mid : heatEffUtcStellar entièrement null (trou honnête)', () => {
+    const heatStellar = result_eurc.heatEffUtcStellar['250']!;
+    expect(heatStellar.length).toBe(7);
+    for (const row of heatStellar) {
+      for (const cell of row) {
+        expect(cell).toBeNull();
+      }
+    }
+  });
+
+  it('EURC sans mid : intradayStellar entièrement null (trou honnête)', () => {
+    const intraStellar = result_eurc.intradayStellar['250']!;
+    expect(intraStellar.length).toBe(7);
+    for (const row of intraStellar) {
+      for (const cell of row) {
+        expect(cell).toBeNull();
+      }
+    }
+  });
+
+  it('EURC avec mid (1.05 ≠ eurc_usd 1.08) : effStellar ≠ eff EVM', () => {
+    // result_eurc_mid : eurc_stellar_mid=1.05, eurc_usd=1.08 → effStellar ≠ effEvm
+    const avgEvm = result_eurc_mid.effWeekAvg['250'] as number;
+    const avgStellar = result_eurc_mid.effWeekAvgStellar['250'] as number;
+    expect(avgStellar).not.toBeNull();
+    expect(avgEvm).not.toBeNull();
+    // effStellar = (net/amt) / (blnd/stellar_mid) ; effEvm = (net/amt) / (blnd/eurc_usd)
+    // stellar_mid < eurc_usd → spot stellar > spot evm → effStellar < effEvm
+    expect(Math.abs(avgStellar - avgEvm)).toBeGreaterThan(0.001);
+  });
+
+  it('EURC avec mid : heatEffUtcStellar ≠ heatEffUtc (au moins une cellule)', () => {
+    const heat = result_eurc_mid.heatEffUtc['250']!;
+    const heatStellar = result_eurc_mid.heatEffUtcStellar['250']!;
+    // Au moins une cellule doit différer
+    let found = false;
+    for (let d = 0; d < 7 && !found; d++) {
+      for (let h = 0; h < 24 && !found; h++) {
+        if (heat[d]![h] !== null && heatStellar[d]![h] !== null && heat[d]![h] !== heatStellar[d]![h]) {
+          found = true;
+        }
+      }
+    }
+    expect(found).toBe(true);
+  });
+
+  it('EURC avec mid : dimensions 7×24 et 7×96 présentes', () => {
+    const heatStellar = result_eurc_mid.heatEffUtcStellar['250']!;
+    expect(heatStellar.length).toBe(7);
+    for (const row of heatStellar) expect(row.length).toBe(24);
+
+    const intraStellar = result_eurc_mid.intradayStellar['250']!;
+    expect(intraStellar.length).toBe(7);
+    for (const row of intraStellar) expect(row.length).toBe(96);
   });
 });
