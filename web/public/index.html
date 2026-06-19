@@ -120,12 +120,14 @@ body{margin:0; background:var(--bg); color:var(--val);
 .pos{color:var(--green);} .neg{color:var(--red);}
 
 .routeline{display:flex; align-items:flex-start; gap:.5rem; flex-wrap:wrap;}
-/* composite : 2 jambes Tx1/Tx2 sur une seule ligne, l'une à la suite de l'autre (défile si trop long) */
-.complegs{display:flex; align-items:flex-start; gap:.5rem; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; padding-bottom:3px;}
-.complegs .routeline{flex-wrap:nowrap;}
-.complegs .txbadge{font-size:11px; font-weight:700; background:var(--heading); color:var(--bg); border-radius:4px; padding:1px 6px; white-space:nowrap; margin-top:4px;}
-.complegs .txvenue{font-weight:600; white-space:nowrap; margin-top:4px;}
-.complegs .txsep{color:var(--sub); font-weight:700; font-size:18px; margin-top:1px;}
+/* composite : 2 jambes Tx1/Tx2 en enfilade ; bascule en empilement (wrap) si la place manque.
+   Badge « Tx » placé SOUS le nom de l'outil pour économiser la largeur. */
+.complegs{display:flex; flex-wrap:wrap; align-items:flex-start; gap:.55rem 1.3rem;}
+.complegs .legblock{display:flex; align-items:flex-start; gap:.5rem; max-width:100%; overflow-x:auto; overflow-y:hidden; padding-bottom:3px;}
+.complegs .legblock .routeline{flex-wrap:nowrap;}
+.complegs .txhead{display:flex; flex-direction:column; align-items:flex-start; gap:2px; white-space:nowrap; margin-top:2px;}
+.complegs .txvenue{font-weight:600;}
+.complegs .txbadge{font-size:11px; font-weight:700; background:var(--heading); color:var(--bg); border-radius:4px; padding:1px 6px; align-self:flex-start;}
 .rasset{display:inline-flex; flex-direction:column; align-items:center; gap:3px;}
 .asset{font-weight:700; font-size:14px; padding:4px 11px; border-radius:9px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--val);}
 .asset.out{color:var(--green); border-color:color-mix(in srgb, var(--green) 45%, var(--card-border));}
@@ -1243,7 +1245,7 @@ function simCard() {
     const legsData = (displayRow || b).legs;
     const routeDiv = legsData
       ? '<div class="complegs">' + legsData.map((leg, i) =>
-          `${i > 0 ? '<span class="txsep">›</span>' : ''}<span class="txbadge">${t('tx_label')} ${i + 1}</span><span class="txvenue">${leg.display}</span>${routeFromParts(leg.routeParts, false)}`
+          `<div class="legblock"><div class="txhead"><span class="txvenue">${leg.display}</span><span class="txbadge">${t('tx_label')} ${i + 1}</span></div>${routeFromParts(leg.routeParts, false)}</div>`
         ).join('') + '</div>'
       : `<div style="overflow-x:auto;overflow-y:hidden">${route}</div>`;
     resultHtml = `<div class="result">
