@@ -1428,7 +1428,7 @@ function setView(v) {
 async function loadHealth() {
   renderApp(); // affiche "Chargement…" immédiatement
   try {
-    const r = await fetch(`/api/health?tzoff=${localOffset()}`);
+    const r = await fetch('/api/health');
     if (r.ok) health = await r.json();
   } catch {}
   renderApp();

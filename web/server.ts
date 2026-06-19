@@ -102,9 +102,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (req.method === 'GET' && path === '/api/health') {
       const now = new Date();
       const windowStart = new Date(now.getTime() - 7 * 86_400_000).toISOString();
-      const tzoffRaw = Number(query['tzoff'] ?? '0');
-      const healthOffsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
-      const result = buildSourceHealth(db, windowStart, now, healthOffsetH);
+      const result = buildSourceHealth(db, windowStart, now);
       json(res, 200, { ...result, generatedAt: now.toISOString() });
       return;
     }

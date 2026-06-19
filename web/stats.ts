@@ -528,7 +528,6 @@ export function buildSourceHealth(
   db: DatabaseSync,
   windowStart: string,
   now: Date,
-  _offsetH: number = 0,
 ): SourceHealthResult {
   // Sources connues : les clés de FULL_NAME (7 venues atomiques)
   const knownIds = Object.keys(FULL_NAME);

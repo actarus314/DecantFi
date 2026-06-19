@@ -112,20 +112,10 @@ export interface ReviewData {
   route: string;
   /** Frais réseau max (fee du XDR en XLM). Plafond autorisé par le wallet. */
   gasFeeXlm: number;
-  /** Frais réseau réels estimés (resource fee Soroban de la simulation). Absent si == gasFeeXlm (tx classique). */
+  /** Frais réseau réels estimés (resource fee Soroban de la simulation ; == gasFeeXlm pour une tx classique). */
   gasRealXlm?: number;
   /** Présent seulement si le net affiché au meta-agrégateur était supérieur à ce qu'on exécute. */
   fidelity?: { displayedWinner: string; displayedWinnerNet: number };
-}
-
-/** Parse le fee du XDR assemblé et le convertit en XLM. Retourne 0 si le XDR est invalide. */
-export async function xdrFeeXlm(xdr: string): Promise<number> {
-  try {
-    const { TransactionBuilder, Networks } = await import('@stellar/stellar-sdk');
-    return Number(TransactionBuilder.fromXDR(xdr, Networks.PUBLIC).fee) / 1e7;
-  } catch {
-    return 0;
-  }
 }
 
 /** {max: fee totale autorisée, real: resource fee Soroban (coût réel estimé depuis la sim)}. Pour tx classique real==max. */
