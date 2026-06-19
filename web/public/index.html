@@ -482,6 +482,7 @@ const STRINGS = {
     health_col_coherence: 'Cohérence',
     health_col_exec: 'Exécution',
     health_total: 'Total (tick)',
+    health_total_tip: "Durée d'un tick complet (médiane 7 j) : sélection RPC, prix, cotations en parallèle, re-simulations, classement et écriture. Pas la somme des venues.",
     health_coh_none: 'aucune sonde',
     health_coh_ok: (n) => `${n} sondes, toutes cohérentes`,
     health_coh_suspect: (s, t) => `${s} suspecte(s) sur ${t}`,
@@ -730,6 +731,7 @@ const STRINGS = {
     health_col_coherence: 'Coherence',
     health_col_exec: 'Execution',
     health_total: 'Total (tick)',
+    health_total_tip: 'Full tick time (7-day median): RPC selection, prices, parallel quotes, re-simulations, ranking and write. Not the sum of venues.',
     health_coh_none: 'no probes',
     health_coh_ok: (n) => `${n} probes, all coherent`,
     health_coh_suspect: (s, t) => `${s} suspect(s) out of ${t}`,
@@ -1358,7 +1360,7 @@ function buildHealthPage(topbarHtml) {
       </tr></thead>
       <tbody>${tableRows}</tbody>
       <tfoot><tr>
-        <td style="font-weight:700;color:var(--caption);font-size:12px;border-top:2px solid var(--card-border);background:var(--section-bg)">${t('health_total')}</td>
+        <td title="${t('health_total_tip')}" style="font-weight:700;color:var(--caption);font-size:12px;border-top:2px solid var(--card-border);background:var(--section-bg);cursor:help">${t('health_total')}</td>
         <td style="border-top:2px solid var(--card-border);background:var(--section-bg)"></td>
         <td style="color:var(--caption);font-variant-numeric:tabular-nums;font-size:12px;border-top:2px solid var(--card-border);background:var(--section-bg)">${(() => {
           const ms = health && health.execTotalMs;
@@ -1368,7 +1370,7 @@ function buildHealthPage(topbarHtml) {
         <td colspan="3" style="border-top:2px solid var(--card-border);background:var(--section-bg)"></td>
       </tr></tfoot>
     </table></div>
-    <p style="margin:.6rem 0 0">${t('health_sources_scope')}</p>
+    <p class="help" style="margin:.6rem 0 0;font-size:12px">${t('health_sources_scope')}</p>
     <p class="help" style="margin:.7rem 0 0;font-size:12px">
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i></i></span>${t('health_legend_ok')} &nbsp;
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="w"></i></span>${t('health_legend_warn')} &nbsp;
@@ -1419,7 +1421,7 @@ function buildHealthPage(topbarHtml) {
       <tbody>${rpcRows}</tbody>
     </table></div>
     <p class="help" style="margin:.7rem 0 0;font-size:12px">${t('health_rpc_note')}</p>
-    <p style="margin:.6rem 0 0">${t('health_rpc_scope')}</p>
+    <p class="help" style="margin:.6rem 0 0;font-size:12px">${t('health_rpc_scope')}</p>
   </div></div>`;
   })()}
   ${coherenceModalHtml()}`;
