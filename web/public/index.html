@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>stellarswap — compagnon de swap</title>
+<title>decant — BLND swaps, accurately decanted.</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
 :root{
@@ -281,7 +281,7 @@ table.flt tr.sel td{background:color-mix(in srgb, var(--heading) 9%, transparent
 const STRINGS = {
   fr: {
     // Topbar / brand
-    brand_dim: 'compagnon de swap',
+    brand_dim: 'swaps BLND, décantés avec précision.',
     tz_note: 'UTC stocké · affiché en heure locale (Europe/Paris)',
     theme_dark: '🌙',
     theme_light: '☀️',
@@ -495,7 +495,7 @@ const STRINGS = {
   },
   en: {
     // Topbar / brand
-    brand_dim: 'swap companion',
+    brand_dim: 'BLND swaps, accurately decanted.',
     tz_note: 'UTC stored · displayed in local time (Europe/Paris)',
     theme_dark: '🌙',
     theme_light: '☀️',
@@ -1343,7 +1343,7 @@ function buildPage() {
   const topbarHtml = `
   <div class="topbar">
     <img class="brand-logo" src="/favicon.svg" width="22" height="22" alt="">
-    <span class="brand">stellarswap <span class="dim">· ${t('brand_dim')}</span></span>
+    <span class="brand">decant <span class="dim">· ${t('brand_dim')}</span></span>
     ${view === 'dashboard' ? `<span class="pagenav" style="margin-left:.3rem">
       <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
       <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
