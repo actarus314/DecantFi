@@ -49,6 +49,7 @@ function rowFromQuote(pair: string, amountIn: bigint, q: NormalizedQuote, isWinn
     net_out: q.netOut, net_confidence: q.netConfidence, price_impact_pct: q.priceImpactPct ?? null,
     gas_in_target: q.gasInTarget, fee_total: feeTotal(q), route_summary: routeSummary(q),
     is_winner: isWinner, eurc_path: eurcPath, raw_json: JSON.stringify(q.raw, bigIntJson),
+    duration_ms: q.durationMs ?? null,
   };
 }
 
@@ -81,6 +82,7 @@ function rowsForProbe(probe: Probe, result: QuoteResult, prices: Prices): QuoteI
       gas_in_target: v.leg1.gasInTarget + v.leg2.gasInTarget, fee_total: null, // composite : gas des 2 legs
       route_summary: `${v.leg1.source}:BLND->USDC | ${v.leg2.source}:USDC->EURC`,
       is_winner: win, eurc_path: 'via-usdc', raw_json: JSON.stringify(eurc, bigIntJson),
+      duration_ms: null, // composite 2-tx : pas de durée atomique mesurable
     });
   }
   return rows;

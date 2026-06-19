@@ -56,6 +56,8 @@ export async function quoteAll(
   );
   // ponytail: un store ALS par adaptateur — diag.run() injecte le contexte sans changer la signature.
   const stores: Diag[] = adapters.map(() => ({}));
+  // Chronomètre indépendant par adaptateur (Date.now() : précision ms suffisante en prod).
+  const startTimes = adapters.map(() => Date.now());
   const settled = await Promise.allSettled(
     adapters.map((a, i) => diag.run(stores[i]!, () => a.quote(req, cfg))),
   );
@@ -65,7 +67,10 @@ export async function quoteAll(
   settled.forEach((s, i) => {
     const id = adapters[i]!.id;
     if (s.status === 'fulfilled' && s.value) {
-      quotes.push(finalize(s.value, prices));
+      const q = s.value;
+      // Affecte la durée du fetch API (la re-sim sera cumulée dans quote-api / tick).
+      q.durationMs = Date.now() - startTimes[i]!;
+      quotes.push(finalize(q, prices));
     } else {
       errors.push(id);
       const thrownReason = s.status === 'rejected' && (s.reason as Error)?.name === 'TimeoutError' ? 'timeout' : null;

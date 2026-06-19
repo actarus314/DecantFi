@@ -11,10 +11,12 @@ const tick: TickInsert = {
 const quotes: QuoteInsert[] = [
   { pair: 'BLND->USDC', amount_in: 2_500_000_000n, source_id: 'xbull', net_out: 505_000_000n,
     net_confidence: 'exact', price_impact_pct: 1.2, gas_in_target: 1_000n, fee_total: null,
-    route_summary: 'BLND->USDC', is_winner: true, eurc_path: null, raw_json: '{"toAmount":"505000000"}' },
+    route_summary: 'BLND->USDC', is_winner: true, eurc_path: null, raw_json: '{"toAmount":"505000000"}',
+    duration_ms: 320 },
   { pair: 'BLND->USDC', amount_in: 2_500_000_000n, source_id: 'horizon', net_out: 459_000_000n,
     net_confidence: 'exact', price_impact_pct: 10.1, gas_in_target: 0n, fee_total: null,
-    route_summary: 'BLND->XLM->USDC', is_winner: false, eurc_path: null, raw_json: null },
+    route_summary: 'BLND->XLM->USDC', is_winner: false, eurc_path: null, raw_json: null,
+    duration_ms: null },
 ];
 
 describe('openDb + insertTickWithQuotes', () => {

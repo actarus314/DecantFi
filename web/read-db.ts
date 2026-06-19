@@ -62,6 +62,56 @@ export function readCoherenceProbes(db: DatabaseSync, sinceIso: string): Coheren
   return (stmt.all(sinceIso) as Array<Record<string, unknown>>).map(mapProbeRow);
 }
 
+/**
+ * Lit les duration_ms non-null des quotes par source_id sur la fenêtre,
+ * jointe aux ticks ok=1. Renvoie une Map<source_id, number[]>.
+ * Seuls les IDs atomiques sont retournés (les '+' sont ignorés côté requête SQL via NOT LIKE).
+ */
+export function readExecMsBySource(
+  db: DatabaseSync,
+  sinceIso: string,
+): Map<string, number[]> {
+  const stmt = prepBig(db, `
+    SELECT q.source_id, q.duration_ms
+      FROM quote q
+      JOIN tick t ON t.id = q.tick_id
+     WHERE t.ok = 1 AND t.started_at >= ?
+       AND q.duration_ms IS NOT NULL
+       AND q.source_id NOT LIKE '%+%'
+     ORDER BY q.source_id
+  `);
+  const rows = stmt.all(sinceIso) as Array<Record<string, unknown>>;
+  const result = new Map<string, number[]>();
+  for (const r of rows) {
+    const src = String(r['source_id'] ?? '');
+    const ms = Number(r['duration_ms']);
+    if (!isFinite(ms)) continue;
+    let arr = result.get(src);
+    if (!arr) { arr = []; result.set(src, arr); }
+    arr.push(ms);
+  }
+  return result;
+}
+
+/** Lit les (started_at, finished_at) des ticks ok=1 sur la fenêtre pour le calcul du wall-clock. */
+export function readTickWallClocks(
+  db: DatabaseSync,
+  sinceIso: string,
+): Array<{ started_at: string; finished_at: string }> {
+  const stmt = prepBig(db, `
+    SELECT started_at, finished_at
+      FROM tick
+     WHERE ok = 1 AND started_at >= ? AND finished_at IS NOT NULL
+  `);
+  const rows = stmt.all(sinceIso) as Array<Record<string, unknown>>;
+  return rows
+    .map((r) => ({
+      started_at: String(r['started_at'] ?? ''),
+      finished_at: String(r['finished_at'] ?? ''),
+    }))
+    .filter((r) => r.started_at && r.finished_at);
+}
+
 /** Lit les sondes de cohérence d'une venue donnée depuis sinceIso, triées created_at DESC. */
 export function readCoherenceProbesByVenue(
   db: DatabaseSync,

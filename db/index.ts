@@ -13,6 +13,8 @@ export interface QuoteInsert {
   net_out: bigint | null; net_confidence: string | null; price_impact_pct: number | null;
   gas_in_target: bigint | null; fee_total: bigint | null; route_summary: string | null;
   is_winner: boolean; eurc_path: string | null; raw_json: string | null;
+  /** Durée totale de cotation pour cette source (fetch + re-sim), en ms. null = non mesuré. */
+  duration_ms: number | null;
 }
 
 export interface RpcProbeInsert {
@@ -45,8 +47,8 @@ export class Db {
     );
     const insQuote = this.db.prepare(
       `INSERT INTO quote (tick_id, pair, amount_in, source_id, net_out, net_confidence, price_impact_pct,
-                          gas_in_target, fee_total, route_summary, is_winner, eurc_path)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                          gas_in_target, fee_total, route_summary, is_winner, eurc_path, duration_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     const insRaw = this.db.prepare(`INSERT INTO quote_raw (quote_id, raw_json) VALUES (?, ?)`);
     const insRpc = this.db.prepare(
@@ -67,7 +69,7 @@ export class Db {
         const quoteId = Number(
           insQuote.run(tickId, q.pair, q.amount_in, q.source_id, q.net_out, q.net_confidence,
             q.price_impact_pct, q.gas_in_target, q.fee_total, q.route_summary, q.is_winner ? 1 : 0,
-            q.eurc_path).lastInsertRowid,
+            q.eurc_path, q.duration_ms ?? null).lastInsertRowid,
         );
         if (q.raw_json !== null) insRaw.run(quoteId, q.raw_json);
       }

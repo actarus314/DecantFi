@@ -2,7 +2,7 @@
 // Fenêtre = 7 jours. Timezone : agrégation serveur UTC, conversion côté client.
 // ponytail: Number = affichage, jamais règlement.
 import { type DatabaseSync } from 'node:sqlite';
-import { prepBig, readCoherenceProbes } from './read-db.js';
+import { prepBig, readCoherenceProbes, readExecMsBySource, readTickWallClocks } from './read-db.js';
 import { toNumber } from '../core/amount.js';
 import type { CollectorConfig } from '../collector/config.js';
 
@@ -135,6 +135,21 @@ export function prettyRoute(summary: string): string {
     return chain.join(' → ');
   }
   return summary.split('->').map((x) => x.trim()).filter(Boolean).map((n) => (n === 'native' ? 'XLM' : n)).join(' → ');
+}
+
+// ─── Médiane ────────────────────────────────────────────────────────────────────
+
+/**
+ * Médiane d'un tableau de nombres (ne modifie pas l'original).
+ * Pair : moyenne des deux valeurs centrales. Vide : null.
+ */
+export function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[mid]!
+    : (sorted[mid - 1]! + sorted[mid]!) / 2;
 }
 
 // ─── Mapping DB pair ─────────────────────────────────────────────────────────
@@ -502,6 +517,8 @@ export interface SourceHealth {
   };
   /** Tendance de disponibilité : comparaison fenêtre courante vs précédente (7 j vs 7 j d'avant). */
   uptimeTrend: 'up' | 'down' | 'flat';
+  /** Durée médiane de cotation de cette source sur la fenêtre 7 j (ms). null = aucune mesure. */
+  execMs: number | null;
 }
 
 export interface RpcHealth {
@@ -527,6 +544,9 @@ export interface SourceHealthResult {
   /** Heures écoulées dans la journée locale courante (0..24), pour le rendu du cercle partiel. */
   todayElapsedH: number;
   rpcs: RpcHealth[];
+  /** Médiane du wall-clock réel d'un tick (finished_at − started_at, ms) sur la fenêtre.
+   *  = temps total d'obtention du classement complet. null si aucun tick avec finished_at. */
+  execTotalMs: number | null;
 }
 
 /** Parse source_errors : JSON ([{id,reason}]) ou CSV legacy ("soroswap, comet"). */
@@ -777,6 +797,14 @@ export function buildSourceHealth(
   const coherenceProbes = readCoherenceProbes(db, windowStart);
   const coherenceAgg = aggregateCoherenceByVenue(coherenceProbes, knownIds);
 
+  // ── Durée médiane par source (execMs) + wall-clock total (execTotalMs) ──────
+  const execMsBySource = readExecMsBySource(db, windowStart);
+  const tickWallClocks = readTickWallClocks(db, windowStart);
+  const wallClockDiffs = tickWallClocks
+    .map((r) => Date.parse(r.finished_at) - Date.parse(r.started_at))
+    .filter((d) => isFinite(d) && d >= 0);
+  const execTotalMs = median(wallClockDiffs);
+
   // Requête A : ticks ok=1 dans la fenêtre — TOUS les ticks (auto ET manuels).
   // Les relevés manuels (note='manual') sont désormais inclus dans les stats de stabilité :
   // ils alimentent la page Stabilité comme le tableau/zoom (modèle temporaire, purgés au prochain relevé auto).
@@ -937,6 +965,7 @@ export function buildSourceHealth(
     // Cohérence
     const coh = coherenceAgg.get(id) ?? { tests: 0, suspects: 0, lastSuspectAt: null };
 
+    const execMsArr = execMsBySource.get(id) ?? [];
     return {
       id,
       display: displayName(id),
@@ -950,6 +979,7 @@ export function buildSourceHealth(
       pairNote: id === 'comet' ? 'USDC uniquement' : null,
       coherence: { tests: coh.tests, suspects: coh.suspects, lastSuspectAt: coh.lastSuspectAt },
       uptimeTrend,
+      execMs: median(execMsArr),
     };
   });
 
@@ -966,7 +996,7 @@ export function buildSourceHealth(
   const todayElapsedH = localNow.getUTCHours() + localNow.getUTCMinutes() / 60;
 
   const rpcs = buildRpcHealth(db, windowStart);
-  return { totalTicks, windowDays: 7, sources, todayElapsedH, rpcs };
+  return { totalTicks, windowDays: 7, sources, todayElapsedH, rpcs, execTotalMs };
 }
 
 // ─── Point d'entrée public ────────────────────────────────────────────────────

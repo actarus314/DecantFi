@@ -127,6 +127,7 @@ function buildTestDb(): void {
               is_winner: isWinner,
               eurc_path: eurcPath,
               raw_json: null,
+              duration_ms: null,
             });
           }
         }

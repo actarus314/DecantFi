@@ -148,16 +148,22 @@ export async function resimAquariusXbull(
 
   const aqRanked = result.ranking.ranked.find((q) => q.source === 'aquarius');
   const rawXdr = (aqRanked?.raw as { swap_chain_xdr?: unknown } | undefined)?.swap_chain_xdr;
+  let aqSimMs = 0;
   if (aqRanked && rawXdr) {
+    const t0Aq = Date.now();
     const simNet = await simFnAq(String(rawXdr), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null);
+    aqSimMs = Date.now() - t0Aq;
     if (simNet !== null && simNet > 0n && simNet !== aqRanked.netOut) aquariusSimNet = simNet;
   }
 
   const xbRanked = result.ranking.ranked.find((q) => q.source === 'xbull');
   const route = (xbRanked?.raw as { route?: unknown } | undefined)?.route;
   let xbullHops: RouteHop[] | undefined;
+  let xbSimMs = 0;
   if (xbRanked && route) {
+    const t0Xb = Date.now();
     const xbSim = await simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null);
+    xbSimMs = Date.now() - t0Xb;
     if (xbSim && xbSim.net > 0n && xbSim.net !== xbRanked.netOut) xbullSimNet = xbSim.net;
     if (xbSim && xbSim.route.length >= 2) {
       const r = xbSim.route;
@@ -168,11 +174,13 @@ export async function resimAquariusXbull(
   if (aquariusSimNet !== undefined || xbullSimNet !== undefined || xbullHops !== undefined) {
     const newQuotes = result.ranking.ranked.map((q) => {
       if (q.source === 'aquarius' && aquariusSimNet !== undefined)
-        return { ...q, netOut: aquariusSimNet, grossOut: aquariusSimNet };
+        return { ...q, netOut: aquariusSimNet, grossOut: aquariusSimNet,
+          durationMs: (q.durationMs ?? 0) + aqSimMs };
       if (q.source === 'xbull' && (xbullSimNet !== undefined || xbullHops))
         return { ...q,
           ...(xbullSimNet !== undefined ? { netOut: xbullSimNet, grossOut: xbullSimNet } : {}),
-          ...(xbullHops ? { route: xbullHops } : {}) };
+          ...(xbullHops ? { route: xbullHops } : {}),
+          durationMs: (q.durationMs ?? 0) + xbSimMs };
       return q;
     });
     result.ranking = rankQuotes(newQuotes);

@@ -45,6 +45,7 @@ function mkQuote(sourceId: string, overrides: Partial<QuoteInsert> = {}): QuoteI
     is_winner: true,
     eurc_path: null,
     raw_json: null,
+    duration_ms: null,
     ...overrides,
   };
 }
@@ -640,5 +641,117 @@ describe('buildSourceHealth — champ uptimeTrend', () => {
     const xbull = res.sources.find((s) => s.id === 'xbull')!;
     // delta = 100 - 100 = 0 → 'flat'
     expect(xbull.uptimeTrend).toBe('flat');
+  });
+});
+
+// ─── median — fonction pure ───────────────────────────────────────────────────
+
+import { median, buildSourceHealth as _bsh } from './stats.js';
+
+describe('median — fonction pure', () => {
+  it('tableau vide → null', () => {
+    expect(median([])).toBeNull();
+  });
+
+  it('1 élément', () => {
+    expect(median([42])).toBe(42);
+  });
+
+  it('impair : valeur centrale', () => {
+    expect(median([3, 1, 2])).toBe(2); // trié → [1,2,3] → med=2
+  });
+
+  it('pair : moyenne des deux valeurs centrales', () => {
+    expect(median([1, 3, 5, 7])).toBe(4); // trié → [1,3,5,7] → (3+5)/2=4
+  });
+
+  it('ne modifie pas le tableau original', () => {
+    const arr = [5, 3, 1];
+    median(arr);
+    expect(arr).toEqual([5, 3, 1]);
+  });
+});
+
+// ─── execMs par venue + execTotalMs ──────────────────────────────────────────
+
+describe('buildSourceHealth — execMs et execTotalMs', () => {
+  let dirExec: string;
+  let pathExec: string;
+  let resExec: ReturnType<typeof _bsh>;
+
+  const NOW_EXEC = new Date('2025-06-01T12:00:00Z');
+  const WIN_EXEC = new Date(NOW_EXEC.getTime() - 7 * 86_400_000).toISOString();
+
+  beforeAll(() => {
+    dirExec = mkdtempSync(join(tmpdir(), 'stellarswap-execms-'));
+    pathExec = join(dirExec, 'test.db');
+    const db = openDb(pathExec);
+
+    // Tick 1 : 3000 ms de wall-clock, xbull=100ms aquarius=200ms
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-28T10:00:00Z', finished_at: '2025-05-28T10:00:03Z' }),
+      [
+        mkQuote('xbull',    { duration_ms: 100 }),
+        mkQuote('aquarius', { duration_ms: 200 }),
+      ],
+    );
+
+    // Tick 2 : 5000 ms de wall-clock, xbull=150ms aquarius=250ms
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-29T10:00:00Z', finished_at: '2025-05-29T10:00:05Z' }),
+      [
+        mkQuote('xbull',    { duration_ms: 150 }),
+        mkQuote('aquarius', { duration_ms: 250 }),
+      ],
+    );
+
+    // Tick 3 : 1000 ms de wall-clock, xbull=null (non mesuré), aquarius=220ms
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-30T10:00:00Z', finished_at: '2025-05-30T10:00:01Z' }),
+      [
+        mkQuote('xbull',    { duration_ms: null }),
+        mkQuote('aquarius', { duration_ms: 220 }),
+      ],
+    );
+
+    // Tick ok=0 : exclu du calcul
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-31T10:00:00Z', ok: false }),
+      [mkQuote('xbull', { duration_ms: 999 })],
+    );
+
+    db.close();
+    const rdb = openReadOnly(pathExec);
+    resExec = _bsh(rdb, WIN_EXEC, NOW_EXEC);
+    rdb.close();
+  });
+
+  afterAll(() => { rmSync(dirExec, { recursive: true, force: true }); });
+
+  it('execMs xbull = médiane de [100, 150] (null ignoré) = 125', () => {
+    const xbull = resExec.sources.find((s) => s.id === 'xbull')!;
+    // [100, 150] → médiane pair = (100+150)/2 = 125
+    expect(xbull.execMs).toBe(125);
+  });
+
+  it('execMs aquarius = médiane de [200, 250, 220] = 220', () => {
+    const aq = resExec.sources.find((s) => s.id === 'aquarius')!;
+    // trié [200, 220, 250] → médiane impaire = 220
+    expect(aq.execMs).toBe(220);
+  });
+
+  it('execMs soroswap (aucune mesure) = null', () => {
+    const ss = resExec.sources.find((s) => s.id === 'soroswap')!;
+    expect(ss.execMs).toBeNull();
+  });
+
+  it('execTotalMs = médiane des (finished_at - started_at) en ms = médiane de [3000, 5000, 1000] = 3000', () => {
+    // ticks ok=1 avec finished_at : [3000, 5000, 1000] → trié [1000, 3000, 5000] → med=3000
+    expect(resExec.execTotalMs).toBe(3000);
+  });
+
+  it('les ticks ok=0 sont exclus du wall-clock', () => {
+    // Si on incluait le tick ok=0, on aurait 4 valeurs → médiane ≠ 3000. Donc ok=0 exclu.
+    expect(resExec.execTotalMs).toBe(3000);
   });
 });

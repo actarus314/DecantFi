@@ -14,7 +14,8 @@ function insertAt(db: ReturnType<typeof openDb>, startedAt: string, net: string)
   const quotes: QuoteInsert[] = [
     { pair: 'BLND->USDC', amount_in: toStroops('250'), source_id: 'xbull', net_out: toStroops(net),
       net_confidence: 'exact', price_impact_pct: 1.0, gas_in_target: 0n, fee_total: null,
-      route_summary: 'BLND->USDC', is_winner: true, eurc_path: null, raw_json: '{"k":1}' },
+      route_summary: 'BLND->USDC', is_winner: true, eurc_path: null, raw_json: '{"k":1}',
+      duration_ms: null },
   ];
   return db.insertTickWithQuotes(tick, quotes);
 }

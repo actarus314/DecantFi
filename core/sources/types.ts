@@ -84,6 +84,9 @@ export interface NormalizedQuote {
   priceImpactPct?: number;
   /** Reponse brute de la source (debug / fixtures). */
   raw: unknown;
+  /** Durée totale de cotation pour cette source (ms) : fetch API + re-simulation incluse le cas échéant.
+   *  Alimenté par engine (fetch) + quote-api/tick (re-sim). Optionnel : absent = non mesuré. */
+  durationMs?: number;
 }
 
 export interface SourceAdapter {

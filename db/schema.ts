@@ -107,4 +107,5 @@ export function migrate(db: DatabaseSync): void {
 
   // Migrations additives idempotentes (pour les DB créées avant l'ajout d'une colonne).
   ensureColumn(db, 'rpc_probe', 'rpc_calls', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'quote', 'duration_ms', 'INTEGER');
 }
