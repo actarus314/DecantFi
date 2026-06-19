@@ -151,6 +151,10 @@ body{margin:0; background:var(--bg); color:var(--val);
 .tip-wrap .tip-box::before{
   content:''; position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
   border:5px solid transparent; border-bottom-color:var(--val);}
+/* Variante « vers le haut, alignée à gauche » — pour les lignes en bas de tableau (tfoot) où
+   un tooltip vers le bas serait masqué par overflow:hidden. Monte dans le tableau, s'étend à droite. */
+.tip-wrap .tip-box.up{top:auto; bottom:calc(100% + 4px); left:0; transform:none;}
+.tip-wrap .tip-box.up::before{top:100%; bottom:auto; left:16px; transform:none; border-bottom-color:transparent; border-top-color:var(--val);}
 
 table.flt{width:100%; border-collapse:collapse; font-size:13px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:.6rem; overflow:hidden;}
 table.flt th{font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--caption); text-align:right; padding:8px 12px; background:var(--section-bg); font-weight:600; border-bottom:1px solid var(--card-border);}
@@ -1335,7 +1339,7 @@ function buildHealthPage(topbarHtml) {
 
     const pairNote = s.pairNote ? ` <span class="muted" style="font-size:12px">· ${s.pairNote}</span>` : '';
     return `<tr>
-      <td><span class="srcname">${s.display}</span>${pairNote}</td>
+      <td style="white-space:nowrap"><span class="srcname">${s.display}</span>${pairNote}</td>
       <td>${cohCell}</td>
       <td style="color:var(--caption);font-variant-numeric:tabular-nums">${execCell}</td>
       <td><span class="days">${dots}</span> <span style="margin-left:1rem;font-size:12px;color:var(--caption);font-variant-numeric:tabular-nums;white-space:nowrap">${s.uptimePct.toFixed(0)} % ${trendArrow}</span></td>
@@ -1351,7 +1355,7 @@ function buildHealthPage(topbarHtml) {
     ${kpiHtml}
     <div style="overflow-x:auto"><table class="flt">
       <thead><tr>
-        <th style="width:1%;white-space:nowrap">${t('health_col_source')}</th>
+        <th>${t('health_col_source')}</th>
         <th>${t('health_col_coherence')}</th>
         <th>${t('health_col_exec')}</th>
         <th>${t('health_col_days')}</th>
@@ -1360,7 +1364,7 @@ function buildHealthPage(topbarHtml) {
       </tr></thead>
       <tbody>${tableRows}</tbody>
       <tfoot><tr>
-        <td style="font-weight:700;color:var(--caption);font-size:12px;border-top:2px solid var(--card-border);background:var(--section-bg)"><span class="tip-wrap" style="display:inline-flex;align-items:center">${t('health_total')}<span class="tip-icon">ⓘ</span><span class="tip-box">${t('health_total_tip')}</span></span></td>
+        <td style="font-weight:700;color:var(--caption);font-size:12px;border-top:2px solid var(--card-border);background:var(--section-bg)"><span class="tip-wrap" style="display:inline-flex;align-items:center">${t('health_total')}<span class="tip-icon">ⓘ</span><span class="tip-box up">${t('health_total_tip')}</span></span></td>
         <td style="border-top:2px solid var(--card-border);background:var(--section-bg)"></td>
         <td style="color:var(--caption);font-variant-numeric:tabular-nums;font-size:12px;border-top:2px solid var(--card-border);background:var(--section-bg)">${(() => {
           const ms = health && health.execTotalMs;
