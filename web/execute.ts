@@ -1,7 +1,7 @@
 // Orchestrateur d'exécution : BLND → USDC/EURC via xBull, Soroswap, Horizon ou Aquarius.
 // Money-path : bigint stroops partout, jamais de float pour les calculs.
 import { BLND, USDC, EURC, bySac, classicColon, type Asset } from '../core/assets.js';
-import { decodeTransfers, routeFromTransfers } from '../core/soroban-route.js';
+import { decodeTransfers, routeFromTransfers, type Transfer } from '../core/soroban-route.js';
 import { bumpRpc } from '../core/rpc-meter.js';
 import { toNumber, fromStroops, toStroops } from '../core/amount.js';
 import { stroopsOrNull, bigintOrNull } from '../core/sources/util.js';
@@ -323,7 +323,7 @@ export async function simulateXbullNet(
   route: string,
   amountIn: bigint,
   cfg: { rpcUrl: string },
-): Promise<{ net: bigint; route: string[] } | null> {
+): Promise<{ net: bigint; route: string[]; transfers: Transfer[] } | null> {
   for (const witness of AQUARIUS_WITNESSES) {
     let xdrStr: string;
     try {
@@ -356,10 +356,106 @@ export async function simulateXbullNet(
       // Extraction de la route réelle depuis la chaîne de transferts SAC
       const transfers = await decodeTransfers((sim as any).events ?? []);
       const route = routeFromTransfers(transfers);
-      return { net, route: route.length >= 2 ? route : [] };
+      return { net, route: route.length >= 2 ? route : [], transfers };
     } catch {
       continue;
     }
+  }
+  return null;
+}
+
+/** Simule swap_chained Aquarius et retourne les Transfer[] bruts (pour la sonde de cohérence).
+ *  Même logique que simulateAquariusNet mais retourne les events décodés au lieu du retval.
+ *  null si tous les témoins échouent ou si le XDR n'est pas décodable. */
+export async function simulateAquariusTransfers(
+  swapChainXdr: string,
+  amountIn: bigint,
+  cfg: { rpcUrl: string },
+): Promise<Transfer[] | null> {
+  const sdk = await import('@stellar/stellar-sdk');
+  const { rpc, Address, TransactionBuilder, Networks, Account, Contract, nativeToScVal, xdr } = sdk;
+
+  let swapsChain: ReturnType<typeof xdr.ScVal.fromXDR>;
+  try {
+    swapsChain = xdr.ScVal.fromXDR(swapChainXdr, 'base64');
+  } catch {
+    return null;
+  }
+
+  const server = new rpc.Server((cfg.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
+  for (const witness of AQUARIUS_WITNESSES) {
+    const args = [
+      Address.fromString(witness).toScVal(),
+      swapsChain,
+      Address.fromString(BLND.sac!).toScVal(),
+      nativeToScVal(amountIn, { type: 'u128' }),
+      nativeToScVal(0n, { type: 'u128' }),
+    ];
+    const tx = new TransactionBuilder(new Account(witness, '0'), { fee: '10000', networkPassphrase: Networks.PUBLIC })
+      .addOperation(new Contract(AQUA_ROUTER).call('swap_chained', ...args))
+      .setTimeout(180)
+      .build();
+    bumpRpc();
+    const sim = await server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationError(sim) || !sim.result) continue;
+    return decodeTransfers((sim as any).events ?? []);
+  }
+  return null;
+}
+
+/** Simule un swap Soroswap et retourne les Transfer[] bruts (pour la sonde de cohérence).
+ *  Construit le XDR via buildSoroswap puis simule sans préparer (simulateTransaction).
+ *  null si le build échoue ou si la simulation échoue. */
+export async function simulateSoroswapTransfers(
+  client: SoroswapClient,
+  quote: unknown,
+  sender: string,
+  cfg: { rpcUrl: string },
+): Promise<Transfer[] | null> {
+  try {
+    const { xdr: xdrStr } = await buildSoroswap(client, quote, sender);
+    const sdk = await import('@stellar/stellar-sdk');
+    const { rpc, TransactionBuilder, Networks } = sdk;
+    const tx = TransactionBuilder.fromXDR(xdrStr, Networks.PUBLIC);
+    const server = new rpc.Server((cfg.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
+    bumpRpc();
+    const sim = await server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationError(sim) || !sim.result) return null;
+    return decodeTransfers((sim as any).events ?? []);
+  } catch {
+    return null;
+  }
+}
+
+/** Simule swap_exact_amount_in Comet et retourne les Transfer[] bruts (pour la sonde de cohérence).
+ *  Calque simulateCometReal mais retourne les events décodés au lieu du net.
+ *  null si tous les témoins échouent. */
+export async function simulateCometTransfers(a: {
+  sellSac: string;
+  buySac: string;
+  amountIn: bigint;
+  rpcUrl: string;
+}): Promise<Transfer[] | null> {
+  const sdk = await import('@stellar/stellar-sdk');
+  const { rpc, Address, TransactionBuilder, Networks, Account, Contract, nativeToScVal } = sdk;
+  const server = new rpc.Server((a.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
+  for (const user of COMET_WITNESSES) {
+    const args = [
+      new Address(a.sellSac).toScVal(),
+      nativeToScVal(a.amountIn, { type: 'i128' }),
+      new Address(a.buySac).toScVal(),
+      nativeToScVal(0n, { type: 'i128' }),
+      nativeToScVal(I128_MAX, { type: 'i128' }),
+      new Address(user).toScVal(),
+    ];
+    const tx = new TransactionBuilder(new Account(user, '0'), { fee: '100', networkPassphrase: Networks.PUBLIC })
+      .addOperation(new Contract(COMET_POOL).call('swap_exact_amount_in', ...args))
+      .setTimeout(30)
+      .build();
+    bumpRpc();
+    const sim = await server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationError(sim) || !sim.result) continue;
+    return decodeTransfers((sim as any).events ?? []);
   }
   return null;
 }

@@ -142,7 +142,7 @@ describe('runTick (resim Aquarius + xBull)', () => {
     };
 
     const fakeSimXb = async (_route: string, _amt: bigint, _opts: { rpcUrl: string }) =>
-      ({ net: toStroops('11.8'), route: ['BLND', 'XLM', 'USDC'] });
+      ({ net: toStroops('11.8'), route: ['BLND', 'XLM', 'USDC'], transfers: [] });
 
     const { quotes } = await runTick({
       probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],

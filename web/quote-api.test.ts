@@ -152,7 +152,7 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
       errors: [],
     } as any);
 
-    const fakeSimXb = vi.fn(async () => ({ net: 3_9000000n, route: [] })); // net simulé xBull < Aquarius
+    const fakeSimXb = vi.fn(async () => ({ net: 3_9000000n, route: [], transfers: [] })); // net simulé xBull < Aquarius
     const result = await liveQuote('USDC', AMT, FAKE_CFG as any, { simulateXbullNet: fakeSimXb });
 
     expect(fakeSimXb).toHaveBeenCalledOnce();
