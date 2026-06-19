@@ -100,18 +100,9 @@ export function displayName(sourceId: string): string {
   return FULL_NAME[sourceId] ?? sourceId;
 }
 
-export function noteFor(sourceId: string, winner: boolean, eurcPath: string | null): string {
-  const parts: string[] = [];
-  if (winner) {
-    const base = 'gagnant';
-    const via = eurcPath === 'via-usdc' ? 'via-USDC' : null;
-    parts.push(via ? `${base} · ${via}` : base);
-  }
-  if (sourceId === 'comet') parts.push('cross-check backstop');
-  else if (sourceId === 'ultrastellar') parts.push('fee = 0');
-  else if (sourceId === 'stellarbroker') parts.push('plancher (fee opaque)');
-  else if (sourceId === 'horizon') parts.push('plancher DEX');
-  return parts.join(' · ');
+export function noteFor(_sourceId: string, _winner: boolean, eurcPath: string | null): string {
+  // Seule annotation conservée : la route composite EURC via-USDC.
+  return eurcPath === 'via-usdc' ? 'via-USDC' : '';
 }
 
 export function chipFor(netConfidence: string, sourceId: string, eurcPath: string | null): Chip {
