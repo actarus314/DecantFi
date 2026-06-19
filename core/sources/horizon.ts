@@ -42,7 +42,7 @@ export function parseHorizon(raw: unknown, req: QuoteRequest): NormalizedQuote |
   if (grossOut === null || grossOut <= 0n) return null;
 
   const pathSyms = (best?.path ?? []).map((p) => (p?.asset_type === 'native' ? 'XLM' : p?.asset_code ?? '?'));
-  const route = hops('sdex', [req.sellAsset.symbol, ...pathSyms, req.buyAsset.symbol]);
+  const route = hops('horizon', [req.sellAsset.symbol, ...pathSyms, req.buyAsset.symbol]);
 
   return {
     source: 'horizon',
