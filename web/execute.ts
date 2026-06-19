@@ -82,13 +82,13 @@ export function classifyExecError(message: string): 'trustline' | 'funds' | 'sli
 
 /** Label de route lisible pour l'UI.
  *  Soroswap : chaque SAC → symbole via bySac (fallback C1234…7890).
- *  xBull : route opaque → ☁ (glyph rendu côté web comme "hops cachés"). */
+ *  xBull : route décodée depuis la sim (simulateXbullNet) — plus de masque ☁. */
 export function routeLabel(
   venue: 'xbull' | 'soroswap',
   target: 'USDC' | 'EURC',
   sorobanPath?: string[],
 ): string {
-  if (venue === 'xbull') return `BLND → ☁ → ${target}`;
+  if (venue === 'xbull') return `BLND → ${target}`;
   if (!sorobanPath || sorobanPath.length === 0) return `BLND → ${target}`;
   return sorobanPath
     .map((sac) => {

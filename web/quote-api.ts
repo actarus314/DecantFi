@@ -179,12 +179,14 @@ export async function liveQuote(
       }
     }
 
-    if (aquariusSimNet !== undefined || xbullSimNet !== undefined) {
+    if (aquariusSimNet !== undefined || xbullSimNet !== undefined || xbullHops !== undefined) {
       const newQuotes = result.ranking.ranked.map((q) => {
         if (q.source === 'aquarius' && aquariusSimNet !== undefined)
           return { ...q, netOut: aquariusSimNet, grossOut: aquariusSimNet };
-        if (q.source === 'xbull' && xbullSimNet !== undefined)
-          return { ...q, netOut: xbullSimNet, grossOut: xbullSimNet, ...(xbullHops ? { route: xbullHops } : {}) };
+        if (q.source === 'xbull' && (xbullSimNet !== undefined || xbullHops))
+          return { ...q,
+            ...(xbullSimNet !== undefined ? { netOut: xbullSimNet, grossOut: xbullSimNet } : {}),
+            ...(xbullHops ? { route: xbullHops } : {}) };
         return q;
       });
       result.ranking = rankQuotes(newQuotes);

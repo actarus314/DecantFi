@@ -1,12 +1,14 @@
 // Exécute UN tick : prix 1× (injecté aux sondes pour comparabilité), quote() par sonde, assemble les lignes.
 // Aucune I/O DB. Renvoie un TickInsert + ses QuoteInsert (prêts pour db.insertTickWithQuotes).
+// ponytail: l'import de simulateXbullNet (web/execute.ts) est intentionnel — execute.ts est DOM-free et compilé ensemble.
 import { BLND } from '../core/assets.js';
 import { priceImpactPct, targetUsdPerUnit, type Prices } from '../core/prices.js';
 import type { QuoteResult, QuoteOptions, EngineConfig } from '../core/engine.js';
-import type { NormalizedQuote } from '../core/sources/types.js';
+import type { NormalizedQuote, RouteHop } from '../core/sources/types.js';
 import type { TickInsert, QuoteInsert } from '../db/index.js';
 import type { CollectorConfig } from './config.js';
 import type { Probe } from './probes.js';
+import { simulateXbullNet } from '../web/execute.js';
 
 export interface TickDeps {
   probes: Probe[];
@@ -99,6 +101,24 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     for (const e of result.errors) {
       if (!reasons.has(e)) reasons.set(e, result.errorReasons?.[e] ?? 'indisponible');
     }
+
+    // Décode la route xBull réelle (best-effort) : remplace les RouteHop[] avant routeSummary()
+    // pour que la DB stocke "BLND->XLM->USDC" au lieu du résumé à 2 nœuds sans hops.
+    const xbRanked = result.ranking.ranked.find((q) => q.source === 'xbull');
+    if (xbRanked) {
+      const rawRoute = (xbRanked.raw as { route?: unknown } | undefined)?.route;
+      if (rawRoute) {
+        try {
+          const xbSim = await simulateXbullNet(String(rawRoute), probe.amountIn, { rpcUrl: deps.cfg.rpcUrl });
+          if (xbSim && xbSim.route.length >= 2) {
+            const r = xbSim.route;
+            const hops: RouteHop[] = r.slice(0, -1).map((sell, i) => ({ venue: 'xbull', sell, buy: r[i + 1]! }));
+            (xbRanked as { route: RouteHop[] }).route = hops;
+          }
+        } catch { /* best-effort : échec → route originale conservée */ }
+      }
+    }
+
     quotes.push(...rowsForProbe(probe, result, prices));
   }
 

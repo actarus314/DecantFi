@@ -114,7 +114,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         json(res, 400, { error: `pair invalide: ${pairRaw}` });
         return;
       }
-      const result = overview(db, pair, cfg);
+      const tzoffRaw = Number(query['tzoff'] ?? '0');
+      const offsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
+      const result = overview(db, pair, cfg, undefined, offsetH);
       json(res, 200, result);
       return;
     }
@@ -185,8 +187,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         return;
       }
       const pair = parsePair(query['pair'] ?? 'USDC') ?? 'USDC';
+      const tzoffRaw = Number(query['tzoff'] ?? '0');
+      const offsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
       const refresh = await manualRefresh(cfg);
-      json(res, 200, { refresh, overview: overview(db, pair, cfg) });
+      json(res, 200, { refresh, overview: overview(db, pair, cfg, undefined, offsetH) });
       return;
     }
 

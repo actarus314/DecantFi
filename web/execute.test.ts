@@ -138,7 +138,7 @@ describe('reviewData', () => {
     netStroops: 5_0000000n,   // 5 USDC
     minReceivedStroops: 4_9750000n,
     slippageBps: 50,
-    route: 'BLND → ☁ → USDC',
+    route: 'BLND → USDC',
     gasFeeXlm: 0,
   };
 
@@ -186,8 +186,8 @@ describe('routeLabel', () => {
     expect(label).toBe('BLND → USDC → EURC');
   });
 
-  it('xbull → BLND → ☁ → USDC', () => {
-    expect(routeLabel('xbull', 'USDC')).toBe('BLND → ☁ → USDC');
+  it('xbull → BLND → USDC', () => {
+    expect(routeLabel('xbull', 'USDC')).toBe('BLND → USDC');
   });
 
   it('soroswap sans path → BLND → USDC', () => {

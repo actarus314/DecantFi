@@ -4,7 +4,7 @@ import { toStroops } from '../core/amount.js';
 export interface CollectorConfig {
   cadenceSec: number; jitterSec: number;
   sizesBlnd: bigint[]; pairs: ('USDC' | 'EURC')[];
-  dbPath: string; tz: string; timeoutMs: number;
+  dbPath: string; timeoutMs: number;
   rawRetentionDays: number; rollupAfterDays: number;
   rpcUrl: string; horizonUrl: string; soroswapApiKey?: string; walletAddress?: string;
 }
@@ -34,13 +34,11 @@ export function loadCollectorConfig(env: Env = process.env): CollectorConfig {
     sizesBlnd: sizes,
     pairs: pairs as ('USDC' | 'EURC')[],
     dbPath: env.COLLECTOR_DB_PATH ?? './data/quotes.db',
-    tz: env.COLLECTOR_TZ ?? 'Europe/Paris',
     timeoutMs: int(env, 'COLLECTOR_TIMEOUT_MS', 15000),
     rawRetentionDays: int(env, 'RAW_RETENTION_DAYS', 90),
     rollupAfterDays: int(env, 'ROLLUP_AFTER_DAYS', 365),
     rpcUrl: env.STELLAR_RPC_URL || 'https://mainnet.sorobanrpc.com',
     horizonUrl: env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org',
     soroswapApiKey: env.SOROSWAP_API_KEY || undefined,
-    walletAddress: env.WALLET_ADDRESS || undefined,
   };
 }

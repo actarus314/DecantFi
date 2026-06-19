@@ -19,10 +19,11 @@ interface Args {
   split: boolean;
   help: boolean;
   balance: boolean;
+  balanceAddr: string; // adresse fournie après --balance, ou ''
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { amount: '', target: '', from: 'BLND', slippageBps: 50, json: false, split: false, help: false, balance: false };
+  const a: Args = { amount: '', target: '', from: 'BLND', slippageBps: 50, json: false, split: false, help: false, balance: false, balanceAddr: '' };
   const pos: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i]!;
@@ -34,8 +35,14 @@ function parseArgs(argv: string[]): Args {
     else if (t === '--slippage') a.slippageBps = Number(argv[++i]);
     else pos.push(t);
   }
-  if (a.balance && pos.length === 1) {
-    a.target = pos[0] ?? '';            // --balance : un seul positionnel = la cible
+  if (a.balance) {
+    // --balance [G…] <USDC|EURC> ou --balance <USDC|EURC>
+    if (pos.length >= 2) {
+      a.balanceAddr = pos[0] ?? '';     // premier positionnel = adresse G…
+      a.target = pos[1] ?? '';
+    } else {
+      a.target = pos[0] ?? '';          // rétrocompat : adresse via WALLET_ADDRESS
+    }
   } else {
     a.amount = pos[0] ?? '';
     a.target = pos[1] ?? '';
@@ -52,7 +59,7 @@ Options:
   --from <ASSET>      actif vendu (defaut BLND)
   --slippage <bps>    tolerance en points de base (defaut 50 = 0,5 %)
   --split             ajoute l'analyse de fractionnement (25/50/100 %)
-  --balance           cote la balance BLND live du wallet (au lieu du montant positionnel)
+  --balance [G…]      cote la balance BLND live du wallet (adresse optionnelle, sinon WALLET_ADDRESS)
   --json              sortie JSON brute
   -h, --help          cette aide
 
@@ -203,8 +210,8 @@ async function main(): Promise<void> {
 
   let amountIn: bigint = 0n;
   if (args.balance) {
-    const addr = process.env.WALLET_ADDRESS;
-    if (!addr) return fail('WALLET_ADDRESS absent (.env) : requis pour --balance');
+    const addr = args.balanceAddr || process.env.WALLET_ADDRESS;
+    if (!addr) return fail('adresse requise : `decant --balance G… USDC` ou WALLET_ADDRESS dans .env');
     const { readBlndBalance } = await import('../core/balance.js');
     amountIn = await readBlndBalance(addr, {
       horizonUrl: process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org', timeoutMs: 12000,
