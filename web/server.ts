@@ -95,6 +95,13 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return;
     }
 
+    if (req.method === 'GET' && path === '/version.js') {
+      const rev = (process.env.APP_REV || 'dev').replace(/[^\w.-]/g, '');
+      res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(`window.__REV='${rev}';`);
+      return;
+    }
+
     if (req.method === 'GET' && path === '/favicon.svg') {
       res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'max-age=86400' });
       res.end(faviconSvg);

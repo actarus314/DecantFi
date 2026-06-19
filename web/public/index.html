@@ -122,9 +122,10 @@ body{margin:0; background:var(--bg); color:var(--val);
 .routeline{display:flex; align-items:flex-start; gap:.5rem; flex-wrap:wrap;}
 /* composite : 2 jambes Tx1/Tx2 en enfilade ; bascule en empilement (wrap) si la place manque.
    Badge « Tx » placé SOUS le nom de l'outil pour économiser la largeur. */
-.complegs{display:flex; flex-wrap:wrap; align-items:flex-start; gap:.55rem 1.3rem;}
+.complegs{display:flex; flex-wrap:wrap; align-items:flex-start; gap:1.1rem 1.3rem;}
 .complegs .legblock{display:flex; align-items:flex-start; gap:.5rem; max-width:100%; overflow-x:auto; overflow-y:hidden; padding-bottom:3px;}
 .complegs .legblock .routeline{flex-wrap:nowrap;}
+.complegs .txsep{align-self:center; color:var(--sub); font-weight:700; font-size:18px;}
 .complegs .txhead{display:flex; flex-direction:column; align-items:flex-start; gap:2px; white-space:nowrap; margin-top:2px;}
 .complegs .txvenue{font-weight:600;}
 .complegs .txbadge{font-size:11px; font-weight:700; background:var(--heading); color:var(--bg); border-radius:4px; padding:1px 6px; align-self:flex-start;}
@@ -1245,13 +1246,13 @@ function simCard() {
     const legsData = (displayRow || b).legs;
     const routeDiv = legsData
       ? '<div class="complegs">' + legsData.map((leg, i) =>
-          `<div class="legblock"><div class="txhead"><span class="txvenue">${leg.display}</span><span class="txbadge">${t('tx_label')} ${i + 1}</span></div>${routeFromParts(leg.routeParts, false)}</div>`
+          `${i > 0 ? '<span class="txsep">›</span>' : ''}<div class="legblock"><div class="txhead"><span class="txvenue">${leg.display}</span><span class="txbadge">${t('tx_label')} ${i + 1}</span></div>${routeFromParts(leg.routeParts, false)}</div>`
         ).join('') + '</div>'
       : `<div style="overflow-x:auto;overflow-y:hidden">${route}</div>`;
     resultHtml = `<div class="result">
       <div style="flex:1 1 100%;min-width:0">${routeDiv}</div>
       <span class="meta" style="flex:1 1 100%; margin-top:.4rem">${rateStr}${impactMeta}</span>
-      <span class="meta" style="flex:1 1 100%; margin-top:.2rem">${minStr}</span>
+      <span class="meta" style="flex:1 1 100%; margin-top:${target === 'EURC' ? '0' : '.2rem'}">${minStr}</span>
     </div>`;
     if (simResult.errors && simResult.errors.length > 0) {
       resultHtml += `<p class="help" style="margin:.4rem 0 0">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
