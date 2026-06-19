@@ -1767,13 +1767,15 @@ function buildPage() {
 // Idempotent : sans effet si #leg2-details absent (route atomique / pas de composite).
 function adjustLegs() {
   // Composite : masque le séparateur › dès que les 2 jambes passent sur 2 lignes (empilées),
-  // où un séparateur horizontal n'a plus de sens.
+  // où un séparateur horizontal n'a plus de sens. On RÉAFFICHE d'abord le séparateur puis on
+  // mesure : sinon une re-mesure dans l'état "sans séparateur" verrait une mise en page rétrécie
+  // (qui ne déborde plus) et le ré-afficherait à tort.
   document.querySelectorAll('.complegs').forEach((c) => {
     const blocks = c.querySelectorAll('.legblock');
     const sep = c.querySelector('.txsep');
-    if (sep && blocks.length >= 2) {
-      sep.style.display = (blocks[1].offsetTop > blocks[0].offsetTop + 1) ? 'none' : '';
-    }
+    if (!sep || blocks.length < 2) return;
+    sep.style.display = '';
+    if (blocks[1].offsetTop > blocks[0].offsetTop + 1) sep.style.display = 'none';
   });
   const leg2 = document.getElementById('leg2-details');
   if (!leg2) return;
@@ -1791,9 +1793,16 @@ function renderApp() {
   document.documentElement.lang = lang;
   document.title = 'decant.fi — ' + t('brand_dim');
   document.getElementById('app').innerHTML = buildPage();
-  // Post-render : ajuste l'état ouvert/fermé de la jambe 2 selon le débordement.
-  requestAnimationFrame(adjustLegs);
+  // Post-render : ajuste l'état ouvert/fermé de la jambe 2 + masquage du séparateur composite.
+  // Double-rAF : la 1re passe mesure souvent avant que le layout (et les polices) soit stabilisé ;
+  // la 2e passe corrige une fois le reflow terminé.
+  requestAnimationFrame(() => { adjustLegs(); requestAnimationFrame(adjustLegs); });
 }
+
+// Re-mesure le séparateur composite quand la largeur change (resize) ou quand les polices
+// finissent de charger (reflow qui peut faire passer les jambes sur 2 lignes après coup).
+window.addEventListener('resize', adjustLegs);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(adjustLegs).catch(() => {});
 
 // ─── Navigation vue ───────────────────────────────────────────────────────────
 function setView(v) {
