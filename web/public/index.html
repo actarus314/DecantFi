@@ -146,7 +146,12 @@ body{margin:0; background:var(--bg); color:var(--val);
   background:var(--val); color:var(--bg); font-size:12px; font-weight:400; line-height:1.45;
   text-transform:none; letter-spacing:0; border-radius:6px; padding:.45rem .65rem;
   white-space:normal; width:260px; z-index:100; pointer-events:none; box-shadow:0 3px 10px rgba(0,0,0,.18);}
-.tip-wrap:hover .tip-box{display:block;}
+/* Tooltips rendus via #tipPortal (position:fixed) pour échapper au clipping overflow des tables
+   et passer AU-DESSUS de toute l'UI (topbar sticky incluse). .tip-box ne sert que de source de contenu. */
+#tipPortal{position:fixed; z-index:99999; display:none; width:max-content; max-width:280px;
+  background:var(--val); color:var(--bg); font-size:12px; font-weight:400; line-height:1.45;
+  text-transform:none; letter-spacing:0; border-radius:6px; padding:.45rem .65rem;
+  white-space:normal; pointer-events:none; box-shadow:0 4px 14px rgba(0,0,0,.28);}
 /* Arrow up */
 .tip-wrap .tip-box::before{
   content:''; position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
@@ -274,6 +279,7 @@ table.flt tr.sel td{background:color-mix(in srgb, var(--heading) 9%, transparent
 </head>
 <body>
 <div class="page"><div id="app"></div></div>
+<div id="tipPortal"></div>
 <script>
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const STRINGS = {
@@ -2346,6 +2352,40 @@ function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() 
     pos = (k === seq[pos]) ? pos + 1 : (k === seq[0] ? 1 : 0);
     if (pos === seq.length) { pos = 0; toggleScamEgg(); }
   });
+})();
+
+/* Tooltip portal : rend le contenu de .tip-box dans un noeud position:fixed au-dessus de tout,
+   flip bas→haut si pas la place. Immunise tous les tooltips contre le clipping overflow des tables. */
+(function () {
+  const portal = document.getElementById('tipPortal');
+  if (!portal) return;
+  function show(wrap) {
+    const box = wrap.querySelector('.tip-box');
+    if (!box) return;
+    portal.innerHTML = box.innerHTML;
+    portal.style.left = '-9999px'; portal.style.top = '0'; portal.style.display = 'block';
+    const r = wrap.getBoundingClientRect();
+    const pw = portal.offsetWidth, ph = portal.offsetHeight, M = 8;
+    const left = Math.max(M, Math.min(r.left, window.innerWidth - pw - M));
+    let top = r.bottom + 6;
+    if (top + ph > window.innerHeight - M) {
+      const above = r.top - ph - 6;
+      top = above >= M ? above : Math.max(M, window.innerHeight - ph - M);
+    }
+    portal.style.left = left + 'px'; portal.style.top = top + 'px';
+  }
+  function hide() { portal.style.display = 'none'; portal.innerHTML = ''; }
+  document.addEventListener('mouseover', (e) => {
+    const w = e.target.closest ? e.target.closest('.tip-wrap') : null;
+    if (w) show(w);
+  });
+  document.addEventListener('mouseout', (e) => {
+    const w = e.target.closest ? e.target.closest('.tip-wrap') : null;
+    if (!w) return;
+    if (e.relatedTarget && w.contains(e.relatedTarget)) return;
+    hide();
+  });
+  window.addEventListener('scroll', hide, true);
 })();
 </script>
 </body>
