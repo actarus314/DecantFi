@@ -1,6 +1,7 @@
 // Orchestrateur d'exécution : BLND → USDC/EURC via xBull, Soroswap, Horizon ou Aquarius.
 // Money-path : bigint stroops partout, jamais de float pour les calculs.
 import { BLND, USDC, EURC, bySac, classicColon, type Asset } from '../core/assets.js';
+import { decodeTransfers, routeFromTransfers } from '../core/soroban-route.js';
 import { bumpRpc } from '../core/rpc-meter.js';
 import { toNumber, fromStroops, toStroops } from '../core/amount.js';
 import { stroopsOrNull, bigintOrNull } from '../core/sources/util.js';
@@ -343,7 +344,7 @@ export async function simulateXbullNet(
     }
     try {
       const sdk = await import('@stellar/stellar-sdk');
-      const { rpc, TransactionBuilder, Networks, scValToNative, StrKey, xdr } = sdk;
+      const { rpc, TransactionBuilder, Networks, scValToNative } = sdk;
       const server = new rpc.Server((cfg.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
       const tx = TransactionBuilder.fromXDR(xdrStr, Networks.PUBLIC);
       bumpRpc();
@@ -353,20 +354,9 @@ export async function simulateXbullNet(
       if (!Array.isArray(rv) || rv.length < 2) continue;
       const net = BigInt(rv[1]);
       // Extraction de la route réelle depuis la chaîne de transferts SAC
-      const seq: string[] = [];
-      for (const ev of ((sim as any).events ?? [])) {
-        try {
-          let e: any = ev; if (typeof e === 'string') e = xdr.DiagnosticEvent.fromXDR(e, 'base64');
-          const ce = e.event ? e.event() : e;
-          const cid = ce.contractId ? StrKey.encodeContract(ce.contractId()) : '';
-          const tp = ce.body().v0().topics().map((t: any) => { try { return scValToNative(t); } catch { return null; } });
-          if (tp[0] === 'transfer' && cid) {
-            const a = bySac(cid)?.symbol ?? (cid.slice(0, 4) + '…');
-            if (seq[seq.length - 1] !== a) seq.push(a);
-          }
-        } catch {}
-      }
-      return { net, route: seq.length >= 2 ? seq : [] };
+      const transfers = await decodeTransfers((sim as any).events ?? []);
+      const route = routeFromTransfers(transfers);
+      return { net, route: route.length >= 2 ? route : [] };
     } catch {
       continue;
     }
