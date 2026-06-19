@@ -4,10 +4,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { openDb, type TickInsert, type QuoteInsert } from '../db/index.js';
+import { openDb, type TickInsert, type QuoteInsert, type RpcProbeInsert } from '../db/index.js';
 import { toStroops } from '../core/amount.js';
 import { openReadOnly } from './read-db.js';
-import { buildSourceHealth } from './stats.js';
+import { buildSourceHealth, buildRpcHealth } from './stats.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -313,5 +313,82 @@ describe('buildSourceHealth — dispo par taille (bySize)', () => {
     expect(s.uptimePct).toBe(100);        // a produit ≥1 cotation
     expect(s.failedTicks).toBe(1);        // une sonde a échoué (source_errors)
     expect(s.lastFailureReason).toBe('rate-limit');
+  });
+});
+
+// ─── buildRpcHealth — reqTotal / reqPerSec depuis rpc_call_log ────────────────
+
+describe('buildRpcHealth — reqTotal/reqPerSec depuis rpc_call_log', () => {
+  let dir4: string;
+  let path4: string;
+
+  const RPC_URL = 'https://rpc.example.com';
+  const WINDOW_START_RPC = new Date(NOW.getTime() - 7 * 86_400_000).toISOString();
+
+  beforeAll(() => {
+    dir4 = mkdtempSync(join(tmpdir(), 'stellarswap-health-rpcload-'));
+    path4 = join(dir4, 'test.db');
+    const db = openDb(path4);
+
+    const probe: RpcProbeInsert = {
+      url: RPC_URL, ok: true, latency_ms: 100, ledger: 55000,
+      chosen: true, sim_errors: 0, rpc_calls: 30, error: null,
+    };
+
+    // Tick 1 : auto, 30 appels, 3s
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-28T10:00:00Z', finished_at: '2025-05-28T10:00:03Z' }),
+      [],
+      [probe],
+    );
+    // Tick 2 : refresh (note=manual), 20 appels, 2s
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-29T10:00:00Z', finished_at: '2025-05-29T10:00:02Z', note: 'manual' }),
+      [],
+      [{ ...probe, rpc_calls: 20 }],
+    );
+    // Tick 3 : non-chosen, rpc_calls=99 → ne doit PAS apparaître dans rpc_call_log
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-30T10:00:00Z', finished_at: '2025-05-30T10:00:01Z' }),
+      [],
+      [{ ...probe, chosen: false, rpc_calls: 99 }],
+    );
+    // Ajoute manuellement une ligne rpc_call_log kind='quote' (simule un devis manuel)
+    db.raw().prepare(
+      `INSERT INTO rpc_call_log (at, url, kind, calls, dur_ms) VALUES (?, ?, ?, ?, ?)`,
+    ).run('2025-05-30T12:00:00Z', RPC_URL, 'quote', 10, 1000);
+
+    db.close();
+  });
+
+  afterAll(() => { rmSync(dir4, { recursive: true, force: true }); });
+
+  it('reqTotal agrège auto + refresh + quote depuis rpc_call_log', () => {
+    const db = openReadOnly(path4);
+    const rpcs = buildRpcHealth(db, WINDOW_START_RPC);
+    db.close();
+    const rpc = rpcs.find(r => r.host === new URL(RPC_URL).host)!;
+    expect(rpc).toBeDefined();
+    // 30 (auto) + 20 (refresh) + 10 (quote) = 60
+    expect(rpc.reqTotal).toBe(60);
+  });
+
+  it('reqPerSec = total_calls / (total_dur_ms / 1000)', () => {
+    const db = openReadOnly(path4);
+    const rpcs = buildRpcHealth(db, WINDOW_START_RPC);
+    db.close();
+    const rpc = rpcs.find(r => r.host === new URL(RPC_URL).host)!;
+    // total_calls=60, total_dur_ms=3000+2000+1000=6000s → 60/6=10
+    expect(rpc.reqPerSec).toBe(10);
+  });
+
+  it('rpcs[].reqTotal et reqPerSec sont des nombres (jamais undefined)', () => {
+    const db = openReadOnly(path4);
+    const rpcs = buildRpcHealth(db, WINDOW_START_RPC);
+    db.close();
+    for (const r of rpcs) {
+      expect(typeof r.reqTotal).toBe('number');
+      expect(typeof r.reqPerSec).toBe('number');
+    }
   });
 });

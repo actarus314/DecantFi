@@ -60,6 +60,15 @@ CREATE TABLE IF NOT EXISTS rpc_probe (
   error      TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_rpc_probe_tick ON rpc_probe(tick_id);
+CREATE TABLE IF NOT EXISTS rpc_call_log (
+  id     INTEGER PRIMARY KEY,
+  at     TEXT NOT NULL,
+  url    TEXT NOT NULL,
+  kind   TEXT NOT NULL,
+  calls  INTEGER NOT NULL,
+  dur_ms INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rpc_call_log_at ON rpc_call_log(at);
 `;
 
 /** Ajoute une colonne si elle manque (CREATE TABLE IF NOT EXISTS n'altère PAS une table existante :

@@ -490,16 +490,19 @@ const STRINGS = {
     // RPC health
     health_rpc_title: 'Santé des RPC Soroban — 7 derniers jours',
     health_rpc_col_rpc: 'RPC',
-    health_rpc_col_actif: 'Actif',
+    health_rpc_col_actif: 'Statut',
     health_rpc_col_latence: 'Latence (sonde)',
     health_rpc_col_ledger: 'Ledger',
     health_rpc_col_dispo: 'Dispo 7j',
     health_rpc_col_echecs: 'Échecs',
     health_rpc_col_simerr: 'Err. sim',
-    health_rpc_active_yes: 'oui',
-    health_rpc_active_no: '—',
+    health_rpc_col_req7j: 'Req 7j',
+    health_rpc_col_reqps: 'Req/s',
+    health_rpc_active_yes: 'actif',
+    health_rpc_active_no: 'fallback',
     health_rpc_note: 'Sonde réalisée au démarrage de chaque tick — 1 ligne par endpoint configuré. Le RPC actif est celui retenu pour ce tick.',
-    health_rpc_load: (n, s) => `Charge : ≈ ${n} req/tick · ≈ ${s} req/s (pendant le tick)`,
+    health_sources_scope: 'Statistiques calculées sur les relevés automatiques et les rafraîchissements manuels.',
+    health_rpc_scope: 'Charge calculée sur l\'ensemble des requêtes RPC : relevés automatiques, rafraîchissements manuels et devis manuels. Disponibilité et latence mesurées par sonde au début de chaque tick.',
     nav_back: '← Tableau de bord',
     // click-to-select
     exec_via: (tool) => 'Exécuter via ' + tool,
@@ -716,16 +719,19 @@ const STRINGS = {
     // RPC health
     health_rpc_title: 'Soroban RPC health — last 7 days',
     health_rpc_col_rpc: 'RPC',
-    health_rpc_col_actif: 'Active',
+    health_rpc_col_actif: 'Status',
     health_rpc_col_latence: 'Latency (probe)',
     health_rpc_col_ledger: 'Ledger',
     health_rpc_col_dispo: 'Uptime 7d',
     health_rpc_col_echecs: 'Failures',
     health_rpc_col_simerr: 'Sim errors',
-    health_rpc_active_yes: 'yes',
-    health_rpc_active_no: '—',
+    health_rpc_col_req7j: 'Req 7d',
+    health_rpc_col_reqps: 'Req/s',
+    health_rpc_active_yes: 'active',
+    health_rpc_active_no: 'fallback',
     health_rpc_note: 'Probed at the start of each tick — one row per configured endpoint. The active RPC is the one selected for that tick.',
-    health_rpc_load: (n, s) => `Load: ≈ ${n} req/tick · ≈ ${s} req/s (during tick)`,
+    health_sources_scope: 'Statistics computed from automatic readings and manual refreshes.',
+    health_rpc_scope: 'Load computed across all RPC requests: automatic readings, manual refreshes, and manual quotes. Availability and latency measured by probe at the start of each tick.',
     nav_back: '← Dashboard',
     // click-to-select
     exec_via: (tool) => 'Execute via ' + tool,
@@ -1291,6 +1297,7 @@ function buildHealthPage(topbarHtml) {
       </tr></thead>
       <tbody>${tableRows}</tbody>
     </table></div>
+    <p style="margin:.6rem 0 0">${t('health_sources_scope')}</p>
     <p class="help" style="margin:.7rem 0 0;font-size:11px">
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i></i></span>${t('health_legend_ok')} &nbsp;
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="w"></i></span>${t('health_legend_warn')} &nbsp;
@@ -1306,8 +1313,12 @@ function buildHealthPage(topbarHtml) {
       const ledger = r.lastLedger != null
         ? `${r.lastLedger}${r.ledgerLag > 0 ? ` <span class="muted">−${r.ledgerLag}</span>` : ''}`
         : t('health_never');
-      const activeTxt = r.active ? `<span style="color:var(--green)">${t('health_rpc_active_yes')}</span>` : t('health_rpc_active_no');
+      const activeTxt = r.active
+        ? `<span style="color:var(--green)">${t('health_rpc_active_yes')}</span>`
+        : `<span class="muted">${t('health_rpc_active_no')}</span>`;
       const simTip = r.simErrors > 0 ? ` title="sim errors: ${r.simErrors}"` : '';
+      const reqTotal = (r.reqTotal != null && r.reqTotal > 0) ? r.reqTotal.toLocaleString() : '—';
+      const reqPerSec = (r.reqPerSec != null && r.reqPerSec > 0) ? r.reqPerSec : '—';
       return `<tr${r.active ? ' class="win"' : ''}>
         <td>${r.host}</td>
         <td>${activeTxt}</td>
@@ -1316,12 +1327,10 @@ function buildHealthPage(topbarHtml) {
         <td>${r.uptimePct.toFixed(0)} %</td>
         <td>${r.failures}</td>
         <td${simTip}>${r.simErrors > 0 ? `<span style="color:var(--amber)">${r.simErrors}</span>` : '0'}</td>
+        <td>${reqTotal}</td>
+        <td>${reqPerSec}</td>
       </tr>`;
     }).join('');
-    const rpcLoad = health.rpcLoad;
-    const loadLine = rpcLoad
-      ? `<p class="help" style="margin:.4rem 0 0;font-size:11px">${t('health_rpc_load', rpcLoad.reqPerTick, rpcLoad.reqPerSec)}</p>`
-      : '';
     return `<div class="zone-group"><div class="zone">
     <div class="zone-h">${t('health_rpc_title')}</div>
     <div style="overflow-x:auto"><table class="flt">
@@ -1333,11 +1342,13 @@ function buildHealthPage(topbarHtml) {
         <th>${t('health_rpc_col_dispo')}</th>
         <th>${t('health_rpc_col_echecs')}</th>
         <th title="${t('health_rpc_col_simerr')}">${t('health_rpc_col_simerr')}</th>
+        <th>${t('health_rpc_col_req7j')}</th>
+        <th>${t('health_rpc_col_reqps')}</th>
       </tr></thead>
       <tbody>${rpcRows}</tbody>
     </table></div>
     <p class="help" style="margin:.7rem 0 0;font-size:11px">${t('health_rpc_note')}</p>
-    ${loadLine}
+    <p style="margin:.6rem 0 0">${t('health_rpc_scope')}</p>
   </div></div>`;
   })()}`;
 }

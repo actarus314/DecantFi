@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
-import { openDb, type TickInsert, type QuoteInsert } from './index.js';
+import { openDb, type TickInsert, type QuoteInsert, type RpcProbeInsert } from './index.js';
 import { migrate } from './schema.js';
 
 const tick: TickInsert = {
@@ -59,6 +59,73 @@ describe('openDb + insertTickWithQuotes', () => {
     // quotes du tick manuel partis en cascade ; ceux du programmé restent
     const qn = db.raw().prepare('SELECT COUNT(*) AS n FROM quote WHERE tick_id = ?').get(scheduled) as any;
     expect(Number(qn.n)).toBe(2);
+    db.close();
+  });
+});
+
+describe('insertTickWithQuotes — rpc_call_log', () => {
+  const probe: RpcProbeInsert = {
+    url: 'https://rpc.example.com',
+    ok: true, latency_ms: 120, ledger: 55000,
+    chosen: true, sim_errors: 0, rpc_calls: 42, error: null,
+  };
+
+  it('écrit une ligne rpc_call_log kind=auto quand note=null et chosen probe a rpc_calls>0', () => {
+    const db = openDb(':memory:');
+    const t: TickInsert = {
+      started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:05.000Z',
+      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eur_usd: 1.08,
+      ok: true, source_errors: null, note: null,
+    };
+    db.insertTickWithQuotes(t, [], [probe]);
+    const rows = db.raw().prepare('SELECT * FROM rpc_call_log').all() as any[];
+    expect(rows.length).toBe(1);
+    expect(rows[0].kind).toBe('auto');
+    expect(rows[0].url).toBe('https://rpc.example.com');
+    expect(rows[0].calls).toBe(42);
+    expect(rows[0].dur_ms).toBe(5000);
+    db.close();
+  });
+
+  it('écrit kind=refresh quand note=manual', () => {
+    const db = openDb(':memory:');
+    const t: TickInsert = {
+      started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:03.000Z',
+      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eur_usd: 1.08,
+      ok: true, source_errors: null, note: 'manual',
+    };
+    db.insertTickWithQuotes(t, [], [probe]);
+    const rows = db.raw().prepare('SELECT * FROM rpc_call_log').all() as any[];
+    expect(rows.length).toBe(1);
+    expect(rows[0].kind).toBe('refresh');
+    db.close();
+  });
+
+  it('n\'écrit aucune ligne si rpc_calls=0 (sonde non-chosen ou pas d\'appels)', () => {
+    const db = openDb(':memory:');
+    const t: TickInsert = {
+      started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:01.000Z',
+      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eur_usd: 1.08,
+      ok: true, source_errors: null, note: null,
+    };
+    const zeroCalls: RpcProbeInsert = { ...probe, rpc_calls: 0 };
+    db.insertTickWithQuotes(t, [], [zeroCalls]);
+    const rows = db.raw().prepare('SELECT COUNT(*) AS n FROM rpc_call_log').get() as any;
+    expect(Number(rows.n)).toBe(0);
+    db.close();
+  });
+
+  it('n\'écrit pas de ligne pour une sonde non-chosen', () => {
+    const db = openDb(':memory:');
+    const t: TickInsert = {
+      started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:01.000Z',
+      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eur_usd: 1.08,
+      ok: true, source_errors: null, note: null,
+    };
+    const notChosen: RpcProbeInsert = { ...probe, chosen: false };
+    db.insertTickWithQuotes(t, [], [notChosen]);
+    const rows = db.raw().prepare('SELECT COUNT(*) AS n FROM rpc_call_log').get() as any;
+    expect(Number(rows.n)).toBe(0);
     db.close();
   });
 });

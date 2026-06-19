@@ -39,6 +39,9 @@ export class Db {
       `INSERT INTO rpc_probe (tick_id, url, ok, latency_ms, ledger, chosen, sim_errors, rpc_calls, error)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
+    const insLog = this.db.prepare(
+      `INSERT INTO rpc_call_log (at, url, kind, calls, dur_ms) VALUES (?, ?, ?, ?, ?)`,
+    );
 
     this.db.exec('BEGIN');
     try {
@@ -56,6 +59,14 @@ export class Db {
       }
       for (const p of rpcProbes) {
         insRpc.run(tickId, p.url, p.ok ? 1 : 0, p.latency_ms, p.ledger, p.chosen ? 1 : 0, p.sim_errors, p.rpc_calls, p.error);
+        // Logge la charge dans rpc_call_log si c'est la sonde choisie.
+        if (p.chosen && p.rpc_calls > 0) {
+          const kind = tick.note === 'manual' ? 'refresh' : 'auto';
+          const durMs = (tick.finished_at != null)
+            ? Math.max(0, new Date(tick.finished_at).getTime() - new Date(tick.started_at).getTime())
+            : 0;
+          insLog.run(tick.started_at, p.url, kind, p.rpc_calls, durMs);
+        }
       }
       this.db.exec('COMMIT');
       return tickId;
@@ -88,4 +99,30 @@ export function openDb(path: string): Db {
   const db = new DatabaseSync(path);
   migrate(db);
   return new Db(db);
+}
+
+/** Interface d'une ligne de charge RPC (devis manuel). */
+export interface RpcCallLogRow {
+  at: string;
+  url: string;
+  kind: 'auto' | 'refresh' | 'quote';
+  calls: number;
+  dur_ms: number;
+}
+
+/**
+ * Insère une ligne dans rpc_call_log en best-effort (fire-and-forget).
+ * Ouvre une connexion RW sans migrate (table neuve → toujours présente), insert, ferme.
+ * Un échec est sans gravité (perdre une ligne de log acceptable).
+ */
+export function appendRpcCallLog(dbPath: string, row: RpcCallLogRow): void {
+  try {
+    const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA busy_timeout = 5000');
+    db.prepare(
+      `INSERT INTO rpc_call_log (at, url, kind, calls, dur_ms) VALUES (?, ?, ?, ?, ?)`,
+    ).run(row.at, row.url, row.kind, row.calls, row.dur_ms);
+    db.close();
+  } catch { /* best-effort : perdre une ligne de log est sans gravité */ }
 }

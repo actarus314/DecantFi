@@ -508,6 +508,8 @@ export interface RpcHealth {
   failures: number;    // sondes ok=0
   simErrors: number;   // total sim_errors sur la fenêtre
   samples: number;     // nb de sondes dans la fenêtre
+  reqTotal: number;    // total requêtes RPC vers cet endpoint sur la fenêtre (toutes kinds)
+  reqPerSec: number;   // req/s moyen (SUM(calls)/SUM(dur_s)), 0 si dénominateur nul
 }
 
 export interface SourceHealthResult {
@@ -517,7 +519,6 @@ export interface SourceHealthResult {
   /** Heures écoulées dans la journée locale courante (0..24), pour le rendu du cercle partiel. */
   todayElapsedH: number;
   rpcs: RpcHealth[];
-  rpcLoad: { reqPerTick: number; reqPerSec: number } | null;
 }
 
 /** Parse source_errors : JSON ([{id,reason}]) ou CSV legacy ("soroswap, comet"). */
@@ -574,6 +575,25 @@ export function buildRpcHealth(db: DatabaseSync, windowStart: string): RpcHealth
     if (l > maxLedger) maxLedger = l;
   }
 
+  // Charge par URL depuis rpc_call_log (toutes kinds : auto, refresh, quote).
+  // Table peut ne pas encore exister (DB ancienne) → try/catch.
+  const loadByUrl = new Map<string, { totalCalls: number; totalDurMs: number }>();
+  try {
+    const loadStmt = prepBig(db, `
+      SELECT url, SUM(calls) as total_calls, SUM(dur_ms) as total_dur_ms
+      FROM rpc_call_log
+      WHERE at >= ?
+      GROUP BY url
+    `);
+    const loadRows = loadStmt.all(windowStart) as Array<Record<string, unknown>>;
+    for (const lr of loadRows) {
+      const url = String(lr['url'] ?? '');
+      const totalCalls = lr['total_calls'] != null ? Number(lr['total_calls']) : 0;
+      const totalDurMs = lr['total_dur_ms'] != null ? Number(lr['total_dur_ms']) : 0;
+      loadByUrl.set(url, { totalCalls, totalDurMs });
+    }
+  } catch { /* table absente (DB ancienne) : charge = 0 pour tous */ }
+
   const result: RpcHealth[] = [];
   for (const [url, probes] of byUrl.entries()) {
     const failures = probes.filter((p) => p['ok'] === 0 || p['ok'] === 0n).length;
@@ -591,6 +611,12 @@ export function buildRpcHealth(db: DatabaseSync, windowStart: string): RpcHealth
     const uptimePct = probes.length > 0 ? Math.round((okProbes.length / probes.length) * 1000) / 10 : 100;
     let host: string;
     try { host = new URL(url).host; } catch { host = url; }
+
+    const load = loadByUrl.get(url);
+    const reqTotal = load?.totalCalls ?? 0;
+    const totalDurSec = load != null ? load.totalDurMs / 1000 : 0;
+    const reqPerSec = totalDurSec > 0 ? Math.round(reqTotal / totalDurSec) : 0;
+
     result.push({
       host,
       active: url === activeUrl,
@@ -601,6 +627,8 @@ export function buildRpcHealth(db: DatabaseSync, windowStart: string): RpcHealth
       failures,
       simErrors,
       samples: probes.length,
+      reqTotal,
+      reqPerSec,
     });
   }
 
@@ -610,39 +638,6 @@ export function buildRpcHealth(db: DatabaseSync, windowStart: string): RpcHealth
     return b.uptimePct - a.uptimePct;
   });
   return result;
-}
-
-/** Charge RPC moyenne sur les 7 derniers jours : req/tick et req/s calculés sur les sondes chosen=1. */
-export function buildRpcLoad(db: DatabaseSync, windowStart: string): { reqPerTick: number; reqPerSec: number } | null {
-  const stmt = prepBig(db, `
-    SELECT r.rpc_calls, t.started_at, t.finished_at
-    FROM rpc_probe r
-    JOIN tick t ON t.id = r.tick_id
-    WHERE r.chosen = 1 AND t.started_at >= ?
-  `);
-  const rows = stmt.all(windowStart) as Array<Record<string, unknown>>;
-  if (rows.length === 0) return null;
-
-  let totalCalls = 0;
-  let totalSec = 0;
-  let validCount = 0;
-
-  for (const r of rows) {
-    const calls = r['rpc_calls'] != null ? Number(r['rpc_calls']) : 0;
-    totalCalls += calls;
-    validCount++;
-    // Dates are ISO TEXT strings — parse in JS (SQL arithmetic coerces wrongly)
-    if (r['finished_at'] != null && r['started_at'] != null) {
-      const dur = (new Date(String(r['finished_at'])).getTime() - new Date(String(r['started_at'])).getTime()) / 1000;
-      if (dur > 0) totalSec += dur;
-    }
-  }
-
-  if (validCount === 0) return null;
-  const reqPerTick = Math.round(totalCalls / validCount);
-  const reqPerSec = totalSec > 0 ? Math.round(totalCalls / totalSec) : null;
-  if (reqPerSec === null) return null;
-  return { reqPerTick, reqPerSec };
 }
 
 /** URL du RPC choisi dans le dernier tick ayant des probes, ou null. */
@@ -846,8 +841,7 @@ export function buildSourceHealth(
   const todayElapsedH = localNow.getUTCHours() + localNow.getUTCMinutes() / 60;
 
   const rpcs = buildRpcHealth(db, windowStart);
-  const rpcLoad = buildRpcLoad(db, windowStart);
-  return { totalTicks, windowDays: 7, sources, todayElapsedH, rpcs, rpcLoad };
+  return { totalTicks, windowDays: 7, sources, todayElapsedH, rpcs };
 }
 
 // ─── Point d'entrée public ────────────────────────────────────────────────────

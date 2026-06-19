@@ -7,6 +7,8 @@ import { loadWebConfig } from './config.js';
 import { openReadOnly } from './read-db.js';
 import { overview, buildSourceHealth, latestChosenRpc } from './stats.js';
 import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
+import { appendRpcCallLog } from '../db/index.js';
+import { resetRpc, readRpc } from '../core/rpc-meter.js';
 import { pickExecutableVenue, submit, buildChangeTrust, ExecError, type Venue } from './execute.js';
 import { manualRefresh, refreshBusy } from './refresh.js';
 import { toStroops, toNumber } from '../core/amount.js';
@@ -151,8 +153,25 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
       const chosenRpc = latestChosenRpc(db);
       const quoteCfg = chosenRpc ? { ...cfg, rpcUrl: chosenRpc } : cfg;
+      resetRpc();
+      const quoteStart = Date.now();
       const result = await liveQuote(pair, amountStroops, quoteCfg);
+      const elapsed = Date.now() - quoteStart;
+      const rpcCalls = readRpc();
       json(res, 200, result);
+      // Log de la charge en best-effort, après l'envoi de la réponse (ne retarde pas le client).
+      if (rpcCalls > 0) {
+        const logUrl = chosenRpc ?? cfg.rpcUrl;
+        try {
+          appendRpcCallLog(cfg.dbPath, {
+            at: new Date(quoteStart).toISOString(),
+            url: logUrl,
+            kind: 'quote',
+            calls: rpcCalls,
+            dur_ms: elapsed,
+          });
+        } catch { /* best-effort */ }
+      }
       return;
     }
 

@@ -109,12 +109,15 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     rpcCache: new Map(),
   };
 
-  const quotes: QuoteInsert[] = [];
-  const reasons = new Map<string, string>(); // id → cause (timeout/http/indisponible)
-  for (const probe of deps.probes) {
+  // Parallélisation : toutes les sondes partent en même temps (Promise.all).
+  // Chaque tâche retourne ses rows + erreurs ; la fusion est faite après (ordre déterministe = ordre deps.probes).
+  type ProbeResult = { rows: QuoteInsert[]; errors: Array<[string, string]> };
+
+  const probeResults = await Promise.all(deps.probes.map(async (probe): Promise<ProbeResult> => {
     const result = await deps.quote({ sell: BLND, buy: probe.buy, amountIn: probe.amountIn, cfg: sourceCfg });
+    const localErrors: Array<[string, string]> = [];
     for (const e of result.errors) {
-      if (!reasons.has(e)) reasons.set(e, result.errorReasons?.[e] ?? 'indisponible');
+      localErrors.push([e, result.errorReasons?.[e] ?? 'indisponible']);
     }
 
     // Re-simulation Aquarius + xBull : remplace les nets sur-cotés et décode la route xBull,
@@ -125,7 +128,17 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
       await resimAquariusXbull(result, pairUi, probe.amountIn, { rpcUrl }, deps.resimDeps);
     } catch { /* repli silencieux : cote API conservée */ }
 
-    quotes.push(...rowsForProbe(probe, result, prices));
+    return { rows: rowsForProbe(probe, result, prices), errors: localErrors };
+  }));
+
+  // Fusion dans l'ordre de deps.probes (déterministe).
+  const quotes: QuoteInsert[] = [];
+  const reasons = new Map<string, string>(); // id → cause (timeout/http/indisponible)
+  for (const pr of probeResults) {
+    quotes.push(...pr.rows);
+    for (const [id, reason] of pr.errors) {
+      if (!reasons.has(id)) reasons.set(id, reason);
+    }
   }
 
   const rpcCalls = readRpc();
