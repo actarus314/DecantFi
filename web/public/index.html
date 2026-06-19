@@ -565,6 +565,7 @@ const STRINGS = {
     nav_back: '← Tableau de bord',
     // click-to-select
     exec_via: (tool) => 'Exécuter via ' + tool,
+    exec_composite: 'Exécuter (2 transactions)',
     exec_open_tool: (tool) => 'Ouvrir ' + tool + ' ↗',
     exec_integrated_soon: 'Exécution intégrée à venir — ouvrez l\'outil pour finaliser le swap.',
     ladder_pick_hint: 'Cliquez une ligne pour exécuter via cet outil (re-clic = retour au choix auto).',
@@ -830,6 +831,7 @@ const STRINGS = {
     nav_back: '← Dashboard',
     // click-to-select
     exec_via: (tool) => 'Execute via ' + tool,
+    exec_composite: 'Execute (2 transactions)',
     exec_open_tool: (tool) => 'Open ' + tool + ' ↗',
     exec_integrated_soon: 'Integrated execution coming soon — open the tool to complete the swap.',
     ladder_pick_hint: 'Click a row to execute via that tool (click again to revert to auto).',
@@ -1270,7 +1272,12 @@ function simCard() {
       resultHtml += `<p class="help" style="margin:.4rem 0 0">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
     }
     // Exec row
-    if (selRow && !selRow.executable) {
+    if (legsData) {
+      // Composite EURC affiché (best ou ligne sélectionnée) → exécution 2-tx guidée.
+      resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+        <button class="btn primary" onclick="doExecuteComposite()">${t('exec_composite')}</button>
+      </div>`;
+    } else if (selRow && !selRow.executable) {
       // Venue non intégré : deep-link uniquement, pas de bouton Execute
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
         ${selRow.deepLink
@@ -1759,6 +1766,15 @@ function buildPage() {
 // Replie la jambe 2 si son contenu déborde horizontalement (FIX 3).
 // Idempotent : sans effet si #leg2-details absent (route atomique / pas de composite).
 function adjustLegs() {
+  // Composite : masque le séparateur › dès que les 2 jambes passent sur 2 lignes (empilées),
+  // où un séparateur horizontal n'a plus de sens.
+  document.querySelectorAll('.complegs').forEach((c) => {
+    const blocks = c.querySelectorAll('.legblock');
+    const sep = c.querySelector('.txsep');
+    if (sep && blocks.length >= 2) {
+      sep.style.display = (blocks[1].offsetTop > blocks[0].offsetTop + 1) ? 'none' : '';
+    }
+  });
   const leg2 = document.getElementById('leg2-details');
   if (!leg2) return;
   // Vérifie le débordement de l'un ou l'autre conteneur de route
@@ -1997,6 +2013,17 @@ async function doExecute() {
     else { execState = { phase: 'review', build: j }; }
   } catch (e) { execState = { phase: 'error', errorMsg: t('err_down') }; }
   renderApp();
+}
+
+// Lance le flux composite 2-tx pour la ligne composite affichée (best OU sélectionnée).
+// Indépendant du flag `winner` du ladder : le headline peut être le composite alors que
+// raw[0] (winner) est une venue atomique → on cible la ligne dont le sourceId contient '+'.
+async function doExecuteComposite() {
+  if (!simResult || !simActive || simAmt <= 0) return;
+  if (!walletAddress) { execState = { phase: 'error', errorMsg: t('exec_connect_first') }; renderApp(); return; }
+  const compRow = (simResult.ladder || []).find(r => r.sourceId && r.sourceId.includes('+') && r.legs);
+  if (!compRow) { execState = { phase: 'error', errorMsg: t('exec_failed') }; renderApp(); return; }
+  await startCompositeLeg1(compRow);
 }
 
 async function startCompositeLeg1(winRow) {
