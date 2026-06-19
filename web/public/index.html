@@ -2042,8 +2042,11 @@ async function startCompositeLeg1(winRow) {
     const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pair: 'USDC', amount: simAmt, sender: walletAddress, slippageBps: Math.round(execSlippagePct * 100), venue: leg1Source }) });
     const j = await r.json();
-    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code }; }
-    else { execState = { phase: 'review', build: j, comp: { leg: 1, leg1Source, usdcBefore, usdcReceived: null, hash1: null } }; }
+    const comp1 = { leg: 1, leg1Source, usdcBefore, usdcReceived: null, hash1: null };
+    // Erreur leg1 (typiquement trustline USDC manquante) : préserve comp{leg:1} + l'actif manquant
+    // (j.asset = USDC ici) → le front ajoute/relance la BONNE trustline, pas le target global (EURC).
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, asset: j.asset, comp: comp1 }; }
+    else { execState = { phase: 'review', build: j, comp: comp1 }; }
   } catch (e) { execState = { phase: 'error', errorMsg: t('err_down') }; }
   renderApp();
 }
@@ -2069,7 +2072,7 @@ async function confirmExecute() {
       body: JSON.stringify({ venue: build.venue, id: build.id, signedXdr: signedTxXdr }) });
     const j = await r.json();
     if (!r.ok) {
-      execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, ...(comp ? { comp } : {}) };
+      execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, asset: j.asset, ...(comp ? { comp } : {}) };
       renderApp(); return;
     }
     if (build.type === 'restore') {
@@ -2149,7 +2152,7 @@ async function buildCompositeLeg2(comp) {
     const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pair: 'EURC', from: 'USDC', amount: comp.usdcReceived, sender: walletAddress, slippageBps: Math.round(execSlippagePct * 100) }) });
     const j = await r.json();
-    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, comp: { ...comp, leg: 2 } }; }
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, asset: j.asset, comp: { ...comp, leg: 2 } }; }
     else { execState = { phase: 'review', build: j, comp: { ...comp, leg: 2 } }; }
   } catch (e) { execState = { phase: 'error', errorMsg: t('err_down'), comp: { ...comp, leg: 2 } }; }
   renderApp();
@@ -2165,27 +2168,30 @@ async function retryCompositeLeg2() {
 // Ajout de la trustline de sortie DEPUIS l'app : build changeTrust → signature wallet → submit Horizon.
 // Pas d'auto-retry du swap (read-after-write Horizon) : on revient à un clic d'exécution → quelques
 // secondes passent (lecture du succès + clic) = buffer de propagation, pas de faux « trustline absente ».
-async function addTrustline() {
+// assetCode = l'actif RÉELLEMENT manquant (USDC au leg1, EURC au leg2/mono) ; défaut = target global.
+async function addTrustline(assetCode) {
   if (!walletAddress) { execState = { phase: 'error', errorMsg: t('exec_connect_first') }; renderApp(); return; }
   // Préserver le contexte composite : si la trustline manque au leg2 (leg1 déjà exécuté, USDC en main),
   // après l'ajout on relance le LEG2 — JAMAIS doExecute() qui re-swapperait du BLND (double swap).
   const comp = (execState && execState.comp) || null;
+  const asset = assetCode || (execState && execState.asset) || target; // pair à truster (USDC/EURC)
+  const keep = { ...(comp ? { comp } : {}), asset };
   try {
-    execState = { phase: 'trustline_adding', ...(comp ? { comp } : {}) }; renderApp();
+    execState = { phase: 'trustline_adding', ...keep }; renderApp();
     const r = await fetch('/api/build-trustline', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pair: target, sender: walletAddress }) });
+      body: JSON.stringify({ pair: asset, sender: walletAddress }) });
     const j = await r.json();
-    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, ...(comp ? { comp } : {}) }; renderApp(); return; }
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, ...keep }; renderApp(); return; }
     await ensureKit();
     const { signedTxXdr } = await SWK.signTransaction(j.xdr, { address: walletAddress, networkPassphrase: KIT_NET });
     const sr = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ venue: 'horizon', signedXdr: signedTxXdr }) });
     const sj = await sr.json();
-    if (!sr.ok) { execState = { phase: 'error', errorMsg: mapExecError(sj.code, sj.error), code: sj.code, ...(comp ? { comp } : {}) }; renderApp(); return; }
-    execState = { phase: 'trustline_added', ...(comp ? { comp } : {}) }; renderApp();
+    if (!sr.ok) { execState = { phase: 'error', errorMsg: mapExecError(sj.code, sj.error), code: sj.code, ...keep }; renderApp(); return; }
+    execState = { phase: 'trustline_added', ...keep }; renderApp();
   } catch (e) {
     const msg = (e && e.message) || '';
-    execState = { phase: 'error', errorMsg: /reject/i.test(msg) ? t('exec_rejected') : (msg || t('exec_failed')), ...(comp ? { comp } : {}) }; renderApp();
+    execState = { phase: 'error', errorMsg: /reject/i.test(msg) ? t('exec_rejected') : (msg || t('exec_failed')), ...keep }; renderApp();
   }
 }
 
@@ -2452,31 +2458,38 @@ function execModal() {
   } else if (phase === 'trustline_adding') {
     content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0">${t('trustline_adding')}</p>`;
   } else if (phase === 'trustline_added') {
+    // Reprise après ajout : leg2 → retryCompositeLeg2 (USDC en main) ; leg1 → doExecuteComposite
+    // (relance la jambe 1, JAMAIS doExecute() qui pourrait exécuter une venue atomique) ; mono → doExecute.
+    const resumeBtn = (comp && comp.leg === 2 && comp.usdcReceived != null)
+      ? `<button class="btn primary" onclick="retryCompositeLeg2()">${t('comp_retry_leg2')}</button>`
+      : (comp && comp.leg === 1)
+        ? `<button class="btn primary" onclick="doExecuteComposite()">${t('exec_btn')}</button>`
+        : `<button class="btn primary" onclick="doExecute()">${t('exec_btn')}</button>`;
     content = `
       <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.5rem">
         <span style="font-size:20px;color:var(--green);line-height:1">✓</span>
-        <span style="font-size:14px;font-weight:700;color:var(--green)">${t('trustline_added', target)}</span>
+        <span style="font-size:14px;font-weight:700;color:var(--green)">${t('trustline_added', execState.asset || target)}</span>
       </div>
       <p class="help" style="margin:0 0 .9rem">${t('trustline_added_hint')}</p>
       <div style="display:flex;gap:.55rem;justify-content:flex-end;flex-wrap:wrap">
         <button class="btn" onclick="cancelExecute()">${t('exec_close')}</button>
-        ${(comp && comp.leg === 2 && comp.usdcReceived != null)
-          ? `<button class="btn primary" onclick="retryCompositeLeg2()">${t('comp_retry_leg2')}</button>`
-          : `<button class="btn primary" onclick="doExecute()">${t('exec_btn')}</button>`}
+        ${resumeBtn}
       </div>`;
   } else if (phase === 'error') {
     // Cas trustline absente : message clair + bouton d'ajout in-app (≠ « échec » dur).
     const isTrust = execState.code === 'trustline';
     // Cas composite leg2 récupérable : leg1 ok, USDC en main, leg2 échoué
     const isLeg2Fail = comp && comp.leg === 2 && comp.usdcReceived != null;
+    // Actif réellement manquant (USDC au leg1, EURC au leg2/mono) — fourni par le backend, PAS le target global.
+    const missAsset = execState.asset || target;
     const title = isTrust ? t('trustline_title') : t('exec_failed');
     const titleColor = isTrust ? 'var(--amber)' : 'var(--red)';
     // leg2 récupérable → message « leg1 ok, USDC en main » (prioritaire sur le générique trustline) ;
     // si la trustline EURC manque, on garde le bouton d'ajout (l'ajout enchaîne sur retryCompositeLeg2).
     const msg = isLeg2Fail ? t('comp_leg2_failed', fmt3(comp.usdcReceived))
-      : isTrust ? t('trustline_need', target)
+      : isTrust ? t('trustline_need', missAsset)
       : escapeHtml(errorMsg);
-    const trustBtn = isTrust ? `<button class="btn primary" onclick="addTrustline()">${t('trustline_add_btn', target)}</button>` : '';
+    const trustBtn = isTrust ? `<button class="btn primary" onclick="addTrustline('${missAsset}')">${t('trustline_add_btn', missAsset)}</button>` : '';
     // Relance directe seulement si ce n'est PAS un manque de trustline (sinon il faut d'abord l'ajouter).
     const retryLeg2Btn = (isLeg2Fail && !isTrust) ? `<button class="btn primary" onclick="retryCompositeLeg2()">${t('comp_retry_leg2')}</button>` : '';
     content = `

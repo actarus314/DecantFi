@@ -26,6 +26,9 @@ export class ExecError extends Error {
   constructor(
     public code: 'trustline' | 'funds' | 'slippage' | 'down' | 'no-route',
     message: string,
+    /** Pour les erreurs trustline : le CODE de l'actif réellement manquant (USDC au leg1, EURC au leg2…).
+     *  Indispensable au front pour ajouter/relancer la BONNE trustline (le `target` global ≠ l'actif de la jambe). */
+    public asset?: string,
   ) {
     super(message);
     this.name = 'ExecError';
@@ -40,6 +43,7 @@ function trustlineMissingError(buy: Asset, sender: string): ExecError {
     `Trustline ${buy.code} (émetteur : ${buy.issuer}) absente sur le compte ${sender}. ` +
     `Pour l'ajouter : dans votre wallet (Freighter / LOBSTR), allez dans « Manage Assets » ` +
     `et ajoutez l'actif ${buy.code}. Coût : ~0,5 XLM de réserve immobilisée (opération changeTrust).`,
+    buy.code,
   );
 }
 

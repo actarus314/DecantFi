@@ -279,7 +279,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         const result = await pickExecutableVenue(pair, amount, b.sender as string, slippageBps, cfg, displayed, undefined, forceVenue, sellAsset);
         json(res, 200, result);
       } catch (e) {
-        if (e instanceof ExecError) { json(res, execStatus(e.code), { error: e.message, code: e.code }); return; }
+        if (e instanceof ExecError) { json(res, execStatus(e.code), { error: e.message, code: e.code, asset: e.asset }); return; }
         throw e; // → 500 via handle()
       }
       return;
