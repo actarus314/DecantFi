@@ -1215,12 +1215,12 @@ function buildHealthPage(topbarHtml) {
     // Vue semaine Lun→Dim : passé (disques pleins) | aujourd'hui (pie) | futur (gris)
     // todayLocalDow() = 0=Lun … 6=Dim ; s.days[0]=aujourd'hui, s.days[1]=hier, etc.
     const todayDow = todayLocalDow();
-    // Secteurs pie SVG 11×11 pour le disque partiel (cx=5.5, cy=5.5, r=5)
+    // Secteurs pie SVG 11×11, r=5.5 → diamètre=11px = même taille que <i> (cx=cy=5.5)
     const PIE = [
       '',
-      'M 5.5 5.5 L 5.5 0.5 A 5 5 0 0 1 10.5 5.5 Z',
-      'M 5.5 5.5 L 5.5 0.5 A 5 5 0 0 1 10.5 5.5 A 5 5 0 0 1 5.5 10.5 Z',
-      'M 5.5 5.5 L 5.5 0.5 A 5 5 0 0 1 10.5 5.5 A 5 5 0 0 1 5.5 10.5 A 5 5 0 0 1 0.5 5.5 Z',
+      'M 5.5 5.5 L 5.5 0 A 5.5 5.5 0 0 1 11 5.5 Z',
+      'M 5.5 5.5 L 5.5 0 A 5.5 5.5 0 0 1 11 5.5 A 5.5 5.5 0 0 1 5.5 11 Z',
+      'M 5.5 5.5 L 5.5 0 A 5.5 5.5 0 0 1 11 5.5 A 5.5 5.5 0 0 1 5.5 11 A 5.5 5.5 0 0 1 0 5.5 Z',
     ];
     const quarters = Math.min(Math.floor(elH / 6), 4);
     const todayStatus = s.days[0];
@@ -1228,7 +1228,7 @@ function buildHealthPage(topbarHtml) {
     const todayDot = quarters === 4
       ? `<i class="${todayStatus === 'ok' ? '' : todayStatus === 'warn' ? 'w' : todayStatus === 'bad' ? 'b' : 'g'}" title="${todayStatus ?? t('health_legend_null')}"></i>`
       : `<svg width="11" height="11" viewBox="0 0 11 11" title="${todayStatus ?? t('health_legend_null')}">
-          <circle cx="5.5" cy="5.5" r="5" fill="var(--card-border)"/>
+          <circle cx="5.5" cy="5.5" r="5.5" fill="var(--card-border)"/>
           ${PIE[quarters] ? `<path d="${PIE[quarters]}" fill="${todayColor}"/>` : ''}
         </svg>`;
     const dots = Array.from({ length: 7 }, (_, d) => {
