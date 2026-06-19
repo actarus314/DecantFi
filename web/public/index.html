@@ -399,7 +399,6 @@ const STRINGS = {
     exec_btn: 'Exécuter le swap',
     exec_connect_first: 'Connecte ton wallet pour exécuter',
     slippage_label: 'Slippage',
-    slip_risk: (winner, floor, alt, sym, slip) => `⚠ ${winner} sur-cote : à ${slip} % de slippage, le plancher exigé (${floor} ${sym}) dépasse ce que les autres routes offrent (${alt} ${sym}) — risque de revert à l'exécution. Augmente le slippage ou choisis une autre route.`,
 
     // Revue avant signature
     review_title: 'Vérifier avant signature',
@@ -613,7 +612,6 @@ const STRINGS = {
     exec_btn: 'Execute swap',
     exec_connect_first: 'Connect your wallet to execute',
     slippage_label: 'Slippage',
-    slip_risk: (winner, floor, alt, sym, slip) => `⚠ ${winner} over-quotes: at ${slip}% slippage, the required floor (${floor} ${sym}) exceeds what other routes offer (${alt} ${sym}) — execution may revert. Raise the slippage or pick another route.`,
 
     // Review before signing
     review_title: 'Review before signing',
@@ -1029,17 +1027,6 @@ function simCard() {
     </div>`;
     if (simResult.errors && simResult.errors.length > 0) {
       resultHtml += `<p class="help" style="margin:.4rem 0 0">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
-    }
-    // Alerte AU QUOTE : le gagnant sur-cote vs le cluster exécutable → son plancher (net − slippage)
-    // dépasse ce que la meilleure AUTRE route exécutable offre ⇒ revert probable à l'exécution.
-    // Purement client (aucun appel réseau), recalculé quand le slippage change.
-    if (winRow && winRow.executable) {
-      const floor = winRow.net * (1 - execSlippagePct / 100);
-      const alts = (simResult.ladder || []).filter(r => r.executable && r.sourceId !== winRow.sourceId).map(r => r.net);
-      const bestAlt = alts.length ? Math.max(...alts) : null;
-      if (bestAlt != null && floor > bestAlt + 1e-7) {
-        resultHtml += `<p class="help" style="margin:.5rem 0 0;color:var(--amber);font-weight:600">${t('slip_risk', winRow.display, fmt3(floor), fmt3(bestAlt), target, execSlippagePct)}</p>`;
-      }
     }
     // Exec row
     if (selRow && !selRow.executable) {

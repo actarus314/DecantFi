@@ -169,9 +169,14 @@ export async function liveQuote(
 
     const xbRanked = result.ranking.ranked.find((q) => q.source === 'xbull');
     const route = (xbRanked?.raw as { route?: unknown } | undefined)?.route;
+    let xbullHops: RouteHop[] | undefined;
     if (xbRanked && route) {
-      const simNet = await simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null);
-      if (simNet !== null && simNet > 0n && simNet !== xbRanked.netOut) xbullSimNet = simNet;
+      const xbSim = await simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null);
+      if (xbSim && xbSim.net > 0n && xbSim.net !== xbRanked.netOut) xbullSimNet = xbSim.net;
+      if (xbSim && xbSim.route.length >= 2) {
+        const r = xbSim.route;
+        xbullHops = r.slice(0, -1).map((sell, i) => ({ venue: 'xbull', sell, buy: r[i + 1]! }));
+      }
     }
 
     if (aquariusSimNet !== undefined || xbullSimNet !== undefined) {
@@ -179,7 +184,7 @@ export async function liveQuote(
         if (q.source === 'aquarius' && aquariusSimNet !== undefined)
           return { ...q, netOut: aquariusSimNet, grossOut: aquariusSimNet };
         if (q.source === 'xbull' && xbullSimNet !== undefined)
-          return { ...q, netOut: xbullSimNet, grossOut: xbullSimNet };
+          return { ...q, netOut: xbullSimNet, grossOut: xbullSimNet, ...(xbullHops ? { route: xbullHops } : {}) };
         return q;
       });
       result.ranking = rankQuotes(newQuotes);
