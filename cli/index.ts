@@ -87,9 +87,22 @@ function routeStr(q: NormalizedQuote): string {
 }
 
 function deltaStr(q: NormalizedQuote): string {
-  if (q.priceImpactPct === undefined) return '—';
-  const sign = q.priceImpactPct > 0 ? '-' : '+';
-  return `${sign}${Math.abs(q.priceImpactPct).toFixed(2)}%`;
+  // Affiche l'impact LOCAL par défaut (SDEX Stellar) ; si EURC et EVM diffère, append discret.
+  const localPct = q.priceImpactLocalPct;
+  const evmPct = q.priceImpactPct;
+  const fmt = (v: number) => `${v > 0 ? '-' : '+'}${Math.abs(v).toFixed(2)}%`;
+  if (localPct !== undefined) {
+    const base = fmt(localPct);
+    // Pour EURC : si EVM disponible et diffère du local de plus de 0.01%, append "(evm ±x%)"
+    if (evmPct !== undefined && q.buyAsset.symbol === 'EURC' && Math.abs(evmPct - localPct) >= 0.01) {
+      const diff = evmPct - localPct;
+      const sign = diff > 0 ? '+' : '';
+      return `${base} (evm ${sign}${diff.toFixed(2)}%)`;
+    }
+    return base;
+  }
+  if (evmPct !== undefined) return fmt(evmPct);
+  return '—';
 }
 
 function table(headers: string[], rows: string[][]): string {
@@ -116,7 +129,7 @@ export function renderText(result: QuoteResult): string {
   const out: string[] = [];
   out.push(`${rq.sell} → ${rq.buy} · ${fromStroops(rq.amountIn)} ${rq.sell} · slippage ${(rq.slippageBps / 100).toFixed(2)}%`);
   const p = (v: number | null, s = '$') => (v == null ? '?' : `${parseFloat(v.toPrecision(4))}${s}`);
-  out.push(`spot BLND ~${p(prices.blndUsd)} · XLM ~${p(prices.xlmUsd)} · EUR/USD ~${p(prices.eurUsd, '')}`);
+  out.push(`spot BLND ~${p(prices.blndUsd)} · XLM ~${p(prices.xlmUsd)} · EURC/USD ~${p(prices.eurcUsd, '')} · EURC@Stellar ~${p(prices.eurcStellarMid, '')}`);
   out.push('');
 
   if (ranking.ranked.length === 0 && !eurc) {

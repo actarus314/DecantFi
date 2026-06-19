@@ -15,8 +15,9 @@ vi.mock('../core/balance.js', () => ({
 // Mock prices.js (fonctions utilisées pour la ligne via-usdc EURC, pas nécessaires ici)
 vi.mock('../core/prices.js', () => ({
   priceImpactPct: vi.fn(() => null),
-  targetUsdPerUnit: vi.fn(() => null),
-  fetchPrices: vi.fn(async () => ({ blndUsd: null, eurUsd: null, xlmUsd: null })),
+  targetEvmPerUnit: vi.fn(() => null),
+  targetLocalPerUnit: vi.fn(() => null),
+  fetchPrices: vi.fn(async () => ({ blndUsd: null, eurcUsd: null, eurcStellarMid: null, xlmUsd: null })),
 }));
 
 import { quote as engineQuote } from '../core/engine.js';
@@ -66,7 +67,7 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
 
     vi.mocked(engineQuote).mockResolvedValue({
       request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
-      prices: { blndUsd: 0.05, eurUsd: 1.08, xlmUsd: 0.12 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
       ranking: {
         ranked: [xbullQ, aquaQ],
         best: xbullQ,
@@ -100,7 +101,7 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
 
     vi.mocked(engineQuote).mockResolvedValue({
       request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
-      prices: { blndUsd: 0.05, eurUsd: 1.08, xlmUsd: 0.12 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
       ranking: {
         ranked: [soroQ, horizonQ],
         best: soroQ,
@@ -125,7 +126,7 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
     const aquaQ = { ...makeQuote('aquarius', 4_0200000n), raw: { swap_chain_xdr: 'AAAA' } };
     vi.mocked(engineQuote).mockResolvedValue({
       request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
-      prices: { blndUsd: 0.05, eurUsd: 1.08, xlmUsd: 0.12 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
       ranking: { ranked: [aquaQ, xbullQ], best: aquaQ },
       errors: [],
     } as any);
@@ -147,7 +148,7 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
     const aquaQ = { ...makeQuote('aquarius', 4_0000000n) };
     vi.mocked(engineQuote).mockResolvedValue({
       request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
-      prices: { blndUsd: 0.05, eurUsd: 1.08, xlmUsd: 0.12 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
       ranking: { ranked: [xbullQ, aquaQ], best: xbullQ },
       errors: [],
     } as any);
@@ -168,7 +169,7 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
 
     vi.mocked(engineQuote).mockResolvedValue({
       request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
-      prices: { blndUsd: 0.05, eurUsd: 1.08, xlmUsd: 0.12 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
       ranking: {
         ranked: [compositeQ],
         best: compositeQ,

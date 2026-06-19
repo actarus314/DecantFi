@@ -93,7 +93,8 @@ function buildTestDb(): void {
         cadence_sec: 900,
         blnd_usd: blndUsd,
         xlm_usd: 0.12,
-        eur_usd: 1.08,
+        eurc_usd: 1.08,
+        eurc_stellar_mid: null,
         ok: isOk,
         source_errors: isOk ? null : 'timeout',
         note: null,
@@ -304,6 +305,125 @@ describe('intradayLocal', () => {
         expect(row.length).toBe(96);
       }
     }
+  });
+});
+
+// ─── Test : impactLocalPct ────────────────────────────────────────────────────
+
+describe('impactLocalPct', () => {
+  it('impactLocalPct présent sur chaque LadderRow USDC', () => {
+    const rows = result_usdc.ladders['750']!;
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect('impactLocalPct' in r).toBe(true);
+    }
+  });
+
+  it('USDC : impactLocalPct non-null (blnd_usd présent, perUnitLocal=1)', () => {
+    // Pour USDC perUnitLocal=1 → impactLocalPct = priceImpactPct recalculé, doit être défini
+    const rows = result_usdc.ladders['750']!;
+    expect(rows.some(r => r.impactLocalPct !== null)).toBe(true);
+  });
+
+  it('USDC : impactLocalPct est un nombre fini quand non-null', () => {
+    const rows = result_usdc.ladders['750']!;
+    for (const r of rows) {
+      if (r.impactLocalPct !== null) {
+        expect(Number.isFinite(r.impactLocalPct)).toBe(true);
+      }
+    }
+  });
+
+  it('EURC : impactLocalPct null quand eurc_stellar_mid absent du tick', () => {
+    // La fixture insère eurc_stellar_mid=null sur tous les ticks → impactLocalPct doit être null
+    const rows = result_eurc.ladders['750']!;
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(r.impactLocalPct).toBeNull();
+    }
+  });
+});
+
+// ─── Test : impactLocalPct avec eurc_stellar_mid renseigné ────────────────────
+
+let result_eurc_mid: ReturnType<typeof overview>;
+let tmpDirEurcMid: string;
+
+describe('impactLocalPct — EURC avec eurc_stellar_mid renseigné', () => {
+  beforeAll(() => {
+    tmpDirEurcMid = mkdtempSync(join(tmpdir(), 'stellarswap-eurcmid-'));
+    const dbPath2 = join(tmpDirEurcMid, 'test.db');
+    const db2 = openDb(dbPath2);
+
+    const amountBlnd = toStroops(250);
+    const blndUsd = 0.05;
+    const eurcStellarMid = 1.05; // USDC par EURC (mid du carnet SDEX)
+    // net_out : 250 BLND * 0.05 USD/BLND / 1.05 USDC/EURC * 0.99 (1% impact) en stroops
+    const netOutEurc = BigInt(Math.round((250 * blndUsd / eurcStellarMid * 0.99) * 1e7));
+
+    db2.insertTickWithQuotes(
+      {
+        started_at: '2025-03-09T12:00:00Z',
+        finished_at: '2025-03-09T12:00:05Z',
+        cadence_sec: 900,
+        blnd_usd: blndUsd,
+        xlm_usd: 0.12,
+        eurc_usd: 1.08,
+        eurc_stellar_mid: eurcStellarMid,
+        ok: true,
+        source_errors: null,
+        note: null,
+      },
+      [{
+        pair: 'BLND->EURC',
+        amount_in: amountBlnd,
+        source_id: 'xbull',
+        net_out: netOutEurc,
+        net_confidence: 'exact',
+        price_impact_pct: 2.5, // valeur DB (EVM) arbitraire — ne correspond pas au local
+        gas_in_target: 0n,
+        fee_total: 0n,
+        route_summary: 'BLND->EURC',
+        is_winner: true,
+        eurc_path: null,
+        raw_json: null,
+        duration_ms: null,
+      }],
+    );
+    db2.close();
+
+    const roDb2 = openReadOnly(dbPath2);
+    result_eurc_mid = overview(roDb2, 'EURC', {
+      ...CFG,
+      sizesBlnd: [toStroops(250)],
+      pairs: ['EURC'],
+      dbPath: dbPath2,
+    }, new Date('2025-03-10T00:00:00Z'));
+    roDb2.close();
+  });
+
+  afterAll(() => {
+    rmSync(tmpDirEurcMid, { recursive: true, force: true });
+  });
+
+  it('impactLocalPct non-null quand eurc_stellar_mid est posé sur le tick', () => {
+    const row = result_eurc_mid.ladders['250']?.[0];
+    expect(row).toBeDefined();
+    expect(row!.impactLocalPct).not.toBeNull();
+  });
+
+  it('impactLocalPct distinct de impactPct DB (calcul local ≠ valeur stockée)', () => {
+    const row = result_eurc_mid.ladders['250']?.[0];
+    expect(row!.impactPct).toBeCloseTo(2.5, 4); // valeur DB inchangée
+    // impactLocalPct recalculé ≈ 1% (net = 0.99 * spot local) → ≠ 2.5
+    expect(row!.impactLocalPct).not.toBeCloseTo(2.5, 0);
+    expect(row!.impactLocalPct).toBeGreaterThan(0);
+  });
+
+  it('impactLocalPct ≈ 1% (cohérence avec le net_out inséré)', () => {
+    const row = result_eurc_mid.ladders['250']?.[0];
+    // On a inséré net = spot_local * 0.99 → impact ≈ 1%
+    expect(row!.impactLocalPct).toBeCloseTo(1.0, 0);
   });
 });
 

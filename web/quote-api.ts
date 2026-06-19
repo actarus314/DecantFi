@@ -6,7 +6,7 @@ import { simulateAquariusNet, simulateXbullNet } from './execute.js';
 import { readBlndBalance } from '../core/balance.js';
 import { BLND, USDC, EURC } from '../core/assets.js';
 import { toStroops, toNumber } from '../core/amount.js';
-import { priceImpactPct, targetUsdPerUnit } from '../core/prices.js';
+import { priceImpactPct, targetEvmPerUnit, targetLocalPerUnit } from '../core/prices.js';
 import { displayName, noteFor, chipFor, maskedRoute, type Chip } from './stats.js';
 import type { WebConfig } from './config.js';
 import type { RouteHop } from '../core/sources/types.js';
@@ -27,7 +27,10 @@ export interface LiveLadderRow {
   net: number;
   deltaVsWinner: number;
   chip: Chip;
+  /** Impact EVM/global (vs prix CoinGecko/Circle). */
   impactPct: number | null;
+  /** Impact local (vs mid SDEX Stellar). null si mid indisponible. */
+  impactLocalPct: number | null;
   winner: boolean;
   // click-to-select : identifiant source brut, deep-link et capacité d'exécution intégrée
   sourceId: string;
@@ -50,14 +53,18 @@ export interface LiveQuote {
     net: number;
     rate: number;
     chip: Chip;
+    /** Impact EVM/global (vs prix CoinGecko/Circle). */
     impactPct: number | null;
+    /** Impact local (vs mid SDEX Stellar). null si mid indisponible. */
+    impactLocalPct: number | null;
     route: RibbonPart[];
     deepLink: string | null;
   };
   ladder: LiveLadderRow[];
   prices: {
     blndUsd: number | null;
-    eurUsd: number | null;
+    eurcUsd: number | null;
+    eurcStellarMid: number | null;
     xlmUsd: number | null;
   };
   errors: string[];
@@ -273,13 +280,15 @@ export async function liveQuote(
         rate: 0,
         chip: 'est',
         impactPct: null,
+        impactLocalPct: null,
         route: [],
         deepLink: null,
       },
       ladder: [],
       prices: {
         blndUsd: result.prices.blndUsd,
-        eurUsd: result.prices.eurUsd,
+        eurcUsd: result.prices.eurcUsd,
+        eurcStellarMid: result.prices.eurcStellarMid,
         xlmUsd: result.prices.xlmUsd,
       },
       errors: result.errors,
@@ -295,6 +304,7 @@ export async function liveQuote(
   // Pour via-usdc : forcer 'calc' car leg1 peut être 'exact' mais c'est une estimation 2 swaps
   const chip: Chip = eurcPath === 'via-usdc' ? 'calc' : chipFor(bestConf, bestSource, eurcPath);
   const impactPct = bestQuote.priceImpactPct ?? null;
+  const impactLocalPct = bestQuote.priceImpactLocalPct ?? null;
 
   // Route complète : si via-usdc, concaténer leg1 + leg2
   const combinedRoute = extraRoute ? [...bestQuote.route, ...extraRoute] : bestQuote.route;
@@ -303,7 +313,7 @@ export async function liveQuote(
   // Échelle complète : ranking direct + (EURC) ligne composite via-USDC, triée par net.
   // Le composite est TOUJOURS listé quand il existe (comme le stockage collecteur) → le tableau
   // colle au simulateur (le gagnant peut être le composite, pas le meilleur direct).
-  const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; hops: RouteHop[] | null; eurcPath: string | null; impactPct: number | null }> =
+  const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; hops: RouteHop[] | null; eurcPath: string | null; impactPct: number | null; impactLocalPct: number | null }> =
     result.ranking.ranked.map((rq) => ({
       source: rq.source,
       netOut: rq.netOut,
@@ -312,6 +322,7 @@ export async function liveQuote(
       hops: rq.route,
       eurcPath: null,
       impactPct: rq.priceImpactPct ?? null,
+      impactLocalPct: rq.priceImpactLocalPct ?? null,
     }));
   if (pairUi === 'EURC' && result.eurc?.viaUsdc) {
     const v = result.eurc.viaUsdc;
@@ -324,7 +335,8 @@ export async function liveQuote(
       route: `${r1} → ${r2.split(' → ').slice(1).join(' → ')}`, // fusionne le nœud USDC partagé
       hops: null, // composite EURC via-USDC : pas de RouteHop[] structuré unique
       eurcPath: 'via-usdc',
-      impactPct: priceImpactPct(amountStroops, v.netEurc, result.prices.blndUsd, targetUsdPerUnit('EURC', result.prices)) ?? null,
+      impactPct: priceImpactPct(amountStroops, v.netEurc, result.prices.blndUsd, targetEvmPerUnit('EURC', result.prices)) ?? null,
+      impactLocalPct: priceImpactPct(amountStroops, v.netEurc, result.prices.blndUsd, targetLocalPerUnit('EURC', result.prices)) ?? null,
     });
   }
   raw.sort((a, b) => (a.netOut < b.netOut ? 1 : a.netOut > b.netOut ? -1 : 0));
@@ -338,6 +350,7 @@ export async function liveQuote(
     deltaVsWinner: toNumber(r.netOut) - topNetNum,
     chip: r.eurcPath === 'via-usdc' ? 'calc' : chipFor(r.conf, r.source, r.eurcPath),
     impactPct: r.impactPct,
+    impactLocalPct: r.impactLocalPct,
     winner: i === 0,
     sourceId: r.source,
     deepLink: deepLink(r.source, pairUi),
@@ -353,13 +366,15 @@ export async function liveQuote(
       rate,
       chip,
       impactPct,
+      impactLocalPct,
       route,
       deepLink: deepLink(bestSource, pairUi),
     },
     ladder,
     prices: {
       blndUsd: result.prices.blndUsd,
-      eurUsd: result.prices.eurUsd,
+      eurcUsd: result.prices.eurcUsd,
+      eurcStellarMid: result.prices.eurcStellarMid,
       xlmUsd: result.prices.xlmUsd,
     },
     errors: result.errors,

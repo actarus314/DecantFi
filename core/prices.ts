@@ -6,14 +6,25 @@ import { toNumber } from './amount.js';
 export interface Prices {
   blndUsd: number | null;
   xlmUsd: number | null;
-  /** USD par EUR (pour valoriser EURC). */
-  eurUsd: number | null;
+  /** USD par EURC (euro-coin, token Stellar/Base) — distinct du fiat EUR/USD. */
+  eurcUsd: number | null;
+  /** Mid du carnet EURC/USDC sur le SDEX Stellar (USDC par EURC). Best-effort, null si carnet vide/à sens unique/anomalie. */
+  eurcStellarMid: number | null;
 }
 
 export type Fetcher = typeof fetch;
 
-// DefiLlama agrege les prix CoinGecko en un appel keyless. eurUsd = prix USD de l'EURC (~= EUR/USD).
+// DefiLlama agrege les prix CoinGecko en un appel keyless. eurcUsd = prix USD de l'EURC (euro-coin).
 const LLAMA = 'https://coins.llama.fi/prices/current/coingecko:blend,coingecko:stellar,coingecko:euro-coin';
+
+// Carnet EURC/USDC sur le SDEX Stellar (1 niveau de profondeur suffit pour le mid).
+const HORIZON_ORDER_BOOK =
+  'https://horizon.stellar.org/order_book' +
+  '?selling_asset_type=credit_alphanum4&selling_asset_code=EURC' +
+  '&selling_asset_issuer=GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2' +
+  '&buying_asset_type=credit_alphanum4&buying_asset_code=USDC' +
+  '&buying_asset_issuer=GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN' +
+  '&limit=1';
 
 interface LlamaCoin {
   price?: number;
@@ -22,19 +33,52 @@ interface LlamaResponse {
   coins?: Record<string, LlamaCoin>;
 }
 
-/** Recupere blndUsd, xlmUsd et eurUsd en un appel DefiLlama. Best-effort, chaque champ peut etre null. */
+interface OrderBookResponse {
+  bids?: Array<{ price: string }>;
+  asks?: Array<{ price: string }>;
+}
+
+/** Fetch le mid EURC/USDC du carnet SDEX Stellar. Best-effort : null si échec ou données invalides. */
+export async function fetchEurcStellarMid(
+  fetcher: Fetcher,
+  timeoutMs: number,
+): Promise<number | null> {
+  try {
+    const res = await fetcher(HORIZON_ORDER_BOOK, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) return null;
+    const ob = (await res.json()) as OrderBookResponse;
+    const bidPrice = ob.bids?.[0]?.price;
+    const askPrice = ob.asks?.[0]?.price;
+    if (!bidPrice || !askPrice) return null;
+    const bid = Number(bidPrice);
+    const ask = Number(askPrice);
+    if (!Number.isFinite(bid) || !Number.isFinite(ask) || bid <= 0 || ask <= 0) return null;
+    const mid = (bid + ask) / 2;
+    // Anomalie : mid hors [0.5, 2.0] → suspect, on rejette
+    if (mid < 0.5 || mid > 2.0) return null;
+    return mid;
+  } catch {
+    return null;
+  }
+}
+
+/** Recupere blndUsd, xlmUsd et eurcUsd en un appel DefiLlama + mid carnet Stellar. Best-effort, chaque champ peut etre null. */
 export async function fetchPrices(opts: { fetcher?: Fetcher; timeoutMs?: number } = {}): Promise<Prices> {
   const fetcher = opts.fetcher ?? fetch;
-  const empty: Prices = { blndUsd: null, xlmUsd: null, eurUsd: null };
+  const timeoutMs = opts.timeoutMs ?? 8000;
+  const empty: Prices = { blndUsd: null, xlmUsd: null, eurcUsd: null, eurcStellarMid: null };
   try {
-    const res = await fetcher(LLAMA, { signal: AbortSignal.timeout(opts.timeoutMs ?? 8000) });
+    const res = await fetcher(LLAMA, { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) return empty;
     const c = ((await res.json()) as LlamaResponse).coins ?? {};
-    return {
+    const llamaPrices = {
       blndUsd: num(c['coingecko:blend']?.price),
       xlmUsd: num(c['coingecko:stellar']?.price),
-      eurUsd: num(c['coingecko:euro-coin']?.price),
+      eurcUsd: num(c['coingecko:euro-coin']?.price),
     };
+    // Fetch mid carnet Stellar en parallèle (best-effort, try/catch séparé)
+    const eurcStellarMid = await fetchEurcStellarMid(fetcher, timeoutMs).catch(() => null);
+    return { ...llamaPrices, eurcStellarMid };
   } catch {
     return empty;
   }
@@ -44,10 +88,17 @@ function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
 }
 
-/** Prix USD d'une unite de l'asset cible : USDC -> 1 ; EURC -> eurUsd. */
-export function targetUsdPerUnit(targetSymbol: string, prices: Prices): number | null {
+/** Prix EVM/global d'une unite de l'asset cible : USDC -> 1 ; EURC -> eurcUsd (prix CoinGecko/Circle). */
+export function targetEvmPerUnit(targetSymbol: string, prices: Prices): number | null {
   if (targetSymbol === 'USDC') return 1;
-  if (targetSymbol === 'EURC') return prices.eurUsd;
+  if (targetSymbol === 'EURC') return prices.eurcUsd;
+  return null;
+}
+
+/** Prix local (SDEX Stellar) d'une unite de l'asset cible : USDC -> 1 ; EURC -> eurcStellarMid. */
+export function targetLocalPerUnit(targetSymbol: string, prices: Prices): number | null {
+  if (targetSymbol === 'USDC') return 1;
+  if (targetSymbol === 'EURC') return prices.eurcStellarMid;
   return null;
 }
 

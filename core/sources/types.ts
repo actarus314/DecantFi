@@ -80,8 +80,10 @@ export interface NormalizedQuote {
   /** Fourchette quand netOut est incertain (ex. StellarBroker : [plancher directTrade, pre-fee]). */
   netRange?: { low: Stroops; high: Stroops };
   route: RouteHop[];
-  /** Ecart du prix effectif (netOut/amountIn) vs spot, en %. */
+  /** Ecart du prix effectif (netOut/amountIn) vs spot EVM/global, en %. */
   priceImpactPct?: number;
+  /** Ecart du prix effectif vs spot local (carnet SDEX Stellar). null/undefined si mid indisponible. */
+  priceImpactLocalPct?: number;
   /** Reponse brute de la source (debug / fixtures). */
   raw: unknown;
   /** Durée totale de cotation pour cette source (ms) : fetch API + re-simulation incluse le cas échéant.

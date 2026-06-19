@@ -9,7 +9,7 @@ const daysAgo = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOStr
 function insertAt(db: ReturnType<typeof openDb>, startedAt: string, net: string): number {
   const tick: TickInsert = {
     started_at: startedAt, finished_at: startedAt, cadence_sec: 900,
-    blnd_usd: 0.05, xlm_usd: 0.11, eur_usd: 1.08, ok: true, source_errors: null, note: null,
+    blnd_usd: 0.05, xlm_usd: 0.11, eurc_usd: 1.08, eurc_stellar_mid: null, ok: true, source_errors: null, note: null,
   };
   const quotes: QuoteInsert[] = [
     { pair: 'BLND->USDC', amount_in: toStroops('250'), source_id: 'xbull', net_out: toStroops(net),

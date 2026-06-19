@@ -6,7 +6,7 @@ import type { Asset } from './assets.js';
 import { BLND, USDC, EURC } from './assets.js';
 import { ADAPTERS } from './sources/index.js';
 import { rankQuotes, type Ranking } from './rank.js';
-import { fetchPrices, targetUsdPerUnit, priceImpactPct, type Prices } from './prices.js';
+import { fetchPrices, targetEvmPerUnit, targetLocalPerUnit, priceImpactPct, type Prices } from './prices.js';
 import { convertXlmToTarget } from './gas.js';
 import { compareEurc, type EurcComparison } from './eurc.js';
 import { analyzeSplit, type SplitAnalysis } from './split.js';
@@ -39,11 +39,20 @@ export interface QuoteResult {
  *  wallet/explorer). gasInTarget reste calculé à titre INFORMATIF (estimation, non déduite ;
  *  le CLI l'affiche en colonne séparée). L'impact vs spot est calculé sur le brut. */
 export function finalize(q: NormalizedQuote, prices: Prices): NormalizedQuote {
-  const tUsd = targetUsdPerUnit(q.buyAsset.symbol, prices);
-  const gasInTarget = convertXlmToTarget(q.gasXlm, prices.xlmUsd, tUsd);
+  const tEvm = targetEvmPerUnit(q.buyAsset.symbol, prices);
+  const tLoc = targetLocalPerUnit(q.buyAsset.symbol, prices);
+  const gasInTarget = convertXlmToTarget(q.gasXlm, prices.xlmUsd, tEvm);
   const netOut = q.grossOut;
-  const impact = priceImpactPct(q.amountIn, netOut, prices.blndUsd, tUsd);
-  return { ...q, gasInTarget, netOut, priceImpactPct: impact ?? q.priceImpactPct, netRange: q.netRange };
+  const impact = priceImpactPct(q.amountIn, netOut, prices.blndUsd, tEvm);
+  const impactLocal = priceImpactPct(q.amountIn, netOut, prices.blndUsd, tLoc);
+  return {
+    ...q,
+    gasInTarget,
+    netOut,
+    priceImpactPct: impact ?? q.priceImpactPct,
+    priceImpactLocalPct: impactLocal ?? q.priceImpactLocalPct,
+    netRange: q.netRange,
+  };
 }
 
 export async function quoteAll(

@@ -5,7 +5,7 @@ import { migrate } from './schema.js';
 
 export interface TickInsert {
   started_at: string; finished_at: string | null; cadence_sec: number;
-  blnd_usd: number | null; xlm_usd: number | null; eur_usd: number | null;
+  blnd_usd: number | null; xlm_usd: number | null; eurc_usd: number | null; eurc_stellar_mid: number | null;
   ok: boolean; source_errors: string | null; note: string | null;
 }
 export interface QuoteInsert {
@@ -42,8 +42,8 @@ export class Db {
   /** Insère un tick et ses quotes (+ raw) et les sondes RPC atomiquement. Renvoie l'id du tick. */
   insertTickWithQuotes(tick: TickInsert, quotes: QuoteInsert[], rpcProbes: RpcProbeInsert[] = []): number {
     const insTick = this.db.prepare(
-      `INSERT INTO tick (started_at, finished_at, cadence_sec, blnd_usd, xlm_usd, eur_usd, ok, source_errors, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tick (started_at, finished_at, cadence_sec, blnd_usd, xlm_usd, eurc_usd, eurc_stellar_mid, ok, source_errors, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     const insQuote = this.db.prepare(
       `INSERT INTO quote (tick_id, pair, amount_in, source_id, net_out, net_confidence, price_impact_pct,
@@ -63,7 +63,7 @@ export class Db {
     try {
       const tickId = Number(
         insTick.run(tick.started_at, tick.finished_at, tick.cadence_sec, tick.blnd_usd, tick.xlm_usd,
-          tick.eur_usd, tick.ok ? 1 : 0, tick.source_errors, tick.note).lastInsertRowid,
+          tick.eurc_usd, tick.eurc_stellar_mid, tick.ok ? 1 : 0, tick.source_errors, tick.note).lastInsertRowid,
       );
       for (const q of quotes) {
         const quoteId = Number(

@@ -1,7 +1,7 @@
 // Exécute UN tick : prix 1× (injecté aux sondes pour comparabilité), quote() par sonde, assemble les lignes.
 // Aucune I/O DB. Renvoie un TickInsert + ses QuoteInsert (prêts pour db.insertTickWithQuotes).
 import { BLND, EURC } from '../core/assets.js';
-import { priceImpactPct, targetUsdPerUnit, type Prices } from '../core/prices.js';
+import { priceImpactPct, targetEvmPerUnit, type Prices } from '../core/prices.js';
 import type { QuoteResult, QuoteOptions, EngineConfig } from '../core/engine.js';
 import type { NormalizedQuote } from '../core/sources/types.js';
 import type { TickInsert, QuoteInsert, RpcProbeInsert } from '../db/index.js';
@@ -74,7 +74,7 @@ function rowsForProbe(probe: Probe, result: QuoteResult, prices: Prices): QuoteI
   });
   if (eurc?.viaUsdc) {
     const v = eurc.viaUsdc;
-    const impact = priceImpactPct(probe.amountIn, v.netEurc, prices.blndUsd, targetUsdPerUnit('EURC', prices));
+    const impact = priceImpactPct(probe.amountIn, v.netEurc, prices.blndUsd, targetEvmPerUnit('EURC', prices));
     const win = eurc.winner === 'via-usdc';
     rows.push({
       pair: probe.pair, amount_in: probe.amountIn, source_id: `${v.leg1.source}+${v.leg2.source}`,
@@ -147,7 +147,7 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
   const finishedAt = deps.now();
   const tick: TickInsert = {
     started_at: startedAt.toISOString(), finished_at: finishedAt.toISOString(), cadence_sec: deps.cfg.cadenceSec,
-    blnd_usd: prices.blndUsd, xlm_usd: prices.xlmUsd, eur_usd: prices.eurUsd,
+    blnd_usd: prices.blndUsd, xlm_usd: prices.xlmUsd, eurc_usd: prices.eurcUsd, eurc_stellar_mid: prices.eurcStellarMid,
     ok: quotes.some((q) => q.net_out !== null && q.net_out > 0n),
     source_errors: reasons.size > 0
       ? JSON.stringify([...reasons].map(([id, reason]) => ({ id, reason })))
@@ -173,6 +173,6 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
 export function failedTick(cfg: { cadenceSec: number }, startedAt: Date, finishedAt: Date, message: string): TickInsert {
   return {
     started_at: startedAt.toISOString(), finished_at: finishedAt.toISOString(), cadence_sec: cfg.cadenceSec,
-    blnd_usd: null, xlm_usd: null, eur_usd: null, ok: false, source_errors: null, note: `exception: ${message}`,
+    blnd_usd: null, xlm_usd: null, eurc_usd: null, eurc_stellar_mid: null, ok: false, source_errors: null, note: `exception: ${message}`,
   };
 }

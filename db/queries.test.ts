@@ -6,7 +6,7 @@ function seed() {
   const db = openDb(':memory:');
   const tick: TickInsert = {
     started_at: '2026-06-16T10:00:00.000Z', finished_at: '2026-06-16T10:00:02.000Z', cadence_sec: 900,
-    blnd_usd: 0.05, xlm_usd: 0.11, eur_usd: 1.08, ok: true, source_errors: null, note: null,
+    blnd_usd: 0.05, xlm_usd: 0.11, eurc_usd: 1.08, eurc_stellar_mid: null, ok: true, source_errors: null, note: null,
   };
   const quotes: QuoteInsert[] = [
     { pair: 'BLND->USDC', amount_in: 2_500_000_000n, source_id: 'xbull', net_out: 505_000_000n,

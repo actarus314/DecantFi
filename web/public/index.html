@@ -338,9 +338,15 @@ const STRINGS = {
     ladder_col_delta: 'Δ gagnant',
     ladder_col_chip: 'Confiance',
     ladder_col_impact: 'Impact',
+    ladder_col_impact_evm: 'Impact EVM',
     ladder_col_route: 'Route',
     ladder_tip_chip: 'Observé = cotation réelle de la source<br>Calculé = route composée (2 swaps)<br>Estimé = borne/plancher (frais opaques)',
-    ladder_tip_impact: 'Écart entre le montant reçu et sa valeur au prix de référence (DefiLlama).<br><br>Positif = on reçoit moins (frais + slippage).<br>Négatif = on reçoit plus (le prix on-chain bat la référence).',
+    ladder_tip_impact: '<b>Mode LOCAL (défaut)</b> : écart vs le prix de l\'EURC <i>sur Stellar</i> (carnet SDEX EURC/USDC). Mesure la qualité du swap dans le marché où il a lieu — pertinent si tu gardes l\'EURC on-chain.<br><br><b>Mode EVM</b> : écart vs le prix de l\'EURC <i>global</i> (valeur de rachat sur Base/Ethereum). Pertinent si tu rapatries l\'EURC vers EVM pour le sortir en euros — la prime/décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>Clique le titre de colonne pour basculer. Positif = tu reçois moins. Négatif = tu reçois plus.',
+    impact_evm_notice_title: 'Passer en mode Impact EVM ?',
+    impact_evm_notice_body: 'En mode <b>EVM</b>, l\'impact est calculé par rapport au prix de l\'EURC <b>sur Base/Ethereum</b> (valeur de rachat). La prime ou décote du marché Stellar compte comme un vrai gain ou une perte.<br><br>En mode <b>Local</b> (défaut), l\'impact est calculé par rapport au prix EURC sur le <b>SDEX Stellar</b> — pertinent si tu restes sur Stellar.',
+    impact_evm_confirm: 'Passer en mode EVM',
+    impact_evm_dismiss: 'Ne plus me montrer',
+    spot_eurc_stellar: 'EURC@Stellar',
     ladder_empty: 'Aucune donnée',
     ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
 
@@ -587,9 +593,15 @@ const STRINGS = {
     ladder_col_delta: 'Δ winner',
     ladder_col_chip: 'Confidence',
     ladder_col_impact: 'Impact',
+    ladder_col_impact_evm: 'Impact EVM',
     ladder_col_route: 'Route',
     ladder_tip_chip: 'Observed = real quote from the source<br>Calculated = composite route (2 swaps)<br>Estimated = floor/ceiling (opaque fees)',
-    ladder_tip_impact: 'Gap between the amount received and its value at the reference price (DefiLlama).<br><br>Positive = you receive less (fees + slippage).<br>Negative = you receive more (on-chain beats the reference).',
+    ladder_tip_impact: '<b>LOCAL mode (default)</b>: gap vs the EURC price <i>on Stellar</i> (SDEX EURC/USDC order book). Measures swap quality in the market where it happens — relevant if you keep EURC on-chain.<br><br><b>EVM mode</b>: gap vs the <i>global</i> EURC price (redemption value on Base/Ethereum). Relevant if you bridge EURC back to EVM to exit in euros — the Stellar market premium/discount then counts as a real gain or loss.<br><br>Click the column header to toggle. Positive = you receive less. Negative = you receive more.',
+    impact_evm_notice_title: 'Switch to EVM Impact mode?',
+    impact_evm_notice_body: 'In <b>EVM</b> mode, impact is measured against the EURC price <b>on Base/Ethereum</b> (redemption value). The Stellar market premium or discount counts as a real gain or loss.<br><br>In <b>Local</b> mode (default), impact is measured against the EURC price on the <b>Stellar SDEX</b> — relevant if you stay on Stellar.',
+    impact_evm_confirm: 'Switch to EVM mode',
+    impact_evm_dismiss: 'Don\'t show again',
+    spot_eurc_stellar: 'EURC@Stellar',
     ladder_empty: 'No data',
     ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
 
@@ -827,6 +839,10 @@ let execSlippagePct = (() => { const s = parseFloat(localStorage.getItem('slippa
 let selectedSource = null;
 // Modal cohérence : null = fermée, sinon { venue, loading, data }
 let coherenceModal = null;
+// Mode d'affichage de l'impact : 'local' (défaut) | 'evm'
+let impactMode = (() => { const v = localStorage.getItem('impactMode'); return v === 'evm' ? 'evm' : 'local'; })();
+// Modal avertissement passage en EVM : null = fermée, sinon 'pending'
+let impactEvmModalOpen = false;
 
 function selectSource(id) {
   selectedSource = (selectedSource === id) ? null : id; // re-clic = désélection
@@ -967,6 +983,8 @@ function reasonLabel(code) {
 
 // ─── Échelle de sources ───────────────────────────────────────────────────────
 function ladderHead(u) {
+  const impactLabel = impactMode === 'evm' ? t('ladder_col_impact_evm') : t('ladder_col_impact');
+  const impactStyle = 'cursor:pointer;user-select:none;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;';
   return `<thead><tr>
     <th>${t('ladder_col_tool')}</th>
     <th>${t('ladder_col_net', u)}</th>
@@ -977,14 +995,74 @@ function ladderHead(u) {
         <span class="tip-box">${t('ladder_tip_chip')}</span>
       </div>
     </th>
-    <th>
+    <th onclick="toggleImpactMode()" title="${impactMode === 'evm' ? 'Mode EVM actif — cliquer pour revenir en Local' : 'Cliquer pour passer en mode EVM'}" style="${impactStyle}">
       <div class="tip-wrap" style="display:inline-flex;align-items:center;">
-        ${t('ladder_col_impact')}<span class="tip-icon">ⓘ</span>
-        <span class="tip-box">${t('ladder_tip_impact')}</span>
+        ${impactLabel}<span style="font-size:10px;margin-left:2px;opacity:.7">▾</span><span class="tip-icon">ⓘ</span>
+        <span class="tip-box up">${t('ladder_tip_impact')}</span>
       </div>
     </th>
     <th class="left">${t('ladder_col_route')}</th>
   </tr></thead>`;
+}
+
+function getImpactVal(row) {
+  if (impactMode === 'evm') return row.impactPct != null ? row.impactPct : null;
+  // mode local : préfère impactLocalPct, repli sur impactPct si indisponible (ex. USDC = identique)
+  if (row.impactLocalPct !== undefined) return row.impactLocalPct != null ? row.impactLocalPct : null;
+  return row.impactPct != null ? row.impactPct : null;
+}
+
+function impactStr(row) {
+  const v = getImpactVal(row);
+  return v != null ? fmt(v) + ' %' : '—';
+}
+
+function toggleImpactMode() {
+  if (impactMode === 'evm') {
+    // evm → local : silencieux
+    impactMode = 'local';
+    localStorage.setItem('impactMode', 'local');
+    renderApp();
+  } else {
+    // local → evm : popup si jamais vu
+    const dismissed = localStorage.getItem('impactEvmNoticeDismissed');
+    if (dismissed) {
+      impactMode = 'evm';
+      localStorage.setItem('impactMode', 'evm');
+      renderApp();
+    } else {
+      impactEvmModalOpen = true;
+      renderApp();
+    }
+  }
+}
+
+function confirmImpactEvm(dismiss) {
+  if (dismiss) localStorage.setItem('impactEvmNoticeDismissed', '1');
+  impactEvmModalOpen = false;
+  impactMode = 'evm';
+  localStorage.setItem('impactMode', 'evm');
+  renderApp();
+}
+
+function cancelImpactEvm() {
+  impactEvmModalOpen = false;
+  renderApp();
+}
+
+function impactEvmModalHtml() {
+  if (!impactEvmModalOpen) return '';
+  return `<div class="modal-overlay" onclick="if(event.target===this)cancelImpactEvm()">
+    <div class="modal-card">
+      <div style="font-size:14px;font-weight:700;margin-bottom:.75rem">${t('impact_evm_notice_title')}</div>
+      <p style="font-size:13px;color:var(--caption);line-height:1.55;margin:0 0 1rem">${t('impact_evm_notice_body')}</p>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
+        <button class="btn" onclick="cancelImpactEvm()">${t('review_cancel')}</button>
+        <button class="btn" onclick="confirmImpactEvm(true)" style="font-size:12px">${t('impact_evm_dismiss')}</button>
+        <button class="btn primary" onclick="confirmImpactEvm(false)">${t('impact_evm_confirm')}</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 function ladderRows(rows, u, down) {
@@ -992,7 +1070,7 @@ function ladderRows(rows, u, down) {
   let html = rows.map(r => {
     const delta = r.deltaVsWinner === 0 ? '—' : `−${fmt3(Math.abs(r.deltaVsWinner))}`;
     const deltaClass = r.deltaVsWinner < 0 ? 'neg' : 'muted';
-    const impact = r.impactPct != null ? fmt(r.impactPct) + ' %' : '—';
+    const impact = impactStr(r);
     const routeText = renderRoute(r.route);
     const isSel = r.sourceId && r.sourceId === selectedSource;
     const trClass = [r.winner ? 'win' : '', isSel ? 'sel' : ''].filter(Boolean).join(' ');
@@ -1059,7 +1137,7 @@ function simCard() {
       : null;
     const displayRow = selRow && !selRow.winner ? selRow : null; // non-gagnant sélectionné → détail spécifique
     const winRow = (simResult.ladder || []).find(r => r.winner);
-    let route, rateStr, impactStr, minReceived;
+    let route, rateStr, impactMeta, minReceived;
     if (displayRow) {
       // #7 — harmonise le rendu de la ligne non-gagnante avec le gagnant
       route = displayRow.routeParts && displayRow.routeParts.length > 0
@@ -1067,21 +1145,27 @@ function simCard() {
         : renderRoute(displayRow.route);
       const rowRate = simAmt > 0 ? displayRow.net / simAmt : 0;
       rateStr = rowRate > 0 ? rowRate.toFixed(6) + ' ' + target + '/BLND' : '';
-      impactStr = displayRow.impactPct != null ? ` · impact ${fmt(displayRow.impactPct)} %` : '';
+      { const v = getImpactVal(displayRow); impactMeta = v != null ? ` · impact ${fmt(v)} %` : ''; }
       minReceived = displayRow.net * (1 - execSlippagePct / 100);
     } else {
       route = b.route && b.route.length > 0
         ? routeFromParts(b.route, true)
         : routeSimple(fmt3(simAmt), b.net, b.display, target, true);
       rateStr = b.rate > 0 ? b.rate.toFixed(6) + ' ' + target + '/BLND' : '';
-      impactStr = b.impactPct != null ? ` · impact ${fmt(b.impactPct)} %` : '';
+      { const v = getImpactVal(b); impactMeta = v != null ? ` · impact ${fmt(v)} %` : ''; }
       minReceived = b.net * (1 - execSlippagePct / 100);
     }
     const minStr = `<span style="color:var(--caption)">${t('sim_min', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(minReceived)} ${target}</span>`;
+    // EURC@Stellar mid (spot local) affiché si disponible
+    const stellarMid = simResult.prices && simResult.prices.eurcStellarMid != null
+      ? ` · <span style="color:var(--sub)">${t('spot_eurc_stellar')} ${simResult.prices.eurcStellarMid.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 4, maximumFractionDigits: 6 })} USDC</span>`
+      : '';
+    const stellarMidLine = target === 'EURC' && stellarMid ? `<span class="meta" style="flex:1 1 100%; margin-top:.2rem">${stellarMid.replace(/^ · /, '')}</span>` : '';
     // Nom de l'outil retiré ici : il est désormais porté par le bouton « Exécuter via [outil] ».
     resultHtml = `<div class="result">
       <div style="flex:1 1 100%">${route}</div>
-      <span class="meta" style="flex:1 1 100%; margin-top:.4rem">${rateStr}${impactStr}</span>
+      <span class="meta" style="flex:1 1 100%; margin-top:.4rem">${rateStr}${impactMeta}</span>
+      ${stellarMidLine}
       <span class="meta" style="flex:1 1 100%; margin-top:.2rem">${minStr}</span>
     </div>`;
     if (simResult.errors && simResult.errors.length > 0) {
@@ -1563,7 +1647,8 @@ function buildPage() {
     </div>
   </div>
   ${footerHtml}
-  ${execModal()}`;
+  ${execModal()}
+  ${impactEvmModalHtml()}`;
 }
 
 function renderApp() {
@@ -2256,7 +2341,7 @@ function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() 
   const seq = ['arrowup','arrowup','arrowdown','arrowdown','arrowleft','arrowright','arrowleft','arrowright','b','a'];
   let pos = 0;
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeScamEgg(); return; }
+    if (e.key === 'Escape') { if (impactEvmModalOpen) { cancelImpactEvm(); return; } closeScamEgg(); return; }
     const k = e.key.toLowerCase();
     pos = (k === seq[pos]) ? pos + 1 : (k === seq[0] ? 1 : 0);
     if (pos === seq.length) { pos = 0; toggleScamEgg(); }

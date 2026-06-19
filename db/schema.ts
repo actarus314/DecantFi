@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS tick (
   started_at    TEXT NOT NULL,
   finished_at   TEXT,
   cadence_sec   INTEGER NOT NULL,
-  blnd_usd      REAL, xlm_usd REAL, eur_usd REAL,
+  blnd_usd      REAL, xlm_usd REAL, eurc_usd REAL, eurc_stellar_mid REAL,
   ok            INTEGER NOT NULL,
   source_errors TEXT,
   note          TEXT
@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS rollup_hourly (
   n_ticks      INTEGER NOT NULL,
   net_min      INTEGER, net_med INTEGER, net_max INTEGER,
   impact_avg   REAL,
+  impact_avg_local REAL,
   winner_dist  TEXT,
   blnd_usd_avg REAL,
   UNIQUE(hour_utc, pair, amount_in)
@@ -96,6 +97,16 @@ function ensureColumn(db: DatabaseSync, table: string, column: string, decl: str
   }
 }
 
+/** Renomme une colonne si oldCol existe et newCol est absent (SQLite ≥3.25). Idempotent. */
+function ensureRename(db: DatabaseSync, table: string, oldCol: string, newCol: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  const hasOld = cols.some((c) => c.name === oldCol);
+  const hasNew = cols.some((c) => c.name === newCol);
+  if (hasOld && !hasNew) {
+    db.exec(`ALTER TABLE ${table} RENAME COLUMN ${oldCol} TO ${newCol}`);
+  }
+}
+
 /** Applique PRAGMA (avant création des tables pour auto_vacuum) puis crée le schéma. Idempotent. */
 export function migrate(db: DatabaseSync): void {
   db.exec('PRAGMA journal_mode = WAL');
@@ -106,6 +117,10 @@ export function migrate(db: DatabaseSync): void {
   db.exec(DDL);
 
   // Migrations additives idempotentes (pour les DB créées avant l'ajout d'une colonne).
+  // Renommage eur_usd → eurc_usd (avant ensureColumn pour éviter collision).
+  ensureRename(db, 'tick', 'eur_usd', 'eurc_usd');
+  ensureColumn(db, 'tick', 'eurc_stellar_mid', 'REAL');
+  ensureColumn(db, 'rollup_hourly', 'impact_avg_local', 'REAL');
   ensureColumn(db, 'rpc_probe', 'rpc_calls', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'quote', 'duration_ms', 'INTEGER');
 }

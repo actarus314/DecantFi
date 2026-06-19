@@ -13,7 +13,7 @@ const cfg = (over: Partial<CollectorConfig> = {}): CollectorConfig => ({
 });
 // Fake selectRpc : évite toute connexion réseau dans les tests.
 const fakeSelectRpc = async (urls: string[]) => ({ chosen: urls[0] ?? 'r', probes: [] });
-const prices = { blndUsd: 0.05, xlmUsd: 0.11, eurUsd: 1.08 };
+const prices = { blndUsd: 0.05, xlmUsd: 0.11, eurcUsd: 1.08, eurcStellarMid: null };
 const now = () => new Date('2026-06-16T10:00:00.000Z');
 
 function usdcResult(amountIn: bigint): QuoteResult {
@@ -43,7 +43,7 @@ describe('runTick (USDC)', () => {
   });
 
   it('prix KO (blndUsd null) → tick enregistré avec prix null, ok=true si quotes présentes', async () => {
-    const noPrices = { blndUsd: null, xlmUsd: null, eurUsd: null };
+    const noPrices = { blndUsd: null, xlmUsd: null, eurcUsd: null, eurcStellarMid: null };
     const { tick } = await runTick({
       probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
       cfg: cfg(), now, fetchPrices: async () => noPrices, quote: async (o: any) => usdcResult(o.amountIn), selectRpc: fakeSelectRpc,

@@ -5,7 +5,7 @@ import { BLND, USDC, EURC } from './assets.js';
 import { toStroops } from './amount.js';
 import { quote as mk } from '../test/factory.js';
 
-const prices = { blndUsd: 0.0512, xlmUsd: 0.11, eurUsd: 1.08 };
+const prices = { blndUsd: 0.0512, xlmUsd: 0.11, eurcUsd: 1.08, eurcStellarMid: null };
 
 function fakeAdapter(id: string, net: bigint, available = true): SourceAdapter {
   return {

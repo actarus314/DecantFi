@@ -4,6 +4,7 @@
 import { type DatabaseSync } from 'node:sqlite';
 import { prepBig, readCoherenceProbes, readExecMsBySource, readTickWallClocks } from './read-db.js';
 import { toNumber } from '../core/amount.js';
+import { priceImpactPct } from '../core/prices.js';
 import type { CollectorConfig } from '../collector/config.js';
 
 // ─── Types publics ───────────────────────────────────────────────────────────
@@ -18,6 +19,7 @@ export interface LadderRow {
   deltaVsWinner: number;
   chip: Chip;
   impactPct: number | null;
+  impactLocalPct: number | null;
   winner: boolean;
 }
 
@@ -27,7 +29,7 @@ export interface Meta {
   nTicks: number;
   nTicksOk: number;
   blndUsd: number | null;
-  eurUsd: number | null;
+  eurcUsd: number | null;
   xlmUsd: number | null;
   windowDays: 7;
   /** Sondes configurées (COLLECTOR_SIZES_BLND), en BLND entiers, triées croissant. */
@@ -162,7 +164,7 @@ function dbPair(pairUi: string): string {
 
 interface TickRow {
   blnd_usd: number | null;
-  eur_usd: number | null;
+  eurc_usd: number | null;
 }
 
 /** eff = (net_out_units / amount_in_BLND_units) / spot_cible_par_BLND */
@@ -178,7 +180,7 @@ export function effOf(
   const blndUsd = tick.blnd_usd;
   if (!blndUsd || blndUsd <= 0) return null;
   const spot = pairUi === 'EURC'
-    ? (tick.eur_usd && tick.eur_usd > 0 ? blndUsd / tick.eur_usd : null)
+    ? (tick.eurc_usd && tick.eurc_usd > 0 ? blndUsd / tick.eurc_usd : null)
     : blndUsd;
   if (!spot || spot <= 0) return null;
   return (net / amt) / spot;
@@ -189,12 +191,15 @@ export function effOf(
 function buildLadder(db: DatabaseSync, pair: string, amountIn: bigint): LadderRow[] {
   // Trouve le dernier tick ok
   const lastTickStmt = prepBig(db, `
-    SELECT id FROM tick WHERE ok = 1 ORDER BY started_at DESC LIMIT 1
+    SELECT id, eurc_stellar_mid, blnd_usd FROM tick WHERE ok = 1 ORDER BY started_at DESC LIMIT 1
   `);
   const lastTickRows = lastTickStmt.all() as Array<Record<string, unknown>>;
   const lastTickRow = lastTickRows[0];
   if (!lastTickRow) return [];
   const tickId = lastTickRow['id'] as bigint;
+  const blndUsdTick = lastTickRow['blnd_usd'] != null ? Number(lastTickRow['blnd_usd']) : null;
+  const eurcStellarMid = lastTickRow['eurc_stellar_mid'] != null ? Number(lastTickRow['eurc_stellar_mid']) : null;
+  const isEurc = pair.includes('EURC');
 
   const stmt = prepBig(db, `
     SELECT q.source_id, q.net_out, q.net_confidence, q.price_impact_pct, q.is_winner, q.eurc_path, q.route_summary
@@ -220,6 +225,10 @@ function buildLadder(db: DatabaseSync, pair: string, amountIn: bigint): LadderRo
     const eurcPath = r['eurc_path'] != null ? String(r['eurc_path']) : null;
     const impactRaw = r['price_impact_pct'];
     const impactPct = (impactRaw != null && impactRaw !== undefined) ? Number(impactRaw) : null;
+    const perUnitLocal: number | null = isEurc ? eurcStellarMid : 1;
+    const impactLocalPct = netRaw && netRaw > 0n
+      ? (priceImpactPct(amountIn, netRaw, blndUsdTick, perUnitLocal) ?? null)
+      : null;
 
     return {
       display: displayName(sourceId),
@@ -229,6 +238,7 @@ function buildLadder(db: DatabaseSync, pair: string, amountIn: bigint): LadderRo
       deltaVsWinner,
       chip: chipFor(netConf, sourceId, eurcPath),
       impactPct,
+      impactLocalPct,
       winner: isWinner,
     };
   });
@@ -311,7 +321,7 @@ function fetchWinnerEffRows(
   pairUi: string,
 ): WinnerEffRow[] {
   const stmt = prepBig(db, `
-    SELECT t.started_at, t.blnd_usd, t.eur_usd, q.net_out, q.amount_in as q_amount_in
+    SELECT t.started_at, t.blnd_usd, t.eurc_usd, q.net_out, q.amount_in as q_amount_in
     FROM quote q JOIN tick t ON t.id = q.tick_id
     WHERE q.is_winner = 1 AND q.pair = ? AND q.amount_in = ?
       AND t.ok = 1 AND t.started_at >= ?
@@ -330,10 +340,10 @@ function fetchWinnerEffRows(
     const netOut = r['net_out'] as bigint | null;
     const qAmountIn = r['q_amount_in'] as bigint;
     const blndUsd = r['blnd_usd'] != null ? Number(r['blnd_usd']) : null;
-    const eurUsd = r['eur_usd'] != null ? Number(r['eur_usd']) : null;
+    const eurcUsd = r['eurc_usd'] != null ? Number(r['eurc_usd']) : null;
 
     if (!netOut || netOut <= 0n || qAmountIn <= 0n) continue;
-    const eff = effOf(netOut, qAmountIn, pairUi, { blnd_usd: blndUsd, eur_usd: eurUsd });
+    const eff = effOf(netOut, qAmountIn, pairUi, { blnd_usd: blndUsd, eurc_usd: eurcUsd });
     if (eff === null) continue;
 
     result.push({ hour_utc: hourUtc, dow_utc: dowUtc, eff, startedAtMs: d.getTime() });
@@ -470,7 +480,7 @@ function buildMeta(db: DatabaseSync, cadenceSec: number, sondes: number[]): Meta
   const cntStmt = prepBig(db, `SELECT COUNT(*) as n FROM tick`);
   const cntOkStmt = prepBig(db, `SELECT COUNT(*) as n FROM tick WHERE ok = 1`);
   const lastStmt = prepBig(db,
-    `SELECT started_at, blnd_usd, xlm_usd, eur_usd FROM tick WHERE ok = 1 ORDER BY started_at DESC LIMIT 1`);
+    `SELECT started_at, blnd_usd, xlm_usd, eurc_usd FROM tick WHERE ok = 1 ORDER BY started_at DESC LIMIT 1`);
 
   const cntRow = (cntStmt.all() as Array<Record<string, unknown>>)[0];
   const cntOkRow = (cntOkStmt.all() as Array<Record<string, unknown>>)[0];
@@ -482,7 +492,7 @@ function buildMeta(db: DatabaseSync, cadenceSec: number, sondes: number[]): Meta
     nTicks: cntRow ? Number(cntRow['n'] as bigint) : 0,
     nTicksOk: cntOkRow ? Number(cntOkRow['n'] as bigint) : 0,
     blndUsd: lastRow?.['blnd_usd'] != null ? Number(lastRow['blnd_usd']) : null,
-    eurUsd: lastRow?.['eur_usd'] != null ? Number(lastRow['eur_usd']) : null,
+    eurcUsd: lastRow?.['eurc_usd'] != null ? Number(lastRow['eurc_usd']) : null,
     xlmUsd: lastRow?.['xlm_usd'] != null ? Number(lastRow['xlm_usd']) : null,
     windowDays: 7,
     sondes,

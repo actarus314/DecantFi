@@ -5,7 +5,7 @@ import { migrate } from './schema.js';
 
 const tick: TickInsert = {
   started_at: '2026-06-16T10:00:00.000Z', finished_at: '2026-06-16T10:00:03.000Z',
-  cadence_sec: 900, blnd_usd: 0.0512, xlm_usd: 0.11, eur_usd: 1.08,
+  cadence_sec: 900, blnd_usd: 0.0512, xlm_usd: 0.11, eurc_usd: 1.08, eurc_stellar_mid: null,
   ok: true, source_errors: 'stellarbroker', note: null,
 };
 const quotes: QuoteInsert[] = [
@@ -76,7 +76,7 @@ describe('insertTickWithQuotes — rpc_call_log', () => {
     const db = openDb(':memory:');
     const t: TickInsert = {
       started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:05.000Z',
-      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eur_usd: 1.08,
+      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eurc_usd: 1.08, eurc_stellar_mid: null,
       ok: true, source_errors: null, note: null,
     };
     db.insertTickWithQuotes(t, [], [probe]);
@@ -93,7 +93,7 @@ describe('insertTickWithQuotes — rpc_call_log', () => {
     const db = openDb(':memory:');
     const t: TickInsert = {
       started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:03.000Z',
-      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eur_usd: 1.08,
+      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eurc_usd: 1.08, eurc_stellar_mid: null,
       ok: true, source_errors: null, note: 'manual',
     };
     db.insertTickWithQuotes(t, [], [probe]);
@@ -107,7 +107,7 @@ describe('insertTickWithQuotes — rpc_call_log', () => {
     const db = openDb(':memory:');
     const t: TickInsert = {
       started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:01.000Z',
-      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eur_usd: 1.08,
+      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eurc_usd: 1.08, eurc_stellar_mid: null,
       ok: true, source_errors: null, note: null,
     };
     const zeroCalls: RpcProbeInsert = { ...probe, rpc_calls: 0 };
@@ -121,7 +121,7 @@ describe('insertTickWithQuotes — rpc_call_log', () => {
     const db = openDb(':memory:');
     const t: TickInsert = {
       started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:01.000Z',
-      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eur_usd: 1.08,
+      cadence_sec: 900, blnd_usd: 0.05, xlm_usd: 0.11, eurc_usd: 1.08, eurc_stellar_mid: null,
       ok: true, source_errors: null, note: null,
     };
     const notChosen: RpcProbeInsert = { ...probe, chosen: false };
