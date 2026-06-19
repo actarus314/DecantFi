@@ -955,7 +955,7 @@ function ladderTable(rows, u, down) {
 
 // ─── Carte "Meilleures routes (7 j)" ──────────────────────────────────────────
 function bestRoutesCard() {
-  const routes = overview ? (overview.bestRoutes || []) : [];
+  const routes = overview && overview.bestRoutes ? (overview.bestRoutes[sondeKey] || []) : [];
   if (routes.length === 0) {
     return `<p class="help">${t('routes_empty')}</p>`;
   }
@@ -1211,9 +1211,23 @@ function buildHealthPage(topbarHtml) {
       const cls = b.uptimePct >= 98 ? '' : b.uptimePct >= 90 ? ' warn' : ' bad';
       return `<div class="ubar"><span class="sz">${b.size}</span><div class="track${cls}"><span style="width:${b.uptimePct}%"></span></div><span class="pct">${b.uptimePct.toFixed(0)} %</span></div>`;
     }).join('');
-    const dots = s.days.map(d => {
+    const elH = (health && health.todayElapsedH) || 0;
+    const dots = s.days.map((d, i) => {
+      if (i === 0) {
+        // Aujourd'hui : cercle partiel par incréments de 6h (1/4 de tour)
+        const quarters = Math.min(Math.floor(elH / 6) + (elH > 0 ? 1 : 0), 4);
+        const frac = quarters / 4;
+        const r = 5, circ = 2 * Math.PI * r;
+        const color = d === 'ok' ? 'var(--green)' : d === 'warn' ? 'var(--amber)' : d === 'bad' ? 'var(--tool)' : 'var(--card-border)';
+        return `<svg width="16" height="16" viewBox="-1 -1 14 14" style="vertical-align:-4px" title="${d ?? t('health_legend_null')}">
+          <circle cx="6" cy="6" r="${r}" fill="none" stroke="var(--card-border)" stroke-width="2.5"/>
+          <circle cx="6" cy="6" r="${r}" fill="none" stroke="${color}" stroke-width="2.5"
+            stroke-dasharray="${(frac * circ).toFixed(2)} ${circ.toFixed(2)}"
+            transform="rotate(-90 6 6)"/>
+        </svg>`;
+      }
       const cls = d === 'ok' ? '' : d === 'warn' ? ' w' : d === 'bad' ? ' b' : ' g';
-      return `<i class="${cls.trim()}"title="${d ?? t('health_legend_null')}"></i>`;
+      return `<i class="${cls.trim()}" title="${d ?? t('health_legend_null')}"></i>`;
     }).join('');
     const pairNote = s.pairNote ? ` <span class="muted" style="font-size:11px">· ${s.pairNote}</span>` : '';
     return `<tr>
@@ -1303,7 +1317,7 @@ function buildPage() {
     ladderContent = ladderTable(rows || [], u);
   }
 
-  const dist = overview ? overview.winnerDist : [];
+  const dist = overview && overview.winnerDist ? (overview.winnerDist[sondeKey] || []) : [];
 
   // Fraîcheur + compte à rebours
   const freshHtml = meta ? freshLabel(meta.lastTickAt) : `<span class="fresh">${t('loading')}</span>`;
@@ -1373,7 +1387,7 @@ function buildPage() {
     <div class="zone"><div class="zone-h">${t('section_routes')}</div>
       <div class="card">
         ${bestRoutesCard()}${limitedNote}
-        <p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${u==='USDC'?t('dist_note_usdc'):t('dist_note_eurc')}</p></div>
+        ${u!=='USDC'?`<p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${t('dist_note_eurc')}</p>`:''}</div>
     </div>
 
     <div class="zone"><div class="zone-h">${t('section_who')}</div>
@@ -1404,7 +1418,7 @@ function setView(v) {
 async function loadHealth() {
   renderApp(); // affiche "Chargement…" immédiatement
   try {
-    const r = await fetch('/api/health');
+    const r = await fetch(`/api/health?tzoff=${localOffset()}`);
     if (r.ok) health = await r.json();
   } catch {}
   renderApp();
@@ -1759,12 +1773,20 @@ function reviewTableHtml(rv, tgt, showSimDelta) {
   }
   const feeXlm = rv.gasFeeXlm ?? 0;
   const feeStr = feeXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
+  const realXlm = rv.gasRealXlm;
+  const realStr = realXlm != null ? realXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
+  const feeDisplay = realStr != null
+    ? `${realStr} XLM <span style="font-size:11px;color:var(--caption)">(max&nbsp;${feeStr})</span>`
+    : `${feeStr} XLM`;
+  const feeLabel = realStr != null
+    ? (lang === 'fr' ? 'Frais réseau (réel / max)' : 'Network fee (real / max)')
+    : t('review_network_fee');
   return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.4rem">
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} BLND</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${tgt}${simDeltaHtml}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt3(rv.minReceived)} ${tgt}</td></tr>
-    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_network_fee')}</td><td style="padding:4px 0;text-align:right;color:var(--caption);font-variant-numeric:tabular-nums">${feeStr} XLM</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${feeLabel}</td><td style="padding:4px 0;text-align:right;color:var(--caption);font-variant-numeric:tabular-nums">${feeDisplay}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${vl}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
   </table>
@@ -1779,9 +1801,7 @@ function execModal() {
   let content = '';
   if (phase === 'review') {
     const rv = build.review;
-    const fidelityNote = rv.fidelity
-      ? `<p class="help" style="margin:.6rem 0 0">${t('review_fidelity', rv.fidelity.displayedWinner, fmt3(rv.fidelity.displayedWinnerNet))}</p>`
-      : '';
+    const fidelityNote = '';
     // Disclosure restore AVANT signature : la 1re signature restaure l'état du contrat, le swap est rebuild + re-revu ensuite.
     const restoreNote = build.type === 'restore'
       ? `<p class="help" style="margin:.6rem 0 0;color:var(--amber)">${t('exec_restore')}</p>`
@@ -1829,10 +1849,14 @@ function execModal() {
       }
       const doneFeeXlm = rv.gasFeeXlm ?? 0;
       const doneFeeStr = doneFeeXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
+      const doneRealXlm = rv.gasRealXlm;
+      const doneRealStr = doneRealXlm != null ? doneRealXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
+      const doneFeeDisplay = doneRealStr != null ? `${doneRealStr} XLM <span style="font-size:11px;color:var(--caption)">(max&nbsp;${doneFeeStr})</span>` : `${doneFeeStr} XLM`;
+      const doneFeeLabel = doneRealStr != null ? (lang === 'fr' ? 'Frais réseau (réel / max)' : 'Network fee (real / max)') : t('review_network_fee');
       compBlock = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:.9rem 0 .3rem">
         <tr><td style="padding:5px 0;color:var(--caption)">${t('exec_quoted')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.netOut)} ${target}</td></tr>
         <tr><td style="padding:5px 0;color:var(--caption)">${t('review_receive_min')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.minReceived)} ${target}</td></tr>
-        <tr><td style="padding:5px 0;color:var(--caption)">${t('review_network_fee')}</td><td style="padding:5px 0;text-align:right;color:var(--caption);font-variant-numeric:tabular-nums">${doneFeeStr} XLM</td></tr>
+        <tr><td style="padding:5px 0;color:var(--caption)">${doneFeeLabel}</td><td style="padding:5px 0;text-align:right;color:var(--caption);font-variant-numeric:tabular-nums">${doneFeeDisplay}</td></tr>
         <tr style="border-top:1px solid var(--card-border)"><td style="padding:6px 0;color:var(--heading);font-weight:600">${t('exec_executed')}</td><td style="padding:6px 0;text-align:right">${execVal}</td></tr>
       </table>${deltaChip}`;
     }
