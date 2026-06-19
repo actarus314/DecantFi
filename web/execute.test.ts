@@ -508,6 +508,44 @@ describe('pickExecutableVenue', () => {
     expect(result.venue).toBe('xbull');
     expect((deps.simulateComet as any).mock.calls.length).toBe(0);
   });
+
+  // ─── leg2 composite USDC → EURC ──────────────────────────────────────────────
+
+  it('(leg2) USDC→EURC : assetIn=USDC.sac, Comet exclu, route commence par USDC', async () => {
+    // xBull gagne sur la paire USDC→EURC.
+    const netOut = 9_8000000n; // 9.8 EURC pour 10 USDC
+    const deps = fakeDeps({
+      xbullQuote: { toAmount: netOut.toString(), route: 'uuid-leg2' },
+      xbullAccept: { id: 'leg2-id', xdr: 'xdr-leg2', type: 'full' },
+      soroQuote: null,
+      cometOut: null,
+    });
+
+    const result = await pickExecutableVenue(
+      'EURC',
+      10_0000000n, // 10 USDC en stroops
+      SENDER,
+      50,
+      CFG,
+      undefined,
+      deps,
+      undefined, // forceVenue
+      USDC,      // sellAsset = USDC (leg2)
+    );
+
+    // (a) cotation xBull demandée avec assetIn = USDC.sac
+    const fetchCalls = (deps.fetchJson as ReturnType<typeof vi.fn>).mock.calls as Array<[string, ...unknown[]]>;
+    const quoteUrl = fetchCalls.find((args) => args[0].includes('/swaps/quote'))?.[0] ?? '';
+    expect(quoteUrl).toBeTruthy();
+    expect(quoteUrl).toContain(USDC.sac);
+
+    // (b) Comet n'est PAS coté (sellAsset ≠ BLND)
+    expect((deps.simulateComet as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
+
+    // (c) build réussi, route commence par USDC
+    expect(result.venue).toBe('xbull');
+    expect(result.review.route.startsWith('USDC')).toBe(true);
+  });
 });
 
 describe('submit', () => {

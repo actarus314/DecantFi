@@ -975,12 +975,13 @@ export async function buildUltra(
 
 // ─── Trustline (pré-flight + ajout in-app) ───────────────────────────────────
 
-/** Pré-flight : charge le compte une seule fois pour vérifier la trustline ET le solde BLND liquide.
+/** Pré-flight : charge le compte une seule fois pour vérifier la trustline ET le solde liquide de sellAsset.
  *  trustline : true/false ou null si lecture impossible (compte introuvable / Horizon en panne).
- *  liquid    : solde BLND liquide en stroops, ou null si lecture impossible.
+ *  liquid    : solde liquide de sellAsset en stroops, ou null si lecture impossible.
  *  → null = on laisse les builds gérer, pas de faux-positif. */
 async function senderPreflight(
   sender: string,
+  sellAsset: Asset,
   buy: Asset,
   horizonUrl?: string,
 ): Promise<{ trustline: boolean | null; liquid: bigint | null }> {
@@ -992,7 +993,15 @@ async function senderPreflight(
     const trustline = buy.native
       ? true
       : account.balances.some((b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer);
-    const liquid = parseBlndBalance({ balances: account.balances });
+    // Solde liquide de l'actif vendu (pas forcément BLND)
+    const sellBal = account.balances.find(
+      (b) => 'asset_code' in b && b.asset_code === sellAsset.code && b.asset_issuer === sellAsset.issuer,
+    );
+    const liquid = sellBal && 'balance' in sellBal
+      ? BigInt(Math.round(parseFloat(sellBal.balance) * 1e7))
+      : sellAsset.code === 'BLND'
+        ? parseBlndBalance({ balances: account.balances })
+        : null;
     return { trustline, liquid };
   } catch {
     return { trustline: null, liquid: null };
@@ -1030,25 +1039,26 @@ export async function pickExecutableVenue(
   displayed?: { winner?: string; net?: number },
   depsOverride?: Partial<ExecDeps>,
   forceVenue?: Venue,
+  sellAsset: Asset = BLND,
 ): Promise<{ venue: Venue; xdr: string; id?: string; type: 'full' | 'restore' | 'swap'; review: ReviewData }> {
   const deps: ExecDeps = { ...defaultDeps(cfg.timeoutMs), ...depsOverride };
   const buyAsset = target === 'EURC' ? EURC : USDC;
-  const sellSac = BLND.sac;
+  const sellSac = sellAsset.sac;
   const buySac = buyAsset.sac;
 
   // 1. Re-quote live en parallèle (tolérant : échec → null) + pré-flight trustline (parallèle → zéro latence ajoutée).
   const soroClient = cfg.soroswapApiKey ? deps.makeSoroswap(cfg.soroswapApiKey) : null;
   const [preflight, xbullQ, soroQ, horizonQ, aquariusQ, cometQ, ultraQ] = await Promise.all([
-    senderPreflight(sender, buyAsset, cfg.horizonUrl),
+    senderPreflight(sender, sellAsset, buyAsset, cfg.horizonUrl),
     quoteXbull(sellSac, buySac, amountStroops, deps),
     soroClient
       ? quoteSoroswap(soroClient, sellSac, buySac, amountStroops, slippageBps)
       : Promise.resolve(null),
-    quoteHorizon(BLND, buyAsset, amountStroops, deps, cfg.horizonUrl),
+    quoteHorizon(sellAsset, buyAsset, amountStroops, deps, cfg.horizonUrl),
     quoteAquarius(sellSac, buySac, amountStroops, deps),
-    // Comet = pool BLND/USDC uniquement : pas de cotation pour EURC.
-    target === 'USDC' ? quoteComet(deps, sellSac, buySac, amountStroops, cfg.rpcUrl) : Promise.resolve(null),
-    quoteUltra(BLND, buyAsset, amountStroops, deps),
+    // Comet = pool BLND/USDC uniquement : pas de cotation si sellAsset ≠ BLND ou target ≠ USDC.
+    sellAsset === BLND && target === 'USDC' ? quoteComet(deps, sellSac, buySac, amountStroops, cfg.rpcUrl) : Promise.resolve(null),
+    quoteUltra(sellAsset, buyAsset, amountStroops, deps),
   ]);
 
   const { trustline, liquid } = preflight;
@@ -1062,9 +1072,14 @@ export async function pickExecutableVenue(
   // → comportement uniforme pour toutes les venues (les classiques Horizon/Ultra n'atteignent plus Freighter
   //   pour échouer ensuite à la soumission). liquid null = lecture KO → on laisse les builds gérer.
   if (liquid !== null && liquid < amountStroops) {
-    throw new ExecError('funds',
-      `BLND liquide insuffisant (${fromStroops(liquid)} dispo, ${fromStroops(amountStroops)} requis) — ` +
-      `ton BLND est peut-être staké dans le backstop Blend (retire-le d'abord).`);
+    if (sellAsset.code === 'BLND') {
+      throw new ExecError('funds',
+        `BLND liquide insuffisant (${fromStroops(liquid)} dispo, ${fromStroops(amountStroops)} requis) — ` +
+        `ton BLND est peut-être staké dans le backstop Blend (retire-le d'abord).`);
+    } else {
+      throw new ExecError('funds',
+        `solde ${sellAsset.code} liquide insuffisant (${fromStroops(liquid)} dispo, ${fromStroops(amountStroops)} requis).`);
+    }
   }
 
   // 2. Trier les candidats non-null par netOut décroissant.
@@ -1109,7 +1124,7 @@ export async function pickExecutableVenue(
         const realNet = xbSim?.net ?? cand.netOut;
         const minToGet = minReceivedStroops(realNet, slippageBps);
         const built = await buildXbull(cand.route, sender, amountStroops, minToGet, deps);
-        const route = (xbSim?.route && xbSim.route.length >= 2) ? xbSim.route.join(' → ') : routeLabel('xbull', target);
+        const route = (xbSim?.route && xbSim.route.length >= 2) ? xbSim.route.join(' → ') : `${sellAsset.code} → ${target}`;
         const review = reviewData({
           venue: 'xbull',
           target,
@@ -1130,8 +1145,8 @@ export async function pickExecutableVenue(
     } else if (cand.venue === 'horizon') {
       try {
         const destMin = minReceivedStroops(cand.netOut, slippageBps);
-        const built = await buildHorizon(sender, BLND, buyAsset, amountStroops, destMin, cand.path, cfg.horizonUrl);
-        const route = ['BLND', ...horizonPathSymbols(cand.path), target].join(' → ');
+        const built = await buildHorizon(sender, sellAsset, buyAsset, amountStroops, destMin, cand.path, cfg.horizonUrl);
+        const route = [sellAsset.code, ...horizonPathSymbols(cand.path), target].join(' → ');
         const review = reviewData({
           venue: 'horizon',
           target,
@@ -1154,7 +1169,7 @@ export async function pickExecutableVenue(
         const outMin = minReceivedStroops(cand.netOut, slippageBps);
         const built = await buildAquarius(sender, buyAsset, sellSac, amountStroops, outMin, cand.swapChainXdr, { rpcUrl: cfg.rpcUrl, horizonUrl: cfg.horizonUrl });
         const syms = aquariusPathSymbols(cand.tokens);
-        const route = syms.length >= 2 ? syms.join(' → ') : `BLND → ${target}`;
+        const route = syms.length >= 2 ? syms.join(' → ') : `${sellAsset.code} → ${target}`;
         const review = reviewData({
           venue: 'aquarius',
           target,
@@ -1176,7 +1191,7 @@ export async function pickExecutableVenue(
       try {
         const outMin = minReceivedStroops(cand.netOut, slippageBps);
         const built = await buildComet(sender, amountStroops, outMin, { rpcUrl: cfg.rpcUrl, horizonUrl: cfg.horizonUrl });
-        const route = `BLND → ${target}`;
+        const route = `${sellAsset.code} → ${target}`;
         const review = reviewData({
           venue: 'comet',
           target,
@@ -1196,9 +1211,9 @@ export async function pickExecutableVenue(
       }
     } else if (cand.venue === 'ultrastellar') {
       try {
-        const built = await buildUltra(sender, BLND, buyAsset, cand.legs, amountStroops, slippageBps, cfg.horizonUrl);
+        const built = await buildUltra(sender, sellAsset, buyAsset, cand.legs, amountStroops, slippageBps, cfg.horizonUrl);
         const outMin = cand.legs.reduce((s, l) => s + minReceivedStroops(l.destStroops, slippageBps), 0n);
-        const route = `BLND → ${target} · split SDEX ×${cand.legs.length}`;
+        const route = `${sellAsset.code} → ${target} · split SDEX ×${cand.legs.length}`;
         const review = reviewData({
           venue: 'ultrastellar',
           target,

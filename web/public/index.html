@@ -478,6 +478,12 @@ const STRINGS = {
     trustline_added: (tgt) => `Trustline ${tgt} ajoutée`,
     trustline_added_hint: 'Tu peux maintenant lancer le swap.',
 
+    // Composite 2-tx
+    comp_step: (n) => `Étape ${n} / 2`,
+    comp_leg1_confirming: 'Leg 1 confirmé — préparation du leg 2…',
+    comp_leg2_failed: (x) => `Leg 1 réussi : ${x} USDC reçus. Le leg 2 a échoué — tu détiens ces USDC.`,
+    comp_retry_leg2: 'Relancer le leg 2',
+
     // Navigation
     nav_dashboard: 'Tableau de bord',
     nav_health: 'Stabilité',
@@ -736,6 +742,12 @@ const STRINGS = {
     trustline_adding: 'Adding trustline…',
     trustline_added: (tgt) => `${tgt} trustline added`,
     trustline_added_hint: 'You can now run the swap.',
+
+    // Composite 2-tx
+    comp_step: (n) => `Step ${n} / 2`,
+    comp_leg1_confirming: 'Leg 1 confirmed — preparing leg 2…',
+    comp_leg2_failed: (x) => `Leg 1 succeeded: ${x} USDC received. Leg 2 failed — you hold these USDC.`,
+    comp_retry_leg2: 'Retry leg 2',
 
     // Navigation
     nav_dashboard: 'Dashboard',
@@ -1961,17 +1973,21 @@ async function doExecute() {
     : null;
   const winRow = (simResult.ladder || []).find(r => r.winner);
   const isComposite = !!(winRow && winRow.sourceId && winRow.sourceId.includes('+'));
+  // Composite EURC → flux guidé 2 jambes
+  if (isComposite) {
+    await startCompositeLeg1(winRow);
+    return;
+  }
   // Venue à forcer : la ligne sélectionnée si exécutable, sinon le GAGNANT affiché s'il est exécutable.
   // Fini la bascule silencieuse vers une autre venue : le bouton dit « via [gagnant] », on exécute [gagnant]
-  // (l'alerte au quote prévient en amont s'il sur-cote). Gagnant composite/non-exécutable → repli serveur.
+  // (l'alerte au quote prévient en amont s'il sur-cote). Gagnant non-exécutable → repli serveur.
   const forceRow = (selRow && selRow.executable) ? selRow
-    : (winRow && winRow.executable && !isComposite ? winRow : null);
+    : (winRow && winRow.executable ? winRow : null);
   const body = {
     pair: target,
     amount: simAmt,
     sender: walletAddress,
     slippageBps: Math.round(execSlippagePct * 100),
-    displayed: isComposite && simResult.best ? { winner: simResult.best.display, net: simResult.best.net } : undefined,
     ...(forceRow ? { venue: forceRow.sourceId.split('+')[0].trim() } : {}),
   };
   try {
@@ -1983,12 +1999,35 @@ async function doExecute() {
   renderApp();
 }
 
+async function startCompositeLeg1(winRow) {
+  const leg1Source = (winRow.legs && winRow.legs[0] && winRow.legs[0].sourceId)
+    || winRow.sourceId.split('+')[0].trim();
+  // Lire le solde USDC avant (non bloquant)
+  let usdcBefore = null;
+  if (walletAddress) {
+    try {
+      const br = await fetch(`/api/asset-balance?address=${walletAddress}&asset=USDC`);
+      if (br.ok) { const bj = await br.json(); usdcBefore = typeof bj.balance === 'number' ? bj.balance : null; }
+    } catch (_) { /* non bloquant */ }
+  }
+  // Build leg1 : BLND→USDC, venue forcée
+  try {
+    const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pair: 'USDC', amount: simAmt, sender: walletAddress, slippageBps: Math.round(execSlippagePct * 100), venue: leg1Source }) });
+    const j = await r.json();
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code }; }
+    else { execState = { phase: 'review', build: j, comp: { leg: 1, leg1Source, usdcBefore, usdcReceived: null, hash1: null } }; }
+  } catch (e) { execState = { phase: 'error', errorMsg: t('err_down') }; }
+  renderApp();
+}
+
 async function confirmExecute() {
   const build = execState && execState.build; if (!build) return;
-  execState = { phase: 'signing', build }; renderApp();
+  const comp = execState.comp || null;
+  execState = { phase: 'signing', build, ...(comp ? { comp } : {}) }; renderApp();
   try {
     // Lire le solde cible AVANT signature pour comparer après exécution (#3)
-    const asset = target;
+    const asset = (build.review && build.review.target) || target;
     let destBefore = null;
     if (walletAddress) {
       try {
@@ -1998,18 +2037,56 @@ async function confirmExecute() {
     }
     await ensureKit();
     const { signedTxXdr } = await SWK.signTransaction(build.xdr, { address: walletAddress, networkPassphrase: KIT_NET });
-    execState = { phase: 'submitting', build }; renderApp();
+    execState = { phase: 'submitting', build, ...(comp ? { comp } : {}) }; renderApp();
     const r = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ venue: build.venue, id: build.id, signedXdr: signedTxXdr }) });
     const j = await r.json();
-    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code }; renderApp(); return; }
+    if (!r.ok) {
+      execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, ...(comp ? { comp } : {}) };
+      renderApp(); return;
+    }
     if (build.type === 'restore') {
       // la tx restore est soumise ; reconstruire le vrai swap puis revenir à la revue.
       // ponytail: branche restore best-effort, non testée en live (nécessite un contrat archivé).
       await doExecute(); return;
     }
+    // ─── Composite leg1 terminé : poll USDC puis enchaîner leg2 ─────────────
+    if (comp && comp.leg === 1) {
+      const hash1 = j.hash;
+      const usdcBefore = comp.usdcBefore;
+      execState = { phase: 'leg1_confirming', comp: { ...comp, hash1 } }; renderApp();
+      // Poll solde USDC jusqu'à réception (10 essais × 1,5 s)
+      let usdcReceived = null;
+      let initialBal = null;
+      for (let i = 0; i < 10; i++) {
+        await new Promise(res => setTimeout(res, 1500));
+        if (!execState || execState.phase !== 'leg1_confirming') return; // modal fermé
+        try {
+          const pr = await fetch(`/api/asset-balance?address=${walletAddress}&asset=USDC`);
+          if (!pr.ok) continue;
+          const pj = await pr.json();
+          const bal = typeof pj.balance === 'number' ? pj.balance : null;
+          if (bal == null) continue;
+          if (initialBal == null) initialBal = bal;
+          const ref = usdcBefore != null ? usdcBefore : initialBal;
+          if (bal > ref + 1e-7) {
+            usdcReceived = bal - (usdcBefore != null ? usdcBefore : initialBal);
+            break;
+          }
+        } catch (_) { /* continuer */ }
+      }
+      // Si on n'a pas détecté l'arrivée, best-effort : prendre la dernière balance connue - before
+      if (usdcReceived == null && initialBal != null && usdcBefore != null) {
+        usdcReceived = Math.max(0, initialBal - usdcBefore);
+      }
+      const newComp = { ...comp, hash1, usdcReceived };
+      execState = { phase: 'leg1_confirming', comp: newComp }; renderApp();
+      await buildCompositeLeg2(newComp);
+      return;
+    }
+    // ─── Mono ou composite leg2 : comportement done normal ───────────────────
     const doneHash = j.hash;
-    execState = { phase: 'done', hash: doneHash, venue: build.venue, build }; renderApp();
+    execState = { phase: 'done', hash: doneHash, venue: build.venue, build, ...(comp ? { comp } : {}) }; renderApp();
     // Poll du solde cible pour afficher le reçu on-chain (#3)
     if (destBefore != null && walletAddress) {
       (async () => {
@@ -2036,8 +2113,26 @@ async function confirmExecute() {
   } catch (e) {
     const msg = (e && e.message) || '';
     const errorMsg = /reject/i.test(msg) ? t('exec_rejected') : (msg || t('exec_failed'));
-    execState = { phase: 'error', errorMsg }; renderApp();
+    execState = { phase: 'error', errorMsg, ...(comp ? { comp } : {}) }; renderApp();
   }
+}
+
+async function buildCompositeLeg2(comp) {
+  try {
+    const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pair: 'EURC', from: 'USDC', amount: comp.usdcReceived, sender: walletAddress, slippageBps: Math.round(execSlippagePct * 100) }) });
+    const j = await r.json();
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, comp: { ...comp, leg: 2 } }; }
+    else { execState = { phase: 'review', build: j, comp: { ...comp, leg: 2 } }; }
+  } catch (e) { execState = { phase: 'error', errorMsg: t('err_down'), comp: { ...comp, leg: 2 } }; }
+  renderApp();
+}
+
+async function retryCompositeLeg2() {
+  const comp = execState && execState.comp;
+  if (!comp || comp.usdcReceived == null) return;
+  execState = { phase: 'leg1_confirming', comp }; renderApp();
+  await buildCompositeLeg2(comp);
 }
 
 // Ajout de la trustline de sortie DEPUIS l'app : build changeTrust → signature wallet → submit Horizon.
@@ -2236,6 +2331,15 @@ function coherenceModalHtml() {
 function execModal() {
   if (!execState) return '';
   const { phase, build, hash, errorMsg, executed } = execState;
+  const comp = execState.comp || null;
+
+  // Badge d'étape composite (affiché dans review / signing / submitting)
+  const stepBadge = (comp && (phase === 'review' || phase === 'signing' || phase === 'submitting'))
+    ? `<div style="display:inline-block;background:var(--teal);color:#fff;border-radius:999px;padding:.15rem .65rem;font-size:11px;font-weight:700;margin-bottom:.65rem">${t('comp_step', comp.leg)}</div>`
+    : '';
+
+  // Actif courant de la jambe (USDC au leg1, EURC au leg2 / mono)
+  const legTarget = (build && build.review && build.review.target) || target;
 
   let content = '';
   if (phase === 'review') {
@@ -2246,8 +2350,9 @@ function execModal() {
       ? `<p class="help" style="margin:.6rem 0 0;color:var(--amber)">${t('exec_restore')}</p>`
       : '';
     content = `
+      ${stepBadge}
       <div style="font-size:14px;font-weight:700;margin-bottom:.9rem">${t('review_title')}</div>
-      ${reviewTableHtml(rv, target, true)}
+      ${reviewTableHtml(rv, legTarget, true)}
       ${fidelityNote}
       ${restoreNote}
       <div style="display:flex;gap:.55rem;margin-top:.9rem;justify-content:flex-end">
@@ -2256,27 +2361,32 @@ function execModal() {
       </div>`;
   } else if (phase === 'signing') {
     const rv = build && build.review;
-    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, target)}</div>` : '';
+    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, legTarget)}</div>` : '';
     content = `
+      ${stepBadge}
       <p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem">${t('exec_signing_wallet')}</p>
       ${dimTable}`;
   } else if (phase === 'submitting') {
     const rv = build && build.review;
-    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, target)}</div>` : '';
+    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, legTarget)}</div>` : '';
     const restoreNote = build && build.type === 'restore'
       ? `<p class="help" style="margin:.5rem 0 0">${t('exec_restore')}</p>`
       : '';
     content = `
+      ${stepBadge}
       <p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem">${t('exec_submitting')}</p>
       ${restoreNote}
       ${dimTable}`;
+  } else if (phase === 'leg1_confirming') {
+    content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0">${t('comp_leg1_confirming')}</p>`;
   } else if (phase === 'done') {
     const rv = build && build.review;
+    const doneTarget = (rv && rv.target) || target;
     let compBlock = '';
     if (rv) {
       // Ligne "Reçu" : pulse si lecture en cours, valeur colorée si reçu
       const execVal = executed != null
-        ? `<span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;color:${executed >= rv.netOut ? 'var(--green)' : 'var(--red)'}">${fmt3(executed)} ${target}</span>`
+        ? `<span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;color:${executed >= rv.netOut ? 'var(--green)' : 'var(--red)'}">${fmt3(executed)} ${doneTarget}</span>`
         : `<span class="pulse" style="color:var(--caption);font-size:13px">${t('exec_reading')}</span>`;
       // Chip d'écart proéminent (seulement quand reçu connu)
       let deltaChip = '';
@@ -2284,7 +2394,7 @@ function execModal() {
         const d = executed - rv.netOut;
         const col = d >= 0 ? 'var(--green)' : 'var(--red)';
         const sign = d >= 0 ? '+' : '';
-        deltaChip = `<div style="display:inline-flex;align-items:center;gap:.3rem;background:${col}22;color:${col};border:1px solid ${col}55;border-radius:999px;padding:.2rem .75rem;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:.5rem">${sign}${fmt3(d)} ${target} ${t('exec_delta')}</div>`;
+        deltaChip = `<div style="display:inline-flex;align-items:center;gap:.3rem;background:${col}22;color:${col};border:1px solid ${col}55;border-radius:999px;padding:.2rem .75rem;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:.5rem">${sign}${fmt3(d)} ${doneTarget} ${t('exec_delta')}</div>`;
       }
       const doneFeeXlm = rv.gasFeeXlm ?? 0;
       const doneFeeStr = doneFeeXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
@@ -2293,8 +2403,8 @@ function execModal() {
       const doneFeeDisplay = doneRealStr != null ? `${doneRealStr} XLM <span style="font-size:12px;color:var(--caption)">(max&nbsp;${doneFeeStr})</span>` : `${doneFeeStr} XLM`;
       const doneFeeLabel = lang === 'fr' ? 'Frais réseau (réel / max)' : 'Network fee (real / max)';
       compBlock = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:.9rem 0 .3rem">
-        <tr><td style="padding:5px 0;color:var(--caption)">${t('exec_quoted')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.netOut)} ${target}</td></tr>
-        <tr><td style="padding:5px 0;color:var(--caption)">${t('review_receive_min')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.minReceived)} ${target}</td></tr>
+        <tr><td style="padding:5px 0;color:var(--caption)">${t('exec_quoted')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.netOut)} ${doneTarget}</td></tr>
+        <tr><td style="padding:5px 0;color:var(--caption)">${t('review_receive_min')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.minReceived)} ${doneTarget}</td></tr>
         <tr><td style="padding:5px 0;color:var(--caption)">${doneFeeLabel}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${doneFeeDisplay}</td></tr>
         <tr style="border-top:1px solid var(--card-border)"><td style="padding:6px 0;color:var(--heading);font-weight:600">${t('exec_executed')}</td><td style="padding:6px 0;text-align:right">${execVal}</td></tr>
       </table>${deltaChip}`;
@@ -2325,16 +2435,22 @@ function execModal() {
   } else if (phase === 'error') {
     // Cas trustline absente : message clair + bouton d'ajout in-app (≠ « échec » dur).
     const isTrust = execState.code === 'trustline';
+    // Cas composite leg2 récupérable : leg1 ok, USDC en main, leg2 échoué
+    const isLeg2Fail = comp && comp.leg === 2 && comp.usdcReceived != null;
     const title = isTrust ? t('trustline_title') : t('exec_failed');
     const titleColor = isTrust ? 'var(--amber)' : 'var(--red)';
-    const msg = isTrust ? t('trustline_need', target) : escapeHtml(errorMsg);
+    const msg = isTrust ? t('trustline_need', target)
+      : isLeg2Fail ? t('comp_leg2_failed', fmt3(comp.usdcReceived))
+      : escapeHtml(errorMsg);
     const trustBtn = isTrust ? `<button class="btn primary" onclick="addTrustline()">${t('trustline_add_btn', target)}</button>` : '';
+    const retryLeg2Btn = isLeg2Fail ? `<button class="btn primary" onclick="retryCompositeLeg2()">${t('comp_retry_leg2')}</button>` : '';
     content = `
       <p style="font-size:14px;font-weight:700;color:${titleColor};margin:0 0 .5rem">${title}</p>
       <p class="help" style="margin:0 0 .9rem;overflow-wrap:anywhere">${msg}</p>
       <div style="display:flex;gap:.55rem;justify-content:flex-end;flex-wrap:wrap">
         <button class="btn" onclick="cancelExecute()">${t('exec_close')}</button>
         ${trustBtn}
+        ${retryLeg2Btn}
       </div>`;
   }
 

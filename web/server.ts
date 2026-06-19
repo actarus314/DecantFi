@@ -13,7 +13,7 @@ import { pickExecutableVenue, submit, buildChangeTrust, ExecError, type Venue } 
 import { manualRefresh, refreshBusy } from './refresh.js';
 import { toStroops, toNumber } from '../core/amount.js';
 import { readBlndBalance, readAssetBalance } from '../core/balance.js';
-import { TARGETS } from '../core/assets.js';
+import { TARGETS, BLND, USDC } from '../core/assets.js';
 
 const cfg = loadWebConfig();
 const db = openReadOnly(cfg.dbPath);
@@ -271,8 +271,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         if (!isVenue(b.venue)) { json(res, 400, { error: 'venue invalide' }); return; }
         forceVenue = b.venue;
       }
+      if (b.from !== undefined && b.from !== 'BLND' && b.from !== 'USDC') {
+        json(res, 400, { error: 'from invalide' }); return;
+      }
+      const sellAsset = b.from === 'USDC' ? USDC : BLND;
       try {
-        const result = await pickExecutableVenue(pair, amount, b.sender, slippageBps, cfg, displayed, undefined, forceVenue);
+        const result = await pickExecutableVenue(pair, amount, b.sender as string, slippageBps, cfg, displayed, undefined, forceVenue, sellAsset);
         json(res, 200, result);
       } catch (e) {
         if (e instanceof ExecError) { json(res, execStatus(e.code), { error: e.message, code: e.code }); return; }
