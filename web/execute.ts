@@ -1025,7 +1025,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: minToGet,
           slippageBps,
           route,
-          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real < g.max - 1e-7 ? g.real : undefined })),
+          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real })),
           displayed,
         });
         return { venue: 'xbull', xdr: built.xdr, id: built.id, type: built.type, review };
@@ -1047,7 +1047,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: destMin,
           slippageBps,
           route,
-          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real < g.max - 1e-7 ? g.real : undefined })),
+          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real })),
           displayed,
         });
         return { venue: 'horizon', xdr: built.xdr, type: 'swap', review };
@@ -1070,7 +1070,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: outMin,
           slippageBps,
           route,
-          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real < g.max - 1e-7 ? g.real : undefined })),
+          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real })),
           displayed,
         });
         return { venue: 'aquarius', xdr: built.xdr, type: 'swap', review };
@@ -1092,7 +1092,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: outMin,
           slippageBps,
           route,
-          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real < g.max - 1e-7 ? g.real : undefined })),
+          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real })),
           displayed,
         });
         return { venue: 'comet', xdr: built.xdr, type: 'swap', review };
@@ -1114,7 +1114,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: outMin,
           slippageBps,
           route,
-          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real < g.max - 1e-7 ? g.real : undefined })),
+          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real })),
           displayed,
         });
         return { venue: 'ultrastellar', xdr: built.xdr, type: 'swap', review };
@@ -1137,7 +1137,7 @@ export async function pickExecutableVenue(
           minReceivedStroops: cand.minOut,
           slippageBps,
           route,
-          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real < g.max - 1e-7 ? g.real : undefined })),
+          ...await xdrGasBreakdown(built.xdr).then(g => ({ gasFeeXlm: g.max, gasRealXlm: g.real })),
           displayed,
         });
         return { venue: 'soroswap', xdr: built.xdr, type: 'swap', review };
