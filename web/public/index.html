@@ -1306,6 +1306,7 @@ function buildPage() {
 
   const NOW_SLOT = nowLocalHour() * 4 + Math.floor(new Date().getMinutes() / 15);
   const sondeKey = String(ladderSonde);
+  const sondeSeg = sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('');
   const EMPTY24 = Array.from({length:7}, () => new Array(24).fill(null));
   const EMPTY96 = Array.from({length:7}, () => new Array(96).fill(null));
   const heatEffLocal = overview && overview.heatEffUtc && overview.heatEffUtc[sondeKey] ? rotateHeatUtc(overview.heatEffUtc[sondeKey], offsetH) : EMPTY24;
@@ -1321,9 +1322,7 @@ function buildPage() {
     ladderZoneRight = `<span class="tag">${t('ladder_sim_tag', fmt0(simAmt), u)}</span>`;
     ladderContent = ladderTable(simResult.ladder, u, simResult.downSources);
   } else {
-    ladderZoneRight = `<span class="seg">${sondes.map(n =>
-      `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`
-    ).join('')}</span>`;
+    ladderZoneRight = `<span class="seg">${sondeSeg}</span>`;
     const rows = overview ? overview.ladders[String(ladderSonde)] : null;
     ladderContent = ladderTable(rows || [], u);
   }
@@ -1385,7 +1384,7 @@ function buildPage() {
   </div>
 
   <div class="zone-group">
-    <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right"><span class="seg">${sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('')}</span></span></div>
+    <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right"><span class="seg">${sondeSeg}</span></span></div>
       <div class="card">
         ${noData || `${encartHtml(tm, TODAY, NOW_HOUR)}${hebdoHtml(tm, TODAY, selDay)}<p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${t('slots_help')}</p>${limitedNote}`}
       </div></div>
@@ -1395,7 +1394,7 @@ function buildPage() {
   </div>
 
   <div class="zone-group">
-    <div class="zone"><div class="zone-h">${t('section_routes')}</div>
+    <div class="zone"><div class="zone-h">${t('section_routes')} <span class="right"><span class="seg">${sondeSeg}</span></span></div>
       <div class="card">
         ${bestRoutesCard(sondeKey)}${limitedNote}</div>
     </div>
