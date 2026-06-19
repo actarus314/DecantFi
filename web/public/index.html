@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>decant — BLND swaps - accurately decanted</title>
+<title>decant.fi — BLND swaps - accurately decanted</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
 :root{
@@ -26,7 +26,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 .topbar{display:flex; align-items:center; gap:.7rem; margin-bottom:1rem; flex-wrap:wrap; position:sticky; top:0; z-index:50; background:var(--bg); border-bottom:1px solid var(--card-border); padding:.55rem 0;}
 .brand{font-size:15px; font-weight:700; letter-spacing:-.01em;}
 .brand .dim{color:var(--caption); font-weight:600;}
-.brand-logo{border-radius:5px; display:block; flex:none; margin-right:-.3rem;}
+.brand-logo{display:block; flex:none; margin-right:-.3rem;}
 .pagenav{display:inline-flex; gap:4px; background:var(--section-bg); border:1px solid var(--card-border); border-radius:9999px; padding:3px;}
 .pagenav button{border:0; background:transparent; color:var(--caption); font-size:13px; font-weight:700; padding:5px 16px; border-radius:9999px; cursor:pointer; transition:all .15s;}
 .pagenav button.active{background:#1e293b; color:#fff;}
@@ -282,7 +282,7 @@ const STRINGS = {
   fr: {
     // Topbar / brand
     brand_dim: 'BLND swaps - décantés avec précision',
-    tz_note: 'UTC stocké · affiché en heure locale (Europe/Paris)',
+    tz_note: (z) => `UTC stocké · affiché en heure locale (${z})`,
     theme_dark: '🌙',
     theme_light: '☀️',
     lang_fr: '🇫🇷',
@@ -495,7 +495,7 @@ const STRINGS = {
   en: {
     // Topbar / brand
     brand_dim: 'BLND swaps - accurately decanted',
-    tz_note: 'UTC stored · displayed in local time (Europe/Paris)',
+    tz_note: (z) => `UTC stored · displayed in local time (${z})`,
     theme_dark: '🌙',
     theme_light: '☀️',
     lang_fr: '🇫🇷',
@@ -796,22 +796,9 @@ function renderRoute(s) {
 }
 
 // ─── Timezone client ──────────────────────────────────────────────────────────
-function localOffset() {
-  const now = new Date();
-  const paris = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
-  const utc = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
-  return Math.round((paris - utc) / 3600000);
-}
-function nowLocalHour() {
-  const d = new Date();
-  return parseInt(d.toLocaleString('en-US', { timeZone: 'Europe/Paris', hour: 'numeric', hour12: false }), 10) % 24;
-}
-function todayLocalDow() {
-  const d = new Date();
-  const dayStr = d.toLocaleString('en-US', { timeZone: 'Europe/Paris', weekday: 'short' });
-  const map = { Sun: 6, Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5 };
-  return map[dayStr] ?? 0;
-}
+function localOffset(){ return -Math.round(new Date().getTimezoneOffset()/60); }
+function nowLocalHour(){ return new Date().getHours(); }
+function todayLocalDow(){ return (new Date().getDay()+6)%7; } // 0=Lun..6=Dim
 
 function rotateUtc(arr, offsetH) {
   if (!arr || arr.length !== 24) return arr;
@@ -1329,8 +1316,8 @@ function buildPage() {
 
   const topbarHtml = `
   <div class="topbar">
-    <img class="brand-logo" src="/favicon.svg" width="22" height="22" alt="">
-    <span class="brand">decant <span class="dim">· ${t('brand_dim')}</span></span>
+    <img class="brand-logo" src="/favicon.svg" width="28" height="28" alt="">
+    <span class="brand">decant.fi <span class="dim">· ${t('brand_dim')}</span></span>
     ${view === 'dashboard' ? `<span class="pagenav" style="margin-left:.3rem">
       <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
       <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
@@ -1374,7 +1361,7 @@ function buildPage() {
         ${noData || `${encartHtml(tm, TODAY, NOW_HOUR)}${hebdoHtml(tm, TODAY, selDay)}<p class="help" style="margin:.7rem 0 0;font-size:11px;line-height:1.55">${t('slots_help')}</p>${limitedNote}`}
       </div></div>
 
-    <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note')}</span></div>
+    <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note', Intl.DateTimeFormat().resolvedOptions().timeZone)}</span></div>
       <div class="card">${noData || zoomHtml(tm, intraday[selDay], selDay, TODAY, NOW_SLOT, u) + limitedNote}</div></div>
   </div>
 
@@ -1420,21 +1407,17 @@ async function loadHealth() {
 // ─── Chargement des données ───────────────────────────────────────────────────
 async function loadOverview() {
   try {
-    const r = await fetch(`/api/overview?pair=${target}`);
+    const r = await fetch(`/api/overview?pair=${target}&tzoff=${localOffset()}`);
     if (r.ok) overview = await r.json();
   } catch {}
   renderApp();
 }
 
 async function loadBalance() {
+  if (!walletAddress) { walletBlnd = 0; walletConfigured = false; renderApp(); return; }
   try {
-    const url = walletAddress ? `/api/balance?address=${walletAddress}` : '/api/balance';
-    const r = await fetch(url);
-    if (r.ok) {
-      const b = await r.json();
-      walletBlnd = b.blnd || 0;
-      walletConfigured = b.configured !== false;
-    }
+    const r = await fetch(`/api/balance?address=${walletAddress}`);
+    if (r.ok) { const b = await r.json(); walletBlnd = b.blnd || 0; walletConfigured = b.configured !== false; }
   } catch {}
   renderApp();
 }

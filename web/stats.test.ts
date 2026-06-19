@@ -18,7 +18,6 @@ const CFG: CollectorConfig = {
   sizesBlnd: [toStroops(250), toStroops(750)],
   pairs: ['USDC', 'EURC'],
   dbPath: '',
-  tz: 'Europe/Paris',
   timeoutMs: 15000,
   rawRetentionDays: 90,
   rollupAfterDays: 365,

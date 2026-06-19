@@ -121,13 +121,10 @@ export function chipFor(netConfidence: string, sourceId: string, eurcPath: strin
   return 'est';
 }
 
-/** xBull ne renvoie qu'un ID de route opaque (pas le chemin) → un swap atomique 2-nœuds (A→B)
- *  est rendu "A → ☁ → B" (nuage = hops internes inaccessibles, pas un wrap). Les autres sources exposent leur
- *  chemin réel (Soroswap via trade.path, Aquarius/Ultra multi-hop) → inchangés. */
-export function maskedRoute(path: string, sourceId: string): string {
-  if (sourceId !== 'xbull') return path; // seul xBull masque son chemin
-  const nodes = path.split(' → ');
-  return nodes.length === 2 ? `${nodes[0]} → ☁ → ${nodes[1]}` : path;
+// xBull route now decoded from sim (collector + live) → affichée telle quelle, plus de masque.
+// ponytail: gardé comme seam pour les 3 appelants.
+export function maskedRoute(path: string, _sourceId: string): string {
+  return path;
 }
 
 /** route_summary DB → chaîne lisible. "BLND->XLM->USDC" → "BLND→XLM→USDC" ;
@@ -719,6 +716,7 @@ export function overview(
   pairUi: string,
   cfg: CollectorConfig,
   now?: Date,
+  offsetH: number = 0,
 ): Overview {
   const pair = dbPair(pairUi);
   const nowDate = now ?? new Date();
@@ -734,8 +732,7 @@ export function overview(
   const winnerDist = buildWinnerDist(db, pair, windowStart);
   const bestRoutes = buildBestRoutes(db, pair, windowStart);
 
-  // Calcule l'offset Paris une fois pour les 7 jours
-  const offsetH = parisOffsetHours(nowDate);
+  // Offset (heures) fourni par le client (UTC+offsetH) — 0 = UTC par défaut
 
   const heatEffUtc: Record<string, (number | null)[][]> = {};
   const intradayLocal: Record<string, (number | null)[][]> = {};

@@ -8,7 +8,7 @@ import { quote as mk } from '../test/factory.js';
 
 const cfg = (over: Partial<CollectorConfig> = {}): CollectorConfig => ({
   cadenceSec: 900, jitterSec: 60, sizesBlnd: [toStroops('250')], pairs: ['USDC'],
-  dbPath: ':memory:', tz: 'UTC', timeoutMs: 1000, rawRetentionDays: 90, rollupAfterDays: 365,
+  dbPath: ':memory:', timeoutMs: 1000, rawRetentionDays: 90, rollupAfterDays: 365,
   rpcUrl: 'r', horizonUrl: 'h', ...over,
 });
 const prices = { blndUsd: 0.05, xlmUsd: 0.11, eurUsd: 1.08 };
