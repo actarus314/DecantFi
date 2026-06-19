@@ -1338,7 +1338,7 @@ function buildHealthPage(topbarHtml) {
       <td><span class="srcname">${s.display}</span>${pairNote}</td>
       <td>${cohCell}</td>
       <td style="color:var(--caption);font-variant-numeric:tabular-nums">${execCell}</td>
-      <td><span class="days">${dots}</span> <span style="font-size:12px;color:var(--caption);font-variant-numeric:tabular-nums;white-space:nowrap">${s.uptimePct.toFixed(0)} % ${trendArrow}</span></td>
+      <td><span class="days">${dots}</span> <span style="margin-left:1rem;font-size:12px;color:var(--caption);font-variant-numeric:tabular-nums;white-space:nowrap">${s.uptimePct.toFixed(0)} % ${trendArrow}</span></td>
       <td>${s.failedTicks}</td>
       <td class="muted">${healthAgo(s.lastFailureAt)}${s.lastFailureAt && s.lastFailureReason ? ' · ' + reasonLabel(s.lastFailureReason) : ''}</td>
     </tr>`;
@@ -1351,7 +1351,7 @@ function buildHealthPage(topbarHtml) {
     ${kpiHtml}
     <div style="overflow-x:auto"><table class="flt">
       <thead><tr>
-        <th>${t('health_col_source')}</th>
+        <th style="width:1%;white-space:nowrap">${t('health_col_source')}</th>
         <th>${t('health_col_coherence')}</th>
         <th>${t('health_col_exec')}</th>
         <th>${t('health_col_days')}</th>
@@ -1360,7 +1360,7 @@ function buildHealthPage(topbarHtml) {
       </tr></thead>
       <tbody>${tableRows}</tbody>
       <tfoot><tr>
-        <td title="${t('health_total_tip')}" style="font-weight:700;color:var(--caption);font-size:12px;border-top:2px solid var(--card-border);background:var(--section-bg);cursor:help">${t('health_total')}</td>
+        <td style="font-weight:700;color:var(--caption);font-size:12px;border-top:2px solid var(--card-border);background:var(--section-bg)"><span class="tip-wrap" style="display:inline-flex;align-items:center">${t('health_total')}<span class="tip-icon">ⓘ</span><span class="tip-box">${t('health_total_tip')}</span></span></td>
         <td style="border-top:2px solid var(--card-border);background:var(--section-bg)"></td>
         <td style="color:var(--caption);font-variant-numeric:tabular-nums;font-size:12px;border-top:2px solid var(--card-border);background:var(--section-bg)">${(() => {
           const ms = health && health.execTotalMs;
