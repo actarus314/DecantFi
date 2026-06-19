@@ -10,10 +10,10 @@ import { fromStroops } from '../core/amount.js';
 async function main(): Promise<void> {
   const cfg = loadCollectorConfig();
   const db = openDb(cfg.dbPath);
-  const { tick, quotes } = await runTick({
+  const { tick, quotes, rpcProbes } = await runTick({
     probes: buildProbes(cfg), cfg, now: () => new Date(), fetchPrices, quote,
   });
-  const tickId = db.insertTickWithQuotes(tick, quotes);
+  const tickId = db.insertTickWithQuotes(tick, quotes, rpcProbes);
   process.stdout.write(`tick #${tickId} · ok=${tick.ok} · ${quotes.length} quotes\n`);
   for (const q of quotes.filter((x) => x.is_winner)) {
     process.stdout.write(`  ${q.pair} ${fromStroops(q.amount_in)} → ${q.net_out ? fromStroops(q.net_out) : 'n/a'} via ${q.source_id}` +

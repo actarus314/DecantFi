@@ -496,12 +496,27 @@ export interface SourceHealth {
   pairNote: string | null;       // ex. 'USDC uniquement' pour comet
 }
 
+export interface RpcHealth {
+  // PAS de `url` complète ici : cet objet est sérialisé tel quel par /api/health vers le client.
+  // L'URL peut contenir une clé API (ex. Validation Cloud /v1/<clé>) → on n'expose QUE le host.
+  host: string;     // new URL(url).host — masque la clé API (le host exclut le path)
+  active: boolean;  // chosen=1 dans le dernier tick ayant des probes
+  uptimePct: number;
+  latencyMsP50: number | null;
+  lastLedger: number | null;
+  ledgerLag: number;   // maxLedger (tous RPCs) − lastLedger de cet RPC (0 = pas de retard)
+  failures: number;    // sondes ok=0
+  simErrors: number;   // total sim_errors sur la fenêtre
+  samples: number;     // nb de sondes dans la fenêtre
+}
+
 export interface SourceHealthResult {
   totalTicks: number;
   windowDays: 7;
   sources: SourceHealth[];
   /** Heures écoulées dans la journée locale courante (0..24), pour le rendu du cercle partiel. */
   todayElapsedH: number;
+  rpcs: RpcHealth[];
 }
 
 /** Parse source_errors : JSON ([{id,reason}]) ou CSV legacy ("soroswap, comet"). */
@@ -516,6 +531,96 @@ export function parseSourceErrors(raw: unknown): Array<{ id: string; reason: str
     } catch { /* fallthrough */ }
   }
   return s.split(',').map((t) => t.trim()).filter(Boolean).map((id) => ({ id, reason: null }));
+}
+
+// ─── Santé RPC (7 j) ──────────────────────────────────────────────────────────
+
+export function buildRpcHealth(db: DatabaseSync, windowStart: string): RpcHealth[] {
+  // Toutes les sondes sur la fenêtre, tous ticks confondus (pas de filtre ok=1 — le but est de mesurer le RPC lui-même).
+  const stmt = prepBig(db, `
+    SELECT r.url, r.ok, r.latency_ms, r.ledger, r.chosen, r.sim_errors
+    FROM rpc_probe r
+    JOIN tick t ON t.id = r.tick_id
+    WHERE t.started_at >= ?
+    ORDER BY r.url, t.started_at
+  `);
+  const rows = stmt.all(windowStart) as Array<Record<string, unknown>>;
+  if (rows.length === 0) return [];
+
+  // Regrouper par URL
+  const byUrl = new Map<string, Array<Record<string, unknown>>>();
+  for (const r of rows) {
+    const url = String(r['url'] ?? '');
+    let arr = byUrl.get(url);
+    if (!arr) { arr = []; byUrl.set(url, arr); }
+    arr.push(r);
+  }
+
+  // Dernier tick ayant des probes : pour définir "active"
+  const lastTickStmt = prepBig(db, `
+    SELECT r.url FROM rpc_probe r
+    WHERE r.tick_id = (SELECT MAX(tick_id) FROM rpc_probe)
+    AND r.chosen = 1
+    LIMIT 1
+  `);
+  const lastRows = lastTickStmt.all() as Array<Record<string, unknown>>;
+  const activeUrl = lastRows[0] ? String(lastRows[0]['url'] ?? '') : null;
+
+  // maxLedger global pour le calcul du lag
+  let maxLedger = 0;
+  for (const r of rows) {
+    const l = r['ledger'] != null ? Number(r['ledger']) : 0;
+    if (l > maxLedger) maxLedger = l;
+  }
+
+  const result: RpcHealth[] = [];
+  for (const [url, probes] of byUrl.entries()) {
+    const failures = probes.filter((p) => p['ok'] === 0 || p['ok'] === 0n).length;
+    const okProbes = probes.filter((p) => p['ok'] === 1 || p['ok'] === 1n);
+    const latencies = okProbes
+      .map((p) => p['latency_ms'] != null ? Number(p['latency_ms']) : null)
+      .filter((v): v is number => v !== null)
+      .sort((a, b) => a - b);
+    const latencyMsP50 = latencies.length > 0
+      ? latencies[Math.floor(latencies.length / 2)]!
+      : null;
+    const ledgers = okProbes.map((p) => p['ledger'] != null ? Number(p['ledger']) : null).filter((v): v is number => v !== null);
+    const lastLedger = ledgers.length > 0 ? ledgers[ledgers.length - 1]! : null;
+    const simErrors = probes.reduce((s, p) => s + (p['sim_errors'] != null ? Number(p['sim_errors']) : 0), 0);
+    const uptimePct = probes.length > 0 ? Math.round((okProbes.length / probes.length) * 1000) / 10 : 100;
+    let host: string;
+    try { host = new URL(url).host; } catch { host = url; }
+    result.push({
+      host,
+      active: url === activeUrl,
+      uptimePct,
+      latencyMsP50,
+      lastLedger,
+      ledgerLag: maxLedger > 0 && lastLedger !== null ? Math.max(0, maxLedger - lastLedger) : 0,
+      failures,
+      simErrors,
+      samples: probes.length,
+    });
+  }
+
+  // Actif en premier, puis par uptimePct desc
+  result.sort((a, b) => {
+    if (a.active !== b.active) return a.active ? -1 : 1;
+    return b.uptimePct - a.uptimePct;
+  });
+  return result;
+}
+
+/** URL du RPC choisi dans le dernier tick ayant des probes, ou null. */
+export function latestChosenRpc(db: DatabaseSync): string | null {
+  const stmt = prepBig(db, `
+    SELECT url FROM rpc_probe
+    WHERE tick_id = (SELECT MAX(tick_id) FROM rpc_probe)
+    AND chosen = 1
+    LIMIT 1
+  `);
+  const rows = stmt.all() as Array<Record<string, unknown>>;
+  return rows[0] ? String(rows[0]['url'] ?? '') : null;
 }
 
 /**
@@ -706,7 +811,8 @@ export function buildSourceHealth(
   const localNow = new Date(localNowMs);
   const todayElapsedH = localNow.getUTCHours() + localNow.getUTCMinutes() / 60;
 
-  return { totalTicks, windowDays: 7, sources, todayElapsedH };
+  const rpcs = buildRpcHealth(db, windowStart);
+  return { totalTicks, windowDays: 7, sources, todayElapsedH, rpcs };
 }
 
 // ─── Point d'entrée public ────────────────────────────────────────────────────

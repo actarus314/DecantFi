@@ -9,8 +9,10 @@ import { quote as mk } from '../test/factory.js';
 const cfg = (over: Partial<CollectorConfig> = {}): CollectorConfig => ({
   cadenceSec: 900, jitterSec: 60, sizesBlnd: [toStroops('250')], pairs: ['USDC'],
   dbPath: ':memory:', timeoutMs: 1000, rawRetentionDays: 90, rollupAfterDays: 365,
-  rpcUrl: 'r', horizonUrl: 'h', ...over,
+  rpcUrl: 'r', rpcUrls: ['r'], horizonUrl: 'h', ...over,
 });
+// Fake selectRpc : évite toute connexion réseau dans les tests.
+const fakeSelectRpc = async (urls: string[]) => ({ chosen: urls[0] ?? 'r', probes: [] });
 const prices = { blndUsd: 0.05, xlmUsd: 0.11, eurUsd: 1.08 };
 const now = () => new Date('2026-06-16T10:00:00.000Z');
 
@@ -30,7 +32,7 @@ describe('runTick (USDC)', () => {
     const fakeQuote = async (o: any) => usdcResult(o.amountIn);
     const { tick, quotes } = await runTick({
       probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
-      cfg: cfg(), now, fetchPrices: async () => prices, quote: fakeQuote,
+      cfg: cfg(), now, fetchPrices: async () => prices, quote: fakeQuote, selectRpc: fakeSelectRpc,
     });
     expect(tick.ok).toBe(true);
     expect(tick.blnd_usd).toBe(0.05);
@@ -44,7 +46,7 @@ describe('runTick (USDC)', () => {
     const noPrices = { blndUsd: null, xlmUsd: null, eurUsd: null };
     const { tick } = await runTick({
       probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
-      cfg: cfg(), now, fetchPrices: async () => noPrices, quote: async (o: any) => usdcResult(o.amountIn),
+      cfg: cfg(), now, fetchPrices: async () => noPrices, quote: async (o: any) => usdcResult(o.amountIn), selectRpc: fakeSelectRpc,
     });
     expect(tick.blnd_usd).toBeNull();
     expect(tick.ok).toBe(true);
@@ -65,7 +67,7 @@ describe('runTick (EURC)', () => {
     };
     const { quotes } = await runTick({
       probes: [{ pair: 'BLND->EURC', buy: EURC, amountIn: toStroops('250') }],
-      cfg: cfg({ pairs: ['EURC'] }), now, fetchPrices: async () => prices, quote: async () => result,
+      cfg: cfg({ pairs: ['EURC'] }), now, fetchPrices: async () => prices, quote: async () => result, selectRpc: fakeSelectRpc,
     });
     const paths = quotes.map((q) => q.eurc_path);
     expect(paths).toContain('direct');
@@ -88,7 +90,7 @@ describe('runTick (EURC)', () => {
     };
     const { quotes } = await runTick({
       probes: [{ pair: 'BLND->EURC', buy: EURC, amountIn: toStroops('250') }],
-      cfg: cfg({ pairs: ['EURC'] }), now, fetchPrices: async () => prices, quote: async () => result,
+      cfg: cfg({ pairs: ['EURC'] }), now, fetchPrices: async () => prices, quote: async () => result, selectRpc: fakeSelectRpc,
     });
     const winners = quotes.filter((q) => q.is_winner);
     expect(winners.length).toBe(1);
@@ -114,7 +116,7 @@ describe('runTick (resim Aquarius + xBull)', () => {
     const { quotes } = await runTick({
       probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
       cfg: cfg(), now, fetchPrices: async () => prices, quote: async () => result,
-      resimDeps: { simulateAquariusNet: fakeSimAq },
+      resimDeps: { simulateAquariusNet: fakeSimAq }, selectRpc: fakeSelectRpc,
     });
 
     expect(quotes.length).toBe(1);
@@ -145,7 +147,7 @@ describe('runTick (resim Aquarius + xBull)', () => {
     const { quotes } = await runTick({
       probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
       cfg: cfg(), now, fetchPrices: async () => prices, quote: async () => result,
-      resimDeps: { simulateXbullNet: fakeSimXb },
+      resimDeps: { simulateXbullNet: fakeSimXb }, selectRpc: fakeSelectRpc,
     });
 
     expect(quotes.length).toBe(2);
@@ -174,7 +176,7 @@ describe('runTick (resim Aquarius + xBull)', () => {
     const { tick, quotes } = await runTick({
       probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
       cfg: cfg(), now, fetchPrices: async () => prices, quote: async () => result,
-      resimDeps: { simulateXbullNet: throwingSim as any },
+      resimDeps: { simulateXbullNet: throwingSim as any }, selectRpc: fakeSelectRpc,
     });
 
     // tick ne doit pas exploser, cote API conservée
@@ -203,7 +205,7 @@ describe('runTick (tout-KO)', () => {
     };
     const { tick, quotes } = await runTick({
       probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
-      cfg: cfg(), now, fetchPrices: async () => prices, quote: async () => empty,
+      cfg: cfg(), now, fetchPrices: async () => prices, quote: async () => empty, selectRpc: fakeSelectRpc,
     });
     expect(tick.ok).toBe(false);
     expect(quotes.length).toBe(0);

@@ -6,7 +6,7 @@ export interface CollectorConfig {
   sizesBlnd: bigint[]; pairs: ('USDC' | 'EURC')[];
   dbPath: string; timeoutMs: number;
   rawRetentionDays: number; rollupAfterDays: number;
-  rpcUrl: string; horizonUrl: string; soroswapApiKey?: string; walletAddress?: string;
+  rpcUrl: string; rpcUrls: string[]; horizonUrl: string; soroswapApiKey?: string; walletAddress?: string;
 }
 
 type Env = Record<string, string | undefined>;
@@ -38,6 +38,11 @@ export function loadCollectorConfig(env: Env = process.env): CollectorConfig {
     rawRetentionDays: int(env, 'RAW_RETENTION_DAYS', 90),
     rollupAfterDays: int(env, 'ROLLUP_AFTER_DAYS', 365),
     rpcUrl: env.STELLAR_RPC_URL || 'https://mainnet.sorobanrpc.com',
+    rpcUrls: (() => {
+      const primary = env.STELLAR_RPC_URL || 'https://mainnet.sorobanrpc.com';
+      const fallback = env.STELLAR_RPC_URL_FALLBACK;
+      return fallback && fallback !== primary ? [primary, fallback] : [primary];
+    })(),
     horizonUrl: env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org',
     soroswapApiKey: env.SOROSWAP_API_KEY || undefined,
   };

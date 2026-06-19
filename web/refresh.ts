@@ -27,13 +27,13 @@ export async function manualRefresh(cfg: WebConfig): Promise<RefreshResult> {
   inFlight = true;
   try {
     const probes = buildProbes(cfg);
-    const { tick, quotes } = await runTick({
+    const { tick, quotes, rpcProbes } = await runTick({
       probes, cfg, now: () => new Date(), fetchPrices, quote,
     });
     tick.note = 'manual'; // marqueur de purge par le poll programmé
     const db = openDb(cfg.dbPath); // connexion d'écriture (volume RW) ; refermée aussitôt
     try {
-      const tickId = db.insertTickWithQuotes(tick, quotes);
+      const tickId = db.insertTickWithQuotes(tick, quotes, rpcProbes);
       return { tickId, ok: tick.ok, quotes: quotes.length, startedAt: tick.started_at };
     } finally {
       db.close();

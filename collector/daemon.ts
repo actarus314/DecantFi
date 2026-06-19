@@ -37,8 +37,8 @@ async function main(): Promise<void> {
   const tickAndStore = async (): Promise<void> => {
     const startedAt = new Date();
     try {
-      const { tick, quotes } = await runTick({ probes, cfg, now: () => new Date(), fetchPrices, quote });
-      db.insertTickWithQuotes(tick, quotes);
+      const { tick, quotes, rpcProbes } = await runTick({ probes, cfg, now: () => new Date(), fetchPrices, quote });
+      db.insertTickWithQuotes(tick, quotes, rpcProbes);
       const purged = db.purgeManualTicks(); // le poll programmé prime : on jette les refresh manuels provisoires
       writeFileSync(heartbeat, new Date().toISOString());
       process.stdout.write(`[tick] ${tick.started_at} ok=${tick.ok} quotes=${quotes.length}` +
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
       const msg = e instanceof Error ? e.message : String(e);
       process.stderr.write(`[tick] échec : ${msg}\n`);
       try {
-        db.insertTickWithQuotes(failedTick(cfg, startedAt, new Date(), msg), []);
+        db.insertTickWithQuotes(failedTick(cfg, startedAt, new Date(), msg), [], []);
       } catch (e2) {
         process.stderr.write(`[tick] insert ok=0 impossible : ${e2 instanceof Error ? e2.message : e2}\n`);
       }

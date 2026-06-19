@@ -47,6 +47,18 @@ CREATE INDEX IF NOT EXISTS idx_quote_tick        ON quote(tick_id);
 CREATE INDEX IF NOT EXISTS idx_quote_pair_winner ON quote(pair, is_winner);
 CREATE INDEX IF NOT EXISTS idx_tick_started      ON tick(started_at);
 CREATE INDEX IF NOT EXISTS idx_rollup_bucket     ON rollup_hourly(pair, amount_in, hour_utc);
+CREATE TABLE IF NOT EXISTS rpc_probe (
+  id         INTEGER PRIMARY KEY,
+  tick_id    INTEGER NOT NULL REFERENCES tick(id) ON DELETE CASCADE,
+  url        TEXT NOT NULL,
+  ok         INTEGER NOT NULL,
+  latency_ms INTEGER,
+  ledger     INTEGER,
+  chosen     INTEGER NOT NULL,
+  sim_errors INTEGER NOT NULL DEFAULT 0,
+  error      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_rpc_probe_tick ON rpc_probe(tick_id);
 `;
 
 /** Applique PRAGMA (avant création des tables pour auto_vacuum) puis crée le schéma. Idempotent. */

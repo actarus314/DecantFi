@@ -4,11 +4,12 @@ import { BLND, EURC } from '../core/assets.js';
 import { priceImpactPct, targetUsdPerUnit, type Prices } from '../core/prices.js';
 import type { QuoteResult, QuoteOptions, EngineConfig } from '../core/engine.js';
 import type { NormalizedQuote } from '../core/sources/types.js';
-import type { TickInsert, QuoteInsert } from '../db/index.js';
+import type { TickInsert, QuoteInsert, RpcProbeInsert } from '../db/index.js';
 import type { CollectorConfig } from './config.js';
 import type { Probe } from './probes.js';
 import { resimAquariusXbull } from '../web/quote-api.js';
 import type { simulateAquariusNet, simulateXbullNet } from '../web/execute.js';
+import { selectRpc, type RpcSelection } from '../core/rpc-select.js';
 
 export interface TickDeps {
   probes: Probe[];
@@ -18,9 +19,11 @@ export interface TickDeps {
   quote: (opts: QuoteOptions) => Promise<QuoteResult>;
   /** Injection de fakes pour les sims Aquarius/xBull (tests uniquement). */
   resimDeps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet };
+  /** Injection de fake pour la sélection RPC (tests uniquement). */
+  selectRpc?: (urls: string[], timeoutMs: number) => Promise<RpcSelection>;
 }
 
-export interface TickAssembled { tick: TickInsert; quotes: QuoteInsert[]; }
+export interface TickAssembled { tick: TickInsert; quotes: QuoteInsert[]; rpcProbes: RpcProbeInsert[]; }
 
 function bigIntJson(_k: string, v: unknown): unknown {
   return typeof v === 'bigint' ? v.toString() : v;
@@ -84,10 +87,18 @@ function rowsForProbe(probe: Probe, result: QuoteResult, prices: Prices): QuoteI
 
 export async function runTick(deps: TickDeps): Promise<TickAssembled> {
   const startedAt = deps.now();
+
+  // Sélection du meilleur RPC : best-effort, un échec ne casse jamais le tick.
+  let sel: RpcSelection = { chosen: deps.cfg.rpcUrl, probes: [] };
+  try {
+    sel = await (deps.selectRpc ?? selectRpc)(deps.cfg.rpcUrls, deps.cfg.timeoutMs);
+  } catch { /* repli silencieux : rpcUrl par défaut */ }
+  const rpcUrl = sel.chosen || deps.cfg.rpcUrl;
+
   const prices = await deps.fetchPrices({ timeoutMs: deps.cfg.timeoutMs });
 
   const sourceCfg: EngineConfig = {
-    rpcUrl: deps.cfg.rpcUrl, horizonUrl: deps.cfg.horizonUrl,
+    rpcUrl, horizonUrl: deps.cfg.horizonUrl,
     soroswapApiKey: deps.cfg.soroswapApiKey, walletAddress: deps.cfg.walletAddress,
     timeoutMs: deps.cfg.timeoutMs, prices, // <- prix injecté : 1 seul fetch, comparabilité préservée
     // Cache RPC partagé par les 4 sondes du tick : coalesce les lectures de pools identiques
@@ -109,7 +120,7 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     // Best-effort : un échec RPC (429, timeout) ne casse jamais le tick.
     const pairUi = probe.buy.symbol === EURC.symbol ? 'EURC' : 'USDC';
     try {
-      await resimAquariusXbull(result, pairUi, probe.amountIn, { rpcUrl: deps.cfg.rpcUrl }, deps.resimDeps);
+      await resimAquariusXbull(result, pairUi, probe.amountIn, { rpcUrl }, deps.resimDeps);
     } catch { /* repli silencieux : cote API conservée */ }
 
     quotes.push(...rowsForProbe(probe, result, prices));
@@ -125,7 +136,18 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
       : null,
     note: null,
   };
-  return { tick, quotes };
+
+  // Comptage sim_errors par URL RPC (429, rate-limit, timeout, ECONNRESET)
+  const simErrorRe = /429|rate.?limit|too many|timeout|ETIMEDOUT|ECONNRESET/i;
+  const simErrorCount = [...reasons.values()].filter((r) => simErrorRe.test(r)).length;
+  const rpcProbes: RpcProbeInsert[] = sel.probes.map((p) => ({
+    url: p.url, ok: p.ok, latency_ms: p.latencyMs, ledger: p.ledger,
+    chosen: p.url === rpcUrl,
+    sim_errors: p.url === rpcUrl ? simErrorCount : 0,
+    error: p.error,
+  }));
+
+  return { tick, quotes, rpcProbes };
 }
 
 /** Tick d'échec (exception inattendue) : ligne ok=false avec note, zéro quote. Spec §7 — le trou reste visible. */

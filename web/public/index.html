@@ -487,6 +487,18 @@ const STRINGS = {
     reason_rpc: 'erreur RPC',
     reason_simulation: 'simulation',
     health_col_sizes: 'Disponibilité par sonde',
+    // RPC health
+    health_rpc_title: 'Santé des RPC Soroban — 7 derniers jours',
+    health_rpc_col_rpc: 'RPC',
+    health_rpc_col_actif: 'Actif',
+    health_rpc_col_latence: 'Latence (sonde)',
+    health_rpc_col_ledger: 'Ledger',
+    health_rpc_col_dispo: 'Dispo 7j',
+    health_rpc_col_echecs: 'Échecs',
+    health_rpc_col_simerr: 'Err. sim',
+    health_rpc_active_yes: 'oui',
+    health_rpc_active_no: '—',
+    health_rpc_note: 'Sonde réalisée au démarrage de chaque tick — 1 ligne par endpoint configuré. Le RPC actif est celui retenu pour ce tick.',
     nav_back: '← Tableau de bord',
     // click-to-select
     exec_via: (tool) => 'Exécuter via ' + tool,
@@ -700,6 +712,18 @@ const STRINGS = {
     reason_rpc: 'RPC error',
     reason_simulation: 'simulation',
     health_col_sizes: 'Availability by probe',
+    // RPC health
+    health_rpc_title: 'Soroban RPC health — last 7 days',
+    health_rpc_col_rpc: 'RPC',
+    health_rpc_col_actif: 'Active',
+    health_rpc_col_latence: 'Latency (probe)',
+    health_rpc_col_ledger: 'Ledger',
+    health_rpc_col_dispo: 'Uptime 7d',
+    health_rpc_col_echecs: 'Failures',
+    health_rpc_col_simerr: 'Sim errors',
+    health_rpc_active_yes: 'yes',
+    health_rpc_active_no: '—',
+    health_rpc_note: 'Probed at the start of each tick — one row per configured endpoint. The active RPC is the one selected for that tick.',
     nav_back: '← Dashboard',
     // click-to-select
     exec_via: (tool) => 'Execute via ' + tool,
@@ -1271,6 +1295,41 @@ function buildHealthPage(topbarHtml) {
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="b"></i></span>${t('health_legend_bad')} &nbsp;
       <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="g"></i></span>${t('health_legend_null')}
     </p>
+    ${(() => {
+      const rpcs = (health && health.rpcs) || [];
+      if (rpcs.length === 0) return '';
+      const rpcRows = rpcs.map(r => {
+        const latency = r.latencyMsP50 != null ? `${r.latencyMsP50} ms` : t('health_never');
+        const ledger = r.lastLedger != null
+          ? `${r.lastLedger}${r.ledgerLag > 0 ? ` <span class="muted">−${r.ledgerLag}</span>` : ''}`
+          : t('health_never');
+        const activeTxt = r.active ? `<span style="color:var(--green)">${t('health_rpc_active_yes')}</span>` : t('health_rpc_active_no');
+        const simTip = r.simErrors > 0 ? ` title="sim errors: ${r.simErrors}"` : '';
+        return `<tr${r.active ? ' class="win"' : ''}>
+          <td>${r.host}</td>
+          <td>${activeTxt}</td>
+          <td>${latency}</td>
+          <td>${ledger}</td>
+          <td>${r.uptimePct.toFixed(0)} %</td>
+          <td>${r.failures}</td>
+          <td${simTip}>${r.simErrors > 0 ? `<span style="color:var(--amber)">${r.simErrors}</span>` : '0'}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="zone-h" style="margin-top:1.5rem">${t('health_rpc_title')}</div>
+      <div style="overflow-x:auto"><table class="flt">
+        <thead><tr>
+          <th>${t('health_rpc_col_rpc')}</th>
+          <th>${t('health_rpc_col_actif')}</th>
+          <th>${t('health_rpc_col_latence')}</th>
+          <th>${t('health_rpc_col_ledger')}</th>
+          <th>${t('health_rpc_col_dispo')}</th>
+          <th>${t('health_rpc_col_echecs')}</th>
+          <th title="${t('health_rpc_col_simerr')}">${t('health_rpc_col_simerr')}</th>
+        </tr></thead>
+        <tbody>${rpcRows}</tbody>
+      </table></div>
+      <p class="help" style="margin:.7rem 0 0;font-size:11px">${t('health_rpc_note')}</p>`;
+    })()}
   </div>`;
 }
 

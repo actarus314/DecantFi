@@ -22,6 +22,7 @@ const CFG: CollectorConfig = {
   rawRetentionDays: 90,
   rollupAfterDays: 365,
   rpcUrl: 'https://mainnet.sorobanrpc.com',
+  rpcUrls: ['https://mainnet.sorobanrpc.com'],
   horizonUrl: 'https://horizon.stellar.org',
 };
 

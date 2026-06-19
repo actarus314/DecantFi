@@ -26,4 +26,16 @@ describe('loadCollectorConfig', () => {
   it('rejette une paire inconnue', () => {
     expect(() => loadCollectorConfig({ ...base, COLLECTOR_PAIRS: 'BTC' })).toThrow();
   });
+  it('rpcUrls = [primary] quand pas de fallback', () => {
+    const c = loadCollectorConfig({ ...base });
+    expect(c.rpcUrls).toEqual(['rpc']);
+  });
+  it('rpcUrls = [primary, fallback] quand fallback différent', () => {
+    const c = loadCollectorConfig({ ...base, STELLAR_RPC_URL_FALLBACK: 'rpc2' });
+    expect(c.rpcUrls).toEqual(['rpc', 'rpc2']);
+  });
+  it('déduplique si fallback = primary', () => {
+    const c = loadCollectorConfig({ ...base, STELLAR_RPC_URL_FALLBACK: 'rpc' });
+    expect(c.rpcUrls).toEqual(['rpc']);
+  });
 });

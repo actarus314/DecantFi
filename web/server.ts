@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadWebConfig } from './config.js';
 import { openReadOnly } from './read-db.js';
-import { overview, buildSourceHealth } from './stats.js';
+import { overview, buildSourceHealth, latestChosenRpc } from './stats.js';
 import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
 import { pickExecutableVenue, submit, buildChangeTrust, ExecError, type Venue } from './execute.js';
 import { manualRefresh, refreshBusy } from './refresh.js';
@@ -149,7 +149,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         amountStroops = parsed;
       }
 
-      const result = await liveQuote(pair, amountStroops, cfg);
+      const chosenRpc = latestChosenRpc(db);
+      const quoteCfg = chosenRpc ? { ...cfg, rpcUrl: chosenRpc } : cfg;
+      const result = await liveQuote(pair, amountStroops, quoteCfg);
       json(res, 200, result);
       return;
     }
