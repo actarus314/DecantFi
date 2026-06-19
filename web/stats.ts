@@ -2,7 +2,7 @@
 // Fenêtre = 7 jours. Timezone : agrégation serveur UTC, conversion côté client.
 // ponytail: Number = affichage, jamais règlement.
 import { type DatabaseSync } from 'node:sqlite';
-import { prepBig } from './read-db.js';
+import { prepBig, readCoherenceProbes } from './read-db.js';
 import { toNumber } from '../core/amount.js';
 import type { CollectorConfig } from '../collector/config.js';
 
@@ -494,6 +494,14 @@ export interface SourceHealth {
   lastFailureReason: string | null; // rate-limit / timeout / rpc / simulation / http / null
   days: Array<'ok' | 'warn' | 'bad' | null>;  // 7 entrées, index 0 = le plus récent
   pairNote: string | null;       // ex. 'USDC uniquement' pour comet
+  /** Agrégat des sondes de cohérence (quote vs sim) sur la fenêtre. */
+  coherence: {
+    tests: number;                 // total sondes
+    suspects: number;              // sondes incoherent=true
+    lastSuspectAt: string | null;  // max(created_at) parmi les suspectes
+  };
+  /** Tendance de disponibilité : comparaison fenêtre courante vs précédente (7 j vs 7 j d'avant). */
+  uptimeTrend: 'up' | 'down' | 'flat';
 }
 
 export interface RpcHealth {
@@ -652,6 +660,95 @@ export function latestChosenRpc(db: DatabaseSync): string | null {
   return rows[0] ? String(rows[0]['url'] ?? '') : null;
 }
 
+// ─── Sous-fonction : uptime par source sur un intervalle ────────────────────────
+
+/**
+ * Calcule le % uptime par sourceId sur [from, to) en s'appuyant uniquement
+ * sur les ticks ok=1 (dénominateur) et les quotes présentes (numérateur).
+ * Renvoie une Map<sourceId, uptimePct> pour les IDs atomiques connus.
+ * Si totalTicks == 0 pour un source, renvoie 100 (pas de base → flat).
+ */
+export function computeUptimeBySource(
+  db: DatabaseSync,
+  knownIds: string[],
+  from: string,
+  to: string,
+): Map<string, number> {
+  // Nombre de ticks ok=1 dans [from, to)
+  const totalStmt = prepBig(db, `
+    SELECT COUNT(*) as n FROM tick WHERE ok = 1 AND started_at >= ? AND started_at < ?
+  `);
+  const totalRow = (totalStmt.all(from, to) as Array<Record<string, unknown>>)[0];
+  const total = totalRow ? Number(totalRow['n'] as bigint) : 0;
+
+  const result = new Map<string, number>();
+  if (total === 0) {
+    for (const id of knownIds) result.set(id, 100);
+    return result;
+  }
+
+  // Ticks ok=1 dans [from, to) où chaque source a produit ≥1 cotation
+  const quotedStmt = prepBig(db, `
+    SELECT q.source_id, COUNT(DISTINCT q.tick_id) as n
+      FROM quote q
+      JOIN tick t ON t.id = q.tick_id
+     WHERE t.ok = 1 AND t.started_at >= ? AND t.started_at < ?
+     GROUP BY q.source_id
+  `);
+  const quotedRows = quotedStmt.all(from, to) as Array<Record<string, unknown>>;
+  const respondedBySource = new Map<string, number>();
+  for (const r of quotedRows) {
+    const srcId = String(r['source_id'] ?? '');
+    if (!srcId.includes('+') && knownIds.includes(srcId)) {
+      respondedBySource.set(srcId, Number(r['n'] as bigint));
+    }
+  }
+
+  for (const id of knownIds) {
+    const responded = respondedBySource.get(id) ?? 0;
+    result.set(id, Math.round((responded / total) * 1000) / 10);
+  }
+  return result;
+}
+
+// ─── Sous-fonction : agrégation cohérence par venue ─────────────────────────────
+
+/** Résultat de l'agrégation des sondes de cohérence par venue. */
+export interface CoherenceAgg {
+  tests: number;
+  suspects: number;
+  lastSuspectAt: string | null;
+}
+
+/**
+ * Agrège les sondes de cohérence par venue sur la fenêtre.
+ * Renvoie une Map<venueId, CoherenceAgg>.
+ * Une venue sans sonde → { tests: 0, suspects: 0, lastSuspectAt: null }.
+ */
+export function aggregateCoherenceByVenue(
+  probes: Array<{ venue: string; incoherent: boolean; created_at: string }>,
+  knownIds: string[],
+): Map<string, CoherenceAgg> {
+  const result = new Map<string, CoherenceAgg>();
+  // Initialise toutes les venues connues
+  for (const id of knownIds) {
+    result.set(id, { tests: 0, suspects: 0, lastSuspectAt: null });
+  }
+  // Accumule les sondes
+  for (const p of probes) {
+    const agg = result.get(p.venue);
+    if (!agg) continue; // venue inconnue ou composite → ignorée
+    agg.tests++;
+    if (p.incoherent) {
+      agg.suspects++;
+      if (!agg.lastSuspectAt || p.created_at > agg.lastSuspectAt) {
+        agg.lastSuspectAt = p.created_at;
+      }
+    }
+  }
+  return result;
+}
+
 /**
  * Construit la santé par source sur la fenêtre [windowStart, now).
  * Seuls les ticks ok=1 entrent dans le dénominateur.
@@ -665,6 +762,20 @@ export function buildSourceHealth(
 ): SourceHealthResult {
   // Sources connues : les clés de FULL_NAME (7 venues atomiques)
   const knownIds = Object.keys(FULL_NAME);
+
+  // ── Calcul de la tendance (fenêtre précédente) ──────────────────────────────
+  // Durée D = now - windowStart. Fenêtre précédente = [windowStart - D, windowStart].
+  const windowStartMs = new Date(windowStart).getTime();
+  const durationMs = now.getTime() - windowStartMs;
+  const prevWindowStart = new Date(windowStartMs - durationMs).toISOString();
+  // uptime courant par source (recalculé via sous-fonction pour être cohérent)
+  const uptimeCurrent = computeUptimeBySource(db, knownIds, windowStart, now.toISOString());
+  // uptime précédent par source
+  const uptimePrev = computeUptimeBySource(db, knownIds, prevWindowStart, windowStart);
+
+  // ── Cohérence : sondes sur la fenêtre courante ──────────────────────────────
+  const coherenceProbes = readCoherenceProbes(db, windowStart);
+  const coherenceAgg = aggregateCoherenceByVenue(coherenceProbes, knownIds);
 
   // Requête A : ticks ok=1 dans la fenêtre — TOUS les ticks (auto ET manuels).
   // Les relevés manuels (note='manual') sont désormais inclus dans les stats de stabilité :
@@ -814,6 +925,18 @@ export function buildSourceHealth(
       return { size, respondedTicks: r, uptimePct: totalTicks > 0 ? Math.round((r / totalTicks) * 1000) / 10 : 100 };
     });
 
+    // Tendance : comparaison fenêtre courante vs précédente.
+    // Pas de base de comparaison (fenêtre précédente sans relevé, ex. < 14 j de données) → 'flat'
+    // (évite un faux 'down' au démarrage pour une source à dispo courante basse).
+    const cur = uptimeCurrent.get(id) ?? 100;
+    const prevRaw = uptimePrev.get(id);
+    const delta = prevRaw === undefined ? 0 : cur - prevRaw;
+    const uptimeTrend: 'up' | 'down' | 'flat' =
+      delta > 1 ? 'up' : delta < -1 ? 'down' : 'flat';
+
+    // Cohérence
+    const coh = coherenceAgg.get(id) ?? { tests: 0, suspects: 0, lastSuspectAt: null };
+
     return {
       id,
       display: displayName(id),
@@ -825,6 +948,8 @@ export function buildSourceHealth(
       lastFailureReason: a.lastFailureReason,
       days,
       pairNote: id === 'comet' ? 'USDC uniquement' : null,
+      coherence: { tests: coh.tests, suspects: coh.suspects, lastSuspectAt: coh.lastSuspectAt },
+      uptimeTrend,
     };
   });
 

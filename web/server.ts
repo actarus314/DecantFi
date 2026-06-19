@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadWebConfig } from './config.js';
-import { openReadOnly } from './read-db.js';
+import { openReadOnly, readCoherenceProbesByVenue } from './read-db.js';
 import { overview, buildSourceHealth, latestChosenRpc } from './stats.js';
 import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
 import { appendRpcCallLog } from '../db/index.js';
@@ -106,6 +106,32 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const windowStart = new Date(now.getTime() - 7 * 86_400_000).toISOString();
       const result = buildSourceHealth(db, windowStart, now);
       json(res, 200, { ...result, generatedAt: now.toISOString() });
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/api/coherence') {
+      const venue = query['venue'] ?? '';
+      if (!venue) {
+        json(res, 400, { error: 'paramètre venue manquant' });
+        return;
+      }
+      const now = new Date();
+      const windowStart = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+      const rows = readCoherenceProbesByVenue(db, venue, windowStart);
+      // Convertit les bigint en string pour la sérialisation JSON
+      const probes = rows.map((p) => ({
+        created_at: p.created_at,
+        pair: p.pair,
+        amount_in: p.amount_in.toString(),
+        incoherent: p.incoherent,
+        reason: p.reason,
+        net_quoted: p.net_quoted !== null ? p.net_quoted.toString() : null,
+        net_simulated: p.net_simulated !== null ? p.net_simulated.toString() : null,
+        delta_bps: p.delta_bps !== null ? Number(p.delta_bps) : null,
+        route: p.route_json !== null ? (() => { try { return JSON.parse(p.route_json!); } catch { return null; } })() : null,
+        trace: p.trace_json !== null ? (() => { try { return JSON.parse(p.trace_json!); } catch { return null; } })() : null,
+      }));
+      json(res, 200, { venue, probes });
       return;
     }
 

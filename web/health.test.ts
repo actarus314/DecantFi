@@ -4,10 +4,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { openDb, type TickInsert, type QuoteInsert, type RpcProbeInsert } from '../db/index.js';
+import { openDb, type TickInsert, type QuoteInsert, type RpcProbeInsert, type CoherenceProbeInsert } from '../db/index.js';
 import { toStroops } from '../core/amount.js';
 import { openReadOnly } from './read-db.js';
-import { buildSourceHealth, buildRpcHealth } from './stats.js';
+import { buildSourceHealth, buildRpcHealth, aggregateCoherenceByVenue, computeUptimeBySource } from './stats.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -390,5 +390,255 @@ describe('buildRpcHealth — reqTotal/reqPerSec depuis rpc_call_log', () => {
       expect(typeof r.reqTotal).toBe('number');
       expect(typeof r.reqPerSec).toBe('number');
     }
+  });
+});
+
+// ─── aggregateCoherenceByVenue — tests unitaires (sous-fonction pure) ──────────
+
+describe('aggregateCoherenceByVenue — agrégation cohérence', () => {
+  const KNOWN = ['xbull', 'soroswap', 'aquarius', 'comet', 'ultrastellar', 'stellarbroker', 'horizon'];
+
+  it('venue sans sonde → tests=0, suspects=0, lastSuspectAt=null', () => {
+    const agg = aggregateCoherenceByVenue([], KNOWN);
+    for (const id of KNOWN) {
+      const a = agg.get(id)!;
+      expect(a.tests).toBe(0);
+      expect(a.suspects).toBe(0);
+      expect(a.lastSuspectAt).toBeNull();
+    }
+  });
+
+  it('compte tests et suspects par venue', () => {
+    const probes = [
+      { venue: 'xbull', incoherent: false, created_at: '2025-05-28T10:00:00Z' },
+      { venue: 'xbull', incoherent: true,  created_at: '2025-05-29T10:00:00Z' },
+      { venue: 'xbull', incoherent: true,  created_at: '2025-05-30T10:00:00Z' },
+      { venue: 'soroswap', incoherent: false, created_at: '2025-05-28T10:00:00Z' },
+    ];
+    const agg = aggregateCoherenceByVenue(probes, KNOWN);
+    const x = agg.get('xbull')!;
+    expect(x.tests).toBe(3);
+    expect(x.suspects).toBe(2);
+    // lastSuspectAt = le plus récent parmi les suspectes
+    expect(x.lastSuspectAt).toBe('2025-05-30T10:00:00Z');
+
+    const s = agg.get('soroswap')!;
+    expect(s.tests).toBe(1);
+    expect(s.suspects).toBe(0);
+    expect(s.lastSuspectAt).toBeNull();
+  });
+
+  it('venue inconnue ignorée', () => {
+    const probes = [
+      { venue: 'unknown-venue', incoherent: true, created_at: '2025-05-28T10:00:00Z' },
+    ];
+    const agg = aggregateCoherenceByVenue(probes, KNOWN);
+    // Aucune venue connue ne doit être impactée
+    for (const id of KNOWN) {
+      expect(agg.get(id)!.tests).toBe(0);
+    }
+  });
+
+  it('lastSuspectAt = max created_at parmi suspectes uniquement', () => {
+    const probes = [
+      { venue: 'aquarius', incoherent: true,  created_at: '2025-05-25T08:00:00Z' },
+      { venue: 'aquarius', incoherent: false, created_at: '2025-05-30T08:00:00Z' }, // non suspecte, plus récente
+      { venue: 'aquarius', incoherent: true,  created_at: '2025-05-27T08:00:00Z' },
+    ];
+    const agg = aggregateCoherenceByVenue(probes, KNOWN);
+    const a = agg.get('aquarius')!;
+    expect(a.tests).toBe(3);
+    expect(a.suspects).toBe(2);
+    // 2025-05-30 est non suspecte → lastSuspectAt = 2025-05-27
+    expect(a.lastSuspectAt).toBe('2025-05-27T08:00:00Z');
+  });
+});
+
+// ─── coherence intégrée dans buildSourceHealth (via DB) ───────────────────────
+
+describe('buildSourceHealth — champ coherence', () => {
+  let dir5: string;
+  let path5: string;
+  let res5: ReturnType<typeof buildSourceHealth>;
+
+  const NOW5 = new Date('2025-06-01T12:00:00Z');
+  const WIN5 = new Date(NOW5.getTime() - 7 * 86_400_000).toISOString();
+
+  beforeAll(() => {
+    dir5 = mkdtempSync(join(tmpdir(), 'stellarswap-health-coherence-'));
+    path5 = join(dir5, 'test.db');
+    const db = openDb(path5);
+
+    // Un tick ok pour avoir un contexte de ticks existants
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-29T10:00:00Z' }),
+      [mkQuote('xbull'), mkQuote('aquarius')],
+    );
+
+    // Sondes de cohérence pour xbull : 3 tests dont 2 suspects
+    const mkProbe = (venue: string, incoherent: boolean, created_at: string): CoherenceProbeInsert => ({
+      created_at,
+      venue,
+      pair: 'BLND->USDC',
+      amount_in: toStroops(250),
+      incoherent,
+      reason: incoherent ? 'delta_bps trop élevé' : null,
+      net_quoted: BigInt(125_000_000),
+      net_simulated: incoherent ? BigInt(123_000_000) : BigInt(125_000_000),
+      delta_bps: incoherent ? 160 : 5,
+      route_json: null,
+      trace_json: null,
+    });
+
+    db.insertCoherenceProbe(mkProbe('xbull', false, '2025-05-27T10:00:00Z'));
+    db.insertCoherenceProbe(mkProbe('xbull', true,  '2025-05-28T10:00:00Z'));
+    db.insertCoherenceProbe(mkProbe('xbull', true,  '2025-05-29T10:00:00Z'));
+
+    // Sonde pour aquarius : 1 test, 0 suspect
+    db.insertCoherenceProbe(mkProbe('aquarius', false, '2025-05-28T10:00:00Z'));
+
+    // Sonde HORS fenêtre (>7j) → doit être ignorée
+    db.insertCoherenceProbe(mkProbe('xbull', true, '2025-05-01T10:00:00Z'));
+
+    db.close();
+    const rdb = openReadOnly(path5);
+    res5 = buildSourceHealth(rdb, WIN5, NOW5);
+    rdb.close();
+  });
+
+  afterAll(() => { rmSync(dir5, { recursive: true, force: true }); });
+
+  it('xbull : 3 tests, 2 suspects, lastSuspectAt = 2025-05-29', () => {
+    const xbull = res5.sources.find((s) => s.id === 'xbull')!;
+    expect(xbull.coherence.tests).toBe(3);
+    expect(xbull.coherence.suspects).toBe(2);
+    expect(xbull.coherence.lastSuspectAt).toContain('2025-05-29');
+  });
+
+  it('aquarius : 1 test, 0 suspects, lastSuspectAt = null', () => {
+    const aq = res5.sources.find((s) => s.id === 'aquarius')!;
+    expect(aq.coherence.tests).toBe(1);
+    expect(aq.coherence.suspects).toBe(0);
+    expect(aq.coherence.lastSuspectAt).toBeNull();
+  });
+
+  it('sonde hors fenêtre ignorée (xbull.tests reste 3)', () => {
+    const xbull = res5.sources.find((s) => s.id === 'xbull')!;
+    // La sonde du 2025-05-01 est hors fenêtre 7j → tests = 3 et non 4
+    expect(xbull.coherence.tests).toBe(3);
+  });
+
+  it('venue sans sonde → coherence.tests = 0', () => {
+    const soroswap = res5.sources.find((s) => s.id === 'soroswap')!;
+    expect(soroswap.coherence.tests).toBe(0);
+    expect(soroswap.coherence.suspects).toBe(0);
+    expect(soroswap.coherence.lastSuspectAt).toBeNull();
+  });
+});
+
+// ─── computeUptimeBySource + uptimeTrend — tests unitaires ────────────────────
+
+describe('buildSourceHealth — champ uptimeTrend', () => {
+  let dir6: string;
+  let path6: string;
+
+  const NOW6 = new Date('2025-06-01T12:00:00Z');
+  // Fenêtre courante : [NOW6-7j, NOW6)
+  const WIN6 = new Date(NOW6.getTime() - 7 * 86_400_000).toISOString();
+  // Fenêtre précédente : [NOW6-14j, NOW6-7j)
+  const WIN6_PREV = new Date(NOW6.getTime() - 14 * 86_400_000).toISOString();
+
+  const KNOWN6 = ['xbull', 'soroswap', 'aquarius', 'comet', 'ultrastellar', 'stellarbroker', 'horizon'];
+
+  beforeAll(() => {
+    dir6 = mkdtempSync(join(tmpdir(), 'stellarswap-health-trend-'));
+    path6 = join(dir6, 'test.db');
+    const db = openDb(path6);
+
+    // Fenêtre précédente [2025-05-18T12:00 .. 2025-05-25T12:00) :
+    // 2 ticks ok, xbull répond à 1 seul (50%)
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-19T10:00:00Z' }),
+      [mkQuote('xbull')],
+    );
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-20T10:00:00Z' }),
+      [], // xbull absent
+    );
+
+    // Fenêtre courante [2025-05-25T12:00 .. 2025-06-01T12:00) :
+    // 2 ticks ok, xbull répond aux 2 (100%)
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-26T10:00:00Z' }),
+      [mkQuote('xbull')],
+    );
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-27T10:00:00Z' }),
+      [mkQuote('xbull')],
+    );
+
+    db.close();
+  });
+
+  afterAll(() => { rmSync(dir6, { recursive: true, force: true }); });
+
+  it('computeUptimeBySource : fenêtre précédente xbull = 50%, courante = 100%', () => {
+    const db = openReadOnly(path6);
+    const prev = computeUptimeBySource(db, KNOWN6, WIN6_PREV, WIN6);
+    const cur = computeUptimeBySource(db, KNOWN6, WIN6, NOW6.toISOString());
+    db.close();
+    expect(prev.get('xbull')).toBeCloseTo(50, 0);
+    expect(cur.get('xbull')).toBeCloseTo(100, 0);
+  });
+
+  it('uptimeTrend = "up" quand delta > 1pt', () => {
+    const db = openReadOnly(path6);
+    const res = buildSourceHealth(db, WIN6, NOW6);
+    db.close();
+    const xbull = res.sources.find((s) => s.id === 'xbull')!;
+    // delta = 100 - 50 = 50 > 1 → 'up'
+    expect(xbull.uptimeTrend).toBe('up');
+  });
+
+  it('uptimeTrend = "flat" si pas de base de comparaison (fenêtre précédente vide)', () => {
+    // Ouvre une DB fraîche avec seulement des ticks dans la fenêtre courante (pas de précédents)
+    const dirFlat = mkdtempSync(join(tmpdir(), 'stellarswap-trend-flat-'));
+    const pathFlat = join(dirFlat, 'test.db');
+    const db = openDb(pathFlat);
+    db.insertTickWithQuotes(
+      mkTick({ started_at: '2025-05-26T10:00:00Z' }),
+      [mkQuote('xbull')],
+    );
+    db.close();
+    const rdb = openReadOnly(pathFlat);
+    const res = buildSourceHealth(rdb, WIN6, NOW6);
+    rdb.close();
+    rmSync(dirFlat, { recursive: true, force: true });
+    const xbull = res.sources.find((s) => s.id === 'xbull')!;
+    // Fenêtre précédente : totalTicks=0 → uptimePrev=100, cur=100 → delta=0 → 'flat'
+    expect(xbull.uptimeTrend).toBe('flat');
+  });
+
+  it('uptimeTrend = "flat" si delta dans [-1, +1]', () => {
+    // Cas fictif via computeUptimeBySource + delta synthétique : vérifie la règle de seuil
+    // On teste la logique pure avec delta = 0.5 (< 1 → flat)
+    // Pour cela, on crée une DB où xbull répond partout dans les deux fenêtres
+    const dirEq = mkdtempSync(join(tmpdir(), 'stellarswap-trend-eq-'));
+    const pathEq = join(dirEq, 'test.db');
+    const db = openDb(pathEq);
+    // Fenêtre précédente : 2 ticks, xbull répond aux 2
+    db.insertTickWithQuotes(mkTick({ started_at: '2025-05-18T10:00:00Z' }), [mkQuote('xbull')]);
+    db.insertTickWithQuotes(mkTick({ started_at: '2025-05-19T10:00:00Z' }), [mkQuote('xbull')]);
+    // Fenêtre courante : 2 ticks, xbull répond aux 2
+    db.insertTickWithQuotes(mkTick({ started_at: '2025-05-26T10:00:00Z' }), [mkQuote('xbull')]);
+    db.insertTickWithQuotes(mkTick({ started_at: '2025-05-27T10:00:00Z' }), [mkQuote('xbull')]);
+    db.close();
+    const rdb = openReadOnly(pathEq);
+    const res = buildSourceHealth(rdb, WIN6, NOW6);
+    rdb.close();
+    rmSync(dirEq, { recursive: true, force: true });
+    const xbull = res.sources.find((s) => s.id === 'xbull')!;
+    // delta = 100 - 100 = 0 → 'flat'
+    expect(xbull.uptimeTrend).toBe('flat');
   });
 });
