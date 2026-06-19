@@ -26,7 +26,9 @@ body{margin:0; background:var(--bg); color:var(--val);
 .topbar{display:flex; align-items:center; gap:.7rem; margin-bottom:1rem; flex-wrap:wrap; position:sticky; top:0; z-index:50; background:var(--bg); border-bottom:1px solid var(--card-border); padding:.55rem 0;}
 .brand{font-size:15px; font-weight:700; letter-spacing:-.01em;}
 .brand .dim{color:var(--caption); font-weight:600;}
-.brand-logo{display:block; flex:none; margin-right:-.3rem;}
+.brand-logo{display:block; flex:none; margin-right:-.3rem; border-radius:7px; padding:3px; box-sizing:border-box; transition:background .15s ease;}
+.brand-link{display:inline-flex; align-items:center; gap:.4rem; text-decoration:none; color:inherit;}
+.brand-link:hover .brand-logo{background:#0f172a;}
 .pagenav{display:inline-flex; gap:4px; background:var(--section-bg); border:1px solid var(--card-border); border-radius:9999px; padding:3px;}
 .pagenav button{border:0; background:transparent; color:var(--caption); font-size:13px; font-weight:700; padding:5px 16px; border-radius:9999px; cursor:pointer; transition:all .15s;}
 .pagenav button.active{background:#1e293b; color:#fff;}
@@ -812,9 +814,9 @@ function rotateHeatUtc(heat, offsetH) {
 }
 
 // ─── Formatage ────────────────────────────────────────────────────────────────
-const fmt = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmt3 = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-const fmt0 = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
+const fmt = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt3 = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const fmt0 = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { maximumFractionDigits: 0 });
 
 function freshLabel(lastTickAt) {
   const hint = t('countdown_refresh_hint');
@@ -1066,7 +1068,7 @@ function distBars(winnerDist) {
 }
 
 // ─── Section temporelle : modèle + rendu (encart / hebdo / zoom) ────────────────
-const hh2 = x => String(x).padStart(2, '0') + ' h';
+const hh2 = x => String(x).padStart(2, '0') + (lang === 'fr' ? ' h' : ':00');
 const pctTxt = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)} %`;
 
 function timeModel(heatEffLocal, weekAvg) {
@@ -1316,8 +1318,10 @@ function buildPage() {
 
   const topbarHtml = `
   <div class="topbar">
-    <img class="brand-logo" src="/favicon.svg" width="28" height="28" alt="">
-    <span class="brand">decant.fi <span class="dim">· ${t('brand_dim')}</span></span>
+    <a class="brand-link" href="/" aria-label="decant.fi">
+      <img class="brand-logo" src="/favicon.svg" width="36" height="36" alt="">
+      <span class="brand">decant.fi <span class="dim">· ${t('brand_dim')}</span></span>
+    </a>
     ${view === 'dashboard' ? `<span class="pagenav" style="margin-left:.3rem">
       <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
       <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
@@ -1383,6 +1387,8 @@ function buildPage() {
 }
 
 function renderApp() {
+  document.documentElement.lang = lang;
+  document.title = 'decant.fi — ' + t('brand_dim');
   document.getElementById('app').innerHTML = buildPage();
 }
 
@@ -1752,7 +1758,7 @@ function reviewTableHtml(rv, tgt, showSimDelta) {
     }
   }
   const feeXlm = rv.gasFeeXlm ?? 0;
-  const feeStr = feeXlm.toLocaleString('fr-FR', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
+  const feeStr = feeXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
   return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.4rem">
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} BLND</td></tr>
@@ -1822,7 +1828,7 @@ function execModal() {
         deltaChip = `<div style="display:inline-flex;align-items:center;gap:.3rem;background:${col}22;color:${col};border:1px solid ${col}55;border-radius:999px;padding:.2rem .75rem;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:.5rem">${sign}${fmt3(d)} ${target} ${t('exec_delta')}</div>`;
       }
       const doneFeeXlm = rv.gasFeeXlm ?? 0;
-      const doneFeeStr = doneFeeXlm.toLocaleString('fr-FR', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
+      const doneFeeStr = doneFeeXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
       compBlock = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:.9rem 0 .3rem">
         <tr><td style="padding:5px 0;color:var(--caption)">${t('exec_quoted')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.netOut)} ${target}</td></tr>
         <tr><td style="padding:5px 0;color:var(--caption)">${t('review_receive_min')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.minReceived)} ${target}</td></tr>
