@@ -412,7 +412,7 @@ const STRINGS = {
     review_slippage: 'Tolérance slippage',
     review_fidelity: (winner, net) => `Le meilleur affiché était ${winner} (net ${net}) — non exécutable en 1 clic ; on exécute la meilleure route exécutable.`,
     review_network_fee: 'Frais réseau (max)',
-    review_network_fee_note: 'Plafond affiché par le wallet ; la part de loyer (rent) non consommée est remboursée.',
+    review_network_fee_note: 'Frais max affichés par le wallet ; la part de loyer (rent) non consommée est remboursée.',
     review_confirm: 'Confirmer & signer',
     review_cancel: 'Annuler',
 
@@ -625,7 +625,7 @@ const STRINGS = {
     review_slippage: 'Slippage tolerance',
     review_fidelity: (winner, net) => `The best displayed was ${winner} (net ${net}) — not executable in 1 click; we execute the best executable route.`,
     review_network_fee: 'Network fee (max)',
-    review_network_fee_note: 'Cap shown by the wallet; unused rent is refunded.',
+    review_network_fee_note: 'Max fees shown by the wallet; unused rent is refunded.',
     review_confirm: 'Confirm & sign',
     review_cancel: 'Cancel',
 
@@ -1212,28 +1212,33 @@ function buildHealthPage(topbarHtml) {
       return `<div class="ubar"><span class="sz">${b.size}</span><div class="track${cls}"><span style="width:${b.uptimePct}%"></span></div><span class="pct">${b.uptimePct.toFixed(0)} %</span></div>`;
     }).join('');
     const elH = (health && health.todayElapsedH) || 0;
-    // Secteurs pie pour le disque partiel (1/4 de cercle par incrément de 6h)
+    // Vue semaine Lun→Dim : passé (disques pleins) | aujourd'hui (pie) | futur (gris)
+    // todayLocalDow() = 0=Lun … 6=Dim ; s.days[0]=aujourd'hui, s.days[1]=hier, etc.
+    const todayDow = todayLocalDow();
+    // Secteurs pie SVG 11×11 pour le disque partiel (cx=5.5, cy=5.5, r=5)
     const PIE = [
-      '',  // Q=0 : fond gris seul
-      'M 6 6 L 6 1 A 5 5 0 0 1 11 6 Z',  // Q=1 : 90°
-      'M 6 6 L 6 1 A 5 5 0 0 1 11 6 A 5 5 0 0 1 6 11 Z',  // Q=2 : 180°
-      'M 6 6 L 6 1 A 5 5 0 0 1 11 6 A 5 5 0 0 1 6 11 A 5 5 0 0 1 1 6 Z',  // Q=3 : 270°
+      '',
+      'M 5.5 5.5 L 5.5 0.5 A 5 5 0 0 1 10.5 5.5 Z',
+      'M 5.5 5.5 L 5.5 0.5 A 5 5 0 0 1 10.5 5.5 A 5 5 0 0 1 5.5 10.5 Z',
+      'M 5.5 5.5 L 5.5 0.5 A 5 5 0 0 1 10.5 5.5 A 5 5 0 0 1 5.5 10.5 A 5 5 0 0 1 0.5 5.5 Z',
     ];
-    // Ordre : passé (oldest first) → aujourd'hui (dernier)
-    const reversedDays = s.days.slice().reverse();
-    const dots = reversedDays.map((d, i) => {
-      if (i === reversedDays.length - 1) {
-        // Aujourd'hui : disque pie qui se remplit par 1/4 de journée
-        const quarters = Math.min(Math.floor(elH / 6), 4);
-        const color = d === 'ok' ? 'var(--green)' : d === 'warn' ? 'var(--amber)' : d === 'bad' ? 'var(--tool)' : 'var(--card-border)';
-        if (quarters === 4) return `<i class="${d === 'ok' ? '' : d === 'warn' ? 'w' : d === 'bad' ? 'b' : 'g'}" title="${d ?? t('health_legend_null')}"></i>`;
-        return `<svg width="13" height="13" viewBox="-1 -1 14 14" title="${d ?? t('health_legend_null')}">
-          <circle cx="6" cy="6" r="5" fill="var(--card-border)"/>
-          ${PIE[quarters] ? `<path d="${PIE[quarters]}" fill="${color}"/>` : ''}
+    const quarters = Math.min(Math.floor(elH / 6), 4);
+    const todayStatus = s.days[0];
+    const todayColor = todayStatus === 'ok' ? 'var(--green)' : todayStatus === 'warn' ? 'var(--amber)' : todayStatus === 'bad' ? 'var(--tool)' : 'var(--card-border)';
+    const todayDot = quarters === 4
+      ? `<i class="${todayStatus === 'ok' ? '' : todayStatus === 'warn' ? 'w' : todayStatus === 'bad' ? 'b' : 'g'}" title="${todayStatus ?? t('health_legend_null')}"></i>`
+      : `<svg width="11" height="11" viewBox="0 0 11 11" title="${todayStatus ?? t('health_legend_null')}">
+          <circle cx="5.5" cy="5.5" r="5" fill="var(--card-border)"/>
+          ${PIE[quarters] ? `<path d="${PIE[quarters]}" fill="${todayColor}"/>` : ''}
         </svg>`;
+    const dots = Array.from({ length: 7 }, (_, d) => {
+      if (d < todayDow) {
+        const pastStatus = s.days[todayDow - d] ?? null;
+        const cls = pastStatus === 'ok' ? '' : pastStatus === 'warn' ? ' w' : pastStatus === 'bad' ? ' b' : ' g';
+        return `<i class="${cls.trim()}" title="${pastStatus ?? t('health_legend_null')}"></i>`;
       }
-      const cls = d === 'ok' ? '' : d === 'warn' ? ' w' : d === 'bad' ? ' b' : ' g';
-      return `<i class="${cls.trim()}" title="${d ?? t('health_legend_null')}"></i>`;
+      if (d === todayDow) return todayDot;
+      return `<i class="g" title="${t('health_legend_null')}"></i>`;  // futur
     }).join('');
     const pairNote = s.pairNote ? ` <span class="muted" style="font-size:11px">· ${s.pairNote}</span>` : '';
     return `<tr>
@@ -1780,18 +1785,16 @@ function reviewTableHtml(rv, tgt, showSimDelta) {
   const feeStr = feeXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
   const realXlm = rv.gasRealXlm;
   const realStr = realXlm != null ? realXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
+  const feeLabel = lang === 'fr' ? 'Frais réseau (réel / max)' : 'Network fee (real / max)';
   const feeDisplay = realStr != null
     ? `${realStr} XLM <span style="font-size:11px;color:var(--caption)">(max&nbsp;${feeStr})</span>`
     : `${feeStr} XLM`;
-  const feeLabel = realStr != null
-    ? (lang === 'fr' ? 'Frais réseau (réel / max)' : 'Network fee (real / max)')
-    : t('review_network_fee');
   return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.4rem">
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} BLND</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${tgt}${simDeltaHtml}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt3(rv.minReceived)} ${tgt}</td></tr>
-    <tr><td style="padding:4px 0;color:var(--caption)">${feeLabel}</td><td style="padding:4px 0;text-align:right;color:var(--caption);font-variant-numeric:tabular-nums">${feeDisplay}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${feeLabel}</td><td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">${feeDisplay}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${vl}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
   </table>
@@ -1857,11 +1860,11 @@ function execModal() {
       const doneRealXlm = rv.gasRealXlm;
       const doneRealStr = doneRealXlm != null ? doneRealXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
       const doneFeeDisplay = doneRealStr != null ? `${doneRealStr} XLM <span style="font-size:11px;color:var(--caption)">(max&nbsp;${doneFeeStr})</span>` : `${doneFeeStr} XLM`;
-      const doneFeeLabel = doneRealStr != null ? (lang === 'fr' ? 'Frais réseau (réel / max)' : 'Network fee (real / max)') : t('review_network_fee');
+      const doneFeeLabel = lang === 'fr' ? 'Frais réseau (réel / max)' : 'Network fee (real / max)';
       compBlock = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:.9rem 0 .3rem">
         <tr><td style="padding:5px 0;color:var(--caption)">${t('exec_quoted')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.netOut)} ${target}</td></tr>
         <tr><td style="padding:5px 0;color:var(--caption)">${t('review_receive_min')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.minReceived)} ${target}</td></tr>
-        <tr><td style="padding:5px 0;color:var(--caption)">${doneFeeLabel}</td><td style="padding:5px 0;text-align:right;color:var(--caption);font-variant-numeric:tabular-nums">${doneFeeDisplay}</td></tr>
+        <tr><td style="padding:5px 0;color:var(--caption)">${doneFeeLabel}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${doneFeeDisplay}</td></tr>
         <tr style="border-top:1px solid var(--card-border)"><td style="padding:6px 0;color:var(--heading);font-weight:600">${t('exec_executed')}</td><td style="padding:6px 0;text-align:right">${execVal}</td></tr>
       </table>${deltaChip}`;
     }
