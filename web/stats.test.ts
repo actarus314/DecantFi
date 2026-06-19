@@ -190,14 +190,9 @@ describe('ladders', () => {
     expect(stellarbroker?.chip).toBe('est');
   });
 
-  it('notes mappées (gagnant, cross-check, fee=0...)', () => {
+  it('notes : vides sauf route composite EURC via-USDC', () => {
     const rows = result_usdc.ladders['750']!;
-    const winner = rows.find(r => r.winner);
-    expect(winner?.note).toContain('gagnant');
-    const comet = rows.find(r => r.display === 'Comet (pool)');
-    expect(comet?.note).toContain('cross-check backstop');
-    const ultra = rows.find(r => r.display === 'Ultra Stellar');
-    expect(ultra?.note).toContain('fee = 0');
+    for (const r of rows) expect(r.note).toBe('');
   });
 
   it('EURC note via-USDC sur le gagnant', () => {
@@ -361,13 +356,13 @@ describe('helpers', () => {
     expect(chipFor('estimate', 'xbull', 'via-usdc')).toBe('calc');
   });
 
-  it('noteFor: gagnant, via-usdc, comet, ultra, broker, horizon', () => {
-    expect(noteFor('xbull', true, null)).toBe('gagnant');
-    expect(noteFor('xbull', true, 'via-usdc')).toBe('gagnant · via-USDC');
-    expect(noteFor('comet', false, null)).toBe('cross-check backstop');
-    expect(noteFor('ultrastellar', false, null)).toBe('fee = 0');
-    expect(noteFor('stellarbroker', false, null)).toBe('plancher (fee opaque)');
-    expect(noteFor('horizon', false, null)).toBe('plancher DEX');
+  it('noteFor: vide sauf via-usdc', () => {
+    expect(noteFor('xbull', true, null)).toBe('');
+    expect(noteFor('xbull', true, 'via-usdc')).toBe('via-USDC');
+    expect(noteFor('comet', false, null)).toBe('');
+    expect(noteFor('ultrastellar', false, null)).toBe('');
+    expect(noteFor('stellarbroker', false, null)).toBe('');
+    expect(noteFor('horizon', false, null)).toBe('');
     expect(noteFor('soroswap', false, null)).toBe('');
   });
 });
