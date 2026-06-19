@@ -1,14 +1,14 @@
 // Exécute UN tick : prix 1× (injecté aux sondes pour comparabilité), quote() par sonde, assemble les lignes.
 // Aucune I/O DB. Renvoie un TickInsert + ses QuoteInsert (prêts pour db.insertTickWithQuotes).
-// ponytail: l'import de simulateXbullNet (web/execute.ts) est intentionnel — execute.ts est DOM-free et compilé ensemble.
-import { BLND } from '../core/assets.js';
+import { BLND, EURC } from '../core/assets.js';
 import { priceImpactPct, targetUsdPerUnit, type Prices } from '../core/prices.js';
 import type { QuoteResult, QuoteOptions, EngineConfig } from '../core/engine.js';
-import type { NormalizedQuote, RouteHop } from '../core/sources/types.js';
+import type { NormalizedQuote } from '../core/sources/types.js';
 import type { TickInsert, QuoteInsert } from '../db/index.js';
 import type { CollectorConfig } from './config.js';
 import type { Probe } from './probes.js';
-import { simulateXbullNet } from '../web/execute.js';
+import { resimAquariusXbull } from '../web/quote-api.js';
+import type { simulateAquariusNet, simulateXbullNet } from '../web/execute.js';
 
 export interface TickDeps {
   probes: Probe[];
@@ -16,6 +16,8 @@ export interface TickDeps {
   now: () => Date;
   fetchPrices: (opts: { timeoutMs?: number }) => Promise<Prices>;
   quote: (opts: QuoteOptions) => Promise<QuoteResult>;
+  /** Injection de fakes pour les sims Aquarius/xBull (tests uniquement). */
+  resimDeps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet };
 }
 
 export interface TickAssembled { tick: TickInsert; quotes: QuoteInsert[]; }
@@ -102,22 +104,13 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
       if (!reasons.has(e)) reasons.set(e, result.errorReasons?.[e] ?? 'indisponible');
     }
 
-    // Décode la route xBull réelle (best-effort) : remplace les RouteHop[] avant routeSummary()
-    // pour que la DB stocke "BLND->XLM->USDC" au lieu du résumé à 2 nœuds sans hops.
-    const xbRanked = result.ranking.ranked.find((q) => q.source === 'xbull');
-    if (xbRanked) {
-      const rawRoute = (xbRanked.raw as { route?: unknown } | undefined)?.route;
-      if (rawRoute) {
-        try {
-          const xbSim = await simulateXbullNet(String(rawRoute), probe.amountIn, { rpcUrl: deps.cfg.rpcUrl });
-          if (xbSim && xbSim.route.length >= 2) {
-            const r = xbSim.route;
-            const hops: RouteHop[] = r.slice(0, -1).map((sell, i) => ({ venue: 'xbull', sell, buy: r[i + 1]! }));
-            (xbRanked as { route: RouteHop[] }).route = hops;
-          }
-        } catch { /* best-effort : échec → route originale conservée */ }
-      }
-    }
+    // Re-simulation Aquarius + xBull : remplace les nets sur-cotés et décode la route xBull,
+    // pour que la DB stocke les vrais fills simulés (pas les cotes API sur-cotées).
+    // Best-effort : un échec RPC (429, timeout) ne casse jamais le tick.
+    const pairUi = probe.buy.symbol === EURC.symbol ? 'EURC' : 'USDC';
+    try {
+      await resimAquariusXbull(result, pairUi, probe.amountIn, { rpcUrl: deps.cfg.rpcUrl }, deps.resimDeps);
+    } catch { /* repli silencieux : cote API conservée */ }
 
     quotes.push(...rowsForProbe(probe, result, prices));
   }

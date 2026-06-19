@@ -96,6 +96,94 @@ describe('runTick (EURC)', () => {
   });
 });
 
+describe('runTick (resim Aquarius + xBull)', () => {
+  it('stocke le net re-simulé d\'Aquarius quand la sim retourne une valeur différente', async () => {
+    // Aquarius sur-cote 12.6 → sim retourne 12.4 → la row DB doit stocker 12.4
+    const aqQ = mk('aquarius', toStroops('12.6'), {
+      sellAsset: BLND, buyAsset: USDC, amountIn: toStroops('250'),
+      raw: { swap_chain_xdr: 'FAKE_XDR' },
+    });
+    const result: QuoteResult = {
+      request: { sell: 'BLND', buy: 'USDC', amountIn: toStroops('250'), slippageBps: 50 }, prices,
+      ranking: { ranked: [{ ...aqQ, rank: 1, deltaVsBestPct: 0 }], best: { ...aqQ, rank: 1, deltaVsBestPct: 0 } },
+      errors: [],
+    };
+
+    const fakeSimAq = async (_xdr: string, _amt: bigint, _opts: { rpcUrl: string }) => toStroops('12.4');
+
+    const { quotes } = await runTick({
+      probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
+      cfg: cfg(), now, fetchPrices: async () => prices, quote: async () => result,
+      resimDeps: { simulateAquariusNet: fakeSimAq },
+    });
+
+    expect(quotes.length).toBe(1);
+    expect(quotes[0]!.source_id).toBe('aquarius');
+    expect(quotes[0]!.net_out).toBe(toStroops('12.4'));
+    expect(quotes[0]!.is_winner).toBe(true);
+  });
+
+  it('stocke le net re-simulé de xBull et est_winner si meilleur après re-rank', async () => {
+    // xBull sur-cote 12.6 → sim retourne 11.8 < Aquarius 12.0 → Aquarius doit être winner
+    const xbQ = mk('xbull', toStroops('12.6'), {
+      sellAsset: BLND, buyAsset: USDC, amountIn: toStroops('250'),
+      raw: { route: 'BLND:GBLD,XLM:native,USDC:GUSDC' },
+    });
+    const aqQ = mk('aquarius', toStroops('12.0'), { sellAsset: BLND, buyAsset: USDC, amountIn: toStroops('250') });
+    const result: QuoteResult = {
+      request: { sell: 'BLND', buy: 'USDC', amountIn: toStroops('250'), slippageBps: 50 }, prices,
+      ranking: {
+        ranked: [{ ...xbQ, rank: 1, deltaVsBestPct: 0 }, { ...aqQ, rank: 2, deltaVsBestPct: -5 }],
+        best: { ...xbQ, rank: 1, deltaVsBestPct: 0 },
+      },
+      errors: [],
+    };
+
+    const fakeSimXb = async (_route: string, _amt: bigint, _opts: { rpcUrl: string }) =>
+      ({ net: toStroops('11.8'), route: ['BLND', 'XLM', 'USDC'] });
+
+    const { quotes } = await runTick({
+      probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
+      cfg: cfg(), now, fetchPrices: async () => prices, quote: async () => result,
+      resimDeps: { simulateXbullNet: fakeSimXb },
+    });
+
+    expect(quotes.length).toBe(2);
+    const xbRow = quotes.find((q) => q.source_id === 'xbull')!;
+    const aqRow = quotes.find((q) => q.source_id === 'aquarius')!;
+    // net re-simulé stocké
+    expect(xbRow.net_out).toBe(toStroops('11.8'));
+    // après re-rank, Aquarius (12.0) > xBull (11.8) → Aquarius est winner
+    expect(aqRow.is_winner).toBe(true);
+    expect(xbRow.is_winner).toBe(false);
+  });
+
+  it('repli silencieux : une exception dans resim ne casse pas le tick (cote API conservée)', async () => {
+    const xbQ = mk('xbull', toStroops('12.6'), {
+      sellAsset: BLND, buyAsset: USDC, amountIn: toStroops('250'),
+      raw: { route: 'FAKE' },
+    });
+    const result: QuoteResult = {
+      request: { sell: 'BLND', buy: 'USDC', amountIn: toStroops('250'), slippageBps: 50 }, prices,
+      ranking: { ranked: [{ ...xbQ, rank: 1, deltaVsBestPct: 0 }], best: { ...xbQ, rank: 1, deltaVsBestPct: 0 } },
+      errors: [],
+    };
+
+    const throwingSim = async () => { throw new Error('RPC 429'); };
+
+    const { tick, quotes } = await runTick({
+      probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
+      cfg: cfg(), now, fetchPrices: async () => prices, quote: async () => result,
+      resimDeps: { simulateXbullNet: throwingSim as any },
+    });
+
+    // tick ne doit pas exploser, cote API conservée
+    expect(tick.ok).toBe(true);
+    expect(quotes.length).toBe(1);
+    expect(quotes[0]!.net_out).toBe(toStroops('12.6'));
+  });
+});
+
 describe('failedTick', () => {
   it('produit une ligne ok=false avec note exception', () => {
     const d = new Date('2026-06-16T10:00:00.000Z');
