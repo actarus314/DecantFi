@@ -120,6 +120,12 @@ body{margin:0; background:var(--bg); color:var(--val);
 .pos{color:var(--green);} .neg{color:var(--red);}
 
 .routeline{display:flex; align-items:flex-start; gap:.5rem; flex-wrap:wrap;}
+/* composite : 2 jambes Tx1/Tx2 sur une seule ligne, l'une à la suite de l'autre (défile si trop long) */
+.complegs{display:flex; align-items:flex-start; gap:.5rem; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; padding-bottom:3px;}
+.complegs .routeline{flex-wrap:nowrap;}
+.complegs .txbadge{font-size:11px; font-weight:700; background:var(--heading); color:var(--bg); border-radius:4px; padding:1px 6px; white-space:nowrap; margin-top:4px;}
+.complegs .txvenue{font-weight:600; white-space:nowrap; margin-top:4px;}
+.complegs .txsep{color:var(--sub); font-weight:700; font-size:18px; margin-top:1px;}
 .rasset{display:inline-flex; flex-direction:column; align-items:center; gap:3px;}
 .asset{font-weight:700; font-size:14px; padding:4px 11px; border-radius:9px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--val);}
 .asset.out{color:var(--green); border-color:color-mix(in srgb, var(--green) 45%, var(--card-border));}
@@ -1236,16 +1242,9 @@ function simCard() {
     // Nom de l'outil retiré ici : il est désormais porté par le bouton « Exécuter via [outil] ».
     const legsData = (displayRow || b).legs;
     const routeDiv = legsData
-      ? legsData.map((leg, i) => `
-        <details${i === 0 ? ' open' : ' id="leg2-details" open'} style="margin-bottom:.35rem">
-          <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-            <span style="font-size:11px;font-weight:700;background:var(--heading);color:var(--bg);border-radius:4px;padding:1px 6px">${t('tx_label')} ${i+1}</span>
-            <span style="font-weight:600">${leg.display}</span>
-            <span style="color:var(--caption);font-size:12px">${leg.from} → ${leg.to}</span>
-            <span style="color:var(--sub);font-size:12px">${t('hops_label', leg.hops)} <span class="hops-arrow"></span></span>
-          </summary>
-          <div id="leg-route-${i}" style="margin-top:.4rem;white-space:nowrap;overflow-x:auto;overflow-y:hidden">${routeFromParts(leg.routeParts, false)}</div>
-        </details>`).join('')
+      ? '<div class="complegs">' + legsData.map((leg, i) =>
+          `${i > 0 ? '<span class="txsep">›</span>' : ''}<span class="txbadge">${t('tx_label')} ${i + 1}</span><span class="txvenue">${leg.display}</span>${routeFromParts(leg.routeParts, false)}`
+        ).join('') + '</div>'
       : `<div style="overflow-x:auto;overflow-y:hidden">${route}</div>`;
     resultHtml = `<div class="result">
       <div style="flex:1 1 100%;min-width:0">${routeDiv}</div>
