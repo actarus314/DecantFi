@@ -211,14 +211,14 @@ describe('ladders', () => {
 
 describe('winnerDist', () => {
   it('somme des pourcentages ≈ 100', () => {
-    const dist = result_usdc.winnerDist;
+    const dist = result_usdc.winnerDist['250']!;
     expect(dist.length).toBeGreaterThan(0);
     const sum = dist.reduce((a, d) => a + d.pct, 0);
     expect(sum).toBeCloseTo(100, 0);
   });
 
   it('source dominante en tête (xBull = seule gagnante dans la graine)', () => {
-    const dist = result_usdc.winnerDist;
+    const dist = result_usdc.winnerDist['250']!;
     expect(dist[0]!.display).toBe('xBull');
     expect(dist[0]!.pct).toBeGreaterThan(90);
   });
@@ -228,7 +228,7 @@ describe('winnerDist', () => {
 
 describe('bestRoutes', () => {
   it('classe les routes gagnantes, % somme ≈ 100, chemin + outils renseignés', () => {
-    const routes = result_usdc.bestRoutes;
+    const routes = result_usdc.bestRoutes['250']!;
     expect(routes.length).toBeGreaterThan(0);
     expect(routes[0]!.path).toContain('BLND');
     expect(routes[0]!.tools.length).toBeGreaterThan(0);
@@ -331,7 +331,7 @@ describe('exclusions', () => {
   });
 
   it('tick à -8 jours ignoré (hors fenêtre 7 j) → winnerDist ne dépasse pas la fenêtre', () => {
-    const dist = result_usdc.winnerDist;
+    const dist = result_usdc.winnerDist['250']!;
     const sum = dist.reduce((a, d) => a + d.pct, 0);
     expect(sum).toBeCloseTo(100, 0);
   });
@@ -346,7 +346,7 @@ describe('helpers', () => {
     expect(displayName('comet')).toBe('Comet (pool)');
     expect(displayName('ultrastellar')).toBe('Ultra Stellar');
     expect(displayName('stellarbroker')).toBe('StellarBroker');
-    expect(displayName('horizon')).toBe('Horizon (strict)');
+    expect(displayName('horizon')).toBe('Horizon');
   });
 
   it('displayName (combiné xbull+ultrastellar)', () => {

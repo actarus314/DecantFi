@@ -46,9 +46,10 @@ export interface Overview {
   meta: Meta;
   /** Échelles du dernier tick ok, une par sonde (clé = BLND entier, ex. '250'). */
   ladders: Record<string, LadderRow[]>;
-  winnerDist: Array<{ display: string; pct: number }>;
-  /** Meilleures routes (chemins gagnants) sur 7 j, par fréquence de victoire. */
-  bestRoutes: RouteRank[];
+  /** Distribution des gagnants par sonde (clé = BLND entier). */
+  winnerDist: Record<string, Array<{ display: string; pct: number }>>;
+  /** Meilleures routes (chemins gagnants) sur 7 j, par sonde (clé = BLND entier). */
+  bestRoutes: Record<string, RouteRank[]>;
   /** 7×24 efficience moyenne brute par (dow, hour) UTC — pour la moyenne/jour normalisée du prix. Clé = sonde en string (ex. '250'/'750'). */
   heatEffUtc: Record<string, (number | null)[][]>;
   /** Trace intraday 15 min par sonde. Clé = sonde. Valeur = 7×96, indexé par jour-de-semaine 0=Lun..6=Dim, chaque ligne = la trace de SA date locale. */
@@ -76,7 +77,7 @@ const FULL_NAME: Record<string, string> = {
   comet: 'Comet (pool)',
   ultrastellar: 'Ultra Stellar',
   stellarbroker: 'StellarBroker',
-  horizon: 'Horizon (strict)',
+  horizon: 'Horizon',
 };
 
 export function shortName(sourceId: string): string {
@@ -233,15 +234,16 @@ function buildWinnerDist(
   db: DatabaseSync,
   pair: string,
   windowStart: string,
+  amountIn?: bigint,
 ): Array<{ display: string; pct: number }> {
   const stmt = prepBig(db, `
     SELECT q.source_id, COUNT(*) as cnt
     FROM quote q JOIN tick t ON t.id = q.tick_id
-    WHERE q.is_winner = 1 AND q.pair = ? AND t.ok = 1 AND t.started_at >= ?
+    WHERE q.is_winner = 1 AND q.pair = ? AND t.ok = 1 AND t.started_at >= ?${amountIn != null ? ' AND q.amount_in = ?' : ''}
     GROUP BY q.source_id
     ORDER BY cnt DESC
   `);
-  const rows = stmt.all(pair, windowStart) as Array<Record<string, unknown>>;
+  const rows = (amountIn != null ? stmt.all(pair, windowStart, amountIn) : stmt.all(pair, windowStart)) as Array<Record<string, unknown>>;
   if (rows.length === 0) return [];
 
   let total = 0n;
@@ -257,15 +259,15 @@ function buildWinnerDist(
 // ─── Meilleures routes (7 j) ──────────────────────────────────────────────────
 
 /** Classe les chemins gagnants distincts (source_id + route) par nombre de victoires sur la fenêtre. */
-function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string): RouteRank[] {
+function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string, amountIn?: bigint): RouteRank[] {
   const stmt = prepBig(db, `
     SELECT q.source_id, q.route_summary, COUNT(*) AS wins
     FROM quote q JOIN tick t ON t.id = q.tick_id
-    WHERE q.is_winner = 1 AND q.pair = ? AND t.ok = 1 AND t.started_at >= ?
+    WHERE q.is_winner = 1 AND q.pair = ? AND t.ok = 1 AND t.started_at >= ?${amountIn != null ? ' AND q.amount_in = ?' : ''}
     GROUP BY q.source_id, q.route_summary
     ORDER BY wins DESC
   `);
-  const rows = stmt.all(pair, windowStart) as Array<Record<string, unknown>>;
+  const rows = (amountIn != null ? stmt.all(pair, windowStart, amountIn) : stmt.all(pair, windowStart)) as Array<Record<string, unknown>>;
   if (rows.length === 0) return [];
 
   let total = 0n;
@@ -507,6 +509,8 @@ export interface SourceHealthResult {
   totalTicks: number;
   windowDays: 7;
   sources: SourceHealth[];
+  /** Heures écoulées dans la journée locale courante (0..24), pour le rendu du cercle partiel. */
+  todayElapsedH: number;
 }
 
 /** Parse source_errors : JSON ([{id,reason}]) ou CSV legacy ("soroswap, comet"). */
@@ -533,6 +537,7 @@ export function buildSourceHealth(
   db: DatabaseSync,
   windowStart: string,
   now: Date,
+  offsetH: number = 0,
 ): SourceHealthResult {
   // Sources connues : les clés de FULL_NAME (7 venues atomiques)
   const knownIds = Object.keys(FULL_NAME);
@@ -550,8 +555,7 @@ export function buildSourceHealth(
 
   const totalTicks = tickRows.length;
 
-  // Offset Paris pour le bucketing journalier
-  const offsetH = parisOffsetHours(now);
+  // offsetH fourni par le client (UTC+offsetH) — remplace l'offset Paris figé.
   const MS_PER_DAY = 86_400_000;
   const nowMs = now.getTime();
 
@@ -706,7 +710,12 @@ export function buildSourceHealth(
       : a.failedTicks - b.failedTicks,
   );
 
-  return { totalTicks, windowDays: 7, sources };
+  // Heures écoulées dans le jour courant (timezone client) pour le cercle partiel
+  const localNowMs = now.getTime() + offsetH * 3_600_000;
+  const localNow = new Date(localNowMs);
+  const todayElapsedH = localNow.getUTCHours() + localNow.getUTCMinutes() / 60;
+
+  return { totalTicks, windowDays: 7, sources, todayElapsedH };
 }
 
 // ─── Point d'entrée public ────────────────────────────────────────────────────
@@ -729,8 +738,13 @@ export function overview(
   const meta = buildMeta(db, cfg.cadenceSec, sondes);
   const ladders: Record<string, LadderRow[]> = {};
   for (const size of sizes) ladders[String(toNumber(size))] = buildLadder(db, pair, size);
-  const winnerDist = buildWinnerDist(db, pair, windowStart);
-  const bestRoutes = buildBestRoutes(db, pair, windowStart);
+  const winnerDist: Record<string, Array<{ display: string; pct: number }>> = {};
+  const bestRoutes: Record<string, RouteRank[]> = {};
+  for (const size of sizes) {
+    const key = String(toNumber(size));
+    winnerDist[key] = buildWinnerDist(db, pair, windowStart, size);
+    bestRoutes[key] = buildBestRoutes(db, pair, windowStart, size);
+  }
 
   // Offset (heures) fourni par le client (UTC+offsetH) — 0 = UTC par défaut
 
