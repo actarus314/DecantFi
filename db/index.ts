@@ -20,6 +20,20 @@ export interface RpcProbeInsert {
   ledger: number | null; chosen: boolean; sim_errors: number; rpc_calls: number; error: string | null;
 }
 
+export interface CoherenceProbeInsert {
+  created_at: string;
+  venue: string;
+  pair: string;
+  amount_in: bigint;
+  incoherent: boolean;       // converti en 0/1 à l'insert
+  reason: string | null;
+  net_quoted: bigint | null;
+  net_simulated: bigint | null;
+  delta_bps: number | null;
+  route_json: string | null;
+  trace_json: string | null;
+}
+
 export class Db {
   constructor(private db: DatabaseSync) {}
 
@@ -82,6 +96,53 @@ export class Db {
   purgeManualTicks(): number {
     const r = this.db.prepare(`DELETE FROM tick WHERE note = 'manual'`).run();
     return Number(r.changes);
+  }
+
+  /** Insère une sonde de cohérence (quote vs sim). Hors transaction — best-effort. */
+  insertCoherenceProbe(row: CoherenceProbeInsert): void {
+    this.db.prepare(
+      `INSERT INTO coherence_probe
+         (created_at, venue, pair, amount_in, incoherent, reason,
+          net_quoted, net_simulated, delta_bps, route_json, trace_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      row.created_at, row.venue, row.pair, row.amount_in,
+      row.incoherent ? 1 : 0, row.reason,
+      row.net_quoted, row.net_simulated, row.delta_bps,
+      row.route_json, row.trace_json,
+    );
+  }
+
+  /** Lit les sondes de cohérence depuis sinceIso (ISO 8601) — pour la fenêtre santé. */
+  readCoherenceProbes(sinceIso: string): Array<{
+    id: bigint; created_at: string; venue: string; pair: string;
+    amount_in: bigint; incoherent: boolean; reason: string | null;
+    net_quoted: bigint | null; net_simulated: bigint | null;
+    delta_bps: bigint | null; route_json: string | null; trace_json: string | null;
+  }> {
+    const stmt = this.db.prepare(
+      `SELECT id, created_at, venue, pair, amount_in, incoherent, reason,
+              net_quoted, net_simulated, delta_bps, route_json, trace_json
+         FROM coherence_probe
+        WHERE created_at >= ?
+        ORDER BY created_at DESC`,
+    );
+    stmt.setReadBigInts(true);
+    const rows = stmt.all(sinceIso) as Array<Record<string, unknown>>;
+    return rows.map((r) => ({
+      id:            r['id'] as bigint,
+      created_at:    r['created_at'] as string,
+      venue:         r['venue'] as string,
+      pair:          r['pair'] as string,
+      amount_in:     r['amount_in'] as bigint,
+      incoherent:    (r['incoherent'] as bigint) !== 0n,
+      reason:        (r['reason'] as string | null) ?? null,
+      net_quoted:    (r['net_quoted'] as bigint | null) ?? null,
+      net_simulated: (r['net_simulated'] as bigint | null) ?? null,
+      delta_bps:     (r['delta_bps'] as bigint | null) ?? null,
+      route_json:    (r['route_json'] as string | null) ?? null,
+      trace_json:    (r['trace_json'] as string | null) ?? null,
+    }));
   }
 
   /** Accès brut (queries, maintenance, tests). */

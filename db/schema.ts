@@ -69,6 +69,22 @@ CREATE TABLE IF NOT EXISTS rpc_call_log (
   dur_ms INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_rpc_call_log_at ON rpc_call_log(at);
+CREATE TABLE IF NOT EXISTS coherence_probe (
+  id            INTEGER PRIMARY KEY,
+  created_at    TEXT NOT NULL,
+  venue         TEXT NOT NULL,
+  pair          TEXT NOT NULL,
+  amount_in     INTEGER NOT NULL,
+  incoherent    INTEGER NOT NULL,
+  reason        TEXT,
+  net_quoted    INTEGER,
+  net_simulated INTEGER,
+  delta_bps     INTEGER,
+  route_json    TEXT,
+  trace_json    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_coherence_venue   ON coherence_probe(venue);
+CREATE INDEX IF NOT EXISTS idx_coherence_created ON coherence_probe(created_at);
 `;
 
 /** Ajoute une colonne si elle manque (CREATE TABLE IF NOT EXISTS n'altère PAS une table existante :
