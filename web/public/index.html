@@ -347,9 +347,9 @@ const STRINGS = {
     ladder_col_impact_evm: 'Impact EVM',
     ladder_col_route: 'Route',
     ladder_tip_chip: 'Observé = cotation réelle de la source<br>Calculé = route composée (2 swaps)<br>Estimé = borne/plancher (frais opaques)',
-    ladder_tip_impact: '<b>Mode LOCAL (défaut)</b> : écart vs le prix de l\'EURC <i>sur Stellar</i> (carnet SDEX EURC/USDC). Mesure la qualité du swap dans le marché où il a lieu — pertinent si tu gardes l\'EURC on-chain.<br><br><b>Mode EVM</b> : écart vs le prix de l\'EURC <i>global</i> (valeur de rachat sur Base/Ethereum). Pertinent si tu rapatries l\'EURC vers EVM pour le sortir en euros — la prime/décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>Clique le titre de colonne pour basculer. Positif = tu reçois moins. Négatif = tu reçois plus.',
+    ladder_tip_impact: '<b>Mode LOCAL (défaut)</b> : écart vs le prix de l\'EURC <i>sur Stellar</i> (carnet SDEX EURC/USDC). Prévaut si tu comptes <b>rester sur Stellar</b>.<br><br><b>Mode EVM</b> : écart vs le prix de l\'EURC <i>global</i> (Base/Ethereum). Prévaut si tu comptes <b>bridger vers EVM</b> — la prime/décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>Clique le titre de colonne pour basculer. Positif = tu reçois moins. Négatif = tu reçois plus.',
     impact_evm_notice_title: 'Passer en mode Impact EVM ?',
-    impact_evm_notice_body: 'En mode <b>EVM</b>, l\'impact est calculé par rapport au prix de l\'EURC <b>sur Base/Ethereum</b> (valeur de rachat). La prime ou décote du marché Stellar compte comme un vrai gain ou une perte.<br><br>En mode <b>Local</b> (défaut), l\'impact est calculé par rapport au prix EURC sur le <b>SDEX Stellar</b> — pertinent si tu restes sur Stellar.',
+    impact_evm_notice_body: 'En mode <b>EVM</b>, l\'impact est calculé vs le prix de l\'EURC <b>global (Base/Ethereum)</b> : prévaut si tu comptes <b>bridger vers EVM</b>. La prime ou décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>En mode <b>Local</b> (défaut), l\'impact est calculé vs le prix EURC sur le <b>SDEX Stellar</b> : prévaut si tu comptes <b>rester sur Stellar</b>.',
     impact_evm_confirm: 'Passer en mode EVM',
     impact_evm_dismiss: 'Ne plus me montrer',
     spot_eurc_stellar: 'EURC@Stellar',
@@ -602,9 +602,9 @@ const STRINGS = {
     ladder_col_impact_evm: 'Impact EVM',
     ladder_col_route: 'Route',
     ladder_tip_chip: 'Observed = real quote from the source<br>Calculated = composite route (2 swaps)<br>Estimated = floor/ceiling (opaque fees)',
-    ladder_tip_impact: '<b>LOCAL mode (default)</b>: gap vs the EURC price <i>on Stellar</i> (SDEX EURC/USDC order book). Measures swap quality in the market where it happens — relevant if you keep EURC on-chain.<br><br><b>EVM mode</b>: gap vs the <i>global</i> EURC price (redemption value on Base/Ethereum). Relevant if you bridge EURC back to EVM to exit in euros — the Stellar market premium/discount then counts as a real gain or loss.<br><br>Click the column header to toggle. Positive = you receive less. Negative = you receive more.',
+    ladder_tip_impact: '<b>LOCAL mode (default)</b>: gap vs the EURC price <i>on Stellar</i> (SDEX EURC/USDC order book). Use it if you plan to <b>stay on Stellar</b>.<br><br><b>EVM mode</b>: gap vs the <i>global</i> EURC price (Base/Ethereum). Use it if you plan to <b>bridge to EVM</b> — the Stellar market premium/discount then counts as a real gain or loss.<br><br>Click the column header to toggle. Positive = you receive less. Negative = you receive more.',
     impact_evm_notice_title: 'Switch to EVM Impact mode?',
-    impact_evm_notice_body: 'In <b>EVM</b> mode, impact is measured against the EURC price <b>on Base/Ethereum</b> (redemption value). The Stellar market premium or discount counts as a real gain or loss.<br><br>In <b>Local</b> mode (default), impact is measured against the EURC price on the <b>Stellar SDEX</b> — relevant if you stay on Stellar.',
+    impact_evm_notice_body: 'In <b>EVM</b> mode, impact is measured against the <b>global EURC price (Base/Ethereum)</b>: use it if you plan to <b>bridge to EVM</b>. The Stellar market premium or discount then counts as a real gain or loss.<br><br>In <b>Local</b> mode (default), impact is measured against the EURC price on the <b>Stellar SDEX</b>: use it if you plan to <b>stay on Stellar</b>.',
     impact_evm_confirm: 'Switch to EVM mode',
     impact_evm_dismiss: 'Don\'t show again',
     spot_eurc_stellar: 'EURC@Stellar',
@@ -1001,7 +1001,7 @@ function ladderHead(u) {
         <span class="tip-box">${t('ladder_tip_chip')}</span>
       </div>
     </th>
-    <th onclick="toggleImpactMode()" title="${impactMode === 'evm' ? 'Mode EVM actif — cliquer pour revenir en Local' : 'Cliquer pour passer en mode EVM'}" style="${impactStyle}">
+    <th onclick="toggleImpactMode()" style="${impactStyle}">
       <div class="tip-wrap" style="display:inline-flex;align-items:center;">
         ${impactLabel}<span style="font-size:10px;margin-left:2px;opacity:.7">▾</span><span class="tip-icon">ⓘ</span>
         <span class="tip-box up">${t('ladder_tip_impact')}</span>
@@ -1024,6 +1024,7 @@ function impactStr(row) {
 }
 
 function toggleImpactMode() {
+  const tp = document.getElementById('tipPortal'); if (tp) { tp.style.display = 'none'; tp.innerHTML = ''; }
   if (impactMode === 'evm') {
     // evm → local : silencieux
     impactMode = 'local';
@@ -1058,7 +1059,7 @@ function cancelImpactEvm() {
 
 function impactEvmModalHtml() {
   if (!impactEvmModalOpen) return '';
-  return `<div class="modal-overlay" onclick="if(event.target===this)cancelImpactEvm()">
+  return `<div class="modal-overlay">
     <div class="modal-card">
       <div style="font-size:14px;font-weight:700;margin-bottom:.75rem">${t('impact_evm_notice_title')}</div>
       <p style="font-size:13px;color:var(--caption);line-height:1.55;margin:0 0 1rem">${t('impact_evm_notice_body')}</p>
@@ -2347,7 +2348,7 @@ function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() 
   const seq = ['arrowup','arrowup','arrowdown','arrowdown','arrowleft','arrowright','arrowleft','arrowright','b','a'];
   let pos = 0;
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { if (impactEvmModalOpen) { cancelImpactEvm(); return; } closeScamEgg(); return; }
+    if (e.key === 'Escape') { if (impactEvmModalOpen) return; closeScamEgg(); return; }
     const k = e.key.toLowerCase();
     pos = (k === seq[pos]) ? pos + 1 : (k === seq[0] ? 1 : 0);
     if (pos === seq.length) { pos = 0; toggleScamEgg(); }
