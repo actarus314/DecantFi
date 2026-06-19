@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { DatabaseSync } from 'node:sqlite';
 import { openDb, type TickInsert, type QuoteInsert } from './index.js';
+import { migrate } from './schema.js';
 
 const tick: TickInsert = {
   started_at: '2026-06-16T10:00:00.000Z', finished_at: '2026-06-16T10:00:03.000Z',
@@ -57,6 +59,39 @@ describe('openDb + insertTickWithQuotes', () => {
     // quotes du tick manuel partis en cascade ; ceux du programmé restent
     const qn = db.raw().prepare('SELECT COUNT(*) AS n FROM quote WHERE tick_id = ?').get(scheduled) as any;
     expect(Number(qn.n)).toBe(2);
+    db.close();
+  });
+});
+
+describe('migrate : migration additive idempotente', () => {
+  it('ajoute rpc_calls à une rpc_probe pré-existante sans la colonne (régression incident 429/no-column)', () => {
+    const db = new DatabaseSync(':memory:');
+    // Simule une DB créée AVANT l'ajout de rpc_calls (schéma déployé en 5011b0d)
+    db.exec('CREATE TABLE tick (id INTEGER PRIMARY KEY, started_at TEXT)');
+    db.exec(`CREATE TABLE rpc_probe (
+      id INTEGER PRIMARY KEY, tick_id INTEGER, url TEXT, ok INTEGER, latency_ms INTEGER,
+      ledger INTEGER, chosen INTEGER, sim_errors INTEGER DEFAULT 0, error TEXT
+    )`);
+    const before = db.prepare('PRAGMA table_info(rpc_probe)').all() as Array<{ name: string }>;
+    expect(before.some((c) => c.name === 'rpc_calls')).toBe(false);
+
+    migrate(db); // doit ALTER TABLE ADD COLUMN rpc_calls
+
+    const after = db.prepare('PRAGMA table_info(rpc_probe)').all() as Array<{ name: string }>;
+    expect(after.some((c) => c.name === 'rpc_calls')).toBe(true);
+    // l'INSERT nommant rpc_calls (celui qui crashait le collecteur) fonctionne désormais
+    db.exec("INSERT INTO tick (started_at) VALUES ('2026-06-19T00:00:00Z')");
+    db.exec('INSERT INTO rpc_probe (tick_id, url, ok, chosen, rpc_calls) VALUES (1, \'u\', 1, 1, 7)');
+    const row = db.prepare('SELECT rpc_calls FROM rpc_probe').get() as { rpc_calls: number };
+    expect(Number(row.rpc_calls)).toBe(7);
+    db.close();
+  });
+
+  it('idempotent : re-migrer une DB déjà à jour ne change rien', () => {
+    const db = openDb(':memory:'); // crée le schéma complet (rpc_calls inclus)
+    expect(() => migrate(db.raw())).not.toThrow();
+    const cols = db.raw().prepare('PRAGMA table_info(rpc_probe)').all() as Array<{ name: string }>;
+    expect(cols.filter((c) => c.name === 'rpc_calls').length).toBe(1);
     db.close();
   });
 });

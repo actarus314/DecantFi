@@ -62,6 +62,15 @@ CREATE TABLE IF NOT EXISTS rpc_probe (
 CREATE INDEX IF NOT EXISTS idx_rpc_probe_tick ON rpc_probe(tick_id);
 `;
 
+/** Ajoute une colonne si elle manque (CREATE TABLE IF NOT EXISTS n'altère PAS une table existante :
+ *  une colonne ajoutée au DDL après coup ne s'applique jamais à une DB déjà créée → "no column named X"). */
+function ensureColumn(db: DatabaseSync, table: string, column: string, decl: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  }
+}
+
 /** Applique PRAGMA (avant création des tables pour auto_vacuum) puis crée le schéma. Idempotent. */
 export function migrate(db: DatabaseSync): void {
   db.exec('PRAGMA journal_mode = WAL');
@@ -70,4 +79,7 @@ export function migrate(db: DatabaseSync): void {
   db.exec('PRAGMA auto_vacuum = INCREMENTAL'); // effectif sur DB neuve (avant toute table)
   db.exec('PRAGMA temp_store = MEMORY');       // aucun fichier temp hors volume (read_only)
   db.exec(DDL);
+
+  // Migrations additives idempotentes (pour les DB créées avant l'ajout d'une colonne).
+  ensureColumn(db, 'rpc_probe', 'rpc_calls', 'INTEGER NOT NULL DEFAULT 0');
 }
