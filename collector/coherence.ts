@@ -1,5 +1,4 @@
 // Sonde de cohérence : vérifie qu'une venue exécute bien la route annoncée.
-// NE PAS appeler depuis le daemon — module autonome (étape suivante).
 // Money-path : bigint stroops partout.
 import {
   quoteXbull,
@@ -23,7 +22,9 @@ import {
   routeFromTransfers,
   type Transfer,
 } from '../core/soroban-route.js';
-import { BLND, USDC, type Asset } from '../core/assets.js';
+import { BLND, USDC, EURC, type Asset } from '../core/assets.js';
+import { type CoherenceProbeInsert } from '../db/index.js';
+import { bigIntJson } from './tick.js';
 import { TransactionBuilder, Networks } from '@stellar/stellar-sdk';
 
 // ─── Constante de seuil ──────────────────────────────────────────────────────
@@ -223,5 +224,92 @@ export async function probeVenueCoherence(
   } catch {
     // Best-effort : tout échec réseau/sim → null (jamais throw)
     return null;
+  }
+}
+
+// ─── Orchestration quotidienne des sondes ────────────────────────────────────
+
+/** Venues à sonder (toutes les venues connues). */
+const PROBE_VENUES: Venue[] = ['xbull', 'aquarius', 'soroswap', 'comet', 'horizon', 'ultrastellar'];
+
+/**
+ * Lance une sonde de cohérence par venue, une fois par jour UTC,
+ * étalée aléatoirement sur la journée (probabilité croissante → 1 avant minuit).
+ * Best-effort : un échec de venue n'interrompt pas les autres ni le daemon.
+ */
+export async function runCoherenceProbes(
+  db: {
+    hasCoherenceProbeSince(venue: string, sinceIso: string): boolean;
+    insertCoherenceProbe(row: CoherenceProbeInsert): void;
+  },
+  cfg: {
+    rpcUrl: string;
+    horizonUrl?: string;
+    soroswapApiKey?: string;
+    timeoutMs?: number;
+    sizesBlnd: bigint[];
+    pairs: Array<'USDC' | 'EURC'>;
+    cadenceSec: number;
+  },
+  now: Date,
+  deps: { random?: () => number; probe?: typeof probeVenueCoherence } = {},
+): Promise<void> {
+  const random = deps.random ?? Math.random;
+  const probe  = deps.probe  ?? probeVenueCoherence;
+
+  // Début du jour UTC courant (ex: "2026-06-19T00:00:00.000Z")
+  const startOfDay = now.toISOString().slice(0, 10) + 'T00:00:00.000Z';
+
+  // Calcul du nombre de ticks restants jusqu'à minuit UTC
+  const nextMidnight = new Date(now.toISOString().slice(0, 10));
+  nextMidnight.setUTCDate(nextMidnight.getUTCDate() + 1); // minuit UTC du lendemain
+  const msToMidnight = nextMidnight.getTime() - now.getTime();
+  const ticksRemaining = Math.max(1, Math.floor(msToMidnight / (cfg.cadenceSec * 1000)));
+
+  for (const venue of PROBE_VENUES) {
+    try {
+      // Déjà sondée aujourd'hui → skip
+      if (db.hasCoherenceProbeSince(venue, startOfDay)) continue;
+
+      // Étalement : p = 1/ticksRemaining → augmente à chaque tick, = 1 sur le dernier tick
+      if (random() >= 1 / ticksRemaining) continue;
+
+      // Comet ne supporte que USDC
+      const pair: 'USDC' | 'EURC' = venue === 'comet'
+        ? 'USDC'
+        : cfg.pairs[Math.floor(random() * cfg.pairs.length)] ?? 'USDC';
+
+      const buy: Asset = pair === 'EURC' ? EURC : USDC;
+
+      // Taille aléatoire parmi les tailles configurées
+      if (cfg.sizesBlnd.length === 0) continue;
+      const amountIn = cfg.sizesBlnd[Math.floor(random() * cfg.sizesBlnd.length)] ?? cfg.sizesBlnd[0];
+
+      const res = await probe(venue, buy, amountIn!, AQUARIUS_WITNESSES[0]!, cfg);
+
+      // null = non mesurable ce tick (on ne pollue pas le décompte, on réessaiera)
+      if (res === null) continue;
+
+      db.insertCoherenceProbe({
+        created_at:    now.toISOString(),
+        venue,
+        pair,
+        amount_in:     amountIn!,
+        incoherent:    res.incoherent,
+        reason:        res.reason,
+        net_quoted:    res.netQuoted,
+        net_simulated: res.netSimulated,
+        delta_bps:     res.deltaBps,
+        route_json:    JSON.stringify(res.route),
+        trace_json:    res.incoherent
+          ? JSON.stringify(
+              { transfers: res.transfers, route: res.route, netQuoted: res.netQuoted, netSimulated: res.netSimulated, deltaBps: res.deltaBps },
+              bigIntJson,
+            )
+          : null,
+      });
+    } catch {
+      // Erreur isolée par venue — le daemon continue
+    }
   }
 }

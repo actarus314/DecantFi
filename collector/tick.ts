@@ -26,7 +26,7 @@ export interface TickDeps {
 
 export interface TickAssembled { tick: TickInsert; quotes: QuoteInsert[]; rpcProbes: RpcProbeInsert[]; }
 
-function bigIntJson(_k: string, v: unknown): unknown {
+export function bigIntJson(_k: string, v: unknown): unknown {
   return typeof v === 'bigint' ? v.toString() : v;
 }
 

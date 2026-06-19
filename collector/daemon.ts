@@ -8,6 +8,7 @@ import { loadCollectorConfig } from './config.js';
 import { buildProbes } from './probes.js';
 import { runTick, failedTick } from './tick.js';
 import { runMaintenance } from './maintenance.js';
+import { runCoherenceProbes } from './coherence.js';
 import { jitteredDelayMs, runLoop, interruptibleSleep } from './scheduler.js';
 import { ensureDirWritable } from './fsguard.js';
 import { openDb } from '../db/index.js';
@@ -63,6 +64,12 @@ async function main(): Promise<void> {
       } catch (e) {
         process.stderr.write(`[maintenance] échec : ${e instanceof Error ? e.message : e}\n`);
       }
+    }
+    // Sondes de cohérence : 1×/jour par venue, étalées aléatoirement, best-effort.
+    try {
+      await runCoherenceProbes(db, cfg, new Date());
+    } catch (e) {
+      process.stderr.write(`[coherence] échec : ${e instanceof Error ? e.message : e}\n`);
     }
   };
 

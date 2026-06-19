@@ -98,6 +98,14 @@ export class Db {
     return Number(r.changes);
   }
 
+  /** Vérifie qu'au moins une sonde de cohérence existe pour `venue` depuis `sinceIso`. */
+  hasCoherenceProbeSince(venue: string, sinceIso: string): boolean {
+    const row = this.db.prepare(
+      `SELECT 1 FROM coherence_probe WHERE venue = ? AND created_at >= ? LIMIT 1`,
+    ).get(venue, sinceIso);
+    return row !== undefined;
+  }
+
   /** Insère une sonde de cohérence (quote vs sim). Hors transaction — best-effort. */
   insertCoherenceProbe(row: CoherenceProbeInsert): void {
     this.db.prepare(
