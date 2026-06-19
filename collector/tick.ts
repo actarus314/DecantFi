@@ -7,7 +7,7 @@ import type { NormalizedQuote } from '../core/sources/types.js';
 import type { TickInsert, QuoteInsert, RpcProbeInsert } from '../db/index.js';
 import type { CollectorConfig } from './config.js';
 import type { Probe } from './probes.js';
-import { resimAquariusXbull } from '../web/quote-api.js';
+import { resimAquariusXbull, makeReSimLeg } from '../web/quote-api.js';
 import type { simulateAquariusNet, simulateXbullNet } from '../web/execute.js';
 import { selectRpc, type RpcSelection } from '../core/rpc-select.js';
 import { resetRpc, readRpc } from '../core/rpc-meter.js';
@@ -109,6 +109,8 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     // (sondes EURC × 3 sous-cotations re-lisent les mêmes pools) → ~180 → ~30 appels RPC/tick,
     // supprime les 429 du RPC public. Neuf à chaque tick (réserves fraîches).
     rpcCache: new Map(),
+    // Re-simulation honnête des jambes EURC via-USDC : idem liveQuote, best-effort.
+    reSimLeg: makeReSimLeg({ rpcUrl }, deps.resimDeps),
   };
 
   // Parallélisation : toutes les sondes partent en même temps (Promise.all).

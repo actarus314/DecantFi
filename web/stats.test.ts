@@ -460,7 +460,7 @@ describe('helpers', () => {
   it('displayName (ids de base)', () => {
     expect(displayName('xbull')).toBe('xBull');
     expect(displayName('soroswap')).toBe('Soroswap');
-    expect(displayName('comet')).toBe('Comet (pool)');
+    expect(displayName('comet')).toBe('Comet');
     expect(displayName('ultrastellar')).toBe('Ultra Stellar');
     expect(displayName('stellarbroker')).toBe('StellarBroker');
     expect(displayName('horizon')).toBe('Horizon');

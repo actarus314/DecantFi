@@ -19,6 +19,15 @@ export interface RibbonPart {
   tool?: string;
 }
 
+export interface CompositeLeg {
+  sourceId: string;
+  display: string;
+  from: string;
+  to: string;
+  hops: number;
+  routeParts: RibbonPart[];
+}
+
 export interface LiveLadderRow {
   display: string;
   note: string;
@@ -36,6 +45,8 @@ export interface LiveLadderRow {
   sourceId: string;
   deepLink: string | null;
   executable: boolean;
+  /** Legs du composite EURC via-USDC (2 transactions). Absent pour les routes atomiques. */
+  legs?: CompositeLeg[];
 }
 
 /** Normalise les symboles d'actifs : 'native' → 'XLM', tout le reste inchangé. */
@@ -59,6 +70,8 @@ export interface LiveQuote {
     impactLocalPct: number | null;
     route: RibbonPart[];
     deepLink: string | null;
+    /** Legs du composite EURC via-USDC (2 transactions). Absent pour les routes atomiques. */
+    legs?: CompositeLeg[];
   };
   ladder: LiveLadderRow[];
   prices: {
@@ -69,7 +82,7 @@ export interface LiveQuote {
   };
   errors: string[];
   // axe santé, distinct des chips de confiance — ponytail: health axis
-  downSources: Array<{ display: string; reason: string }>;
+  downSources: Array<{ display: string; sourceId: string; reason: string }>;
 }
 
 // ─── Deep-links (pages réelles, sans prefill inventé) ────────────────────────
@@ -135,6 +148,47 @@ function buildRoute(hops: RouteHop[], amountIn: bigint, netOut: bigint, pairUi: 
 // ─── Re-simulation Aquarius + xBull (helper partagé web + collecteur) ────────
 
 /**
+ * Crée un callback `reSimLeg` pour `compareEurc` : re-simule on-chain chaque cote xBull/Aquarius
+ * de la liste et remplace netOut+grossOut par le vrai fill. Best-effort : un échec RPC ou l'absence
+ * de données brutes → cote brute conservée, jamais d'exception.
+ * Comet/Soroswap/Horizon/Ultra/StellarBroker sont déjà fidèles → inchangés.
+ */
+export function makeReSimLeg(
+  cfg: { rpcUrl: string },
+  deps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet },
+): (quotes: import('../core/sources/types.js').NormalizedQuote[], amountIn: bigint) => Promise<import('../core/sources/types.js').NormalizedQuote[]> {
+  const simFnAq = deps?.simulateAquariusNet ?? simulateAquariusNet;
+  const simFnXb = deps?.simulateXbullNet ?? simulateXbullNet;
+
+  return async (quotes, amountIn) => {
+    const results = await Promise.all(quotes.map(async (q): Promise<import('../core/sources/types.js').NormalizedQuote | null> => {
+      try {
+        if (q.source === 'aquarius') {
+          const rawXdr = (q.raw as { swap_chain_xdr?: unknown } | undefined)?.swap_chain_xdr;
+          if (!rawXdr) return q;
+          const inputSac = q.sellAsset.sac;
+          // No .catch() — let transient RPC errors throw to outer catch (kept raw)
+          const simNet = await simFnAq(String(rawXdr), amountIn, inputSac, { rpcUrl: cfg.rpcUrl });
+          if (simNet !== null && simNet > 0n) {
+            return { ...q, netOut: simNet, grossOut: simNet };
+          }
+          // simNet === null → structural failure: route non-executable as quoted → exclude
+          return null;
+        } else if (q.source === 'xbull') {
+          const route = (q.raw as { route?: unknown } | undefined)?.route;
+          if (!route) return q;
+          const xbSim = await simFnXb(String(route), amountIn, { rpcUrl: cfg.rpcUrl }).catch(() => null);
+          if (xbSim && xbSim.net > 0n && xbSim.net !== q.netOut)
+            return { ...q, netOut: xbSim.net, grossOut: xbSim.net };
+        }
+      } catch { /* repli silencieux : cote brute conservée */ }
+      return q;
+    }));
+    return results.filter((q): q is import('../core/sources/types.js').NormalizedQuote => q !== null);
+  };
+}
+
+/**
  * Mute `result` en place : remplace les nets sur-cotés d'Aquarius et xBull par
  * les vrais fills simulés on-chain, re-décode la route xBull, puis re-classe via
  * rankQuotes. Met également à jour result.eurc.direct / winner pour EURC direct.
@@ -158,7 +212,7 @@ export async function resimAquariusXbull(
   let aqSimMs = 0;
   if (aqRanked && rawXdr) {
     const t0Aq = Date.now();
-    const simNet = await simFnAq(String(rawXdr), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null);
+    const simNet = await simFnAq(String(rawXdr), amountStroops, BLND.sac, { rpcUrl: cfg.rpcUrl }).catch(() => null);
     aqSimMs = Date.now() - t0Aq;
     if (simNet !== null && simNet > 0n && simNet !== aqRanked.netOut) aquariusSimNet = simNet;
   }
@@ -238,6 +292,9 @@ export async function liveQuote(
       // Cache RPC pour cette requête : une cotation EURC relance 3 sous-cotations qui re-lisent
       // les mêmes pools → coalesce, évite de saturer le RPC sur un seul appel /api/quote.
       rpcCache: new Map(),
+      // Re-simulation honnête des jambes EURC via-USDC (xBull/Aquarius seulement).
+      // Best-effort : un échec RPC laisse la cote brute, ne casse pas la cotation.
+      reSimLeg: pairUi === 'EURC' ? makeReSimLeg({ rpcUrl: cfg.rpcUrl }, deps) : undefined,
     },
   });
 
@@ -292,7 +349,7 @@ export async function liveQuote(
         xlmUsd: result.prices.xlmUsd,
       },
       errors: result.errors,
-      downSources: result.errors.map((id) => ({ display: displayName(id), reason: result.errorReasons?.[id] ?? 'indisponible' })),
+      downSources: result.errors.map((id) => ({ display: displayName(id), sourceId: id, reason: result.errorReasons?.[id] ?? 'indisponible' })),
     };
   }
 
@@ -303,8 +360,15 @@ export async function liveQuote(
   const bestConf = bestQuote.netConfidence;
   // Pour via-usdc : forcer 'calc' car leg1 peut être 'exact' mais c'est une estimation 2 swaps
   const chip: Chip = eurcPath === 'via-usdc' ? 'calc' : chipFor(bestConf, bestSource, eurcPath);
-  const impactPct = bestQuote.priceImpactPct ?? null;
-  const impactLocalPct = bestQuote.priceImpactLocalPct ?? null;
+  // FIX 4 : quand le gagnant est le composite via-usdc, l'impact doit porter sur le net EURC final
+  // (bestNet = netEurc) et non sur la leg1 seule (bestQuote = leg1 BLND→USDC).
+  // On utilise le même calcul que la ligne ladder composite (~ligne 416).
+  const impactPct = eurcPath === 'via-usdc'
+    ? (priceImpactPct(amountStroops, bestNet, result.prices.blndUsd, targetEvmPerUnit('EURC', result.prices)) ?? null)
+    : (bestQuote.priceImpactPct ?? null);
+  const impactLocalPct = eurcPath === 'via-usdc'
+    ? (priceImpactPct(amountStroops, bestNet, result.prices.blndUsd, targetLocalPerUnit('EURC', result.prices)) ?? null)
+    : (bestQuote.priceImpactLocalPct ?? null);
 
   // Route complète : si via-usdc, concaténer leg1 + leg2
   const combinedRoute = extraRoute ? [...bestQuote.route, ...extraRoute] : bestQuote.route;
@@ -313,7 +377,7 @@ export async function liveQuote(
   // Échelle complète : ranking direct + (EURC) ligne composite via-USDC, triée par net.
   // Le composite est TOUJOURS listé quand il existe (comme le stockage collecteur) → le tableau
   // colle au simulateur (le gagnant peut être le composite, pas le meilleur direct).
-  const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; hops: RouteHop[] | null; eurcPath: string | null; impactPct: number | null; impactLocalPct: number | null }> =
+  const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; hops: RouteHop[] | null; eurcPath: string | null; impactPct: number | null; impactLocalPct: number | null; legs?: CompositeLeg[] }> =
     result.ranking.ranked.map((rq) => ({
       source: rq.source,
       netOut: rq.netOut,
@@ -324,10 +388,31 @@ export async function liveQuote(
       impactPct: rq.priceImpactPct ?? null,
       impactLocalPct: rq.priceImpactLocalPct ?? null,
     }));
+
+  // Legs du composite EURC via-USDC (calculés une seule fois, réutilisés pour best et ladder)
+  let compositeLegs: CompositeLeg[] | undefined;
   if (pairUi === 'EURC' && result.eurc?.viaUsdc) {
     const v = result.eurc.viaUsdc;
     const r1 = routeStr(v.leg1.route, v.leg1.sellAsset.symbol, v.leg1.buyAsset.symbol);
     const r2 = routeStr(v.leg2.route, v.leg2.sellAsset.symbol, v.leg2.buyAsset.symbol);
+    compositeLegs = [
+      {
+        sourceId: v.leg1.source,
+        display: displayName(v.leg1.source),
+        from: 'BLND',
+        to: 'USDC',
+        hops: v.leg1.route.length,
+        routeParts: buildRoute(v.leg1.route, amountStroops, v.leg1.grossOut, 'USDC'),
+      },
+      {
+        sourceId: v.leg2.source,
+        display: displayName(v.leg2.source),
+        from: 'USDC',
+        to: 'EURC',
+        hops: v.leg2.route.length,
+        routeParts: buildRoute(v.leg2.route, v.leg1.grossOut, v.leg2.netOut, 'EURC'),
+      },
+    ];
     raw.push({
       source: `${v.leg1.source}+${v.leg2.source}`,
       netOut: v.netEurc,
@@ -337,6 +422,7 @@ export async function liveQuote(
       eurcPath: 'via-usdc',
       impactPct: priceImpactPct(amountStroops, v.netEurc, result.prices.blndUsd, targetEvmPerUnit('EURC', result.prices)) ?? null,
       impactLocalPct: priceImpactPct(amountStroops, v.netEurc, result.prices.blndUsd, targetLocalPerUnit('EURC', result.prices)) ?? null,
+      legs: compositeLegs,
     });
   }
   raw.sort((a, b) => (a.netOut < b.netOut ? 1 : a.netOut > b.netOut ? -1 : 0));
@@ -357,6 +443,7 @@ export async function liveQuote(
     // Les lignes composites (EURC via-USDC = "leg1+leg2") = 2 tx non atomiques → JAMAIS exécutables en 1 clic
     // (sinon un clic exécuterait un swap direct 1-leg ≠ les 2 tx revues). Seules les venues simples le sont.
     executable: !r.source.includes('+') && ['xbull', 'soroswap', 'horizon', 'aquarius', 'comet', 'ultrastellar'].includes(r.source.trim()),
+    legs: r.legs,
   }));
 
   return {
@@ -369,6 +456,7 @@ export async function liveQuote(
       impactLocalPct,
       route,
       deepLink: deepLink(bestSource, pairUi),
+      legs: eurcPath === 'via-usdc' ? compositeLegs : undefined,
     },
     ladder,
     prices: {
@@ -378,7 +466,7 @@ export async function liveQuote(
       xlmUsd: result.prices.xlmUsd,
     },
     errors: result.errors,
-    downSources: result.errors.map((id) => ({ display: displayName(id), reason: result.errorReasons?.[id] ?? 'indisponible' })),
+    downSources: result.errors.map((id) => ({ display: displayName(id), sourceId: id, reason: result.errorReasons?.[id] ?? 'indisponible' })),
   };
 }
 

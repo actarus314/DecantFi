@@ -13,6 +13,7 @@ export type Chip = 'obs' | 'calc' | 'est';
 
 export interface LadderRow {
   display: string;
+  sourceId: string;
   note: string;
   route: string;
   net: number;
@@ -49,7 +50,7 @@ export interface Overview {
   /** Échelles du dernier tick ok, une par sonde (clé = BLND entier, ex. '250'). */
   ladders: Record<string, LadderRow[]>;
   /** Distribution des gagnants par sonde (clé = BLND entier). */
-  winnerDist: Record<string, Array<{ display: string; pct: number }>>;
+  winnerDist: Record<string, Array<{ display: string; pct: number; sourceId: string }>>;
   /** Meilleures routes (chemins gagnants) sur 7 j, par sonde (clé = BLND entier). */
   bestRoutes: Record<string, RouteRank[]>;
   /** 7×24 efficience moyenne brute par (dow, hour) UTC — pour la moyenne/jour normalisée du prix. Clé = sonde en string (ex. '250'/'750'). */
@@ -82,7 +83,7 @@ const FULL_NAME: Record<string, string> = {
   xbull: 'xBull',
   soroswap: 'Soroswap',
   aquarius: 'Aquarius',
-  comet: 'Comet (pool)',
+  comet: 'Comet',
   ultrastellar: 'Ultra Stellar',
   stellarbroker: 'StellarBroker',
   horizon: 'Horizon',
@@ -238,6 +239,7 @@ function buildLadder(db: DatabaseSync, pair: string, amountIn: bigint): LadderRo
 
     return {
       display: displayName(sourceId),
+      sourceId,
       note: noteFor(sourceId, isWinner, eurcPath),
       route: maskedRoute(prettyRoute(r['route_summary'] != null ? String(r['route_summary']) : ''), sourceId),
       net,
@@ -257,7 +259,7 @@ function buildWinnerDist(
   pair: string,
   windowStart: string,
   amountIn?: bigint,
-): Array<{ display: string; pct: number }> {
+): Array<{ display: string; pct: number; sourceId: string }> {
   const stmt = prepBig(db, `
     SELECT q.source_id, COUNT(*) as cnt
     FROM quote q JOIN tick t ON t.id = q.tick_id
@@ -275,6 +277,7 @@ function buildWinnerDist(
   return rows.map((r) => ({
     display: displayName(String(r['source_id'] ?? '')),
     pct: Math.round((Number(r['cnt'] as bigint) / Number(total)) * 1000) / 10,
+    sourceId: String(r['source_id'] ?? ''),
   }));
 }
 
@@ -1019,7 +1022,7 @@ export function overview(
   const meta = buildMeta(db, cfg.cadenceSec, sondes);
   const ladders: Record<string, LadderRow[]> = {};
   for (const size of sizes) ladders[String(toNumber(size))] = buildLadder(db, pair, size);
-  const winnerDist: Record<string, Array<{ display: string; pct: number }>> = {};
+  const winnerDist: Record<string, Array<{ display: string; pct: number; sourceId: string }>> = {};
   const bestRoutes: Record<string, RouteRank[]> = {};
   for (const size of sizes) {
     const key = String(toNumber(size));

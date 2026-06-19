@@ -2,7 +2,10 @@ name: stellarswap
 services:
   collector:
     image: ghcr.io/actarus314/stellarswap-collector:${IMAGE_TAG:-latest}
-    build: .
+    build:
+      context: .
+      args:
+        REV: ${REV:-dev}
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -29,7 +32,10 @@ services:
 
   web:
     image: ghcr.io/actarus314/stellarswap-collector:${IMAGE_TAG:-latest}
-    build: .
+    build:
+      context: .
+      args:
+        REV: ${REV:-dev}
     command: ["node", "dist/web/server.js"]
     restart: unless-stopped
     read_only: true

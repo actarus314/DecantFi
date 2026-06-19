@@ -12,6 +12,7 @@ COPY web ./web
 RUN npm run build
 
 FROM node:24-slim AS runtime
+ARG REV
 WORKDIR /app
 ENV NODE_ENV=production
 ENV SQLITE_TMPDIR=/tmp
@@ -19,5 +20,6 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY web/public ./dist/web/public
+RUN echo "window.__REV='${REV:-dev}';" > /app/dist/web/public/version.js
 # root:root (philosophie standard §14) ; durcissement via directives compose.
 CMD ["node", "dist/collector/daemon.js"]

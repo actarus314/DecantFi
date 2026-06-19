@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>decant.fi — BLND swaps - accurately decanted</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<script src="/version.js" onerror="void 0"></script>
 <style>
 :root{
   --bg:#f1f5f9; --card-bg:#ffffff; --card-border:#e2e8f0; --section-bg:#f8fafc;
@@ -160,6 +161,14 @@ body{margin:0; background:var(--bg); color:var(--val);
    un tooltip vers le bas serait masqué par overflow:hidden. Monte dans le tableau, s'étend à droite. */
 .tip-wrap .tip-box.up{top:auto; bottom:calc(100% + 4px); left:0; transform:none;}
 .tip-wrap .tip-box.up::before{top:100%; bottom:auto; left:16px; transform:none; border-bottom-color:transparent; border-top-color:var(--val);}
+/* Cartes d'identité de venue */
+.tip-wrap.vname{display:inline; cursor:help;}
+.tip-wrap.vname .srcname{text-decoration:underline dotted; text-decoration-color:var(--sub);}
+.vcard{width:300px; max-width:300px;}
+.vcard b{display:block; margin-bottom:.4rem;}
+.vgrid{display:grid; grid-template-columns:auto 1fr; gap:.2rem .6rem; align-items:baseline;}
+.vgrid > span:nth-child(odd){color:var(--sub); font-size:11px; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap;}
+.vgrid > span:nth-child(even){color:var(--bg);}
 
 table.flt{width:100%; border-collapse:collapse; font-size:13px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:.6rem; overflow:hidden;}
 table.flt th{font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--caption); text-align:right; padding:8px 12px; background:var(--section-bg); font-weight:600; border-bottom:1px solid var(--card-border);}
@@ -275,6 +284,9 @@ table.flt tr.sel td{background:color-mix(in srgb, var(--heading) 9%, transparent
 @keyframes se-wobble{0%,100%{transform:rotate(-2deg) scale(1)}50%{transform:rotate(2deg) scale(1.04)}}
 @keyframes se-shake{0%,100%{transform:translate(0,0) rotate(-3deg)}25%{transform:translate(-4px,2px) rotate(3deg)}50%{transform:translate(4px,-2px) rotate(-2deg)}75%{transform:translate(-3px,-3px) rotate(2deg)}}
 @media(prefers-reduced-motion:reduce){#scam-egg *{animation:none!important}}
+/* Flèche état des jambes composite (FIX 3) */
+.hops-arrow::before{content:'▾'}
+details[open] .hops-arrow::before{content:'▴'}
 </style>
 </head>
 <body>
@@ -353,6 +365,7 @@ const STRINGS = {
     impact_evm_confirm: 'Passer en mode EVM',
     impact_evm_dismiss: 'Ne plus me montrer',
     spot_eurc_stellar: 'EURC@Stellar',
+    spot_eurc_evm: 'EURC@EVM',
     ladder_empty: 'Aucune donnée',
     ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
 
@@ -459,6 +472,9 @@ const STRINGS = {
     // Navigation
     nav_dashboard: 'Tableau de bord',
     nav_health: 'Stabilité',
+
+    tx_label: 'Tx',
+    hops_label: (n) => `${n} saut${n > 1 ? 's' : ''}`,
 
     // Footer ②
     footer_readings: (n, nOk, cadenceHuman, perDay, coverH) =>
@@ -608,6 +624,7 @@ const STRINGS = {
     impact_evm_confirm: 'Switch to EVM mode',
     impact_evm_dismiss: 'Don\'t show again',
     spot_eurc_stellar: 'EURC@Stellar',
+    spot_eurc_evm: 'EURC@EVM',
     ladder_empty: 'No data',
     ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
 
@@ -714,6 +731,9 @@ const STRINGS = {
     // Navigation
     nav_dashboard: 'Dashboard',
     nav_health: 'Stability',
+
+    tx_label: 'Tx',
+    hops_label: (n) => `${n} hop${n > 1 ? 's' : ''}`,
 
     // Footer ②
     footer_readings: (n, nOk, cadenceHuman, perDay, coverH) =>
@@ -869,6 +889,51 @@ function t(key, ...args) {
   const v = s ? s[key] : undefined;
   if (typeof v === 'function') return v(...args);
   return v !== undefined ? v : key;
+}
+
+// ─── Cartes d'identité de venue ───────────────────────────────────────────────
+const VENUE_META = {
+  xbull: {
+    fr: { type: 'Agrégateur', couche: 'SDEX + AMM Soroban', liquidite: 'meilleur chemin multi-venues (swap-kit, sans clé)', note: 'prélève 0,1 % — classé sur le fill réellement simulé' },
+    en: { type: 'Aggregator', couche: 'SDEX + Soroban AMMs', liquidite: 'best multi-venue path (swap-kit, keyless)', note: 'skims 0.1% — ranked on the actually simulated fill' },
+  },
+  soroswap: {
+    fr: { type: 'Agrégateur', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: 'frais protocole inclus dans le fill simulé' },
+    en: { type: 'Aggregator', couche: 'Soroban', liquidite: 'Soroswap AMM (router)', note: 'protocol fees included in the simulated fill' },
+  },
+  aquarius: {
+    fr: { type: 'Agrégateur', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + carnet SDEX (find-path)', note: 'find-path sur-cote parfois (3-hop via XLM) → re-simulé' },
+    en: { type: 'Aggregator', couche: 'AMM + SDEX', liquidite: 'Aquarius pools + SDEX book (find-path)', note: 'find-path sometimes over-quotes (3-hop via XLM) → re-simulated' },
+  },
+  stellarbroker: {
+    fr: { type: 'Agrégateur (RFQ)', couche: 'hors-chaîne', liquidite: 'agrège des market makers', note: 'frais opaques → classé en plancher (borne basse)' },
+    en: { type: 'Aggregator (RFQ)', couche: 'off-chain', liquidite: 'aggregates market makers', note: 'opaque fees → treated as a floor (lower bound)' },
+  },
+  ultrastellar: {
+    fr: { type: 'Carnet SDEX', couche: 'SDEX classique', liquidite: "carnet d'ordres natif Stellar", note: 'path payment, frais 0' },
+    en: { type: 'SDEX order book', couche: 'classic SDEX', liquidite: 'native Stellar order book', note: 'path payment, 0 fee' },
+  },
+  horizon: {
+    fr: { type: 'Carnet SDEX', couche: 'SDEX classique', liquidite: "carnet d'ordres natif (strict-send)", note: 'plancher garanti (path payment direct)' },
+    en: { type: 'SDEX order book', couche: 'classic SDEX', liquidite: 'native order book (strict-send)', note: 'guaranteed floor (direct path payment)' },
+  },
+  comet: {
+    fr: { type: 'Pool (source unique)', couche: 'Soroban', liquidite: 'pool backstop Blend 80/20 (BLND/USDC)', note: 'cote indépendante du solde ; BLND→USDC seulement' },
+    en: { type: 'Pool (single source)', couche: 'Soroban', liquidite: 'Blend 80/20 backstop pool (BLND/USDC)', note: 'balance-independent quote; BLND→USDC only' },
+  },
+};
+
+function venueCard(id, name) {
+  const meta = VENUE_META[id];
+  if (!meta) return name; // composite / inconnu → pas de carte
+  const m = meta[lang === 'en' ? 'en' : 'fr'];
+  const L = lang === 'en' ? ['Type', 'Layer', 'Liquidity', 'Note'] : ['Type', 'Couche', 'Liquidité', 'Note'];
+  return `<span class="tip-wrap vname"><span class="srcname">${name}</span>` +
+    `<span class="tip-box vcard"><b>${name}</b>` +
+    `<span class="vgrid"><span>${L[0]}</span><span>${m.type}</span>` +
+    `<span>${L[1]}</span><span>${m.couche}</span>` +
+    `<span>${L[2]}</span><span>${m.liquidite}</span>` +
+    `<span>${L[3]}</span><span>${m.note}</span></span></span></span>`;
 }
 
 function chipLabel(chip) {
@@ -1088,7 +1153,7 @@ function ladderRows(rows, u, down) {
     const trClass = [r.winner ? 'win' : '', isSel ? 'sel' : ''].filter(Boolean).join(' ');
     const sid = r.sourceId ? r.sourceId.replace(/'/g, "\\'") : '';
     return `<tr class="${trClass}" style="cursor:pointer" onclick="selectSource('${sid}')">
-      <td><span class="srcname">${r.display}</span>${r.note ? ` <span class="muted">· ${noteLabel(r.note)}</span>` : ''}</td>
+      <td>${venueCard(r.sourceId, r.display)}${r.note ? ` <span class="muted">· ${noteLabel(r.note)}</span>` : ''}</td>
       <td>${fmt3(r.net)}</td>
       <td class="${deltaClass}">${delta}</td>
       <td><span class="chip ${r.chip}">${chipLabel(r.chip)}</span></td>
@@ -1098,7 +1163,7 @@ function ladderRows(rows, u, down) {
   // Lignes de sources en échec (axe santé, distinct des chips confiance) — ponytail: health axis
   if (down && down.length > 0) {
     html += down.map(d =>
-      `<tr><td><span class="srcname muted">${d.display}</span></td>
+      `<tr><td><span class="muted">${venueCard(d.sourceId, d.display)}</span></td>
       <td class="muted">—</td>
       <td class="muted">—</td>
       <td><span class="chip down">${t('chip_down')} · ${reasonLabel(d.reason)}</span></td>
@@ -1168,16 +1233,23 @@ function simCard() {
       minReceived = b.net * (1 - execSlippagePct / 100);
     }
     const minStr = `<span style="color:var(--caption)">${t('sim_min', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(minReceived)} ${target}</span>`;
-    // EURC@Stellar mid (spot local) affiché si disponible
-    const stellarMid = simResult.prices && simResult.prices.eurcStellarMid != null
-      ? ` · <span style="color:var(--sub)">${t('spot_eurc_stellar')} ${simResult.prices.eurcStellarMid.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 4, maximumFractionDigits: 6 })} USDC</span>`
-      : '';
-    const stellarMidLine = target === 'EURC' && stellarMid ? `<span class="meta" style="flex:1 1 100%; margin-top:.2rem">${stellarMid.replace(/^ · /, '')}</span>` : '';
     // Nom de l'outil retiré ici : il est désormais porté par le bouton « Exécuter via [outil] ».
+    const legsData = (displayRow || b).legs;
+    const routeDiv = legsData
+      ? legsData.map((leg, i) => `
+        <details${i === 0 ? ' open' : ' id="leg2-details" open'} style="margin-bottom:.35rem">
+          <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;background:var(--heading);color:var(--bg);border-radius:4px;padding:1px 6px">${t('tx_label')} ${i+1}</span>
+            <span style="font-weight:600">${leg.display}</span>
+            <span style="color:var(--caption);font-size:12px">${leg.from} → ${leg.to}</span>
+            <span style="color:var(--sub);font-size:12px">${t('hops_label', leg.hops)} <span class="hops-arrow"></span></span>
+          </summary>
+          <div id="leg-route-${i}" style="margin-top:.4rem;white-space:nowrap;overflow-x:auto;overflow-y:hidden">${routeFromParts(leg.routeParts, false)}</div>
+        </details>`).join('')
+      : `<div style="overflow-x:auto;overflow-y:hidden">${route}</div>`;
     resultHtml = `<div class="result">
-      <div style="flex:1 1 100%">${route}</div>
+      <div style="flex:1 1 100%;min-width:0">${routeDiv}</div>
       <span class="meta" style="flex:1 1 100%; margin-top:.4rem">${rateStr}${impactMeta}</span>
-      ${stellarMidLine}
       <span class="meta" style="flex:1 1 100%; margin-top:.2rem">${minStr}</span>
     </div>`;
     if (simResult.errors && simResult.errors.length > 0) {
@@ -1227,7 +1299,7 @@ function distBars(winnerDist) {
   if (!winnerDist || winnerDist.length === 0) return `<p class="help">${t('no_data')}</p>`;
   const max = Math.max(...winnerDist.map(d => d.pct));
   return `<div class="dist">${winnerDist.map(d =>
-    `<div class="drow"><span class="dname">${d.display}</span>
+    `<div class="drow"><span class="dname">${venueCard(d.sourceId, d.display)}</span>
     <span class="dbar"><span style="width:${max > 0 ? d.pct/max*100 : 0}%"></span></span>
     <span class="dpct">${d.pct.toFixed(1)} %</span></div>`
   ).join('')}</div>`;
@@ -1630,7 +1702,7 @@ function buildPage() {
     const perDay = Math.round(86400 / meta.cadenceSec);
     const coverH = Math.round(meta.nTicks * meta.cadenceSec / 3600);
     const cadH = cadenceHuman(meta.cadenceSec);
-    return `<div class="page-footer">${t('footer_readings', meta.nTicks, meta.nTicksOk, cadH, perDay, coverH)} · <button onclick="setView('health')">${t('footer_health_link')}</button></div>`;
+    return `<div class="page-footer">${t('footer_readings', meta.nTicks, meta.nTicksOk, cadH, perDay, coverH)} · <button onclick="setView('health')">${t('footer_health_link')}</button><span style="color:var(--sub);font-size:11px;opacity:.7"> · rev ${window.__REV||'dev'}</span></div>`;
   })() : '';
 
   return `${topbarHtml}
@@ -1670,10 +1742,27 @@ function buildPage() {
   ${impactEvmModalHtml()}`;
 }
 
+// Replie la jambe 2 si son contenu déborde horizontalement (FIX 3).
+// Idempotent : sans effet si #leg2-details absent (route atomique / pas de composite).
+function adjustLegs() {
+  const leg2 = document.getElementById('leg2-details');
+  if (!leg2) return;
+  // Vérifie le débordement de l'un ou l'autre conteneur de route
+  const r0 = document.getElementById('leg-route-0');
+  const r1 = document.getElementById('leg-route-1');
+  const overflows = (el) => el && el.scrollWidth > el.clientWidth;
+  if (overflows(r0) || overflows(r1)) {
+    leg2.removeAttribute('open');
+  }
+  // Sinon leg2 reste open (rendu par défaut open dans le HTML)
+}
+
 function renderApp() {
   document.documentElement.lang = lang;
   document.title = 'decant.fi — ' + t('brand_dim');
   document.getElementById('app').innerHTML = buildPage();
+  // Post-render : ajuste l'état ouvert/fermé de la jambe 2 selon le débordement.
+  requestAnimationFrame(adjustLegs);
 }
 
 // ─── Navigation vue ───────────────────────────────────────────────────────────

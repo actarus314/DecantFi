@@ -20,6 +20,9 @@ export interface EngineConfig extends SourceConfig {
   prices?: Prices;
   /** Sources injectables (tests). Defaut : ADAPTERS. */
   adapters?: SourceAdapter[];
+  /** Re-simulation honnête des jambes xBull/Aquarius pour le composite EURC via-USDC.
+   *  Fourni par la couche web/collecteur. Sans ce callback, les cotes brutes sont utilisées. */
+  reSimLeg?: (quotes: NormalizedQuote[], amountIn: Stroops) => Promise<NormalizedQuote[]>;
 }
 
 export interface QuoteResult {
@@ -120,7 +123,7 @@ export async function quote(opts: QuoteOptions): Promise<QuoteResult> {
       blndToEurc: (amt) => quoteAllFor(BLND, EURC, amt),
       blndToUsdc: (amt) => quoteAllFor(BLND, USDC, amt),
       usdcToEurc: (amt) => quoteAllFor(USDC, EURC, amt),
-    });
+    }, cfg.reSimLeg);
   }
 
   let split: SplitAnalysis | undefined;

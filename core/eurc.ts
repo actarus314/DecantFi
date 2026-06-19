@@ -37,15 +37,23 @@ export interface EurcQuoters {
   usdcToEurc: (amountUsdc: Stroops) => Promise<NormalizedQuote[]>;
 }
 
-export async function compareEurc(amountBlnd: Stroops, q: EurcQuoters): Promise<EurcComparison> {
+export async function compareEurc(
+  amountBlnd: Stroops,
+  q: EurcQuoters,
+  reSimLeg?: (quotes: NormalizedQuote[], amountIn: Stroops) => Promise<NormalizedQuote[]>,
+): Promise<EurcComparison> {
   const direct = rankQuotes(await q.blndToEurc(amountBlnd)).best;
 
   let viaUsdc: ViaUsdcResult | undefined;
-  const leg1 = rankQuotes(await q.blndToUsdc(amountBlnd)).best;
+  const leg1List = await q.blndToUsdc(amountBlnd);
+  const leg1Honest = reSimLeg ? await reSimLeg(leg1List, amountBlnd) : leg1List;
+  const leg1 = rankQuotes(leg1Honest).best;
   if (leg1 && leg1.grossOut > 0n) {
     // Recote sur l'USDC REELLEMENT recu = grossOut (le gas est paye en XLM, pas preleve sur l'USDC).
     const usdcReceived = leg1.grossOut;
-    const leg2 = rankQuotes(await q.usdcToEurc(usdcReceived)).best;
+    const leg2List = await q.usdcToEurc(usdcReceived);
+    const leg2Honest = reSimLeg ? await reSimLeg(leg2List, usdcReceived) : leg2List;
+    const leg2 = rankQuotes(leg2Honest).best;
     if (leg2 && leg2.netOut > 0n) {
       // net = BRUT partout (le gas Soroban se paie en XLM, à part — variable par tx, affiché par le
       // wallet/explorer). On ne déduit plus le gas du leg 1 du résultat EURC. (Le composite reste de

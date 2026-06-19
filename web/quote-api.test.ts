@@ -21,7 +21,7 @@ vi.mock('../core/prices.js', () => ({
 }));
 
 import { quote as engineQuote } from '../core/engine.js';
-import { liveQuote } from './quote-api.js';
+import { liveQuote, makeReSimLeg } from './quote-api.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -184,5 +184,54 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
     expect(row!.sourceId).toBe('xbull+ultrastellar');
     expect(row!.executable).toBe(false); // composite = 2 tx → jamais 1-clic (sinon on exécuterait un swap direct ≠ revue)
     expect(row!.deepLink).toBe('https://swap.xbull.io/'); // lien manuel sur la venue de base reste utile
+  });
+});
+
+describe('makeReSimLeg — Aquarius structural failure exclusion', () => {
+  /** Builds a minimal NormalizedQuote compatible with makeReSimLeg (no engine mock needed). */
+  function makeAqQuote(overrides: Record<string, unknown> = {}) {
+    return {
+      source: 'aquarius' as const,
+      sellAsset: { ...BLND },
+      buyAsset: USDC,
+      amountIn: AMT,
+      grossOut: 5_0000000n,
+      feeBreakdown: [],
+      gasXlm: 0n,
+      gasInTarget: 0n,
+      netOut: 5_0000000n,
+      netConfidence: 'exact' as const,
+      netRange: undefined,
+      route: [],
+      priceImpactPct: undefined,
+      raw: { swap_chain_xdr: 'FAKE_XDR' },
+      ...overrides,
+    };
+  }
+
+  it('excludes an Aquarius quote when simulateAquariusNet returns null (structural failure)', async () => {
+    const aqQ = makeAqQuote();
+    const soroQ = makeQuote('soroswap', 4_9000000n);
+
+    const simFn = vi.fn(async () => null); // structural failure
+    const reSimLeg = makeReSimLeg({ rpcUrl: 'https://rpc.test' }, { simulateAquariusNet: simFn as any });
+
+    const result = await reSimLeg([aqQ as any, soroQ as any], AMT);
+    // Aquarius excluded, soroswap kept
+    expect(result.find(q => q.source === 'aquarius')).toBeUndefined();
+    expect(result.find(q => q.source === 'soroswap')).toBeDefined();
+  });
+
+  it('keeps raw Aquarius quote when simulateAquariusNet throws (transient RPC error)', async () => {
+    const aqQ = makeAqQuote();
+
+    const simFn = vi.fn(async () => { throw new Error('RPC timeout'); });
+    const reSimLeg = makeReSimLeg({ rpcUrl: 'https://rpc.test' }, { simulateAquariusNet: simFn as any });
+
+    const result = await reSimLeg([aqQ as any], AMT);
+    // Kept with raw value (transient error → best-effort)
+    const kept = result.find(q => q.source === 'aquarius');
+    expect(kept).toBeDefined();
+    expect(kept!.netOut).toBe(5_0000000n); // raw, unchanged
   });
 });

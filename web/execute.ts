@@ -282,8 +282,10 @@ export const AQUARIUS_WITNESSES = [
 export async function simulateAquariusNet(
   swapChainXdr: string,
   amountIn: bigint,
+  inputSac: string,
   cfg: { rpcUrl: string },
 ): Promise<bigint | null> {
+  const resolvedCfg = cfg;
   const sdk = await import('@stellar/stellar-sdk');
   const { rpc, Address, TransactionBuilder, Networks, Account, Contract, scValToNative, nativeToScVal, xdr } = sdk;
 
@@ -294,12 +296,12 @@ export async function simulateAquariusNet(
     return null;
   }
 
-  const server = new rpc.Server((cfg.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
+  const server = new rpc.Server((resolvedCfg.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
   for (const witness of AQUARIUS_WITNESSES) {
     const args = [
       Address.fromString(witness).toScVal(),
       swapsChain,
-      Address.fromString(BLND.sac!).toScVal(),
+      Address.fromString(inputSac).toScVal(),
       nativeToScVal(amountIn, { type: 'u128' }),
       nativeToScVal(0n, { type: 'u128' }),
     ];
