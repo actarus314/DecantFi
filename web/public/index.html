@@ -347,9 +347,9 @@ const STRINGS = {
     ladder_col_impact_evm: 'Impact EVM',
     ladder_col_route: 'Route',
     ladder_tip_chip: 'Observé = cotation réelle de la source<br>Calculé = route composée (2 swaps)<br>Estimé = borne/plancher (frais opaques)',
-    ladder_tip_impact: '<b>Mode LOCAL (défaut)</b> : écart vs le prix de l\'EURC <i>sur Stellar</i> (carnet SDEX EURC/USDC). Prévaut si tu comptes <b>rester sur Stellar</b>.<br><br><b>Mode EVM</b> : écart vs le prix de l\'EURC <i>global</i> (Base/Ethereum). Prévaut si tu comptes <b>bridger vers EVM</b> — la prime/décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>Clique le titre de colonne pour basculer. Positif = tu reçois moins. Négatif = tu reçois plus.',
+    ladder_tip_impact: '<b>Mode LOCAL (défaut)</b> : écart vs le prix de l\'EURC <i>sur Stellar</i> (carnet SDEX EURC/USDC). Prévaut si tu comptes <b>rester sur Stellar</b>.<br><br><b>Mode EVM</b> : écart vs le prix de l\'EURC <i>global</i> (Base/Ethereum). Prévaut si tu comptes <b>bridger vers EVM</b> — la prime/décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>Ne concerne que l\'<b>EURC</b> (USDC : identique dans les deux modes).<br><br>Clique le titre de colonne pour basculer. Positif = tu reçois moins. Négatif = tu reçois plus.',
     impact_evm_notice_title: 'Passer en mode Impact EVM ?',
-    impact_evm_notice_body: 'En mode <b>EVM</b>, l\'impact est calculé vs le prix de l\'EURC <b>global (Base/Ethereum)</b> : prévaut si tu comptes <b>bridger vers EVM</b>. La prime ou décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>En mode <b>Local</b> (défaut), l\'impact est calculé vs le prix EURC sur le <b>SDEX Stellar</b> : prévaut si tu comptes <b>rester sur Stellar</b>.',
+    impact_evm_notice_body: 'En mode <b>EVM</b>, l\'impact est calculé vs le prix de l\'EURC <b>global (Base/Ethereum)</b> : prévaut si tu comptes <b>bridger vers EVM</b>. La prime ou décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>En mode <b>Local</b> (défaut), l\'impact est calculé vs le prix EURC sur le <b>SDEX Stellar</b> : prévaut si tu comptes <b>rester sur Stellar</b>.<br><br>Ce réglage ne concerne que l\'<b>EURC</b> (le swap vers USDC est identique dans les deux modes).',
     impact_evm_confirm: 'Passer en mode EVM',
     impact_evm_dismiss: 'Ne plus me montrer',
     spot_eurc_stellar: 'EURC@Stellar',
@@ -602,9 +602,9 @@ const STRINGS = {
     ladder_col_impact_evm: 'Impact EVM',
     ladder_col_route: 'Route',
     ladder_tip_chip: 'Observed = real quote from the source<br>Calculated = composite route (2 swaps)<br>Estimated = floor/ceiling (opaque fees)',
-    ladder_tip_impact: '<b>LOCAL mode (default)</b>: gap vs the EURC price <i>on Stellar</i> (SDEX EURC/USDC order book). Use it if you plan to <b>stay on Stellar</b>.<br><br><b>EVM mode</b>: gap vs the <i>global</i> EURC price (Base/Ethereum). Use it if you plan to <b>bridge to EVM</b> — the Stellar market premium/discount then counts as a real gain or loss.<br><br>Click the column header to toggle. Positive = you receive less. Negative = you receive more.',
+    ladder_tip_impact: '<b>LOCAL mode (default)</b>: gap vs the EURC price <i>on Stellar</i> (SDEX EURC/USDC order book). Use it if you plan to <b>stay on Stellar</b>.<br><br><b>EVM mode</b>: gap vs the <i>global</i> EURC price (Base/Ethereum). Use it if you plan to <b>bridge to EVM</b> — the Stellar market premium/discount then counts as a real gain or loss.<br><br>Only affects <b>EURC</b> (USDC: identical in both modes).<br><br>Click the column header to toggle. Positive = you receive less. Negative = you receive more.',
     impact_evm_notice_title: 'Switch to EVM Impact mode?',
-    impact_evm_notice_body: 'In <b>EVM</b> mode, impact is measured against the <b>global EURC price (Base/Ethereum)</b>: use it if you plan to <b>bridge to EVM</b>. The Stellar market premium or discount then counts as a real gain or loss.<br><br>In <b>Local</b> mode (default), impact is measured against the EURC price on the <b>Stellar SDEX</b>: use it if you plan to <b>stay on Stellar</b>.',
+    impact_evm_notice_body: 'In <b>EVM</b> mode, impact is measured against the <b>global EURC price (Base/Ethereum)</b>: use it if you plan to <b>bridge to EVM</b>. The Stellar market premium or discount then counts as a real gain or loss.<br><br>In <b>Local</b> mode (default), impact is measured against the EURC price on the <b>Stellar SDEX</b>: use it if you plan to <b>stay on Stellar</b>.<br><br>This setting only affects <b>EURC</b> (swapping to USDC is identical in both modes).',
     impact_evm_confirm: 'Switch to EVM mode',
     impact_evm_dismiss: 'Don\'t show again',
     spot_eurc_stellar: 'EURC@Stellar',
@@ -989,8 +989,18 @@ function reasonLabel(code) {
 
 // ─── Échelle de sources ───────────────────────────────────────────────────────
 function ladderHead(u) {
+  const isEurc = (typeof target !== 'undefined' && target === 'EURC');
   const impactLabel = impactMode === 'evm' ? t('ladder_col_impact_evm') : t('ladder_col_impact');
   const impactStyle = 'cursor:pointer;user-select:none;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;';
+  // Le toggle local/EVM ne concerne que l'EURC (USDC : identique). Hors EURC : en-tête simple, non cliquable, sans tooltip.
+  const impactTh = isEurc
+    ? `<th onclick="toggleImpactMode()" style="${impactStyle}">
+      <div class="tip-wrap" style="display:inline-flex;align-items:center;">
+        ${impactLabel}<span style="font-size:10px;margin-left:2px;opacity:.7">▾</span><span class="tip-icon">ⓘ</span>
+        <span class="tip-box up">${t('ladder_tip_impact')}</span>
+      </div>
+    </th>`
+    : `<th>${t('ladder_col_impact')}</th>`;
   return `<thead><tr>
     <th>${t('ladder_col_tool')}</th>
     <th>${t('ladder_col_net', u)}</th>
@@ -1001,12 +1011,7 @@ function ladderHead(u) {
         <span class="tip-box">${t('ladder_tip_chip')}</span>
       </div>
     </th>
-    <th onclick="toggleImpactMode()" style="${impactStyle}">
-      <div class="tip-wrap" style="display:inline-flex;align-items:center;">
-        ${impactLabel}<span style="font-size:10px;margin-left:2px;opacity:.7">▾</span><span class="tip-icon">ⓘ</span>
-        <span class="tip-box up">${t('ladder_tip_impact')}</span>
-      </div>
-    </th>
+    ${impactTh}
     <th class="left">${t('ladder_col_route')}</th>
   </tr></thead>`;
 }
