@@ -1830,6 +1830,31 @@ async function loadOverview() {
   renderApp();
 }
 
+// Poll pendant la fenêtre « imminent » : silencieux tant que le collecteur n'a pas tické.
+// Quand lastTickAt AVANCE (= vrai relevé), flash grisé unique pour signaler l'auto-refresh,
+// puis bascule les nouvelles données. Ne grise PAS à chaque poll (sinon la table clignote).
+async function pollForTick() {
+  const tgt = target;
+  let data;
+  try {
+    const r = await fetch(`/api/overview?pair=${target}&tzoff=${localOffset()}`);
+    if (!r.ok) return;
+    data = await r.json();
+  } catch { return; }
+  if (target !== tgt) return; // paire changée pendant le fetch
+  const prevTick = overview && overview.meta ? overview.meta.lastTickAt : null;
+  const newTick = data && data.meta ? data.meta.lastTickAt : null;
+  if (!newTick || newTick === prevTick) return; // pas de nouveau relevé : reste silencieux
+  // Nouveau relevé détecté : flash grisé puis swap des données.
+  refreshing = true;
+  renderApp();
+  await new Promise((res) => setTimeout(res, 400));
+  if (target !== tgt) { refreshing = false; return; } // paire changée pendant le hold
+  overview = data;
+  refreshing = false;
+  renderApp();
+}
+
 async function loadBalance() {
   if (!walletAddress) { walletBlnd = 0; walletConfigured = false; renderApp(); return; }
   try {
@@ -1847,9 +1872,9 @@ function startCountdownTick() {
     if (el) el.textContent = computeCountdownText();
     // Échéance dépassée : re-fetch périodique jusqu'à ce que le collecteur ait tické,
     // sinon le compte à rebours reste figé sur « imminent ».
-    if (nextTickAt !== null && Date.now() >= nextTickAt && Date.now() - lastImminentPollAt > 20000) {
+    if (nextTickAt !== null && Date.now() >= nextTickAt && Date.now() - lastImminentPollAt > 10000) {
       lastImminentPollAt = Date.now();
-      void loadOverview();
+      void pollForTick();
     }
   }, 1000);
 }
