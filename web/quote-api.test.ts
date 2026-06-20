@@ -56,12 +56,12 @@ const AMT = 100_0000000n; // 100 BLND en stroops
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe('liveQuote — sourceId / deepLink / executable', () => {
+describe('liveQuote — sourceId / executable', () => {
   beforeEach(() => {
     vi.mocked(engineQuote).mockReset();
   });
 
-  it('expose sourceId, deepLink et executable sur chaque ligne', async () => {
+  it('expose sourceId et executable sur chaque ligne', async () => {
     const xbullQ = makeQuote('xbull', 5_2000000n);
     const aquaQ = makeQuote('aquarius', 5_0000000n);
 
@@ -89,13 +89,9 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
     // executable : xbull = true, aquarius = true (venue d'exécution branchée)
     expect(xbullRow!.executable).toBe(true);
     expect(aquaRow!.executable).toBe(true);
-
-    // deepLink : xbull et aquarius ont des liens connus
-    expect(xbullRow!.deepLink).toBe('https://swap.xbull.io/');
-    expect(aquaRow!.deepLink).toBe('https://aqua.network/');
   });
 
-  it('soroswap et horizon sont exécutables (horizon sans deep-link)', async () => {
+  it('soroswap et horizon sont exécutables', async () => {
     const soroQ = makeQuote('soroswap', 5_1000000n);
     const horizonQ = makeQuote('horizon', 4_9000000n);
 
@@ -116,7 +112,6 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
 
     expect(soroRow!.executable).toBe(true);
     expect(horizonRow!.executable).toBe(true); // op native PathPaymentStrictSend branchée
-    expect(horizonRow!.deepLink).toBeNull(); // exécution intégrée → pas de page de swap dédiée
   });
 
   it('re-classe Aquarius sur le net simulé (plus bas que find-path) → Aquarius perd contre xBull', async () => {
@@ -164,7 +159,7 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
     expect(result.ladder[0]?.sourceId).toBe('aquarius');
   });
 
-  it('id composite (leg1+leg2) → NON exécutable (2 tx non atomiques), deepLink = base', async () => {
+  it('id composite (leg1+leg2) → NON exécutable (2 tx non atomiques)', async () => {
     const compositeQ = makeQuote('xbull+ultrastellar', 5_3000000n);
 
     vi.mocked(engineQuote).mockResolvedValue({
@@ -183,7 +178,6 @@ describe('liveQuote — sourceId / deepLink / executable', () => {
     expect(row).toBeDefined();
     expect(row!.sourceId).toBe('xbull+ultrastellar');
     expect(row!.executable).toBe(false); // composite = 2 tx → jamais 1-clic (sinon on exécuterait un swap direct ≠ revue)
-    expect(row!.deepLink).toBe('https://swap.xbull.io/'); // lien manuel sur la venue de base reste utile
   });
 });
 

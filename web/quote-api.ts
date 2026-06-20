@@ -41,9 +41,8 @@ export interface LiveLadderRow {
   /** Impact local (vs mid SDEX Stellar). null si mid indisponible. */
   impactLocalPct: number | null;
   winner: boolean;
-  // click-to-select : identifiant source brut, deep-link et capacité d'exécution intégrée
+  // click-to-select : identifiant source brut et capacité d'exécution intégrée
   sourceId: string;
-  deepLink: string | null;
   executable: boolean;
   /** Legs du composite EURC via-USDC (2 transactions). Absent pour les routes atomiques. */
   legs?: CompositeLeg[];
@@ -69,7 +68,6 @@ export interface LiveQuote {
     /** Impact local (vs mid SDEX Stellar). null si mid indisponible. */
     impactLocalPct: number | null;
     route: RibbonPart[];
-    deepLink: string | null;
     /** Legs du composite EURC via-USDC (2 transactions). Absent pour les routes atomiques. */
     legs?: CompositeLeg[];
   };
@@ -83,21 +81,6 @@ export interface LiveQuote {
   errors: string[];
   // axe santé, distinct des chips de confiance — ponytail: health axis
   downSources: Array<{ display: string; sourceId: string; reason: string }>;
-}
-
-// ─── Deep-links (pages réelles, sans prefill inventé) ────────────────────────
-
-const DEEP_LINKS: Record<string, string> = {
-  xbull: 'https://swap.xbull.io/',
-  soroswap: 'https://app.soroswap.finance/',
-  aquarius: 'https://aqua.network/',
-  ultrastellar: 'https://www.ultrastellar.com/',
-};
-
-export function deepLink(sourceId: string, _pairUi: string): string | null {
-  // Pour un id combiné (ex. "xbull+ultrastellar") → premier hop = xbull
-  const base = sourceId.split('+')[0]?.trim() ?? '';
-  return DEEP_LINKS[base] ?? null;
 }
 
 // ─── Construction du ruban depuis la route du gagnant ────────────────────────
@@ -358,7 +341,6 @@ export async function liveQuote(
         impactPct: null,
         impactLocalPct: null,
         route: [],
-        deepLink: null,
       },
       ladder: [],
       prices: {
@@ -457,7 +439,6 @@ export async function liveQuote(
     impactLocalPct: r.impactLocalPct,
     winner: i === 0,
     sourceId: r.source,
-    deepLink: deepLink(r.source, pairUi),
     // Les lignes composites (EURC via-USDC = "leg1+leg2") = 2 tx non atomiques → JAMAIS exécutables en 1 clic
     // (sinon un clic exécuterait un swap direct 1-leg ≠ les 2 tx revues). Seules les venues simples le sont.
     executable: !r.source.includes('+') && ['xbull', 'soroswap', 'horizon', 'aquarius', 'comet', 'ultrastellar'].includes(r.source.trim()),
@@ -473,7 +454,6 @@ export async function liveQuote(
       impactPct,
       impactLocalPct,
       route,
-      deepLink: deepLink(bestSource, pairUi),
       legs: eurcPath === 'via-usdc' ? compositeLegs : undefined,
     },
     ladder,
