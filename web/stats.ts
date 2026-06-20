@@ -1,6 +1,8 @@
 // Statistiques lues depuis la DB pour l'UI web. Fonctions pures (db en param).
 // Fenêtre = 7 jours. Timezone : agrégation serveur UTC, conversion côté client.
 // ponytail: Number = affichage, jamais règlement.
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { type DatabaseSync } from 'node:sqlite';
 import { prepBig, readCoherenceProbes, readExecMsBySource, readTickWallClocks } from './read-db.js';
 import { toNumber } from '../core/amount.js';
@@ -35,6 +37,8 @@ export interface Meta {
   windowDays: 7;
   /** Sondes configurées (COLLECTOR_SIZES_BLND), en BLND entiers, triées croissant. */
   sondes: number[];
+  /** Prévision daemon du prochain relevé prêt (ISO) ; null/absent si indispo (boot, collecteur ancien). */
+  nextTickAt?: string | null;
 }
 
 /** Une route distincte (chemin + outils) classée par fréquence de victoire sur la fenêtre. */
@@ -518,6 +522,15 @@ function buildMeta(db: DatabaseSync, cadenceSec: number, sondes: number[]): Meta
     windowDays: 7,
     sondes,
   };
+}
+
+function readNextTickAt(dbPath: string): string | null {
+  try {
+    const v = readFileSync(join(dirname(dbPath), '.next_tick'), 'utf8').trim();
+    return v && !Number.isNaN(Date.parse(v)) ? v : null;
+  } catch {
+    return null; // fichier absent (boot, collecteur ancien) ou illisible → le front retombe sur l'estimation
+  }
 }
 
 // ─── Santé des sources (7 j) ─────────────────────────────────────────────────
@@ -1017,6 +1030,7 @@ export function overview(
   const sondes = sizes.map((s) => toNumber(s));
 
   const meta = buildMeta(db, cfg.cadenceSec, sondes);
+  meta.nextTickAt = readNextTickAt(cfg.dbPath);
   const ladders: Record<string, LadderRow[]> = {};
   for (const size of sizes) ladders[String(toNumber(size))] = buildLadder(db, pair, size);
   const winnerDist: Record<string, Array<{ display: string; pct: number; sourceId: string }>> = {};

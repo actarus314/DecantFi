@@ -1006,6 +1006,17 @@ function freshLabel(lastTickAt) {
   return `<span class="fresh" onclick="doRefresh()" title="${hint}"><span class="dot" style="background:${color}"></span><span id="countdown">${computeCountdownText()}</span></span>`;
 }
 
+function computeNextTickAt(meta) {
+  if (!meta) return null;
+  const last = meta.lastTickAt ? new Date(meta.lastTickAt).getTime() : 0;
+  if (meta.nextTickAt) {
+    const t = new Date(meta.nextTickAt).getTime();
+    if (!isNaN(t) && t > last) return t; // prévision daemon (jitter + durée connus) — préférée
+  }
+  if (last && meta.cadenceSec) return last + meta.cadenceSec * 1000; // fallback : estimation nominale
+  return null;
+}
+
 function computeCountdownText() {
   if (nextTickAt === null) {
     // If we have meta, show elapsed ago instead (fallback pre-nextTickAt set)
@@ -1632,9 +1643,8 @@ function buildPage() {
     : null;
 
   // Met à jour nextTickAt depuis le meta (fait une fois par render)
-  if (meta && meta.lastTickAt && meta.cadenceSec) {
-    nextTickAt = new Date(meta.lastTickAt).getTime() + meta.cadenceSec * 1000;
-  }
+  const computedNext = computeNextTickAt(meta);
+  if (computedNext !== null) nextTickAt = computedNext;
 
   // Timezone locale
   const offsetH = localOffset();
@@ -1953,10 +1963,8 @@ async function doRefresh() {
       if (data.overview) {
         overview = data.overview;
         // Réinitialise nextTickAt depuis le nouveau overview
-        const meta = overview.meta;
-        if (meta && meta.lastTickAt && meta.cadenceSec) {
-          nextTickAt = new Date(meta.lastTickAt).getTime() + meta.cadenceSec * 1000;
-        }
+        const computedNext = computeNextTickAt(overview.meta);
+        if (computedNext !== null) nextTickAt = computedNext;
       }
       refreshMsg = '';
     }

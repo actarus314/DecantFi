@@ -30,8 +30,10 @@ async function main(): Promise<void> {
   const db = openDb(cfg.dbPath);
   const probes = buildProbes(cfg);
   const heartbeat = join(dirname(cfg.dbPath), '.heartbeat');
+  const nextTickFile = join(dirname(cfg.dbPath), '.next_tick'); // prévision du prochain relevé prêt, lu par le web
   writeFileSync(heartbeat, new Date().toISOString()); // heartbeat de boot : healthcheck sain avant le 1er tick
   let lastMaintenanceDay = '';
+  let lastTickDurationMs = 0; // durée du dernier tick (started→finished), pour prévoir quand les données seront prêtes
   let stopping = false;
   const abort = new AbortController(); // réveille le sleep à l'arrêt → arrêt propre immédiat
 
@@ -39,6 +41,9 @@ async function main(): Promise<void> {
     const startedAt = new Date();
     try {
       const { tick, quotes, rpcProbes } = await runTick({ probes, cfg, now: () => new Date(), fetchPrices, quote });
+      if (tick.finished_at) {
+        lastTickDurationMs = new Date(tick.finished_at).getTime() - new Date(tick.started_at).getTime();
+      }
       db.insertTickWithQuotes(tick, quotes, rpcProbes);
       const purged = db.purgeManualTicks(); // le poll programmé prime : on jette les refresh manuels provisoires
       writeFileSync(heartbeat, new Date().toISOString());
@@ -82,7 +87,14 @@ async function main(): Promise<void> {
   // après chaque (re)démarrage → compte à rebours figé sur « imminent », point pulsant absent, données périmées.
   if (!stopping) await tickAndStore();
   await runLoop({
-    delayMs: () => jitteredDelayMs(cfg.cadenceSec, cfg.jitterSec),
+    delayMs: () => {
+      const ms = jitteredDelayMs(cfg.cadenceSec, cfg.jitterSec);
+      try {
+        // Publie quand le prochain relevé sera PRÊT (réveil + durée typique d'un tick).
+        writeFileSync(nextTickFile, new Date(Date.now() + ms + lastTickDurationMs).toISOString());
+      } catch { /* best-effort, comme le heartbeat */ }
+      return ms;
+    },
     sleep: (ms) => interruptibleSleep(ms, abort.signal),
     onTick: tickAndStore,
     shouldStop: () => stopping,
