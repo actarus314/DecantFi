@@ -564,8 +564,7 @@ const STRINGS = {
     // click-to-select
     exec_via: (tool) => 'Exécuter via ' + tool,
     exec_composite: 'Exécuter (2 transactions)',
-    exec_open_tool: (tool) => 'Ouvrir ' + tool + ' ↗',
-    exec_integrated_soon: 'Exécution intégrée à venir — ouvrez l\'outil pour finaliser le swap.',
+    exec_integrated_soon: 'Exécution intégrée à venir pour cet outil.',
     ladder_pick_hint: 'Cliquez une ligne pour exécuter via cet outil (re-clic = retour au choix auto).',
   },
   en: {
@@ -829,8 +828,7 @@ const STRINGS = {
     // click-to-select
     exec_via: (tool) => 'Execute via ' + tool,
     exec_composite: 'Execute (2 transactions)',
-    exec_open_tool: (tool) => 'Open ' + tool + ' ↗',
-    exec_integrated_soon: 'Integrated execution coming soon — open the tool to complete the swap.',
+    exec_integrated_soon: 'Integrated execution coming soon for this tool.',
     ladder_pick_hint: 'Click a row to execute via that tool (click again to revert to auto).',
   },
 };
@@ -1281,11 +1279,8 @@ function simCard() {
         <button class="btn primary" onclick="doExecuteComposite()">${t('exec_composite')}</button>
       </div>`;
     } else if (selRow && !selRow.executable) {
-      // Venue non intégré : deep-link uniquement, pas de bouton Execute
+      // Venue non intégré : pas d'exécution, message seul (plus de deep-link)
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-        ${selRow.deepLink
-          ? `<a class="btn primary openlink btnlike" href="${selRow.deepLink}" target="_blank" rel="noopener">${t('exec_open_tool', selRow.display)}</a>`
-          : ''}
         <span style="font-size:12px;color:var(--caption)">${t('exec_integrated_soon')}</span>
       </div>`;
     } else {
