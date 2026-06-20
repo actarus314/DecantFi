@@ -167,7 +167,7 @@ export function makeReSimLeg(
           const rawXdr = (q.raw as { swap_chain_xdr?: unknown } | undefined)?.swap_chain_xdr;
           if (!rawXdr) return q;
           const inputSac = q.sellAsset.sac;
-          // No .catch() — let transient RPC errors throw to outer catch (kept raw)
+          // No .catch() — let transient RPC errors throw to outer catch (downgraded to 'estimate')
           const simNet = await simFnAq(String(rawXdr), amountIn, inputSac, { rpcUrl: cfg.rpcUrl });
           if (simNet !== null && simNet > 0n) {
             return { ...q, netOut: simNet, grossOut: simNet };
@@ -180,8 +180,13 @@ export function makeReSimLeg(
           const xbSim = await simFnXb(String(route), amountIn, { rpcUrl: cfg.rpcUrl }).catch(() => null);
           if (xbSim && xbSim.net > 0n && xbSim.net !== q.netOut)
             return { ...q, netOut: xbSim.net, grossOut: xbSim.net };
+          // xbSim === null → RPC/timeout failure → downgrade confidence
+          if (!xbSim) return { ...q, netConfidence: 'estimate' as const };
         }
-      } catch { /* repli silencieux : cote brute conservée */ }
+      } catch {
+        // Transient RPC error (throw from Aquarius sim) → downgrade confidence, keep raw quote
+        return { ...q, netConfidence: 'estimate' as const };
+      }
       return q;
     }));
     return results.filter((q): q is import('../core/sources/types.js').NormalizedQuote => q !== null);
@@ -206,6 +211,9 @@ export async function resimAquariusXbull(
 
   let aquariusSimNet: bigint | undefined;
   let xbullSimNet: bigint | undefined;
+  // Tracks whether a sim was attempted but failed (→ downgrade to 'estimate')
+  let aquariusSimFailed = false;
+  let xbullSimFailed = false;
 
   const aqRanked = result.ranking.ranked.find((q) => q.source === 'aquarius');
   const rawXdr = (aqRanked?.raw as { swap_chain_xdr?: unknown } | undefined)?.swap_chain_xdr;
@@ -215,6 +223,7 @@ export async function resimAquariusXbull(
     const simNet = await simFnAq(String(rawXdr), amountStroops, BLND.sac, { rpcUrl: cfg.rpcUrl }).catch(() => null);
     aqSimMs = Date.now() - t0Aq;
     if (simNet !== null && simNet > 0n && simNet !== aqRanked.netOut) aquariusSimNet = simNet;
+    else if (simNet === null) aquariusSimFailed = true; // RPC/timeout failure → downgrade
   }
 
   const xbRanked = result.ranking.ranked.find((q) => q.source === 'xbull');
@@ -230,18 +239,28 @@ export async function resimAquariusXbull(
       const r = xbSim.route;
       xbullHops = r.slice(0, -1).map((sell, i) => ({ venue: 'xbull', sell, buy: r[i + 1]! }));
     }
+    if (!xbSim) xbullSimFailed = true; // RPC/timeout failure → downgrade
   }
 
-  if (aquariusSimNet !== undefined || xbullSimNet !== undefined || xbullHops !== undefined) {
+  if (aquariusSimNet !== undefined || xbullSimNet !== undefined || xbullHops !== undefined
+    || aquariusSimFailed || xbullSimFailed) {
     const newQuotes = result.ranking.ranked.map((q) => {
-      if (q.source === 'aquarius' && aquariusSimNet !== undefined)
-        return { ...q, netOut: aquariusSimNet, grossOut: aquariusSimNet,
-          durationMs: (q.durationMs ?? 0) + aqSimMs };
-      if (q.source === 'xbull' && (xbullSimNet !== undefined || xbullHops))
-        return { ...q,
-          ...(xbullSimNet !== undefined ? { netOut: xbullSimNet, grossOut: xbullSimNet } : {}),
-          ...(xbullHops ? { route: xbullHops } : {}),
-          durationMs: (q.durationMs ?? 0) + xbSimMs };
+      if (q.source === 'aquarius') {
+        if (aquariusSimNet !== undefined)
+          return { ...q, netOut: aquariusSimNet, grossOut: aquariusSimNet,
+            durationMs: (q.durationMs ?? 0) + aqSimMs };
+        if (aquariusSimFailed)
+          return { ...q, netConfidence: 'estimate' as const };
+      }
+      if (q.source === 'xbull') {
+        if (xbullSimNet !== undefined || xbullHops)
+          return { ...q,
+            ...(xbullSimNet !== undefined ? { netOut: xbullSimNet, grossOut: xbullSimNet } : {}),
+            ...(xbullHops ? { route: xbullHops } : {}),
+            durationMs: (q.durationMs ?? 0) + xbSimMs };
+        if (xbullSimFailed)
+          return { ...q, netConfidence: 'estimate' as const };
+      }
       return q;
     });
     result.ranking = rankQuotes(newQuotes);
@@ -357,9 +376,8 @@ export async function liveQuote(
   const amtNum = toNumber(amountStroops);
   const rate = amtNum > 0 ? netNum / amtNum : 0;
 
-  const bestConf = bestQuote.netConfidence;
-  // Pour via-usdc : forcer 'calc' car leg1 peut être 'exact' mais c'est une estimation 2 swaps
-  const chip: Chip = eurcPath === 'via-usdc' ? 'calc' : chipFor(bestConf, bestSource, eurcPath);
+  const bestConf = eurcPath === 'via-usdc' ? 'exact' : bestQuote.netConfidence;
+  const chip: Chip = chipFor(bestConf);
   // FIX 4 : quand le gagnant est le composite via-usdc, l'impact doit porter sur le net EURC final
   // (bestNet = netEurc) et non sur la leg1 seule (bestQuote = leg1 BLND→USDC).
   // On utilise le même calcul que la ligne ladder composite (~ligne 416).
@@ -416,7 +434,7 @@ export async function liveQuote(
     raw.push({
       source: `${v.leg1.source}+${v.leg2.source}`,
       netOut: v.netEurc,
-      conf: 'estimate',
+      conf: 'exact',
       route: `${r1} → ${r2.split(' → ').slice(1).join(' → ')}`, // fusionne le nœud USDC partagé
       hops: null, // composite EURC via-USDC : pas de RouteHop[] structuré unique
       eurcPath: 'via-usdc',
@@ -434,7 +452,7 @@ export async function liveQuote(
     routeParts: r.hops !== null ? buildRoute(r.hops, amountStroops, r.netOut, pairUi) : null,
     net: toNumber(r.netOut),
     deltaVsWinner: toNumber(r.netOut) - topNetNum,
-    chip: r.eurcPath === 'via-usdc' ? 'calc' : chipFor(r.conf, r.source, r.eurcPath),
+    chip: chipFor(r.conf),
     impactPct: r.impactPct,
     impactLocalPct: r.impactLocalPct,
     winner: i === 0,

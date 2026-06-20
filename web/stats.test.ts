@@ -470,12 +470,12 @@ describe('helpers', () => {
     expect(displayName('xbull+ultrastellar')).toBe('xBull + Ultra Stellar');
   });
 
-  it('chipFor: exact→obs, floor→est, estimate+simple→est, estimate+combiné→calc', () => {
-    expect(chipFor('exact', 'xbull', null)).toBe('obs');
-    expect(chipFor('floor', 'stellarbroker', null)).toBe('est');
-    expect(chipFor('estimate', 'horizon', null)).toBe('est');
-    expect(chipFor('estimate', 'xbull+ultrastellar', null)).toBe('calc');
-    expect(chipFor('estimate', 'xbull', 'via-usdc')).toBe('calc');
+  it('chipFor: exact→obs, tout autre→est (floor/estimate/combiné/via-usdc)', () => {
+    expect(chipFor('exact')).toBe('obs');
+    expect(chipFor('floor')).toBe('est');
+    expect(chipFor('estimate')).toBe('est');
+    // composite via-usdc : net_confidence posé à 'exact' → observé
+    expect(chipFor('exact')).toBe('obs');
   });
 
   it('noteFor: vide sauf via-usdc', () => {

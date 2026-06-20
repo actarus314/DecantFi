@@ -78,7 +78,7 @@ function rowsForProbe(probe: Probe, result: QuoteResult, prices: Prices): QuoteI
     const win = eurc.winner === 'via-usdc';
     rows.push({
       pair: probe.pair, amount_in: probe.amountIn, source_id: `${v.leg1.source}+${v.leg2.source}`,
-      net_out: v.netEurc, net_confidence: 'estimate', price_impact_pct: impact ?? null,
+      net_out: v.netEurc, net_confidence: 'exact', price_impact_pct: impact ?? null,
       gas_in_target: v.leg1.gasInTarget + v.leg2.gasInTarget, fee_total: null, // composite : gas des 2 legs
       route_summary: `${v.leg1.source}:BLND->USDC | ${v.leg2.source}:USDC->EURC`,
       is_winner: win, eurc_path: 'via-usdc', raw_json: JSON.stringify(eurc, bigIntJson),

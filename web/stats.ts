@@ -9,7 +9,7 @@ import type { CollectorConfig } from '../collector/config.js';
 
 // ─── Types publics ───────────────────────────────────────────────────────────
 
-export type Chip = 'obs' | 'calc' | 'est';
+export type Chip = 'obs' | 'est';
 
 export interface LadderRow {
   display: string;
@@ -114,11 +114,8 @@ export function noteFor(_sourceId: string, _winner: boolean, eurcPath: string | 
   return eurcPath === 'via-usdc' ? 'multi-tx' : '';
 }
 
-export function chipFor(netConfidence: string, sourceId: string, eurcPath: string | null): Chip {
+export function chipFor(netConfidence: string): Chip {
   if (netConfidence === 'exact') return 'obs';
-  if (netConfidence === 'floor') return 'est';
-  // estimate
-  if (sourceId.includes('+') || eurcPath === 'via-usdc') return 'calc';
   return 'est';
 }
 
@@ -244,7 +241,7 @@ function buildLadder(db: DatabaseSync, pair: string, amountIn: bigint): LadderRo
       route: maskedRoute(prettyRoute(r['route_summary'] != null ? String(r['route_summary']) : ''), sourceId),
       net,
       deltaVsWinner,
-      chip: chipFor(netConf, sourceId, eurcPath),
+      chip: chipFor(netConf),
       impactPct,
       impactLocalPct,
       winner: isWinner,

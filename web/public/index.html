@@ -102,7 +102,6 @@ body{margin:0; background:var(--bg); color:var(--val);
 
 .chip{display:inline-block; border:1px solid; background:transparent; border-radius:9999px; font-weight:600; font-size:12px; padding:0 7px; line-height:1.6; vertical-align:middle;}
 .chip.obs{border-color:#4ade80; color:#15803d;} .dark .chip.obs{border-color:#15803d; color:#4ade80;}
-.chip.calc{border-color:#60a5fa; color:#1d4ed8;} .dark .chip.calc{border-color:#1d4ed8; color:#60a5fa;}
 .chip.est{border-color:#c4b5fd; color:#6d28d9;} .dark .chip.est{border-color:#6d28d9; color:#c4b5fd;}
 /* ponytail: health axis, distinct from confidence chips */
 .chip.down{border-color:var(--tool); color:var(--tool);}
@@ -367,7 +366,7 @@ const STRINGS = {
     ladder_col_impact: 'Impact',
     ladder_col_impact_evm: 'Impact EVM',
     ladder_col_route: 'Route',
-    ladder_tip_chip: 'Observé = cotation réelle de la source<br>Calculé = route composée (2 swaps)<br>Estimé = borne/plancher (frais opaques)',
+    ladder_tip_chip: 'Observé = fill vu en simulation (route exécutable)<br>Estimé = pas de fill simulé : borne/plancher ou simulation indisponible<br>Indispo = source injoignable',
     ladder_tip_impact: '<b>Mode LOCAL (défaut)</b> : écart vs le prix de l\'EURC <i>sur Stellar</i> (carnet SDEX EURC/USDC). Prévaut si tu comptes <b>rester sur Stellar</b>.<br><br><b>Mode EVM</b> : écart vs le prix de l\'EURC <i>global</i> (Base/Ethereum). Prévaut si tu comptes <b>bridger vers EVM</b> — la prime/décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>Ne concerne que l\'<b>EURC</b> (USDC : identique dans les deux modes).<br><br>Clique le titre de colonne pour basculer. Positif = tu reçois moins. Négatif = tu reçois plus.',
     impact_evm_notice_title: 'Passer en mode Impact EVM ?',
     impact_evm_notice_body: 'En mode <b>EVM</b>, l\'impact est calculé vs le prix de l\'EURC <b>global (Base/Ethereum)</b> : prévaut si tu comptes <b>bridger vers EVM</b>. La prime ou décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>En mode <b>Local</b> (défaut), l\'impact est calculé vs le prix EURC sur le <b>SDEX Stellar</b> : prévaut si tu comptes <b>rester sur Stellar</b>.<br><br>Ce réglage ne concerne que l\'<b>EURC</b> (le swap vers USDC est identique dans les deux modes).',
@@ -380,8 +379,8 @@ const STRINGS = {
 
     // Chips
     chip_obs: 'observé',
-    chip_calc: 'calculé',
     chip_est: 'estimé',
+    chip_down: 'indispo',
     hops_hidden: 'Chemin non communiqué par xBull',
 
     // Heatmap / profil
@@ -633,7 +632,7 @@ const STRINGS = {
     ladder_col_impact: 'Impact',
     ladder_col_impact_evm: 'Impact EVM',
     ladder_col_route: 'Route',
-    ladder_tip_chip: 'Observed = real quote from the source<br>Calculated = composite route (2 swaps)<br>Estimated = floor/ceiling (opaque fees)',
+    ladder_tip_chip: 'Observed = fill seen in simulation (executable route)<br>Estimated = no simulated fill: floor/ceiling or simulation unavailable<br>Unavailable = source unreachable',
     ladder_tip_impact: '<b>LOCAL mode (default)</b>: gap vs the EURC price <i>on Stellar</i> (SDEX EURC/USDC order book). Use it if you plan to <b>stay on Stellar</b>.<br><br><b>EVM mode</b>: gap vs the <i>global</i> EURC price (Base/Ethereum). Use it if you plan to <b>bridge to EVM</b> — the Stellar market premium/discount then counts as a real gain or loss.<br><br>Only affects <b>EURC</b> (USDC: identical in both modes).<br><br>Click the column header to toggle. Positive = you receive less. Negative = you receive more.',
     impact_evm_notice_title: 'Switch to EVM Impact mode?',
     impact_evm_notice_body: 'In <b>EVM</b> mode, impact is measured against the <b>global EURC price (Base/Ethereum)</b>: use it if you plan to <b>bridge to EVM</b>. The Stellar market premium or discount then counts as a real gain or loss.<br><br>In <b>Local</b> mode (default), impact is measured against the EURC price on the <b>Stellar SDEX</b>: use it if you plan to <b>stay on Stellar</b>.<br><br>This setting only affects <b>EURC</b> (swapping to USDC is identical in both modes).',
@@ -646,8 +645,8 @@ const STRINGS = {
 
     // Chips
     chip_obs: 'observed',
-    chip_calc: 'calculated',
     chip_est: 'estimated',
+    chip_down: 'unavailable',
     hops_hidden: 'Path not disclosed by xBull',
 
     // Heatmap / profil
@@ -960,7 +959,7 @@ function venueCard(id, name) {
 }
 
 function chipLabel(chip) {
-  const map = { obs: t('chip_obs'), calc: t('chip_calc'), est: t('chip_est') };
+  const map = { obs: t('chip_obs'), est: t('chip_est'), down: t('chip_down') };
   return map[chip] || chip;
 }
 

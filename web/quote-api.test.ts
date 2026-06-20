@@ -222,16 +222,17 @@ describe('makeReSimLeg — Aquarius structural failure exclusion', () => {
     expect(result.find(q => q.source === 'soroswap')).toBeDefined();
   });
 
-  it('keeps raw Aquarius quote when simulateAquariusNet throws (transient RPC error)', async () => {
+  it('keeps raw Aquarius quote but downgrades to estimate when simulateAquariusNet throws (transient RPC error)', async () => {
     const aqQ = makeAqQuote();
 
     const simFn = vi.fn(async () => { throw new Error('RPC timeout'); });
     const reSimLeg = makeReSimLeg({ rpcUrl: 'https://rpc.test' }, { simulateAquariusNet: simFn as any });
 
     const result = await reSimLeg([aqQ as any], AMT);
-    // Kept with raw value (transient error → best-effort)
+    // Kept with raw net value but netConfidence downgraded to 'estimate'
     const kept = result.find(q => q.source === 'aquarius');
     expect(kept).toBeDefined();
-    expect(kept!.netOut).toBe(5_0000000n); // raw, unchanged
+    expect(kept!.netOut).toBe(5_0000000n); // raw net, unchanged
+    expect(kept!.netConfidence).toBe('estimate'); // downgraded: sim failed
   });
 });
