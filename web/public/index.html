@@ -355,7 +355,6 @@ const STRINGS = {
     sim_btn_clear: 'Vider',
     sim_loading: 'Cotation en cours…',
     sim_errors: 'Sources en échec :',
-    sim_open: 'Ouvrir ↗',
     sim_min: (u) => `Reçu min (${u})`,
 
     // Tableau ladder
@@ -621,7 +620,6 @@ const STRINGS = {
     sim_btn_clear: 'Clear',
     sim_loading: 'Fetching quote…',
     sim_errors: 'Failed sources:',
-    sim_open: 'Open ↗',
     sim_min: (u) => `Min received (${u})`,
 
     // Tableau ladder
@@ -1037,11 +1035,6 @@ function agoLabel(lastTickAt) {
 
 function tool(name) { return `<span class="tool">${name}</span>`; }
 
-function openLink(dl, big) {
-  if (!dl) return '';
-  return `<a class="openlink${big ? ' btnlike' : ''}" href="${dl}" target="_blank" rel="noopener">${t('sim_open')}</a>`;
-}
-
 // ─── Ruban de route ───────────────────────────────────────────────────────────
 function routeFromParts(parts, big) {
   if (!parts || parts.length === 0) return '';
@@ -1300,7 +1293,6 @@ function simCard() {
         : (winRow && winRow.executable && !winRow.sourceId.includes('+') ? t('exec_via', winRow.display) : t('exec_btn'));
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
         <button class="btn primary" onclick="doExecute()">${execLabel}</button>
-        ${!selRow && b.deepLink ? openLink(b.deepLink, true) : ''}
       </div>`;
     }
   }
