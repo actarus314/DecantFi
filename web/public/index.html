@@ -122,8 +122,8 @@ body{margin:0; background:var(--bg); color:var(--val);
 /* flèche autonome entre actif et cartouche d'outil (alignée sur la rangée des pastilles) */
 .routeline .ar2{color:var(--sub); font-size:13px; line-height:1; padding-top:7px;}
 /* composite : TOUJOURS empilé (2 lignes), encadré ; le marqueur « Tx N » ouvre chaque ligne. */
-.complegs{display:flex; flex-direction:column; background:var(--section-bg); border:1px solid var(--card-border); border-radius:10px; padding:2px 12px;}
-.complegs .legblock{display:flex; align-items:flex-start; gap:.55rem; overflow-x:auto; overflow-y:hidden; padding:9px 0;}
+.complegs{display:flex; flex-direction:column;}
+.complegs .legblock{display:flex; align-items:flex-start; gap:.55rem; overflow-x:auto; overflow-y:hidden; padding:8px 0;}
 .complegs .legblock + .legblock{border-top:1px dashed var(--card-border);}
 .complegs .legblock .routeline{flex-wrap:nowrap;}
 .complegs .txbadge{font-size:10.5px; font-weight:700; background:var(--heading); color:var(--bg); border-radius:4px; padding:1px 6px; align-self:flex-start; margin-top:7px; white-space:nowrap;}
@@ -350,7 +350,7 @@ const STRINGS = {
 
     // Simulateur
     sim_placeholder: 'montant BLND',
-    sim_wallet_ok: (n) => `Solde wallet (${n} BLND)`,
+    sim_wallet_ok: (n) => `Solde wallet (~${n} BLND)`,
     sim_wallet_ko: 'Solde wallet (non configuré)',
     sim_btn_simulate: 'Simuler',
     sim_btn_refresh: 'Rafraîchir',
@@ -614,7 +614,7 @@ const STRINGS = {
 
     // Simulateur
     sim_placeholder: 'BLND amount',
-    sim_wallet_ok: (n) => `Wallet balance (${n} BLND)`,
+    sim_wallet_ok: (n) => `Wallet balance (~${n} BLND)`,
     sim_wallet_ko: 'Wallet balance (not configured)',
     sim_btn_simulate: 'Simulate',
     sim_btn_refresh: 'Refresh',
@@ -994,6 +994,10 @@ function rotateHeatUtc(heat, offsetH) {
 // ─── Formatage ────────────────────────────────────────────────────────────────
 const fmt = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt3 = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+// Montants de route : jusqu'à 3 décimales, zéros inutiles supprimés, séparateur localisé.
+const fmtRoute = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { maximumFractionDigits: 3 });
+// Taux : jusqu'à 6 décimales, séparateur localisé (cohérent avec le reste du simulateur).
+const fmtRate = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { maximumFractionDigits: 6 });
 const fmt0 = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { maximumFractionDigits: 0 });
 
 function freshLabel(lastTickAt) {
@@ -1041,7 +1045,8 @@ function routeFromParts(parts, big) {
   if (!parts || parts.length === 0) return '';
   const assetSpan = (p) => {
     const qtyClass = `qty${p.out ? ' o' : ''}${big ? ' big' : ''}`;
-    return `<span class="rasset"><span class="asset${p.out ? ' out' : ''}">${p.asset}</span>${p.qty ? `<span class="${qtyClass}">${p.qty}</span>` : ''}</span>`;
+    const qtyStr = p.amt != null ? `${fmtRoute(p.amt)} ${p.asset}` : '';
+    return `<span class="rasset"><span class="asset${p.out ? ' out' : ''}">${p.asset}</span>${qtyStr ? `<span class="${qtyClass}">${qtyStr}</span>` : ''}</span>`;
   };
   // Cartouche d'outil UNIQUE entre l'entrée et la sortie. Les jetons traversés ne sont
   // jamais répétés : groupés dans le niveau 2 d'un cartouche 2 niveaux si multi-hop.
@@ -1053,7 +1058,7 @@ function routeFromParts(parts, big) {
   if (assets.length >= 2 && uniform) {
     const mids = assets.slice(1, -1).map(a => a.asset);
     const cart = mids.length > 0
-      ? `<span class="cart2"><span class="lvl1">${tools[0]}</span><span class="lvl2">${mids.join(' · ')}</span></span>`
+      ? `<span class="cart2"><span class="lvl1">${tools[0]}</span><span class="lvl2">via ${mids.join(' · ')}</span></span>`
       : `<span class="tool">${tools[0]}</span>`;
     const ar = '<span class="ar2">→</span>';
     return `<div class="routeline">${assetSpan(assets[0])}${ar}${cart}${ar}${assetSpan(assets[assets.length - 1])}</div>`;
@@ -1064,10 +1069,9 @@ function routeFromParts(parts, big) {
   }).join('') + '</div>';
 }
 
-function routeSimple(sonde, netVal, src, pairUi, big) {
-  const hops = pairUi === 'USDC'
-    ? [{ asset: 'BLND', qty: `${sonde} BLND` }, { tool: src }, { asset: 'USDC', qty: `${fmt3(netVal)} USDC`, out: true }]
-    : [{ asset: 'BLND', qty: `${sonde} BLND` }, { tool: src }, { asset: 'EURC', qty: `${fmt3(netVal)} EURC`, out: true }];
+function routeSimple(amtIn, netVal, src, pairUi, big) {
+  const tgt = pairUi === 'USDC' ? 'USDC' : 'EURC';
+  const hops = [{ asset: 'BLND', amt: amtIn }, { tool: src }, { asset: tgt, amt: netVal, out: true }];
   return routeFromParts(hops, big);
 }
 
@@ -1264,14 +1268,14 @@ function simCard() {
         ? routeFromParts(displayRow.routeParts, true)
         : renderRoute(displayRow.route);
       const rowRate = simAmt > 0 ? displayRow.net / simAmt : 0;
-      rateStr = rowRate > 0 ? rowRate.toFixed(6) + ' ' + target + '/BLND' : '';
+      rateStr = rowRate > 0 ? fmtRate(rowRate) + ' ' + target + '/BLND' : '';
       { const v = getImpactVal(displayRow); impactMeta = v != null ? ` · impact ${fmt(v)} %` : ''; }
       minReceived = displayRow.net * (1 - execSlippagePct / 100);
     } else {
       route = b.route && b.route.length > 0
         ? routeFromParts(b.route, true)
-        : routeSimple(fmt3(simAmt), b.net, b.display, target, true);
-      rateStr = b.rate > 0 ? b.rate.toFixed(6) + ' ' + target + '/BLND' : '';
+        : routeSimple(simAmt, b.net, b.display, target, true);
+      rateStr = b.rate > 0 ? fmtRate(b.rate) + ' ' + target + '/BLND' : '';
       { const v = getImpactVal(b); impactMeta = v != null ? ` · impact ${fmt(v)} %` : ''; }
       minReceived = b.net * (1 - execSlippagePct / 100);
     }

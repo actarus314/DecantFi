@@ -14,7 +14,8 @@ import type { QuoteResult } from '../core/engine.js';
 
 export interface RibbonPart {
   asset?: string;
-  qty?: string;
+  /** Montant BRUT (non formaté) — le front le formate selon la locale + trim des zéros. */
+  amt?: number;
   out?: boolean;
   tool?: string;
 }
@@ -97,30 +98,30 @@ function prettyVenue(v: string): string {
 
 function buildRoute(hops: RouteHop[], amountIn: bigint, netOut: bigint, pairUi: string): RibbonPart[] {
   const parts: RibbonPart[] = [];
-  const amtStr = toNumber(amountIn).toFixed(3);
-  const netStr = toNumber(netOut).toFixed(3);
+  const amt = toNumber(amountIn);
+  const net = toNumber(netOut);
 
   if (hops.length === 0) {
     // Route simple déduite du pair
     const target = pairUi;
-    parts.push({ asset: 'BLND', qty: `${amtStr} BLND` });
+    parts.push({ asset: 'BLND', amt });
     parts.push({ tool: 'swap' });
-    parts.push({ asset: target, qty: `${netStr} ${target}`, out: true });
+    parts.push({ asset: target, amt: net, out: true });
     return parts;
   }
 
-  // Premier asset (BLND) avec quantité
+  // Premier asset (BLND) avec montant
   const firstSell = sym(hops[0]?.sell ?? 'BLND');
-  parts.push({ asset: firstSell, qty: `${amtStr} ${firstSell}` });
+  parts.push({ asset: firstSell, amt });
 
   for (const hop of hops) {
     parts.push({ tool: prettyVenue(hop.venue) });
-    // Asset de sortie du hop — si c'est le dernier hop, marquer out
+    // Asset de sortie du hop — si c'est le dernier hop, marquer out (porte le net)
     const isLast = hop === hops[hops.length - 1];
     const buySymbol = sym(hop.buy);
     parts.push({
       asset: buySymbol,
-      qty: isLast ? `${netStr} ${buySymbol}` : undefined,
+      amt: isLast ? net : undefined,
       out: isLast,
     });
   }
