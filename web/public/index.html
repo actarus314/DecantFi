@@ -118,16 +118,15 @@ body{margin:0; background:var(--bg); color:var(--val);
 .tag{font-size:12px; font-weight:600; color:var(--caption); background:var(--section-bg); border:1px solid var(--card-border); border-radius:6px; padding:1px 7px;}
 .pos{color:var(--green);} .neg{color:var(--red);}
 
-.routeline{display:flex; align-items:flex-start; gap:.5rem; flex-wrap:wrap;}
-/* composite : 2 jambes Tx1/Tx2 en enfilade ; bascule en empilement (wrap) si la place manque.
-   Badge « Tx » placé SOUS le nom de l'outil pour économiser la largeur. */
-.complegs{display:flex; flex-wrap:wrap; align-items:flex-start; gap:1.1rem 1.3rem;}
-.complegs .legblock{display:flex; align-items:flex-start; gap:.5rem; max-width:100%; overflow-x:auto; overflow-y:hidden; padding-bottom:3px;}
+.routeline{display:flex; align-items:flex-start; gap:.45rem; flex-wrap:wrap;}
+/* flèche autonome entre actif et cartouche d'outil (alignée sur la rangée des pastilles) */
+.routeline .ar2{color:var(--sub); font-size:13px; line-height:1; padding-top:7px;}
+/* composite : TOUJOURS empilé (2 lignes), encadré ; le marqueur « Tx N » ouvre chaque ligne. */
+.complegs{display:flex; flex-direction:column; background:var(--section-bg); border:1px solid var(--card-border); border-radius:10px; padding:2px 12px;}
+.complegs .legblock{display:flex; align-items:flex-start; gap:.55rem; overflow-x:auto; overflow-y:hidden; padding:9px 0;}
+.complegs .legblock + .legblock{border-top:1px dashed var(--card-border);}
 .complegs .legblock .routeline{flex-wrap:nowrap;}
-.complegs .txsep{align-self:center; color:var(--sub); font-weight:700; font-size:18px;}
-.complegs .txhead{display:flex; flex-direction:column; align-items:flex-start; gap:2px; white-space:nowrap; margin-top:2px;}
-.complegs .txvenue{font-weight:600;}
-.complegs .txbadge{font-size:11px; font-weight:700; background:var(--heading); color:var(--bg); border-radius:4px; padding:1px 6px; align-self:flex-start;}
+.complegs .txbadge{font-size:10.5px; font-weight:700; background:var(--heading); color:var(--bg); border-radius:4px; padding:1px 6px; align-self:flex-start; margin-top:7px; white-space:nowrap;}
 .rasset{display:inline-flex; flex-direction:column; align-items:center; gap:3px;}
 .asset{font-weight:700; font-size:14px; padding:4px 11px; border-radius:9px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--val);}
 .asset.out{color:var(--green); border-color:color-mix(in srgb, var(--green) 45%, var(--card-border));}
@@ -137,6 +136,10 @@ body{margin:0; background:var(--bg); color:var(--val);
 .leg{display:inline-flex; flex-direction:column; align-items:center; gap:2px; padding-top:4px;}
 .leg .ar{font-size:13px; line-height:1; color:var(--sub);}
 .tool{display:inline-block; font-size:13px; font-weight:700; padding:2px 9px; border-radius:7px; background:var(--tool); color:#fff; letter-spacing:-.01em; white-space:nowrap;}
+/* cartouche d'outil 2 niveaux (multi-hop) : niveau 1 = nom de l'outil, niveau 2 = jetons traversés (gris muet) */
+.cart2{display:inline-flex; flex-direction:column; border-radius:8px; overflow:hidden; border:1px solid color-mix(in srgb, var(--tool) 35%, var(--card-border)); align-self:flex-start;}
+.cart2 .lvl1{background:var(--tool); color:#fff; font-weight:700; font-size:13px; padding:3px 11px; text-align:center; letter-spacing:-.01em; white-space:nowrap;}
+.cart2 .lvl2{background:var(--section-bg); color:var(--sub); font-size:11px; font-weight:600; padding:2px 10px; text-align:center; white-space:nowrap;}
 .openlink{display:inline-flex; align-items:center; gap:3px; font-size:12px; font-weight:600; color:var(--accent); text-decoration:none;
   border:1px solid color-mix(in srgb, var(--accent) 45%, var(--card-border)); border-radius:7px; padding:3px 9px;}
 .openlink:hover{background:color-mix(in srgb, var(--accent) 10%, transparent);}
@@ -1036,12 +1039,28 @@ function tool(name) { return `<span class="tool">${name}</span>`; }
 // ─── Ruban de route ───────────────────────────────────────────────────────────
 function routeFromParts(parts, big) {
   if (!parts || parts.length === 0) return '';
-  return '<div class="routeline">' + parts.map(p => {
-    if (p.tool !== undefined) {
-      return `<span class="leg">${tool(p.tool)}<span class="ar">→</span></span>`;
-    }
+  const assetSpan = (p) => {
     const qtyClass = `qty${p.out ? ' o' : ''}${big ? ' big' : ''}`;
     return `<span class="rasset"><span class="asset${p.out ? ' out' : ''}">${p.asset}</span>${p.qty ? `<span class="${qtyClass}">${p.qty}</span>` : ''}</span>`;
+  };
+  // Cartouche d'outil UNIQUE entre l'entrée et la sortie. Les jetons traversés ne sont
+  // jamais répétés : groupés dans le niveau 2 d'un cartouche 2 niveaux si multi-hop.
+  // Une seule venue par appel (best / ligne sélectionnée / leg composite). Repli sur le
+  // rendu plat si plusieurs outils distincts (cas non attendu).
+  const assets = parts.filter(p => p.asset !== undefined);
+  const tools = parts.filter(p => p.tool !== undefined).map(p => p.tool);
+  const uniform = tools.length > 0 && tools.every(tn => tn === tools[0]);
+  if (assets.length >= 2 && uniform) {
+    const mids = assets.slice(1, -1).map(a => a.asset);
+    const cart = mids.length > 0
+      ? `<span class="cart2"><span class="lvl1">${tools[0]}</span><span class="lvl2">${mids.join(' · ')}</span></span>`
+      : `<span class="tool">${tools[0]}</span>`;
+    const ar = '<span class="ar2">→</span>';
+    return `<div class="routeline">${assetSpan(assets[0])}${ar}${cart}${ar}${assetSpan(assets[assets.length - 1])}</div>`;
+  }
+  return '<div class="routeline">' + parts.map(p => {
+    if (p.tool !== undefined) return `<span class="leg">${tool(p.tool)}<span class="ar">→</span></span>`;
+    return assetSpan(p);
   }).join('') + '</div>';
 }
 
@@ -1261,7 +1280,7 @@ function simCard() {
     const legsData = (displayRow || b).legs;
     const routeDiv = legsData
       ? '<div class="complegs">' + legsData.map((leg, i) =>
-          `${i > 0 ? '<span class="txsep">›</span>' : ''}<div class="legblock"><div class="txhead"><span class="txvenue">${leg.display}</span><span class="txbadge">${t('tx_label')} ${i + 1}</span></div>${routeFromParts(leg.routeParts, false)}</div>`
+          `<div class="legblock"><span class="txbadge">${t('tx_label')} ${i + 1}</span>${routeFromParts(leg.routeParts, false)}</div>`
         ).join('') + '</div>'
       : `<div style="overflow-x:auto;overflow-y:hidden">${route}</div>`;
     resultHtml = `<div class="result">
@@ -1759,46 +1778,11 @@ function buildPage() {
   ${impactEvmModalHtml()}`;
 }
 
-// Replie la jambe 2 si son contenu déborde horizontalement (FIX 3).
-// Idempotent : sans effet si #leg2-details absent (route atomique / pas de composite).
-function adjustLegs() {
-  // Composite : masque le séparateur › dès que les 2 jambes passent sur 2 lignes (empilées),
-  // où un séparateur horizontal n'a plus de sens. On RÉAFFICHE d'abord le séparateur puis on
-  // mesure : sinon une re-mesure dans l'état "sans séparateur" verrait une mise en page rétrécie
-  // (qui ne déborde plus) et le ré-afficherait à tort.
-  document.querySelectorAll('.complegs').forEach((c) => {
-    const blocks = c.querySelectorAll('.legblock');
-    const sep = c.querySelector('.txsep');
-    if (!sep || blocks.length < 2) return;
-    sep.style.display = '';
-    if (blocks[1].offsetTop > blocks[0].offsetTop + 1) sep.style.display = 'none';
-  });
-  const leg2 = document.getElementById('leg2-details');
-  if (!leg2) return;
-  // Vérifie le débordement de l'un ou l'autre conteneur de route
-  const r0 = document.getElementById('leg-route-0');
-  const r1 = document.getElementById('leg-route-1');
-  const overflows = (el) => el && el.scrollWidth > el.clientWidth;
-  if (overflows(r0) || overflows(r1)) {
-    leg2.removeAttribute('open');
-  }
-  // Sinon leg2 reste open (rendu par défaut open dans le HTML)
-}
-
 function renderApp() {
   document.documentElement.lang = lang;
   document.title = 'decant.fi — ' + t('brand_dim');
   document.getElementById('app').innerHTML = buildPage();
-  // Post-render : ajuste l'état ouvert/fermé de la jambe 2 + masquage du séparateur composite.
-  // Double-rAF : la 1re passe mesure souvent avant que le layout (et les polices) soit stabilisé ;
-  // la 2e passe corrige une fois le reflow terminé.
-  requestAnimationFrame(() => { adjustLegs(); requestAnimationFrame(adjustLegs); });
 }
-
-// Re-mesure le séparateur composite quand la largeur change (resize) ou quand les polices
-// finissent de charger (reflow qui peut faire passer les jambes sur 2 lignes après coup).
-window.addEventListener('resize', adjustLegs);
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(adjustLegs).catch(() => {});
 
 // ─── Navigation vue ───────────────────────────────────────────────────────────
 function setView(v) {
