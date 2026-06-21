@@ -350,7 +350,7 @@ const STRINGS = {
 
     // Simulateur
     sim_placeholder: 'montant BLND',
-    sim_wallet_ok: (n) => `Solde wallet (~${n} BLND)`,
+    sim_wallet_ok: (n) => `Solde wallet (${n} BLND)`,
     sim_wallet_ko: 'Solde wallet (non configuré)',
     sim_btn_simulate: 'Simuler',
     sim_btn_refresh: 'Rafraîchir',
@@ -614,7 +614,7 @@ const STRINGS = {
 
     // Simulateur
     sim_placeholder: 'BLND amount',
-    sim_wallet_ok: (n) => `Wallet balance (~${n} BLND)`,
+    sim_wallet_ok: (n) => `Wallet balance (${n} BLND)`,
     sim_wallet_ko: 'Wallet balance (not configured)',
     sim_btn_simulate: 'Simulate',
     sim_btn_refresh: 'Refresh',
@@ -1245,9 +1245,9 @@ function bestRoutesCard(sk) {
 // ─── Simulateur ───────────────────────────────────────────────────────────────
 function simCard() {
   const walletLabel = walletConfigured
-    ? t('sim_wallet_ok', fmt0(walletBlnd))
+    ? t('sim_wallet_ok', fmtRoute(walletBlnd))
     : t('sim_wallet_ko');
-  const simInput = simActive ? fmt3(simAmt) : '';
+  const simInput = simActive ? fmtRoute(simAmt) : '';
 
   let resultHtml = '';
   if (simLoading) {

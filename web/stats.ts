@@ -113,9 +113,9 @@ export function displayName(sourceId: string): string {
   return FULL_NAME[sourceId] ?? sourceId;
 }
 
-export function noteFor(_sourceId: string, _winner: boolean, eurcPath: string | null): string {
-  // Seule annotation conservée : la route composite EURC via-USDC.
-  return eurcPath === 'via-usdc' ? 'multi-tx' : '';
+export function noteFor(_sourceId: string, _winner: boolean, _eurcPath: string | null): string {
+  // Plus aucune annotation de ligne (l'annotation « multi-tx » de la route composite a été retirée).
+  return '';
 }
 
 export function chipFor(netConfidence: string): Chip {

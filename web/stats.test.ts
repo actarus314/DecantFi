@@ -198,10 +198,10 @@ describe('ladders', () => {
     for (const r of rows) expect(r.note).toBe('');
   });
 
-  it('EURC note via-USDC sur le gagnant', () => {
+  it('EURC : plus de note de ligne (multi-tx retiré)', () => {
     const rows = result_eurc.ladders['250']!;
     const winner = rows.find(r => r.winner);
-    expect(winner?.note).toContain('multi-tx');
+    expect(winner?.note).toBe('');
   });
 });
 
@@ -478,9 +478,9 @@ describe('helpers', () => {
     expect(chipFor('exact')).toBe('obs');
   });
 
-  it('noteFor: vide sauf via-usdc', () => {
+  it('noteFor: toujours vide (annotation multi-tx retirée)', () => {
     expect(noteFor('xbull', true, null)).toBe('');
-    expect(noteFor('xbull', true, 'via-usdc')).toBe('multi-tx');
+    expect(noteFor('xbull', true, 'via-usdc')).toBe('');
     expect(noteFor('comet', false, null)).toBe('');
     expect(noteFor('ultrastellar', false, null)).toBe('');
     expect(noteFor('stellarbroker', false, null)).toBe('');
