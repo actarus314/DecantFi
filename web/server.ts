@@ -26,6 +26,8 @@ const walletkitPath = fileURLToPath(new URL('./public/walletkit.js', import.meta
 const walletkitJs = readFileSync(walletkitPath, 'utf-8');
 const faviconPath = fileURLToPath(new URL('./public/favicon.svg', import.meta.url));
 const faviconSvg = readFileSync(faviconPath, 'utf-8');
+const logoPath = fileURLToPath(new URL('./public/logo.svg', import.meta.url));
+const logoSvg = readFileSync(logoPath, 'utf-8');
 
 function json(res: ServerResponse, status: number, data: unknown): void {
   const body = JSON.stringify(data);
@@ -105,6 +107,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (req.method === 'GET' && path === '/favicon.svg') {
       res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'max-age=86400' });
       res.end(faviconSvg);
+      return;
+    }
+    if (req.method === 'GET' && path === '/logo.svg') {
+      res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'max-age=86400' });
+      res.end(logoSvg);
       return;
     }
 
