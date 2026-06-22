@@ -399,7 +399,6 @@ const STRINGS = {
     sim_btn_refresh_wait: (s) => `Rafraîchir (${s}s)`,
     sim_btn_clear: 'Vider',
     sim_loading: 'Cotation en cours…',
-    sim_errors: 'Sources en échec :',
     sim_min: (u) => `Reçu min (${u})`,
 
     // Tableau ladder
@@ -662,7 +661,6 @@ const STRINGS = {
     sim_btn_refresh_wait: (s) => `Refresh (${s}s)`,
     sim_btn_clear: 'Clear',
     sim_loading: 'Fetching quote…',
-    sim_errors: 'Failed sources:',
     sim_min: (u) => `Min received (${u})`,
 
     // Tableau ladder
@@ -925,7 +923,6 @@ const STRINGS = {
     sim_btn_refresh_wait: (s) => `Actualizar (${s}s)`,
     sim_btn_clear: 'Limpiar',
     sim_loading: 'Obteniendo cotización…',
-    sim_errors: 'Fuentes con error:',
     sim_min: (u) => `Mínimo recibido (${u})`,
 
     // Tableau ladder
@@ -1177,7 +1174,6 @@ const STRINGS = {
     sim_btn_refresh_wait: (s) => `Atualizar (${s}s)`,
     sim_btn_clear: 'Limpar',
     sim_loading: 'Buscando cotação…',
-    sim_errors: 'Fontes com falha:',
     sim_min: (u) => `Mínimo recebido (${u})`,
     ladder_col_tool: 'Ferramenta de swap',
     ladder_col_net: (u) => `${u}`,
@@ -1834,9 +1830,6 @@ function simCard() {
       <span class="meta" style="flex:1 1 100%; margin-top:.4rem">${rateStr}${impactMeta}</span>
       <span class="meta" style="flex:1 1 100%; margin-top:${target === 'EURC' ? '0' : '.2rem'}">${minStr}</span>
     </div>`;
-    if (simResult.errors && simResult.errors.length > 0) {
-      resultHtml += `<p class="help" style="margin:.4rem 0 0">${t('sim_errors')} ${simResult.errors.join(', ')}</p>`;
-    }
     // Exec row
     if (legsData) {
       // Composite EURC affiché (best ou ligne sélectionnée) → exécution 2-tx guidée.
