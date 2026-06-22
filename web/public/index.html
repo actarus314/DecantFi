@@ -321,6 +321,9 @@ details[open] .hops-arrow::before{content:'▴'}
 .sk-table tbody tr:hover td, .sk-table tbody tr.sk-hl td{background:color-mix(in srgb, var(--teal) 8%, transparent)}
 .sk-table tbody tr.sk-sel td{background:color-mix(in srgb, var(--teal) 15%, transparent)}
 .sk-table tbody tr.sk-sel td:first-child{box-shadow:inset 3px 0 0 var(--teal)}
+  .sk-table tbody tr.sk-tail-row td{background:color-mix(in srgb, var(--caption) 7%, transparent); font-size:12px; color:var(--caption)}
+  .sk-table tbody tr.sk-tail-row td:first-child{padding-left:28px}
+  .sk-caret{color:var(--caption); font-size:11px; font-weight:700}
 .sk-venue{display:inline-flex; align-items:center}
 .sk-dot{width:9px; height:9px; border-radius:50%; flex-shrink:0; display:inline-block; margin-right:5px; vertical-align:middle}
 .sk-plus{color:var(--caption); margin:0 5px}
@@ -1863,6 +1866,7 @@ const Sankey = (function () {
   const tr = lang => STR[lang === 'en' ? 'en' : 'fr'];
   let tableSort = { col:'freq', dir:'desc' }; // tri du tableau : Fréquence (défaut) ou Marge
   const selKeys = new Set();                  // routes sélectionnées durablement (MULTI ; clés stables tools|chemin)
+  let tailOpen = false;                       // drawer « Autres » déplié ? (persiste au re-rendu)
   const keyOf = r => r.tools + '|' + r.steps.join('>');
 
   function interpolateHex(a, b, t) {
@@ -2065,7 +2069,7 @@ const Sankey = (function () {
     if (tail.length) {
       const SRC = mapped[0].steps[0], TGT = mapped[0].steps[mapped[0].steps.length - 1];
       const sum = Math.round(tail.reduce((s, r) => s + r.winPct, 0) * 10) / 10;
-      keep.push({ tools: 'autres', winPct: sum, marginPct: null, trend: null, composite: false, steps: [SRC, TGT], hopTools: ['—'] });
+      keep.push({ tools: 'autres', winPct: sum, marginPct: null, trend: null, composite: false, steps: [SRC, TGT], hopTools: ['—'], tail });
     }
     return keep;
   }
@@ -2082,14 +2086,20 @@ const Sankey = (function () {
     const dir = tableSort.dir === 'asc' ? 1 : -1;
     const sv = r => tableSort.col === 'marge' ? (r.marginPct == null ? -Infinity : r.marginPct) : r.winPct;
     const ind = c => tableSort.col === c ? (tableSort.dir === 'desc' ? ' ▾' : ' ▴') : '';
+    const venueCell = tools => tools.split(' + ').map(p => `<span class="sk-dot" style="background:${venueColor(p)}"></span>${toolDisplay(p)}`).join('<span class="sk-plus">+</span>');
     const rows = routes.map((r, idx) => ({ r, idx })).sort((a, b) => (sv(a.r) - sv(b.r)) * dir).map(({ r, idx }) => {
       const isGray = r.tools === 'autres', isTwoTx = r.composite === true, mc = marginColor(r.marginPct);
-      const venueHtml = r.tools.split(' + ').map(p => `<span class="sk-dot" style="background:${venueColor(p)}"></span>${toolDisplay(p)}`).join('<span class="sk-plus">+</span>');
+      const hasTail = isGray && Array.isArray(r.tail) && r.tail.length > 0;
+      const venueHtml = venueCell(r.tools) + (hasTail ? ` <span class="sk-caret">${tailOpen ? '▾' : '▸'}</span> <span class="muted">(${r.tail.length})</span>` : '');
       const rkey = keyOf(r);
-      return `<tr data-rk="${idx}" data-sk-key="${rkey.replace(/"/g, '&quot;')}" class="${selKeys.has(rkey) ? 'sk-sel' : ''}" style="cursor:pointer"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
+      let row = `<tr data-rk="${idx}"${hasTail ? ' data-sk-tail="1"' : ''} data-sk-key="${rkey.replace(/"/g, '&quot;')}" class="${selKeys.has(rkey) ? 'sk-sel' : ''}" style="cursor:pointer"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
         + `<td class="sk-route">${r.steps.join(' → ')}</td>`
         + `<td>${(isGray || r.marginPct == null) ? '<span class="muted">—</span>' : `<span style="color:${mc};font-weight:700">${fmtMargin(r.marginPct, lang)}</span>`}</td>`
         + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b>${r.trend==='up'?'<span class="sk-tr sk-up">▲</span>':r.trend==='down'?'<span class="sk-tr sk-down">▼</span>':r.trend==='flat'?'<span class="sk-tr sk-flat">→</span>':''}</span></td></tr>`;
+      if (hasTail && tailOpen) {
+        row += r.tail.slice().sort((a, b) => b.winPct - a.winPct).map(tr => `<tr class="sk-tail-row"><td><span class="sk-venue">${venueCell(tr.tools)}${tr.composite ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td><td class="sk-route">${tr.steps.join(' → ')}</td><td><span class="muted">—</span></td><td><b>${fmtPct(tr.winPct)}</b></td></tr>`).join('');
+      }
+      return row;
     }).join('');
     return `<table class="sk-table"><thead><tr><th>${s.venue}</th><th>${s.route}</th>`
       + `<th class="sk-sortable" data-sk-sort="marge"><span class="tip-wrap" style="display:inline-flex;align-items:center">${s.marge}<span class="tip-icon">ⓘ</span><span class="tip-box">${s.margeTip}</span></span><span class="sk-ind">${ind('marge')}</span></th>`
@@ -2205,7 +2215,7 @@ const Sankey = (function () {
     const labG = E('g', { 'pointer-events':'none' }); svg.appendChild(labG);
     const labs = [];
     // Tous les outils sont étiquetés (même quand le nom dépasse la largeur de bande) ; anti-collision en Y.
-    graph.links.forEach(lk => { const off = Math.min(40, (lk.target.x0 - lk.source.x1) * 0.42); labs.push({ x:lk.source.x1 + off, adj:lk.y0, text:lk.tool === '—' ? s.others : toolDisplay(lk.tool) }); });
+    graph.links.forEach(lk => { const nx = (lk.points && lk.points[1]) ? lk.points[1][0] : lk.target.x0; const off = Math.min(40, (nx - lk.source.x1) * 0.42); labs.push({ x:lk.source.x1 + off, adj:lk.y0, text:lk.tool === '—' ? s.others : toolDisplay(lk.tool) }); });
     labs.sort((a, b) => a.adj - b.adj);
     const MIN_LH = 14, XCLOSE = 96;
     for (let i = 0; i < labs.length; i++) for (let j = 0; j < i; j++) if (Math.abs(labs[i].x - labs[j].x) < XCLOSE && Math.abs(labs[i].adj - labs[j].adj) < MIN_LH) labs[i].adj = labs[j].adj + MIN_LH;
@@ -2215,7 +2225,7 @@ const Sankey = (function () {
       const idx = +tr.getAttribute('data-rk');
       tr.addEventListener('mouseenter', () => setActive(new Set([idx]), true));
       tr.addEventListener('mouseleave', () => applyActive());
-      tr.addEventListener('click', () => { const k = tr.getAttribute('data-sk-key'); if (selKeys.has(k)) selKeys.delete(k); else selKeys.add(k); renderApp(); });
+      tr.addEventListener('click', () => { if (tr.hasAttribute('data-sk-tail')) { tailOpen = !tailOpen; renderApp(); return; } const k = tr.getAttribute('data-sk-key'); if (selKeys.has(k)) selKeys.delete(k); else selKeys.add(k); renderApp(); });
     });
     document.querySelectorAll('.sk-table th[data-sk-sort]').forEach(th => { th.style.cursor = 'pointer'; th.addEventListener('click', () => { const c = th.getAttribute('data-sk-sort'); if (tableSort.col === c) tableSort.dir = tableSort.dir === 'desc' ? 'asc' : 'desc'; else tableSort = { col: c, dir: 'desc' }; renderApp(); }); });
     applyActive(); // applique la sélection durable au (re)rendu
