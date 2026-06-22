@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- fond sombre ardoise (lisibilité onglet) -->
+  <rect width="32" height="32" rx="6" fill="#1e293b"/>
   <!-- decant — alambic : ballon vert BLND #36b04a + essence jaune Stellar #FDDA24 -->
   <g transform="translate(16 16) scale(1.28) translate(-16 -16)">
     <g fill="none" stroke="#36b04a" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">

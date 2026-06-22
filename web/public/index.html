@@ -319,6 +319,8 @@ details[open] .hops-arrow::before{content:'▴'}
 .sk-table tbody td{padding:9px 12px; border-bottom:1px solid var(--card-border); color:var(--val)}
 .sk-table tbody tr:last-child td{border-bottom:none}
 .sk-table tbody tr:hover td, .sk-table tbody tr.sk-hl td{background:color-mix(in srgb, var(--teal) 8%, transparent)}
+.sk-table tbody tr.sk-sel td{background:color-mix(in srgb, var(--teal) 15%, transparent)}
+.sk-table tbody tr.sk-sel td:first-child{box-shadow:inset 3px 0 0 var(--teal)}
 .sk-venue{display:inline-flex; align-items:center}
 .sk-dot{width:9px; height:9px; border-radius:50%; flex-shrink:0; display:inline-block; margin-right:5px; vertical-align:middle}
 .sk-plus{color:var(--caption); margin:0 5px}
@@ -1369,14 +1371,14 @@ function simCard() {
       <span style="font-size:12px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
       <span style="display:inline-flex;align-items:stretch;border:1px solid var(--card-border);border-radius:.4rem;overflow:hidden;background:var(--section-bg)">
         <input id="execSlippage" type="text" inputmode="decimal" value="${fmtRoute(execSlippagePct)}"
-          style="width:46px;font-size:13px;padding:.35rem .4rem;border:0;background:transparent;color:var(--val);text-align:right"
+          style="width:40px;font-size:13px;padding:.35rem .1rem .35rem .4rem;border:0;background:transparent;color:var(--val);text-align:right"
           onchange="onExecSlippage(this.value)">
+        <span style="display:flex;align-items:center;padding:0 .35rem 0 .1rem;font-size:13px;color:var(--caption);user-select:none">%</span>
         <span style="display:flex;flex-direction:column;border-left:1px solid var(--card-border)">
           <button type="button" onclick="nudgeSlippage(0.1)" tabindex="-1" style="flex:1;border:0;border-bottom:1px solid var(--card-border);background:transparent;color:var(--caption);cursor:pointer;font-size:8px;line-height:1;padding:0 .35rem">▲</button>
           <button type="button" onclick="nudgeSlippage(-0.1)" tabindex="-1" style="flex:1;border:0;background:transparent;color:var(--caption);cursor:pointer;font-size:8px;line-height:1;padding:0 .35rem">▼</button>
         </span>
       </span>
-      <span class="suffix">%</span>
     </div>
     <div id="simOut">${resultHtml}</div></div>`;
 }
@@ -1762,7 +1764,7 @@ function buildPage() {
   <div class="topbar">
     <a class="brand-link" href="/" aria-label="decant.fi">
       <img class="brand-logo" src="/favicon.svg" width="36" height="36" alt="">
-      <span class="brand">decant.fi <span class="dim">· ${t('brand_dim')}</span></span>
+      <span class="brand">decant<span style="color:var(--teal)">.fi</span> <span class="dim">· ${t('brand_dim')}</span></span>
     </a>
     ${view === 'dashboard' ? `<span class="pagenav" style="margin-left:.3rem">
       <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
@@ -1860,6 +1862,8 @@ const Sankey = (function () {
   };
   const tr = lang => STR[lang === 'en' ? 'en' : 'fr'];
   let tableSort = { col:'freq', dir:'desc' }; // tri du tableau : Fréquence (défaut) ou Marge
+  let selKey = null;                          // route sélectionnée durablement (clé stable tools|chemin) ; comme l'échelle des sources
+  const keyOf = r => r.tools + '|' + r.steps.join('>');
 
   function interpolateHex(a, b, t) {
     const ah = parseInt(a.slice(1), 16), bh = parseInt(b.slice(1), 16);
@@ -2081,7 +2085,8 @@ const Sankey = (function () {
     const rows = routes.map((r, idx) => ({ r, idx })).sort((a, b) => (sv(a.r) - sv(b.r)) * dir).map(({ r, idx }) => {
       const isGray = r.tools === 'autres', isTwoTx = r.composite === true, mc = marginColor(r.marginPct);
       const venueHtml = r.tools.split(' + ').map(p => `<span class="sk-dot" style="background:${venueColor(p)}"></span>${toolDisplay(p)}`).join('<span class="sk-plus">+</span>');
-      return `<tr data-rk="${idx}"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
+      const rkey = keyOf(r);
+      return `<tr data-rk="${idx}" data-sk-key="${rkey.replace(/"/g, '&quot;')}" class="${rkey === selKey ? 'sk-sel' : ''}" style="cursor:pointer"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
         + `<td class="sk-route">${r.steps.join(' → ')}</td>`
         + `<td>${(isGray || r.marginPct == null) ? '<span class="muted">—</span>' : `<span style="color:${mc};font-weight:700">${fmtMargin(r.marginPct, lang)}</span>`}</td>`
         + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b>${r.trend==='up'?'<span class="sk-tr sk-up">▲</span>':r.trend==='down'?'<span class="sk-tr sk-down">▼</span>':r.trend==='flat'?'<span class="sk-tr sk-flat">→</span>':''}</span></td></tr>`;
@@ -2140,7 +2145,7 @@ const Sankey = (function () {
       const path = E('path', { d, fill:'none', stroke:color, 'stroke-width':sw, 'stroke-opacity':baseOp }); path.style.cursor = 'pointer';
       path.addEventListener('mouseenter', e => { setActive(new Set(lk.idxs), true); showTip(e, lk, routes, s); hlRows(lk.idxs, true); });
       path.addEventListener('mousemove', moveTip);
-      path.addEventListener('mouseleave', () => { setActive(new Set(lk.idxs), false); hideTip(); hlRows(lk.idxs, false); });
+      path.addEventListener('mouseleave', () => { applyActive(); hideTip(); hlRows(lk.idxs, false); });
       linkG.appendChild(path); linkEls.push({ path, lk, baseOp, color, sw, d });
       if (sw >= 7 && !gray) { const a = E('path', { d, fill:'none', stroke: dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.18)', 'stroke-width':Math.min(1.6, sw * 0.18), 'stroke-dasharray':'9 9', 'pointer-events':'none' }); a.setAttribute('class', 'sk-flow'); linkG.appendChild(a); }
     });
@@ -2183,6 +2188,9 @@ const Sankey = (function () {
         topG.appendChild(E('path', { d, fill:'none', stroke: col, 'stroke-width': sw, 'stroke-opacity': 0.98, 'pointer-events':'none' }));
       }
     }
+    // Sélection DURABLE (comme l'échelle des sources) : route sélectionnée → sous-tranche persistante.
+    const selIdx = selKey ? routes.findIndex(r => keyOf(r) === selKey) : -1;
+    const applyActive = () => { if (selIdx >= 0) setActive(new Set([selIdx]), true); else setActive(new Set(), false); };
     // badges = nom d'outil (ancré après le nœud source ; anti-collision en X)
     const labG = E('g', { 'pointer-events':'none' }); svg.appendChild(labG);
     const labs = [];
@@ -2192,9 +2200,15 @@ const Sankey = (function () {
     const MIN_LH = 14, XCLOSE = 96;
     for (let i = 0; i < labs.length; i++) for (let j = 0; j < i; j++) if (Math.abs(labs[i].x - labs[j].x) < XCLOSE && Math.abs(labs[i].adj - labs[j].adj) < MIN_LH) labs[i].adj = labs[j].adj + MIN_LH;
     labs.forEach(({ x, adj, text }) => { const t = E('text', { x, y:adj, 'text-anchor':'start', 'dominant-baseline':'middle', 'font-size':12, 'font-weight':'600', fill:labelFill, opacity:0.95 }); t.textContent = text; labG.appendChild(t); });
-    // cross-hover lignes du tableau → rubans + tri (le tri repasse par renderApp = pattern prod)
-    document.querySelectorAll('.sk-table tr[data-rk]').forEach(tr => { const idx = +tr.getAttribute('data-rk'); tr.addEventListener('mouseenter', () => setActive(new Set([idx]), true)); tr.addEventListener('mouseleave', () => setActive(new Set([idx]), false)); });
+    // cross-hover lignes → rubans (survol éclaire, mouseleave revient à la sélection) + CLIC = sélection durable
+    document.querySelectorAll('.sk-table tr[data-rk]').forEach(tr => {
+      const idx = +tr.getAttribute('data-rk');
+      tr.addEventListener('mouseenter', () => setActive(new Set([idx]), true));
+      tr.addEventListener('mouseleave', () => applyActive());
+      tr.addEventListener('click', () => { const k = tr.getAttribute('data-sk-key'); selKey = (selKey === k) ? null : k; renderApp(); });
+    });
     document.querySelectorAll('.sk-table th[data-sk-sort]').forEach(th => { th.style.cursor = 'pointer'; th.addEventListener('click', () => { const c = th.getAttribute('data-sk-sort'); if (tableSort.col === c) tableSort.dir = tableSort.dir === 'desc' ? 'asc' : 'desc'; else tableSort = { col: c, dir: 'desc' }; renderApp(); }); });
+    applyActive(); // applique la sélection durable au (re)rendu
   }
 
   return { graphHTML, tableHTML, draw };
