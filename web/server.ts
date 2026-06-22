@@ -3,6 +3,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { gzipSync, brotliCompressSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { loadWebConfig } from './config.js';
 import { openReadOnly, readCoherenceProbesByVenue } from './read-db.js';
 import { overview, buildSourceHealth, latestChosenRpc } from './stats.js';
@@ -18,24 +20,92 @@ import { TARGETS, BLND, USDC } from '../core/assets.js';
 const cfg = loadWebConfig();
 const db = openReadOnly(cfg.dbPath);
 
-// HTML servi statiquement (lu une fois au boot)
-const htmlPath = fileURLToPath(new URL('./public/index.html', import.meta.url));
-const html = readFileSync(htmlPath, 'utf-8');
-// Bundle Stellar Wallets Kit self-hosté (esm.sh casse les sous-chemins /modules/*). Régénérer : npm run build:walletkit.
-const walletkitPath = fileURLToPath(new URL('./public/walletkit.js', import.meta.url));
-const walletkitJs = readFileSync(walletkitPath, 'utf-8');
-const faviconPath = fileURLToPath(new URL('./public/favicon.svg', import.meta.url));
-const faviconSvg = readFileSync(faviconPath, 'utf-8');
-const logoPath = fileURLToPath(new URL('./public/logo.svg', import.meta.url));
-const logoSvg = readFileSync(logoPath, 'utf-8');
+// --- Helpers compression + ETag ---
 
-function json(res: ServerResponse, status: number, data: unknown): void {
-  const body = JSON.stringify(data);
-  res.writeHead(status, {
+function staticAsset(buf: Buffer, type: string) {
+  const gz = gzipSync(buf, { level: 9 });
+  const br = brotliCompressSync(buf);
+  return {
+    raw: buf,
+    type,
+    gzip: gz.byteLength < buf.byteLength ? gz : null,
+    br: br.byteLength < buf.byteLength ? br : null,
+    etag: 'W/"' + createHash('sha1').update(buf).digest('hex').slice(0, 16) + '"',
+  };
+}
+
+function sendStatic(
+  req: IncomingMessage,
+  res: ServerResponse,
+  a: ReturnType<typeof staticAsset>,
+  cacheControl: string,
+): void {
+  if (req.headers['if-none-match'] === a.etag) {
+    res.writeHead(304, { 'ETag': a.etag, 'Cache-Control': cacheControl });
+    res.end();
+    return;
+  }
+  const ae = req.headers['accept-encoding'] ?? '';
+  let body = a.raw;
+  let enc: string | undefined;
+  if (a.br && /\bbr\b/.test(ae)) { body = a.br; enc = 'br'; }
+  else if (a.gzip && /\bgzip\b/.test(ae)) { body = a.gzip; enc = 'gzip'; }
+  const hdrs: Record<string, string | number> = {
+    'Content-Type': a.type,
+    'Content-Length': body.byteLength,
+    'Cache-Control': cacheControl,
+    'ETag': a.etag,
+    'Vary': 'Accept-Encoding',
+  };
+  if (enc) hdrs['Content-Encoding'] = enc;
+  res.writeHead(200, hdrs);
+  res.end(body);
+}
+
+// --- Assets statiques pré-compilés au boot ---
+
+// B10 : inliner APP_REV dans le HTML (supprime le round-trip /version.js)
+const rev = (process.env.APP_REV || 'dev').replace(/[^\w.-]/g, '');
+const htmlPath = fileURLToPath(new URL('./public/index.html', import.meta.url));
+const htmlStr = readFileSync(htmlPath, 'utf-8')
+  .replace('<script src="/version.js" onerror="void 0"></script>', `<script>window.__REV=${JSON.stringify(rev)};</script>`);
+const htmlAsset = staticAsset(Buffer.from(htmlStr), 'text/html; charset=utf-8');
+
+// B8 : lire en Buffer (pas utf-8)
+const walletkitPath = fileURLToPath(new URL('./public/walletkit.js', import.meta.url));
+const walletkitAsset = staticAsset(readFileSync(walletkitPath), 'text/javascript; charset=utf-8');
+
+const faviconPath = fileURLToPath(new URL('./public/favicon.svg', import.meta.url));
+const faviconAsset = staticAsset(readFileSync(faviconPath), 'image/svg+xml; charset=utf-8');
+
+const logoPath = fileURLToPath(new URL('./public/logo.svg', import.meta.url));
+const logoAsset = staticAsset(readFileSync(logoPath), 'image/svg+xml; charset=utf-8');
+
+// --- Cache mémoire TTL pour /api/overview (B3) ---
+
+let overviewCache: { key: string; at: number; data: unknown } | null = null;
+const OVERVIEW_TTL_MS = 60_000;
+
+// --- Réponse JSON avec compression conditionnelle (B6) ---
+
+function json(res: ServerResponse, req: IncomingMessage, status: number, data: unknown): void {
+  const body = Buffer.from(JSON.stringify(data));
+  const ae = req.headers['accept-encoding'] ?? '';
+  const hdrs: Record<string, string | number> = {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-store',
-  });
-  res.end(body);
+    'Vary': 'Accept-Encoding',
+  };
+  let out = body;
+  let enc: string | undefined;
+  if (body.byteLength > 1024) {
+    if (/\bbr\b/.test(ae)) { out = brotliCompressSync(body); enc = 'br'; }
+    else if (/\bgzip\b/.test(ae)) { out = gzipSync(body, { level: 6 }); enc = 'gzip'; }
+  }
+  if (enc) hdrs['Content-Encoding'] = enc;
+  hdrs['Content-Length'] = out.byteLength;
+  res.writeHead(status, hdrs);
+  res.end(out);
 }
 
 function parsePair(raw: string | null): 'USDC' | 'EURC' | null {
@@ -86,32 +156,23 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
   try {
     if (req.method === 'GET' && path === '/') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
+      sendStatic(req, res, htmlAsset, 'no-cache');
       return;
     }
 
     if (req.method === 'GET' && path === '/walletkit.js') {
-      res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
-      res.end(walletkitJs);
+      sendStatic(req, res, walletkitAsset, 'no-cache');
       return;
     }
 
-    if (req.method === 'GET' && path === '/version.js') {
-      const rev = (process.env.APP_REV || 'dev').replace(/[^\w.-]/g, '');
-      res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
-      res.end(`window.__REV='${rev}';`);
-      return;
-    }
+    // B10 : /version.js supprimé (APP_REV inliné dans le HTML au boot)
 
     if (req.method === 'GET' && path === '/favicon.svg') {
-      res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'max-age=86400' });
-      res.end(faviconSvg);
+      sendStatic(req, res, faviconAsset, 'public, max-age=86400');
       return;
     }
     if (req.method === 'GET' && path === '/logo.svg') {
-      res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'max-age=86400' });
-      res.end(logoSvg);
+      sendStatic(req, res, logoAsset, 'public, max-age=86400');
       return;
     }
 
@@ -119,14 +180,14 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const now = new Date();
       const windowStart = new Date(now.getTime() - 7 * 86_400_000).toISOString();
       const result = buildSourceHealth(db, windowStart, now);
-      json(res, 200, { ...result, generatedAt: now.toISOString() });
+      json(res, req, 200, { ...result, generatedAt: now.toISOString() });
       return;
     }
 
     if (req.method === 'GET' && path === '/api/coherence') {
       const venue = query['venue'] ?? '';
       if (!venue) {
-        json(res, 400, { error: 'paramètre venue manquant' });
+        json(res, req, 400, { error: 'paramètre venue manquant' });
         return;
       }
       const now = new Date();
@@ -145,7 +206,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         route: p.route_json !== null ? (() => { try { return JSON.parse(p.route_json!); } catch { return null; } })() : null,
         trace: p.trace_json !== null ? (() => { try { return JSON.parse(p.trace_json!); } catch { return null; } })() : null,
       }));
-      json(res, 200, { venue, probes });
+      json(res, req, 200, { venue, probes });
       return;
     }
 
@@ -153,13 +214,20 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const pairRaw = query['pair'] ?? 'USDC';
       const pair = parsePair(pairRaw);
       if (!pair) {
-        json(res, 400, { error: `pair invalide: ${pairRaw}` });
+        json(res, req, 400, { error: `pair invalide: ${pairRaw}` });
         return;
       }
       const tzoffRaw = Number(query['tzoff'] ?? '0');
       const offsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
+      const now = Date.now();
+      const cacheKey = `${pair}|${offsetH}`;
+      if (overviewCache && overviewCache.key === cacheKey && now - overviewCache.at < OVERVIEW_TTL_MS) {
+        json(res, req, 200, overviewCache.data);
+        return;
+      }
       const result = overview(db, pair, cfg, undefined, offsetH);
-      json(res, 200, result);
+      overviewCache = { key: cacheKey, at: now, data: result };
+      json(res, req, 200, result);
       return;
     }
 
@@ -167,7 +235,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const pairRaw = query['pair'] ?? 'USDC';
       const pair = parsePair(pairRaw);
       if (!pair) {
-        json(res, 400, { error: `pair invalide: ${pairRaw}` });
+        json(res, req, 400, { error: `pair invalide: ${pairRaw}` });
         return;
       }
 
@@ -177,7 +245,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         // Utilise le solde wallet
         const balance = await walletBalance(cfg);
         if (!balance.configured || balance.blnd <= 0) {
-          json(res, 400, { error: 'wallet non configuré ou solde nul' });
+          json(res, req, 400, { error: 'wallet non configuré ou solde nul' });
           return;
         }
         amountStroops = toStroops(balance.blnd);
@@ -185,7 +253,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         const amtStr = query['amount'] ?? '';
         const parsed = parseAmountStroops(amtStr);
         if (parsed === null) {
-          json(res, 400, { error: `amount invalide: ${amtStr}` });
+          json(res, req, 400, { error: `amount invalide: ${amtStr}` });
           return;
         }
         amountStroops = parsed;
@@ -198,7 +266,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const result = await liveQuote(pair, amountStroops, quoteCfg);
       const elapsed = Date.now() - quoteStart;
       const rpcCalls = readRpc();
-      json(res, 200, result);
+      json(res, req, 200, result);
       // Log de la charge en best-effort, après l'envoi de la réponse (ne retarde pas le client).
       if (rpcCalls > 0) {
         const logUrl = chosenRpc ?? cfg.rpcUrl;
@@ -218,25 +286,25 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (req.method === 'GET' && path === '/api/balance') {
       const address = query['address'];
       if (address !== undefined) {
-        if (!isStellarPubkey(address)) { json(res, 400, { error: 'adresse invalide' }); return; }
+        if (!isStellarPubkey(address)) { json(res, req, 400, { error: 'adresse invalide' }); return; }
         const stroops = await readBlndBalance(address, { horizonUrl: cfg.horizonUrl, timeoutMs: cfg.timeoutMs });
-        json(res, 200, { blnd: toNumber(stroops), configured: true });
+        json(res, req, 200, { blnd: toNumber(stroops), configured: true });
       } else {
         const result = await walletBalance(cfg);
-        json(res, 200, result);
+        json(res, req, 200, result);
       }
       return;
     }
 
     if (req.method === 'GET' && path === '/api/asset-balance') {
       const address = query['address'];
-      if (!isStellarPubkey(address)) { json(res, 400, { error: 'adresse invalide' }); return; }
+      if (!isStellarPubkey(address)) { json(res, req, 400, { error: 'adresse invalide' }); return; }
       const assetKey = query['asset'];
       const pair = parsePair(assetKey ?? null);
-      if (!pair) { json(res, 400, { error: `asset invalide: ${assetKey ?? '(absent)'}` }); return; }
+      if (!pair) { json(res, req, 400, { error: `asset invalide: ${assetKey ?? '(absent)'}` }); return; }
       const asset = TARGETS[pair];
       const balance = await readAssetBalance(address, asset, { horizonUrl: cfg.horizonUrl, timeoutMs: cfg.timeoutMs });
-      json(res, 200, { balance });
+      json(res, req, 200, { balance });
       return;
     }
 
@@ -244,14 +312,16 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     // puis renvoie l'overview rafraîchi de la paire demandée.
     if (req.method === 'POST' && path === '/api/refresh') {
       if (refreshBusy()) {
-        json(res, 429, { error: 'refresh déjà en cours' });
+        json(res, req, 429, { error: 'refresh déjà en cours' });
         return;
       }
       const pair = parsePair(query['pair'] ?? 'USDC') ?? 'USDC';
       const tzoffRaw = Number(query['tzoff'] ?? '0');
       const offsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
       const refresh = await manualRefresh(cfg);
-      json(res, 200, { refresh, overview: overview(db, pair, cfg, undefined, offsetH) });
+      // B3 : invalide le cache overview après un refresh (les données changent)
+      overviewCache = null;
+      json(res, req, 200, { refresh, overview: overview(db, pair, cfg, undefined, offsetH) });
       return;
     }
 
@@ -259,15 +329,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       const pair = parsePair(typeof b.pair === 'string' ? b.pair : null);
-      if (!pair) { json(res, 400, { error: 'pair invalide' }); return; }
-      if (!isStellarPubkey(b.sender)) { json(res, 400, { error: 'sender invalide (adresse G… requise)' }); return; }
+      if (!pair) { json(res, req, 400, { error: 'pair invalide' }); return; }
+      if (!isStellarPubkey(b.sender)) { json(res, req, 400, { error: 'sender invalide (adresse G… requise)' }); return; }
       const amount = parseAmountStroops(String(b.amount ?? ''));
-      if (amount === null) { json(res, 400, { error: 'amount invalide' }); return; }
+      if (amount === null) { json(res, req, 400, { error: 'amount invalide' }); return; }
       // slippage : entier 0..5000 (cap 50 %), défaut 50.
       let slippageBps = 50;
       if (b.slippageBps !== undefined) {
         const n = Number(b.slippageBps);
-        if (!Number.isInteger(n) || n < 0 || n > 5000) { json(res, 400, { error: 'slippageBps invalide (0..5000)' }); return; }
+        if (!Number.isInteger(n) || n < 0 || n > 5000) { json(res, req, 400, { error: 'slippageBps invalide (0..5000)' }); return; }
         slippageBps = n;
       }
       const displayed = (b.displayed && typeof b.displayed === 'object')
@@ -275,18 +345,18 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         : undefined;
       let forceVenue: Venue | undefined;
       if (b.venue !== undefined) {
-        if (!isVenue(b.venue)) { json(res, 400, { error: 'venue invalide' }); return; }
+        if (!isVenue(b.venue)) { json(res, req, 400, { error: 'venue invalide' }); return; }
         forceVenue = b.venue;
       }
       if (b.from !== undefined && b.from !== 'BLND' && b.from !== 'USDC') {
-        json(res, 400, { error: 'from invalide' }); return;
+        json(res, req, 400, { error: 'from invalide' }); return;
       }
       const sellAsset = b.from === 'USDC' ? USDC : BLND;
       try {
         const result = await pickExecutableVenue(pair, amount, b.sender as string, slippageBps, cfg, displayed, undefined, forceVenue, sellAsset);
-        json(res, 200, result);
+        json(res, req, 200, result);
       } catch (e) {
-        if (e instanceof ExecError) { json(res, execStatus(e.code), { error: e.message, code: e.code, asset: e.asset }); return; }
+        if (e instanceof ExecError) { json(res, req, execStatus(e.code), { error: e.message, code: e.code, asset: e.asset }); return; }
         throw e; // → 500 via handle()
       }
       return;
@@ -296,13 +366,13 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       const pair = parsePair(typeof b.pair === 'string' ? b.pair : null);
-      if (!pair) { json(res, 400, { error: 'pair invalide' }); return; }
-      if (!isStellarPubkey(b.sender)) { json(res, 400, { error: 'sender invalide (adresse G… requise)' }); return; }
+      if (!pair) { json(res, req, 400, { error: 'pair invalide' }); return; }
+      if (!isStellarPubkey(b.sender)) { json(res, req, 400, { error: 'sender invalide (adresse G… requise)' }); return; }
       try {
         const result = await buildChangeTrust(b.sender, TARGETS[pair], cfg.horizonUrl);
-        json(res, 200, result);
+        json(res, req, 200, result);
       } catch (e) {
-        if (e instanceof ExecError) { json(res, execStatus(e.code), { error: e.message, code: e.code }); return; }
+        if (e instanceof ExecError) { json(res, req, execStatus(e.code), { error: e.message, code: e.code }); return; }
         throw e;
       }
       return;
@@ -311,30 +381,34 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (req.method === 'POST' && path === '/api/submit') {
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
-      if (!isVenue(b.venue)) { json(res, 400, { error: 'venue invalide' }); return; }
-      if (typeof b.signedXdr !== 'string' || b.signedXdr.length === 0) { json(res, 400, { error: 'signedXdr manquant' }); return; }
-      if (b.venue === 'xbull' && typeof b.id !== 'string') { json(res, 400, { error: 'id requis pour xbull' }); return; }
+      if (!isVenue(b.venue)) { json(res, req, 400, { error: 'venue invalide' }); return; }
+      if (typeof b.signedXdr !== 'string' || b.signedXdr.length === 0) { json(res, req, 400, { error: 'signedXdr manquant' }); return; }
+      if (b.venue === 'xbull' && typeof b.id !== 'string') { json(res, req, 400, { error: 'id requis pour xbull' }); return; }
       try {
         const result = await submit(b.venue, { id: b.id as string | undefined, signedXdr: b.signedXdr }, cfg);
-        json(res, 200, result);
+        json(res, req, 200, result);
       } catch (e) {
-        if (e instanceof ExecError) { json(res, execStatus(e.code), { error: e.message, code: e.code }); return; }
+        if (e instanceof ExecError) { json(res, req, execStatus(e.code), { error: e.message, code: e.code }); return; }
         throw e;
       }
       return;
     }
 
-    json(res, 404, { error: 'route inconnue' });
+    json(res, req, 404, { error: 'route inconnue' });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     process.stderr.write(`ERROR ${path}: ${msg}\n`);
-    json(res, 500, { error: msg });
+    json(res, req, 500, { error: msg });
   }
 }
 
 const server = createServer((req, res) => {
   void handle(req, res);
 });
+
+// B7 — keep-alive
+server.keepAliveTimeout = 30_000;
+server.headersTimeout = 35_000;
 
 server.listen(cfg.port, '0.0.0.0', () => {
   process.stderr.write(`stellarswap web · http://0.0.0.0:${cfg.port} · DB=${cfg.dbPath}\n`);

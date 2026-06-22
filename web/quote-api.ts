@@ -201,23 +201,34 @@ export async function resimAquariusXbull(
 
   const aqRanked = result.ranking.ranked.find((q) => q.source === 'aquarius');
   const rawXdr = (aqRanked?.raw as { swap_chain_xdr?: unknown } | undefined)?.swap_chain_xdr;
-  let aqSimMs = 0;
-  if (aqRanked && rawXdr) {
-    const t0Aq = Date.now();
-    const simNet = await simFnAq(String(rawXdr), amountStroops, BLND.sac, { rpcUrl: cfg.rpcUrl }).catch(() => null);
-    aqSimMs = Date.now() - t0Aq;
-    if (simNet !== null && simNet > 0n && simNet !== aqRanked.netOut) aquariusSimNet = simNet;
-    else if (simNet === null) aquariusSimFailed = true; // RPC/timeout failure → downgrade
-  }
 
   const xbRanked = result.ranking.ranked.find((q) => q.source === 'xbull');
   const route = (xbRanked?.raw as { route?: unknown } | undefined)?.route;
   let xbullHops: RouteHop[] | undefined;
-  let xbSimMs = 0;
+
+  // B4 — lancer Aquarius + xBull en parallèle (pools disjoints, indépendants)
+  const t0 = Date.now();
+  const [aqSimResult, xbSimResult] = await Promise.all([
+    (aqRanked && rawXdr)
+      ? simFnAq(String(rawXdr), amountStroops, BLND.sac, { rpcUrl: cfg.rpcUrl }).catch(() => null)
+      : Promise.resolve(null),
+    (xbRanked && route)
+      ? simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+  const elapsed = Date.now() - t0;
+  // Durées individuelles non mesurables en parallèle — on attribue le temps total aux deux
+  const aqSimMs = (aqRanked && rawXdr) ? elapsed : 0;
+  const xbSimMs = (xbRanked && route) ? elapsed : 0;
+
+  if (aqRanked && rawXdr) {
+    const simNet = aqSimResult;
+    if (simNet !== null && simNet > 0n && simNet !== aqRanked.netOut) aquariusSimNet = simNet;
+    else if (simNet === null) aquariusSimFailed = true; // RPC/timeout failure → downgrade
+  }
+
   if (xbRanked && route) {
-    const t0Xb = Date.now();
-    const xbSim = await simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null);
-    xbSimMs = Date.now() - t0Xb;
+    const xbSim = xbSimResult;
     if (xbSim && xbSim.net > 0n && xbSim.net !== xbRanked.netOut) xbullSimNet = xbSim.net;
     if (xbSim && xbSim.route.length >= 2) {
       const r = xbSim.route;
