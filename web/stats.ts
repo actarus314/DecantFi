@@ -47,6 +47,7 @@ export interface RouteRank {
   tools: string;  // ex. 'xBull + Ultra'
   wins: number;
   winPct: number;
+  marginPct: number | null;  // marge au 2ᵉ : médiane sur les ticks gagnés de (net_gagnant−net_2ᵉ)/net_gagnant ×100 ; null si non calculable
 }
 
 export interface Overview {
@@ -301,14 +302,47 @@ function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string, am
   const totalNum = Number(total);
   if (totalNum === 0) return [];
 
+  // ─── Marge au 2ᵉ : pour chaque tick gagné par la route, (net_gagnant − net_2ᵉ)/net_gagnant ×100 ;
+  // médiane par (source_id, route_summary). net_2ᵉ = meilleur net parmi les AUTRES cotations du tick
+  // (rowid != → vrai 2ᵉ ; révèle aussi un is_winner qui ne serait pas le max net = marge négative).
+  const mStmt = prepBig(db, `
+    SELECT q.source_id, q.route_summary, q.net_out AS win_net,
+      (SELECT MAX(q2.net_out) FROM quote q2
+        WHERE q2.tick_id = q.tick_id AND q2.pair = q.pair AND q2.amount_in = q.amount_in AND q2.rowid != q.rowid) AS second_net
+    FROM quote q JOIN tick t ON t.id = q.tick_id
+    WHERE q.is_winner = 1 AND q.pair = ? AND t.ok = 1 AND t.started_at >= ?${amountIn != null ? ' AND q.amount_in = ?' : ''}
+  `);
+  const mRows = (amountIn != null ? mStmt.all(pair, windowStart, amountIn) : mStmt.all(pair, windowStart)) as Array<Record<string, unknown>>;
+  const marginSamples = new Map<string, number[]>();
+  for (const r of mRows) {
+    const winNet = r['win_net'] as bigint | null;
+    const secondNet = r['second_net'] as bigint | null;
+    if (winNet == null || secondNet == null || winNet <= 0n) continue;
+    const wn = toNumber(winNet);
+    if (wn <= 0) continue;
+    const margin = ((wn - toNumber(secondNet)) / wn) * 100;
+    const key = String(r['source_id'] ?? '') + ' ' + String(r['route_summary'] ?? '');
+    let arr = marginSamples.get(key);
+    if (!arr) { arr = []; marginSamples.set(key, arr); }
+    arr.push(margin);
+  }
+  const marginFor = (sourceId: string, routeSummary: string): number | null => {
+    const arr = marginSamples.get(sourceId + ' ' + routeSummary);
+    if (!arr || arr.length === 0) return null;
+    const med = median(arr);
+    return med == null ? null : Math.round(med * 100) / 100;
+  };
+
   return rows.map((r) => {
     const wins = Number(r['wins'] as bigint);
     const sourceId = String(r['source_id'] ?? '');
+    const routeSummary = r['route_summary'] != null ? String(r['route_summary']) : '';
     return {
-      path: maskedRoute(prettyRoute(r['route_summary'] != null ? String(r['route_summary']) : ''), sourceId),
+      path: maskedRoute(prettyRoute(routeSummary), sourceId),
       tools: shortName(sourceId),
       wins,
       winPct: Math.round((wins / totalNum) * 1000) / 10,
+      marginPct: marginFor(sourceId, routeSummary),
     };
   });
 }

@@ -236,6 +236,20 @@ describe('bestRoutes', () => {
       expect(routes[i]!.wins).toBeLessThanOrEqual(routes[i - 1]!.wins);
     }
   });
+
+  it('marge au 2ᵉ : renseignée, positive (sign-gate : is_winner == max net) et ≈ 0,2 % sur la graine', () => {
+    const routes = result_usdc.bestRoutes['250']!;
+    const withMargin = routes.filter((r) => r.marginPct != null);
+    expect(withMargin.length).toBeGreaterThan(0);
+    for (const r of withMargin) {
+      // Sign-gate de l'advisor : si beaucoup de marges < 0 sur du RÉEL, is_winner ≠ max net → repenser.
+      // Sur la graine, winner = rank0 = net max → marge ≥ 0.
+      expect(r.marginPct!).toBeGreaterThanOrEqual(0);
+      expect(r.marginPct!).toBeLessThan(2);
+    }
+    // La graine pose rank0=1.0, rank1=0.998 → marge gagnant ≈ 0,2 %.
+    expect(routes[0]!.marginPct!).toBeGreaterThan(0.05);
+  });
 });
 
 // ─── Test 3 : heatEffUtc par sonde ──────────────────────────────────────────
