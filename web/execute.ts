@@ -13,7 +13,7 @@ import { SoroswapSDK, SupportedNetworks, SupportedProtocols, TradeType } from '@
 export type Venue = 'xbull' | 'soroswap' | 'horizon' | 'aquarius' | 'comet' | 'ultrastellar';
 
 // ─── User-Agent commun (xBull bloque l'UA Node par défaut) ──────────────────
-const XBULL_UA = 'Mozilla/5.0 (compatible; stellar-swap/0.1; +exec)';
+const XBULL_UA = 'Mozilla/5.0 (compatible; DecantFi/0.1; +exec)';
 const XBULL_BASE = 'https://swap.apis.xbull.app';
 const HORIZON_BASE_DEFAULT = 'https://horizon.stellar.org';
 const AQUA_ROUTER = 'CBQDHNBFBZYE4MKPWBSJOPIYLW4SFSXAXUTSXJN76GNKYVYPCKWC6QUK';

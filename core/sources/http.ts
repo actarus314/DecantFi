@@ -4,7 +4,7 @@ import { diag } from './diag.js';
 
 const DEFAULT_TIMEOUT = 8000;
 // Certains endpoints (xBull) bloquent l'UA Node par defaut : on se presente comme un client navigateur.
-const UA = 'Mozilla/5.0 (compatible; stellar-swap/0.1; +read-only-quote)';
+const UA = 'Mozilla/5.0 (compatible; DecantFi/0.1; +read-only-quote)';
 
 export async function getJson(
   url: string,

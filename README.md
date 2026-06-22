@@ -1,6 +1,6 @@
 **English** · [Français](README.fr.md)
 
-# decant.fi — stellar-swap
+# DecantFi
 
 **Route recommender** for swapping **BLND → USDC or EURC** on Stellar. It meta-aggregates several independent quoting sources and ranks routes by **best net return** (aggregator fees + pool fees + price impact).
 
@@ -26,11 +26,11 @@ Two services start:
 
 ### Configurable data path
 
-Set `STELLARSWAP_DATA` in your `.env` to control where the database is stored on the host:
+Set `DECANTFI_DATA` in your `.env` to control where the database is stored on the host:
 
 ```bash
-STELLARSWAP_DATA=./data                          # default (relative to the repo)
-STELLARSWAP_DATA=/docker/stellarswap/backend/data  # example: NUC / server path
+DECANTFI_DATA=./data                          # default (relative to the repo)
+DECANTFI_DATA=/docker/decantfi/backend/data   # example: NUC / server path
 ```
 
 ## CLI (development / scripting)
@@ -53,7 +53,7 @@ Output: table ranked by **net received** (aggregator fees + pool fees + price im
 - `SOROSWAP_API_KEY` — not required (Soroswap runs keyless via local `soroswap-router-sdk`).
 - `STELLAR_RPC_URL` / `STELLAR_HORIZON_URL` — override the default public endpoints.
 - `WALLET_ADDRESS` — **public** address only (never a private key). Not required for quoting; reserved for future Blend position display.
-- `STELLARSWAP_DATA` — host data directory (default `./data`; e.g. `/docker/stellarswap/backend/data` on a NUC).
+- `DECANTFI_DATA` — host data directory (default `./data`; e.g. `/docker/decantfi/backend/data` on a NUC).
 - `IMAGE_OWNER` — GHCR image owner (default `actarus314`; set to your account if you fork).
 
 ## Quoting sources

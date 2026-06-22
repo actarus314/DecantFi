@@ -1,7 +1,7 @@
-name: stellarswap
+name: decantfi
 services:
   collector:
-    image: ghcr.io/${IMAGE_OWNER:-actarus314}/stellarswap-collector:${IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_OWNER:-actarus314}/decantfi-collector:${IMAGE_TAG:-latest}
     build:
       context: .
       args:
@@ -16,12 +16,12 @@ services:
     pids_limit: 256
     mem_limit: 512m
     volumes:
-      - ${STELLARSWAP_DATA:-./data}:/app/data
+      - ${DECANTFI_DATA:-./data}:/app/data
     env_file: .env
     environment:
       - COLLECTOR_DB_PATH=/app/data/quotes.db
     networks:
-      - stellarswap
+      - decantfi
     healthcheck:
       test: ["CMD", "node", "-e", "try{const{statSync}=require('node:fs');const m=statSync('/app/data/.heartbeat').mtimeMs;process.exit(Date.now()-m<2*Number(process.env.COLLECTOR_CADENCE_SEC||900)*1000?0:1)}catch{process.exit(1)}"]
       interval: 60s
@@ -31,7 +31,7 @@ services:
     # backend pur : AUCUN bloc ports (n'expose rien).
 
   web:
-    image: ghcr.io/${IMAGE_OWNER:-actarus314}/stellarswap-collector:${IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_OWNER:-actarus314}/decantfi-collector:${IMAGE_TAG:-latest}
     build:
       context: .
       args:
@@ -49,12 +49,12 @@ services:
     ports:
       - "${WEB_HOST_PORT:-8080}:8080"   # NUC = 8080 ; surchargeable (port hôte occupé en dev)
     volumes:
-      - ${STELLARSWAP_DATA:-./data}:/app/data
+      - ${DECANTFI_DATA:-./data}:/app/data
     env_file: .env
     environment:
       - COLLECTOR_DB_PATH=/app/data/quotes.db
     networks:
-      - stellarswap
+      - decantfi
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:8080/api/overview').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -63,5 +63,5 @@ services:
       start_period: 10s
 
 networks:
-  stellarswap:
+  decantfi:
     driver: bridge

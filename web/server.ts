@@ -463,5 +463,5 @@ server.keepAliveTimeout = 30_000;
 server.headersTimeout = 35_000;
 
 server.listen(cfg.port, '0.0.0.0', () => {
-  process.stderr.write(`stellarswap web · http://0.0.0.0:${cfg.port} · DB=${cfg.dbPath}\n`);
+  process.stderr.write(`DecantFi web · http://0.0.0.0:${cfg.port} · DB=${cfg.dbPath}\n`);
 });

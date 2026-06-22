@@ -50,7 +50,7 @@ function parseArgs(argv: string[]): Args {
   return a;
 }
 
-const HELP = `stellar-swap — recommandeur de route nette (read-only, ne signe rien)
+const HELP = `DecantFi — recommandeur de route nette (read-only, ne signe rien)
 
 Usage:
   npm run quote -- <montant> <USDC|EURC> [options]

@@ -54,7 +54,7 @@ function mkQuote(sourceId: string, overrides: Partial<QuoteInsert> = {}): QuoteI
 // ─── Graine de test ───────────────────────────────────────────────────────────
 
 function buildTestDb(): void {
-  tmpDir = mkdtempSync(join(tmpdir(), 'stellarswap-health-test-'));
+  tmpDir = mkdtempSync(join(tmpdir(), 'decantfi-health-test-'));
   dbPath = join(tmpDir, 'test.db');
   const db = openDb(dbPath);
 
@@ -237,7 +237,7 @@ describe('buildSourceHealth — cause JSON', () => {
   let res2: ReturnType<typeof buildSourceHealth>;
 
   beforeAll(() => {
-    dir2 = mkdtempSync(join(tmpdir(), 'stellarswap-health-cause-'));
+    dir2 = mkdtempSync(join(tmpdir(), 'decantfi-health-cause-'));
     path2 = join(dir2, 'test.db');
     const db = openDb(path2);
     // Tick JSON : soroswap=timeout, comet=http
@@ -274,7 +274,7 @@ describe('buildRpcHealth — reqTotal/reqPerSec depuis rpc_call_log', () => {
   const WINDOW_START_RPC = new Date(NOW.getTime() - 7 * 86_400_000).toISOString();
 
   beforeAll(() => {
-    dir4 = mkdtempSync(join(tmpdir(), 'stellarswap-health-rpcload-'));
+    dir4 = mkdtempSync(join(tmpdir(), 'decantfi-health-rpcload-'));
     path4 = join(dir4, 'test.db');
     const db = openDb(path4);
 
@@ -413,7 +413,7 @@ describe('buildSourceHealth — champ coherence', () => {
   const WIN5 = new Date(NOW5.getTime() - 7 * 86_400_000).toISOString();
 
   beforeAll(() => {
-    dir5 = mkdtempSync(join(tmpdir(), 'stellarswap-health-coherence-'));
+    dir5 = mkdtempSync(join(tmpdir(), 'decantfi-health-coherence-'));
     path5 = join(dir5, 'test.db');
     const db = openDb(path5);
 
@@ -499,7 +499,7 @@ describe('buildSourceHealth — champ uptimeTrend', () => {
   const KNOWN6 = ['xbull', 'soroswap', 'aquarius', 'comet', 'ultrastellar', 'stellarbroker', 'horizon'];
 
   beforeAll(() => {
-    dir6 = mkdtempSync(join(tmpdir(), 'stellarswap-health-trend-'));
+    dir6 = mkdtempSync(join(tmpdir(), 'decantfi-health-trend-'));
     path6 = join(dir6, 'test.db');
     const db = openDb(path6);
 
@@ -550,7 +550,7 @@ describe('buildSourceHealth — champ uptimeTrend', () => {
 
   it('uptimeTrend = "flat" si pas de base de comparaison (fenêtre précédente vide)', () => {
     // Ouvre une DB fraîche avec seulement des ticks dans la fenêtre courante (pas de précédents)
-    const dirFlat = mkdtempSync(join(tmpdir(), 'stellarswap-trend-flat-'));
+    const dirFlat = mkdtempSync(join(tmpdir(), 'decantfi-trend-flat-'));
     const pathFlat = join(dirFlat, 'test.db');
     const db = openDb(pathFlat);
     db.insertTickWithQuotes(
@@ -571,7 +571,7 @@ describe('buildSourceHealth — champ uptimeTrend', () => {
     // Cas fictif via computeUptimeBySource + delta synthétique : vérifie la règle de seuil
     // On teste la logique pure avec delta = 0.5 (< 1 → flat)
     // Pour cela, on crée une DB où xbull répond partout dans les deux fenêtres
-    const dirEq = mkdtempSync(join(tmpdir(), 'stellarswap-trend-eq-'));
+    const dirEq = mkdtempSync(join(tmpdir(), 'decantfi-trend-eq-'));
     const pathEq = join(dirEq, 'test.db');
     const db = openDb(pathEq);
     // Fenêtre précédente : 2 ticks, xbull répond aux 2
@@ -630,7 +630,7 @@ describe('buildSourceHealth — execMs et execTotalMs', () => {
   const WIN_EXEC = new Date(NOW_EXEC.getTime() - 7 * 86_400_000).toISOString();
 
   beforeAll(() => {
-    dirExec = mkdtempSync(join(tmpdir(), 'stellarswap-execms-'));
+    dirExec = mkdtempSync(join(tmpdir(), 'decantfi-execms-'));
     pathExec = join(dirExec, 'test.db');
     const db = openDb(pathExec);
 

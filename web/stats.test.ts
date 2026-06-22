@@ -70,7 +70,7 @@ let tmpDir: string;
 let dbPath: string;
 
 function buildTestDb(): void {
-  tmpDir = mkdtempSync(join(tmpdir(), 'stellarswap-test-'));
+  tmpDir = mkdtempSync(join(tmpdir(), 'decantfi-test-'));
   dbPath = join(tmpDir, 'test.db');
   const db = openDb(dbPath);
 
@@ -367,7 +367,7 @@ let tmpDirEurcMid: string;
 
 describe('impactLocalPct — EURC avec eurc_stellar_mid renseigné', () => {
   beforeAll(() => {
-    tmpDirEurcMid = mkdtempSync(join(tmpdir(), 'stellarswap-eurcmid-'));
+    tmpDirEurcMid = mkdtempSync(join(tmpdir(), 'decantfi-eurcmid-'));
     const dbPath2 = join(tmpDirEurcMid, 'test.db');
     const db2 = openDb(dbPath2);
 

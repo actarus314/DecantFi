@@ -1,14 +1,14 @@
-# Contributing to decant.fi / stellar-swap
+# Contributing to DecantFi
 
-**English** · [Français ci-dessous](#contribuer-à-decantfi--stellar-swap)
+**English** · [Français ci-dessous](#contribuer-à-decantfi)
 
 ---
 
 ## Dev setup
 
 ```bash
-git clone https://github.com/actarus314/stellar-swap.git
-cd stellar-swap
+git clone https://github.com/actarus314/DecantFi.git
+cd DecantFi
 cp .env.example .env   # all variables are optional for local dev
 npm install
 ```
@@ -67,17 +67,17 @@ By contributing, you agree that your contributions will be licensed under the sa
 
 ---
 
-## Contribuer à decant.fi / stellar-swap
+## Contribuer à DecantFi
 
-[English above](#contributing-to-decantfi--stellar-swap) · **Français**
+[English above](#contributing-to-decantfi) · **Français**
 
 ---
 
 ## Environnement de développement
 
 ```bash
-git clone https://github.com/actarus314/stellar-swap.git
-cd stellar-swap
+git clone https://github.com/actarus314/DecantFi.git
+cd DecantFi
 cp .env.example .env   # toutes les variables sont optionnelles en dev local
 npm install
 ```
