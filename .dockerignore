@@ -1,0 +1,16 @@
+.git
+node_modules
+dist
+coverage
+data
+*.db
+*.db-journal
+*.log
+.env
+.env.*
+.envrc
+.claude
+CLAUDE.md
+docker-compose.override.yaml
+.DS_Store
+*.tsbuildinfo
