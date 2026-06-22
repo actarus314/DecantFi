@@ -303,7 +303,7 @@ details[open] .hops-arrow::before{content:'▴'}
 @keyframes skFlow{to{stroke-dashoffset:-36}}
 .sk-flow{animation:skFlow 2.6s linear infinite}
 @media(prefers-reduced-motion:reduce){.sk-flow{animation:none}}
-#route-sankey{width:100%; display:block; overflow:visible}
+#route-sankey{width:100%; height:auto; display:block; overflow:visible}
 .sk-wrap{border-radius:10px; padding:6px 4px; transition:background .15s}
 .sk-sub{font-size:12px; color:var(--caption); line-height:1.55; margin:0 0 .55rem}
 .sk-ctl{display:flex; align-items:center; flex-wrap:wrap; gap:5px; margin:0 0 .55rem; font-size:12px; color:var(--caption)}
@@ -1839,7 +1839,7 @@ function buildPage() {
 // ════════════════════════════════════════════════════════════════════════════
 const Sankey = (function () {
   const NS = 'http://www.w3.org/2000/svg';
-  const W = 960, H = 600, LINK_GAP = 16; // H agrandi (il restait de la place dans le bloc)
+  const W = 960, H = 620, LINK_GAP = 16; // viewBox ; le SVG est responsive (CSS width:100% + height:auto → remplit la box sans letterbox)
   const LY = { VM: 24, GAP: 14, MIN_H: 10, PAD: 24, NODE_W: 50 };
 
   const TAIL_PCT = 3; // traîne < ce % agrégée en « autres » — SAUF si la route n'emprunte que des bandes déjà tracées (cf. routesFor)
@@ -1847,7 +1847,7 @@ const Sankey = (function () {
   // Sélecteurs de TEST : fond du graphe (gris d'intensités) + couleur du nœud de départ. État module, pilotés par Sankey.setBg/setStart.
   const BG = { auto: null, g1: '#1b2433', g2: '#141c2b', g3: '#0d1320' };
   let gBg = 'auto';
-  let gStart = 'amber'; // 'amber' | 'slate'
+  let gStart = 'slate'; // 'amber' | 'slate' — défaut ardoise (décision Romain) ; sélecteur gardé pour test
 
   // Strings i18n locales au module (aucun ajout au gros STRINGS de la prod).
   const STR = {
@@ -2078,7 +2078,7 @@ const Sankey = (function () {
     const stBtns = ['amber','slate'].map(k => `<button class="${gStart===k?'sk-on':''}" onclick="Sankey.setStart('${k}')">${s[k]}</button>`).join('');
     return `<p class="sk-sub">${s.sub}<br>${s.tail}</p>`
       + `<div class="sk-ctl"><span>${s.fond}</span>${bgBtns}<span class="sk-ctl-sep">${s.depart}</span>${stBtns}</div>`
-      + `<div class="sk-wrap"${bg ? ` style="background:${bg}"` : ''}><svg id="route-sankey" viewBox="0 0 ${W} ${H}" height="${H}" preserveAspectRatio="xMidYMid meet"></svg></div>`;
+      + `<div class="sk-wrap"${bg ? ` style="background:${bg}"` : ''}><svg id="route-sankey" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"></svg></div>`;
   }
   function tableHTML(pair, sonde, lang) {
     const s = tr(lang), routes = routesFor(sonde);
@@ -2163,8 +2163,35 @@ const Sankey = (function () {
     const topG = E('g', { 'pointer-events':'none' }); svg.appendChild(topG);
     function setActive(idxSet, on) {
       while (topG.firstChild) topG.removeChild(topG.firstChild);
-      linkEls.forEach(({ path, lk, baseOp }) => { const linked = lk.idxs && lk.idxs.some(i => idxSet.has(i)); path.setAttribute('stroke-opacity', on ? (linked ? baseOp : baseOp * 0.5) : baseOp); });
-      if (on) linkEls.forEach(({ lk, color, sw, d }) => { if (lk.idxs && lk.idxs.some(i => idxSet.has(i))) topG.appendChild(E('path', { d, fill:'none', stroke:color, 'stroke-width':sw, 'stroke-opacity':0.95, 'pointer-events':'none' })); });
+      const single = on && idxSet.size === 1; // 1 route (ligne du tableau, ou bande à route unique) → sous-tranche
+      linkEls.forEach(({ path, lk, baseOp }) => {
+        const linked = lk.idxs && lk.idxs.some(i => idxSet.has(i));
+        // mode sous-tranche : tout estompé (le fil fin ressort) ; sinon : matching gardés, autres estompés
+        path.setAttribute('stroke-opacity', on ? (single ? baseOp * 0.45 : (linked ? baseOp : baseOp * 0.5)) : baseOp);
+      });
+      if (single) drawSubSlice([...idxSet][0]);
+      else if (on) linkEls.forEach(({ lk, color, sw, d }) => { if (lk.idxs && lk.idxs.some(i => idxSet.has(i))) topG.appendChild(E('path', { d, fill:'none', stroke:color, 'stroke-width':sw, 'stroke-opacity':0.95, 'pointer-events':'none' })); });
+    }
+    // Éclairage PARTIEL d'UNE route : ruban de largeur = SA fréquence (constante = flux conservé), posé à
+    // son OFFSET empilé DANS CHAQUE bande fusionnée. ⚠ l'offset/la fraction sont PROPRES à chaque bande
+    // (la part globale 4 % ne « remplit » pas un segment, elle en occupe sa juste tranche) → le fil weave.
+    function drawSubSlice(ri) {
+      const r = routes[ri]; if (!r) return;
+      const scale = graph.links.length ? (graph.links[0].width / graph.links[0].value) : 1;
+      const w = r.winPct;
+      for (let i = 0; i < r.steps.length - 1; i++) {
+        const from = r.steps[i], to = r.steps[i + 1], tool = r.hopTools[i];
+        const L = graph.links.find(l => l.source.name === from && l.target.name === to && l.tool === tool);
+        if (!L) continue;
+        const members = L.idxs.slice().sort((a, b) => (routes[b].winPct - routes[a].winPct) || (a - b));
+        let off = 0; for (const m of members) { if (m === ri) break; off += routes[m].winPct; }
+        const dY = (off + w / 2 - L.value / 2) * scale; // décalage de la centrale de bande → centre de la sous-tranche
+        const sw = Math.max(2, w * scale - Math.min(LINK_GAP, w * scale * 0.45));
+        const d = ribbonPath(L.points.map(p => [p[0], p[1] + dY]));
+        const col = L.tool === '—' ? '#9ca3af' : venueColor(L.tool);
+        topG.appendChild(E('path', { d, fill:'none', stroke: dark ? 'rgba(248,250,252,0.6)' : 'rgba(15,23,42,0.45)', 'stroke-width': sw + 3, 'pointer-events':'none' })); // liseré contrasté = pop
+        topG.appendChild(E('path', { d, fill:'none', stroke: col, 'stroke-width': sw, 'stroke-opacity': 0.98, 'pointer-events':'none' }));
+      }
     }
     // badges = nom d'outil (ancré après le nœud source ; anti-collision en X)
     const labG = E('g', { 'pointer-events':'none' }); svg.appendChild(labG);
