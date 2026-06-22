@@ -19,11 +19,12 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "web": "tsx web/server.ts",
-    "build:walletkit": "npx --yes esbuild web/walletkit.entry.js --bundle --format=esm --platform=browser --define:global=globalThis --target=es2020 --outfile=web/public/walletkit.js"
+    "build:walletkit": "node scripts/build-walletkit.mjs"
   },
   "devDependencies": {
     "@creit.tech/stellar-wallets-kit": "^2.3.0",
     "@types/node": "^25.9.3",
+    "esbuild": "^0.28.1",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"

@@ -1,3 +1,4 @@
+// @creit.tech/stellar-wallets-kit@2.3.0 — bundle vendoré (esbuild) ; régénérer: npm run build:walletkit
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
