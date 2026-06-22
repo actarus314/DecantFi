@@ -875,6 +875,269 @@ const STRINGS = {
     exec_integrated_soon: 'Integrated execution coming soon for this tool.',
     ladder_pick_hint: 'Click a row to execute via that tool (click again to revert to auto).',
   },
+  es: {
+    // Topbar / brand
+    brand_dim: 'BLND swaps - con precisión',
+    tz_note: (z) => `UTC almacenado · mostrado en hora local (${z})`,
+    theme_dark: '🌙',
+    theme_light: '☀️',
+    venue_cols: ['Tipo', 'Capa', 'Liquidez', 'Nota'],
+    route_detail: 'Detalle de ruta',
+    net_fee_label: 'Comisión de red (real / máx)',
+
+    // Fraîcheur / countdown
+    fresh_none: 'sin datos aún',
+    fresh_instant: 'ahora mismo',
+    fresh_min: (n) => `hace ${n} min`,
+    fresh_h: (n) => `hace ${n} h`,
+    countdown_label: (m, s) => `próxima actualización en ${m}:${String(s).padStart(2,'0')}`,
+    countdown_imminent: 'inminente',
+    countdown_refresh_hint: 'Clic para forzar una lectura ahora',
+
+    // Refresh
+    refresh_loading: 'Cargando…',
+    refresh_429: 'Actualización ya en curso, por favor espere.',
+    refresh_note: 'La actualización manual es provisional — se reemplaza en el próximo ciclo programado.',
+
+    // Paire / nav
+    pair_usdc: 'USDC',
+    pair_eurc: 'EURC',
+
+    // Sections
+    section_sim: 'Simulador',
+    section_ladder: 'Clasificación de fuentes',
+    section_slots: (u) => `Mejores franjas horarias — neto BLND → ${u}`,
+    section_slots_note: 'agregación horaria · 7 d',
+    slots_help: '<b>Eficiencia</b> = porcentaje del precio de referencia (DefiLlama) realmente obtenido, con comisiones y slippage deducidos — 100 % = ejecución perfecta. Medida sobre la mejor cotización para la sonda seleccionada (≈ 4 lecturas/hora). Cada <b>celda</b> compara esta eficiencia con el promedio de 7 días: <b>verde = mejor que la semana, rojo = peor</b>. Es <b>relativa</b> — una celda verde puede ser mala en términos absolutos si toda la semana es mala. La <b>nota del día</b> = eficiencia media del día, en %.',
+    section_hourly: 'Zoom diario',
+    section_hourly_note: '▼ hora actual',
+    section_routes: 'Mejores rutas (7 d)',
+    section_who: 'Quién gana con más frecuencia (7 d)',
+    routes_wins: 'victorias',
+    routes_empty: 'Historial limitado — el ranking se completa a medida que se acumulan los ciclos.',
+
+    // Simulateur
+    sim_placeholder: 'Cantidad BLND',
+    sim_wallet_ok: (n) => `Saldo del wallet (${n} BLND)`,
+    sim_wallet_ko: 'Saldo del wallet (no configurado)',
+    sim_btn_simulate: 'Simular',
+    sim_btn_refresh: 'Actualizar',
+    sim_btn_refresh_wait: (s) => `Actualizar (${s}s)`,
+    sim_btn_clear: 'Limpiar',
+    sim_loading: 'Obteniendo cotización…',
+    sim_errors: 'Fuentes con error:',
+    sim_min: (u) => `Mínimo recibido (${u})`,
+
+    // Tableau ladder
+    ladder_col_tool: 'Herramienta de swap',
+    ladder_col_net: (u) => `${u}`,
+    ladder_col_delta: 'Δ ganador',
+    ladder_col_chip: 'Confianza',
+    ladder_col_impact: 'Impacto',
+    ladder_col_impact_evm: 'Impacto EVM',
+    ladder_col_route: 'Ruta',
+    ladder_tip_chip: 'Observado = fill visto en simulación (ruta ejecutable)<br>Estimado = sin fill simulado: suelo/techo o simulación no disponible<br>No disponible = fuente inaccesible',
+    ladder_tip_impact: '<b>Modo LOCAL (por defecto)</b>: diferencia respecto al precio EURC <i>en Stellar</i> (libro de órdenes SDEX EURC/USDC). Úselo si planea <b>quedarse en Stellar</b>.<br><br><b>Modo EVM</b>: diferencia respecto al precio EURC <i>global</i> (Base/Ethereum). Úselo si planea <b>hacer bridge a EVM</b> — la prima o descuento del mercado Stellar cuenta entonces como ganancia o pérdida real.<br><br>Solo afecta a <b>EURC</b> (USDC: idéntico en ambos modos).<br><br>Haga clic en el encabezado de columna para alternar. Positivo = recibe menos. Negativo = recibe más.',
+    impact_evm_notice_title: '¿Cambiar al modo Impacto EVM?',
+    impact_evm_notice_body: 'En modo <b>EVM</b>, el impacto se mide respecto al <b>precio global de EURC (Base/Ethereum)</b>: úselo si planea <b>hacer bridge a EVM</b>. La prima o descuento del mercado Stellar cuenta entonces como ganancia o pérdida real.<br><br>En modo <b>Local</b> (por defecto), el impacto se mide respecto al precio de EURC en el <b>SDEX de Stellar</b>: úselo si planea <b>quedarse en Stellar</b>.<br><br>Este ajuste solo afecta a <b>EURC</b> (el swap a USDC es idéntico en ambos modos).',
+    impact_evm_confirm: 'Cambiar a modo EVM',
+    impact_evm_dismiss: 'No mostrar de nuevo',
+    spot_eurc_stellar: 'EURC@Stellar',
+    spot_eurc_evm: 'EURC@EVM',
+    ladder_empty: 'Sin datos',
+    ladder_sim_tag: (n, u) => `simulación · ${n} BLND → ${u}`,
+
+    // Chips
+    chip_obs: 'observado',
+    chip_est: 'estimado',
+    chip_down: 'no disponible',
+    hops_hidden: 'Ruta no revelada por xBull',
+
+    // Heatmap / profil
+    hmap_insufficient: 'Datos insuficientes',
+    hmap_legend_lo: 'neto menor',
+    hmap_legend_hi: 'neto mayor',
+    hmap_legend_note: 'hora local · % desviación respecto al neto promedio de 7 días',
+    days: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
+    hour_now_suffix: ' · ahora',
+
+    // Callout meilleurs créneaux
+    slot_best: 'Mejor franja',
+    slot_gain: 'Ganancia vs promedio',
+    slot_avoid: 'Evitar',
+    slot_gap: 'Diferencia',
+    encart_best_day: 'Mejor día',
+    encart_now: 'Ahora',
+    day_avg: 'Promedio del día',
+    vs_week: 'vs semana',
+    vs_day_avg: 'vs prom. día',
+    per_week: '/ sem',
+    today_badge: 'hoy',
+    vs_week_line: 'prom. 7 días',
+    zoom_legend: 'Las 96 lecturas de quince minutos del día seleccionado (haga clic en una fila de la tabla). El <b>área</b> = desviación respecto al promedio del <b>día</b> (verde por encima, rojo por debajo) → la forma intradía. La <b>línea discontinua</b> = promedio de 7 días, para situar el día. Hoy <b>se detiene en este momento</b> (su promedio se va completando a medida que llegan las lecturas).',
+
+    // Notes
+    limited_note: (n) => `historial limitado: ${n} ciclo${n > 1 ? 's' : ''} ok`,
+    no_data_waiting: 'Esperando al recolector (aún no hay ciclo válido).',
+
+    // Distribution note
+    dist_note_usdc: '<b>xBull</b> suele dominar; <b>Comet</b> solo compite en USDC (pool de respaldo). <b>Diversidad = resiliencia ante fallos.</b>',
+    dist_note_eurc: '<b>Sin pool profunda BLND/EURC</b>: las filas "BLND → EURC" son <b>swaps atómicos enrutados internamente</b> vía USDC/XLM (Soroswap muestra BLND → USDC → EURC, Aquarius vía sUSD, Ultra Stellar vía XLM; <b>solo xBull oculta su ruta</b>). La <b>ruta explícita via-USDC (2 swaps) suele superarlos</b>.',
+
+    // Divers
+    loading: 'Cargando…',
+    no_data: 'Sin datos',
+    last_tick_ago: (n) => `hace ${n} min`,
+
+    // Carte dernier relevé
+    last_release_ago: (n) => `hace ${n} min`,
+
+    // Wallet connect
+    connect_wallet: 'Conectar wallet',
+    wallet_disconnect: 'Desconectar',
+
+    // Swap execution
+    exec_btn: 'Ejecutar swap',
+    exec_connect_first: 'Conecte su wallet para ejecutar',
+    slippage_label: 'Slippage',
+
+    // Review before signing
+    review_title: 'Revisar antes de firmar',
+    review_send: 'Usted envía',
+    review_receive_min: 'Recibirá al menos',
+    review_expected: 'Esperado',
+    review_venue: 'Ejecutado vía',
+    review_route: 'Ruta',
+    review_slippage: 'Tolerancia de slippage',
+    review_fidelity: (winner, net) => `El mejor mostrado fue ${winner} (neto ${net}) — no ejecutable en 1 clic; ejecutamos la mejor ruta ejecutable.`,
+    review_network_fee: 'Comisión de red (máx)',
+    review_network_fee_note: 'Comisiones máximas mostradas por el wallet; el alquiler no utilizado se reembolsa.',
+    review_confirm: 'Confirmar y firmar',
+    review_cancel: 'Cancelar',
+
+    // Review sim-delta
+    review_sim_was: 'sim',
+
+    // Execution states
+    exec_signing: 'Firmando en el wallet…',
+    exec_signing_wallet: 'Firmando en su wallet…',
+    exec_submitting: 'Enviando…',
+    exec_restore: 'Se requiere un paso de restauración de estado (coste único de almacenamiento) — fírmelo y luego reconstruimos el swap.',
+    exec_success: 'Swap enviado',
+    exec_view: 'Ver en stellar.expert ↗',
+    exec_close: 'Cerrar',
+    exec_failed: 'Error',
+    exec_rejected: 'Firma rechazada en el wallet.',
+    exec_quoted: 'Esperado (cotizado)',
+    exec_executed: 'Recibido (ejecutado)',
+    exec_reading: 'leyendo…',
+    exec_delta: 'delta',
+
+    // Exec errors
+    err_trustline: (tgt, issuer) => `Trustline de ${tgt} ausente. Para recibirlo: en su wallet, añada el activo ${tgt} (emisor ${issuer}) — operación changeTrust, reserva ~0,5 XLM. Luego vuelva a intentarlo.`,
+    err_funds: 'BLND líquido insuficiente (su BLND puede estar en staking en Blend — retírelo primero).',
+    err_slippage: 'El precio se ha movido más allá de su tolerancia — vuelva a intentarlo o aumente el slippage.',
+    err_down: 'Fuente de ejecución no disponible, inténtelo de nuevo.',
+    err_noroute: 'No hay ruta ejecutable para esta cantidad.',
+    // In-app trustline
+    trustline_title: 'Trustline requerida',
+    trustline_need: (tgt) => `Su cuenta no tiene trustline de ${tgt} — necesaria para recibir ${tgt}. Añádala con un clic a continuación (~0,5 XLM de reserva bloqueada, reembolsable si la elimina más adelante).`,
+    trustline_add_btn: (tgt) => `Añadir trustline de ${tgt}`,
+    trustline_adding: 'Añadiendo trustline…',
+    trustline_added: (tgt) => `Trustline de ${tgt} añadida`,
+    trustline_added_hint: 'Ya puede ejecutar el swap.',
+
+    // Composite 2-tx
+    comp_step: (n) => `Paso ${n} / 2`,
+    comp_leg1_confirming: 'Tramo 1 confirmado — preparando tramo 2…',
+    comp_leg2_failed: (x) => `Tramo 1 exitoso: ${x} USDC recibidos. Tramo 2 fallido — conserva estos USDC.`,
+    comp_retry_leg2: 'Reintentar tramo 2',
+
+    // Navigation
+    nav_dashboard: 'Panel',
+    nav_health: 'Estabilidad',
+
+    tx_label: 'Tx',
+    hops_label: (n) => `${n} salto${n > 1 ? 's' : ''}`,
+
+    // Footer ②
+    footer_readings: (n, nOk, cadenceHuman, perDay, coverH) =>
+      `${n} lecturas (${nOk} válidas) · 1 cada ${cadenceHuman} ≈ ${perDay}/d · ~${coverH} h de cobertura`,
+    footer_health_link: 'Estabilidad de fuentes →',
+
+    // Health page ④
+    health_title: 'Estabilidad de fuentes — últimos 7 días',
+    health_col_source: 'Fuente',
+    health_col_uptime: 'Disponibilidad',
+    health_col_days: '7 días',
+    health_col_fails: 'Fallos',
+    health_col_last: 'Último fallo',
+    health_legend_ok: 'ok',
+    health_legend_warn: '< 25% fallos',
+    health_legend_bad: '≥ 25% fallos',
+    health_legend_null: 'sin lecturas',
+    health_auto_only: 'Solo se cuentan aquí las mediciones automáticas (una cada 15 min) — las actualizaciones manuales quedan excluidas de las estadísticas de estabilidad.',
+    health_kpi_readings: 'Lecturas válidas',
+    health_kpi_valid: (p) => `${p}% válidas`,
+    health_kpi_cadence: 'Cadencia',
+    health_kpi_perday: (n) => `≈ ${n}/d`,
+    health_kpi_coverage: 'Cobertura',
+    health_never: '—',
+    health_ago_min: (n) => `hace ${n} min`,
+    health_ago_h: (n) => `hace ${n} h`,
+    health_ago_j: (n) => `hace ${n} d`,
+    // Failure causes ③-bis
+    chip_down: 'fallida',
+    reason_timeout: 'tiempo de espera agotado',
+    reason_http: 'error HTTP',
+    reason_indisponible: 'no disponible',
+    'reason_rate-limit': 'RPC limitado (429)',
+    reason_rpc: 'error RPC',
+    reason_simulation: 'simulación',
+    // Coherence / Execution columns + trace modal
+    health_col_coherence: 'Coherencia',
+    health_col_exec: 'Ejecución',
+    health_total: 'Total (ciclo)',
+    health_total_tip: 'Tiempo total del ciclo (mediana 7 días): selección de RPC, precios, cotizaciones paralelas, re-simulaciones, clasificación y escritura. No es la suma de las fuentes.',
+    health_coh_none: 'sin sondas',
+    health_coh_ok: (n) => `${n} sondas, todas coherentes`,
+    health_coh_suspect: (s, t) => `${s} sospechosa${s > 1 ? 's' : ''} de ${t}`,
+    health_coh_modal_title: (d) => `Sondas de coherencia — ${d}`,
+    health_coh_modal_recap: (n, s) => `${n} sonda${n > 1 ? 's' : ''} en 7 d, ${s} sospechosa${s > 1 ? 's' : ''}`,
+    health_coh_modal_none: 'No hay sondas sospechosas en el período.',
+    health_coh_modal_loading: 'Cargando…',
+    health_coh_col_date: 'Fecha',
+    health_coh_col_pair: 'Par',
+    health_coh_col_amount: 'Cantidad',
+    health_coh_col_reason: 'Motivo',
+    health_coh_col_route: 'Ruta',
+    health_coh_col_delta: 'Delta',
+    health_coh_col_quoted: 'Cotizado',
+    health_coh_col_simulated: 'Simulado',
+    health_coh_close: 'Cerrar',
+    // RPC health
+    health_rpc_title: 'Salud del RPC Soroban — últimos 7 días',
+    health_rpc_col_rpc: 'RPC',
+    health_rpc_col_actif: 'Estado',
+    health_rpc_col_latence: 'Latencia (sonda)',
+    health_rpc_col_ledger: 'Ledger',
+    health_rpc_col_dispo: 'Disponibilidad 7d',
+    health_rpc_col_echecs: 'Fallos',
+    health_rpc_col_simerr: 'Errores sim',
+    health_rpc_col_req7j: 'Req 7d',
+    health_rpc_col_reqps: 'Req/s',
+    health_rpc_active_yes: 'activo',
+    health_rpc_active_no: 'respaldo',
+    health_rpc_note: 'Sondeo al inicio de cada ciclo. El RPC activo es el seleccionado para ese ciclo.',
+    health_sources_scope: 'Estadísticas calculadas a partir de lecturas automáticas y actualizaciones manuales, no de cotizaciones manuales.',
+    health_rpc_scope: 'Carga calculada sobre todas las solicitudes RPC: lecturas automáticas, actualizaciones manuales y cotizaciones manuales. Disponibilidad y latencia medidas por sonda al inicio de cada ciclo.',
+    nav_back: '← Panel',
+    // click-to-select
+    exec_via: (tool) => 'Ejecutar vía ' + tool,
+    exec_composite: 'Ejecutar (2 transacciones)',
+    exec_integrated_soon: 'Ejecución integrada próximamente para esta herramienta.',
+    ladder_pick_hint: 'Haga clic en una fila para ejecutar vía esa herramienta (haga clic de nuevo para volver a automático).',
+  },
 };
 
 // ─── Stellar Wallets Kit — module-level cache ─────────────────────────────────
@@ -963,30 +1226,37 @@ const VENUE_META = {
   xbull: {
     fr: { type: 'Agrégateur', couche: 'SDEX + AMM Soroban', liquidite: 'meilleur chemin multi-venues (swap-kit, sans clé)', note: 'prélève 0,1 % — classé sur le fill réellement simulé' },
     en: { type: 'Aggregator', couche: 'SDEX + Soroban AMMs', liquidite: 'best multi-venue path (swap-kit, keyless)', note: 'skims 0.1% — ranked on the actually simulated fill' },
+    es: { type: 'Agregador', couche: 'SDEX + AMMs Soroban', liquidite: 'mejor ruta multi-fuente (swap-kit, sin clave)', note: 'descuenta 0,1% — clasificado sobre el fill realmente simulado' },
   },
   soroswap: {
     fr: { type: 'Agrégateur', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: 'frais protocole inclus dans le fill simulé' },
     en: { type: 'Aggregator', couche: 'Soroban', liquidite: 'Soroswap AMM (router)', note: 'protocol fees included in the simulated fill' },
+    es: { type: 'Agregador', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: 'comisiones del protocolo incluidas en el fill simulado' },
   },
   aquarius: {
     fr: { type: 'Agrégateur', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + carnet SDEX (find-path)', note: 'find-path sur-cote parfois (3-hop via XLM) → re-simulé' },
     en: { type: 'Aggregator', couche: 'AMM + SDEX', liquidite: 'Aquarius pools + SDEX book (find-path)', note: 'find-path sometimes over-quotes (3-hop via XLM) → re-simulated' },
+    es: { type: 'Agregador', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + libro SDEX (find-path)', note: 'find-path a veces sobrecotiza (3 saltos vía XLM) → re-simulado' },
   },
   stellarbroker: {
     fr: { type: 'Agrégateur (RFQ)', couche: 'hors-chaîne', liquidite: 'agrège des market makers', note: 'frais opaques → classé en plancher (borne basse)' },
     en: { type: 'Aggregator (RFQ)', couche: 'off-chain', liquidite: 'aggregates market makers', note: 'opaque fees → treated as a floor (lower bound)' },
+    es: { type: 'Agregador (RFQ)', couche: 'fuera de cadena', liquidite: 'agrega creadores de mercado', note: 'comisiones opacas → tratado como suelo (límite inferior)' },
   },
   ultrastellar: {
     fr: { type: 'Carnet SDEX', couche: 'SDEX classique', liquidite: "carnet d'ordres natif Stellar", note: 'path payment, frais 0' },
     en: { type: 'SDEX order book', couche: 'classic SDEX', liquidite: 'native Stellar order book', note: 'path payment, 0 fee' },
+    es: { type: 'Libro de órdenes SDEX', couche: 'SDEX clásico', liquidite: 'libro de órdenes nativo de Stellar', note: 'path payment, 0 comisión' },
   },
   horizon: {
     fr: { type: 'Carnet SDEX', couche: 'SDEX classique', liquidite: "carnet d'ordres natif (strict-send)", note: 'plancher garanti (path payment direct)' },
     en: { type: 'SDEX order book', couche: 'classic SDEX', liquidite: 'native order book (strict-send)', note: 'guaranteed floor (direct path payment)' },
+    es: { type: 'Libro de órdenes SDEX', couche: 'SDEX clásico', liquidite: 'libro de órdenes nativo (strict-send)', note: 'suelo garantizado (path payment directo)' },
   },
   comet: {
     fr: { type: 'Pool (source unique)', couche: 'Soroban', liquidite: 'pool backstop Blend 80/20 (BLND/USDC)', note: 'cote indépendante du solde ; BLND→USDC seulement' },
     en: { type: 'Pool (single source)', couche: 'Soroban', liquidite: 'Blend 80/20 backstop pool (BLND/USDC)', note: 'balance-independent quote; BLND→USDC only' },
+    es: { type: 'Pool (fuente única)', couche: 'Soroban', liquidite: 'pool de respaldo Blend 80/20 (BLND/USDC)', note: 'cotización independiente del saldo; solo BLND→USDC' },
   },
 };
 
@@ -1873,7 +2143,13 @@ const Sankey = (function () {
           detail:'Route detail', venue:'Venue', route:'Route', marge:'2nd-best margin', freq:'Frequency',
           others:'others', freqOf:'of readings', total:'Total', nodata:'No data yet for this probe',
           margeTip:'2nd-best margin: by how much (%) the winning route beat the 2nd-best quote of the same reading — median over the period.',
-          through:n=>`${n} routes pass through this step` }
+          through:n=>`${n} routes pass through this step` },
+    es: { sub:'<b>Grosor</b> = frecuencia de victoria · <b>Ruta</b> = recorrido y pasos · <b>Color</b> = herramienta de swap',
+          tail:`Rutas &lt; ${TAIL_PCT}% de lecturas agrupadas en "Otros" — salvo que solo usen bandas ya dibujadas.`,
+          detail:'Detalle de ruta', venue:'Fuente', route:'Ruta', marge:'Margen sobre el 2.º mejor', freq:'Frecuencia',
+          others:'otros', freqOf:'de lecturas', total:'Total', nodata:'Aún sin datos para esta sonda',
+          margeTip:'Margen sobre el 2.º mejor: en qué porcentaje (%) la ruta ganadora superó la 2.ª mejor cotización de la misma lectura — mediana del período.',
+          through:n=>`${n} rutas pasan por este paso` }
   };
   const tr = lang => STR[lang] || STR.en;
   let tableSort = { col:'freq', dir:'desc' }; // tri du tableau : Fréquence (défaut) ou Marge
