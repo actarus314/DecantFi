@@ -51,6 +51,12 @@ export function parseStellarbroker(raw: unknown, req: QuoteRequest): NormalizedQ
   };
 }
 
+// TODO (key-based reactivation): the keyless endpoint above is Cloudflare-rate-limited / IP-blocked under
+// automated polling. Once a StellarBroker API key is available (cfg.stellarBrokerApiKey from STELLARBROKER_API_KEY):
+//   1. send it as an Authorization header on the /quote request (authenticated → exempt from anonymous bot limits);
+//   2. once the authenticated response exposes the real fee, switch netConfidence 'floor' → 'exact' and drop the floor/range hack;
+//   3. re-add `stellarbroker` to the ADAPTERS array in core/sources/index.ts.
+// Until then this adapter is intentionally not polled (removed from ADAPTERS).
 export const stellarbroker: SourceAdapter = {
   id: 'stellarbroker',
   available: () => true,

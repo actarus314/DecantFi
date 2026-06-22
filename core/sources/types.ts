@@ -21,6 +21,7 @@ export interface QuoteRequest {
 
 export interface SourceConfig {
   soroswapApiKey?: string;
+  stellarBrokerApiKey?: string;
   rpcUrl: string;
   horizonUrl: string;
   walletAddress?: string;

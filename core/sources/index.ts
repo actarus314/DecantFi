@@ -14,7 +14,9 @@ export const ADAPTERS: SourceAdapter[] = [
   aquarius,
   comet,
   ultrastellar,
-  stellarbroker,
+  // stellarbroker — DISCONNECTED 2026-06-22: keyless endpoint is Cloudflare-rate-limited / IP-blocked
+  // under collector polling (sustained 4xx). Re-enable via the key-based path once STELLARBROKER_API_KEY
+  // is wired — see TODO in stellarbroker.ts.
   horizon,
 ];
 

@@ -6,7 +6,7 @@ export interface CollectorConfig {
   sizesBlnd: bigint[]; pairs: ('USDC' | 'EURC')[];
   dbPath: string; timeoutMs: number;
   rawRetentionDays: number; rollupAfterDays: number;
-  rpcUrl: string; rpcUrls: string[]; horizonUrl: string; soroswapApiKey?: string; walletAddress?: string;
+  rpcUrl: string; rpcUrls: string[]; horizonUrl: string; soroswapApiKey?: string; stellarBrokerApiKey?: string; walletAddress?: string;
 }
 
 type Env = Record<string, string | undefined>;
@@ -45,5 +45,6 @@ export function loadCollectorConfig(env: Env = process.env): CollectorConfig {
     })(),
     horizonUrl: env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org',
     soroswapApiKey: env.SOROSWAP_API_KEY || undefined,
+    stellarBrokerApiKey: env.STELLARBROKER_API_KEY || undefined,
   };
 }

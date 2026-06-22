@@ -246,6 +246,7 @@ async function main(): Promise<void> {
     rpcUrl: process.env.STELLAR_RPC_URL || 'https://mainnet.sorobanrpc.com',
     horizonUrl: process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org',
     soroswapApiKey: process.env.SOROSWAP_API_KEY || undefined,
+    stellarBrokerApiKey: process.env.STELLARBROKER_API_KEY || undefined,
     walletAddress: process.env.WALLET_ADDRESS || undefined,
     slippageBps: Number.isFinite(args.slippageBps) ? args.slippageBps : 50,
     withSplit: args.split,

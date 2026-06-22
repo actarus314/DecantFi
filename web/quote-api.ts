@@ -305,6 +305,7 @@ export async function liveQuote(
       rpcUrl: cfg.rpcUrl,
       horizonUrl: cfg.horizonUrl,
       soroswapApiKey: cfg.soroswapApiKey,
+      stellarBrokerApiKey: cfg.stellarBrokerApiKey,
       walletAddress: cfg.walletAddress,
       timeoutMs: cfg.timeoutMs,
       // Cache RPC pour cette requête : une cotation EURC relance 3 sous-cotations qui re-lisent
