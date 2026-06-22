@@ -1335,9 +1335,15 @@ function simCard() {
       <button class="btn" onclick="clearSim()">${t('sim_btn_clear')}</button>
       <span style="color:var(--card-border);margin:0 .4rem;user-select:none">—</span>
       <span style="font-size:12px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
-      <input id="execSlippage" type="text" inputmode="decimal" value="${fmtRoute(execSlippagePct)}"
-        style="width:70px;font-size:13px;padding:.35rem .5rem;border-radius:.4rem;border:1px solid var(--card-border);background:var(--section-bg);color:var(--val)"
-        onchange="onExecSlippage(this.value)">
+      <span style="display:inline-flex;align-items:stretch;border:1px solid var(--card-border);border-radius:.4rem;overflow:hidden;background:var(--section-bg)">
+        <input id="execSlippage" type="text" inputmode="decimal" value="${fmtRoute(execSlippagePct)}"
+          style="width:46px;font-size:13px;padding:.35rem .4rem;border:0;background:transparent;color:var(--val);text-align:right"
+          onchange="onExecSlippage(this.value)">
+        <span style="display:flex;flex-direction:column;border-left:1px solid var(--card-border)">
+          <button type="button" onclick="nudgeSlippage(0.1)" tabindex="-1" style="flex:1;border:0;border-bottom:1px solid var(--card-border);background:transparent;color:var(--caption);cursor:pointer;font-size:8px;line-height:1;padding:0 .35rem">▲</button>
+          <button type="button" onclick="nudgeSlippage(-0.1)" tabindex="-1" style="flex:1;border:0;background:transparent;color:var(--caption);cursor:pointer;font-size:8px;line-height:1;padding:0 .35rem">▼</button>
+        </span>
+      </span>
       <span class="suffix">%</span>
     </div>
     <div id="simOut">${resultHtml}</div></div>`;
@@ -2267,12 +2273,19 @@ function onExecSlippage(v) {
   renderApp();
 }
 
+// Flèches +/− du champ slippage (pas de 0,1 %, borné 0–50, arrondi pour éviter la dérive flottante).
+function nudgeSlippage(d) {
+  execSlippagePct = Math.max(0, Math.min(50, Math.round((execSlippagePct + d) * 10) / 10));
+  localStorage.setItem('slippagePct', execSlippagePct);
+  renderApp();
+}
+
 // ─── Helper : table de revue (partagée review / signing / submitting) ─────────
 function venueDisplay(id) {
   return id === 'xbull' ? 'xBull' : id === 'soroswap' ? 'Soroswap' : id === 'horizon' ? 'Horizon' : id === 'aquarius' ? 'Aquarius' : id === 'comet' ? 'Comet' : id === 'ultrastellar' ? 'Ultra Stellar' : id;
 }
 
-function reviewTableHtml(rv, tgt, showSimDelta) {
+function reviewTableHtml(rv, tgt, showSimDelta, sendAsset = 'BLND') {
   const vl = venueDisplay(rv.venue);
   // #3 — indicateur sim→build : compare le build (re-coté) au simulateur de la même venue
   let simDeltaHtml = '';
@@ -2297,7 +2310,7 @@ function reviewTableHtml(rv, tgt, showSimDelta) {
     : `${feeStr} XLM`;
   return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.4rem">
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
-    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} BLND</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} ${sendAsset}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${tgt}${simDeltaHtml}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt3(rv.minReceived)} ${tgt}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${feeLabel}</td><td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">${feeDisplay}</td></tr>
@@ -2400,6 +2413,8 @@ function execModal() {
 
   // Actif courant de la jambe (USDC au leg1, EURC au leg2 / mono)
   const legTarget = (build && build.review && build.review.target) || target;
+  // Actif envoyé : USDC au leg2 du composite (on ne (re)vend pas du BLND), BLND sinon.
+  const sendAsset = (comp && comp.leg === 2) ? 'USDC' : 'BLND';
 
   let content = '';
   if (phase === 'review') {
@@ -2412,7 +2427,7 @@ function execModal() {
     content = `
       ${stepBadge}
       <div style="font-size:14px;font-weight:700;margin-bottom:.9rem">${t('review_title')}</div>
-      ${reviewTableHtml(rv, legTarget, true)}
+      ${reviewTableHtml(rv, legTarget, true, sendAsset)}
       ${fidelityNote}
       ${restoreNote}
       <div style="display:flex;gap:.55rem;margin-top:.9rem;justify-content:flex-end">
@@ -2421,14 +2436,14 @@ function execModal() {
       </div>`;
   } else if (phase === 'signing') {
     const rv = build && build.review;
-    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, legTarget)}</div>` : '';
+    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, legTarget, false, sendAsset)}</div>` : '';
     content = `
       ${stepBadge}
       <p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem">${t('exec_signing_wallet')}</p>
       ${dimTable}`;
   } else if (phase === 'submitting') {
     const rv = build && build.review;
-    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, legTarget)}</div>` : '';
+    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, legTarget, false, sendAsset)}</div>` : '';
     const restoreNote = build && build.type === 'restore'
       ? `<p class="help" style="margin:.5rem 0 0">${t('exec_restore')}</p>`
       : '';
