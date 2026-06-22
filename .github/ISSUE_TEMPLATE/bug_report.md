@@ -1,38 +1,25 @@
 ---
-name: Bug report
-about: Create a report to help us improve
-title: ''
-labels: ''
-assignees: ''
-
+name: Bug report / Rapport de bug
+about: Something is wrong / Quelque chose ne marche pas
+title: "[bug] "
+labels: bug
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+<!-- English or Français, both fine. For security issues, do NOT use this — see SECURITY.md. -->
+<!-- Pour une faille de sécurité, n'utilisez PAS ceci — voir SECURITY.md. -->
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+## What happened / Ce qui se passe
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+## Expected / Attendu
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+## Steps to reproduce / Reproduire
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+1.
+2.
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+## Environment / Environnement
 
-**Additional context**
-Add any other context about the problem here.
+- Component / Composant: CLI · web · collector
+- Version / commit:
+- Command or input / Commande ou saisie (e.g. `npm run quote -- 1000 USDC`):
+- Node version:

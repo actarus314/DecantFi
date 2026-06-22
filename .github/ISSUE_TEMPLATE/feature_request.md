@@ -1,20 +1,22 @@
 ---
-name: Feature request
-about: Suggest an idea for this project
-title: ''
-labels: ''
-assignees: ''
-
+name: Feature request / Demande de fonctionnalité
+about: Suggest an idea / Proposer une idée
+title: "[feat] "
+labels: enhancement
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+<!-- English or Français, both fine. -->
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+## Problem / Problème
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+<!-- What are you trying to do that's hard today? -->
+<!-- Qu'essayez-vous de faire qui est difficile aujourd'hui ? -->
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+## Proposed solution / Solution proposée
+
+## Alternatives considered / Alternatives envisagées
+
+## Context / Contexte
+
+<!-- New source/venue, asset pair, CLI flag, UI need, etc. -->
+<!-- Nouvelle source/venue, paire d'actifs, option CLI, besoin UI, etc. -->
