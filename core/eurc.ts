@@ -42,10 +42,13 @@ export async function compareEurc(
   q: EurcQuoters,
   reSimLeg?: (quotes: NormalizedQuote[], amountIn: Stroops) => Promise<NormalizedQuote[]>,
 ): Promise<EurcComparison> {
-  const direct = rankQuotes(await q.blndToEurc(amountBlnd)).best;
+  const [directRaw, leg1List] = await Promise.all([
+    q.blndToEurc(amountBlnd),
+    q.blndToUsdc(amountBlnd),
+  ]);
+  const direct = rankQuotes(directRaw).best;
 
   let viaUsdc: ViaUsdcResult | undefined;
-  const leg1List = await q.blndToUsdc(amountBlnd);
   const leg1Honest = reSimLeg ? await reSimLeg(leg1List, amountBlnd) : leg1List;
   const leg1 = rankQuotes(leg1Honest).best;
   if (leg1 && leg1.grossOut > 0n) {

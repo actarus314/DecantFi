@@ -3628,7 +3628,7 @@ function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() 
     }
     portal.style.left = left + 'px'; portal.style.top = top + 'px';
   }
-  function hide() { portal.style.display = 'none'; portal.innerHTML = ''; }
+  function hide() { if (portal.style.display === 'none') return; portal.style.display = 'none'; portal.innerHTML = ''; }
   document.addEventListener('mouseover', (e) => {
     const w = e.target.closest ? e.target.closest('.tip-wrap') : null;
     if (w) show(w);
@@ -3639,7 +3639,7 @@ function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() 
     if (e.relatedTarget && w.contains(e.relatedTarget)) return;
     hide();
   });
-  window.addEventListener('scroll', hide, true);
+  window.addEventListener('scroll', hide, { capture: true, passive: true });
 })();
 </script>
 </body>
