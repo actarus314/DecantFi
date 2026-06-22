@@ -1,0 +1,6 @@
+# Vendored, pre-bundled third-party dependency (Stellar Wallets Kit).
+# Integrity is verified at CI/build via walletkit.js.sha256, not by editing it.
+# linguist-vendored hides it from language stats; linguist-generated excludes
+# it from CodeQL analysis (it is minified upstream code we do not maintain).
+web/public/walletkit.js linguist-vendored=true
+web/public/walletkit.js linguist-generated=true

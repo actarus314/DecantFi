@@ -1736,7 +1736,7 @@ function ladderRows(rows, u, down) {
     const routeText = renderRoute(r.route);
     const isSel = r.sourceId && r.sourceId === selectedSource;
     const trClass = [r.winner ? 'win' : '', isSel ? 'sel' : ''].filter(Boolean).join(' ');
-    const sid = r.sourceId ? r.sourceId.replace(/'/g, "\\'") : '';
+    const sid = r.sourceId ? r.sourceId.replace(/\\/g, '\\\\').replace(/'/g, "\\'") : '';
     return `<tr class="${trClass}" style="cursor:pointer" onclick="selectSource('${sid}')">
       <td>${venueCard(r.sourceId, r.display)}${r.note ? ` <span class="muted">· ${escapeHtml(noteLabel(r.note))}</span>` : ''}</td>
       <td>${fmt3(r.net)}</td>
