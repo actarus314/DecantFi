@@ -117,6 +117,10 @@ npm run typecheck
 - [FAQ](FAQ.fr.md) — sécurité, déploiement, choix de conception, modèle de menace
 - [CONTRIBUTING](CONTRIBUTING.md) — installation, tests, conventions
 
+---
+
+> 🥚 Quelque part dans le tableau de bord, DecantFi raconte **un seul mensonge** — magnifiquement, à dessein. Il ne se montre qu'à un code de triche que tout gamer de plus de trente ans connaît par cœur. Bonne chasse.
+
 ## Licence
 
 [GPL-3.0-or-later](LICENSE). DecantFi lit les données Stellar on-chain et de façon keyless partout où c'est possible — l'architecture qui convient le mieux à un outil dont tout l'objectif est de vous dire la vérité sur un swap.

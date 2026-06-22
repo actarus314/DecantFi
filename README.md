@@ -117,6 +117,10 @@ npm run typecheck
 - [FAQ](FAQ.md) — safety, deployment, design choices, threat model
 - [CONTRIBUTING](CONTRIBUTING.md) — install, tests, conventions
 
+---
+
+> 🥚 Somewhere in the dashboard, DecantFi tells **exactly one lie** — gloriously, on purpose. It only shows itself to a cheat code that any gamer over thirty knows by heart. Happy hunting.
+
 ## License
 
 [GPL-3.0-or-later](LICENSE). DecantFi keeps Stellar's data on-chain and keyless wherever it can — the architecture that best fits a tool whose whole point is to tell you the truth about a swap.
