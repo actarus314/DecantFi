@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- decant — alambic : ballon vert BLND #36b04a + essence jaune Stellar #FDDA24.
+       Fond TRANSPARENT (logo du header) ; le fond sombre n'apparaît qu'au survol via CSS .brand-link:hover. -->
+  <g transform="translate(16 16) scale(1.30) translate(-16 -16) translate(0 -1.05)">
+    <g fill="none" stroke="#36b04a" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+      <circle cx="16" cy="20.5" r="6.6"/>
+      <path d="M12.8 14.6 L12.8 7 M19.2 14.6 L19.2 7"/>
+      <path d="M11 7 L21 7"/>
+    </g>
+    <circle cx="16" cy="20.8" r="3.2" fill="#FDDA24"/>
+  </g>
+</svg>
