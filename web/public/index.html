@@ -2187,10 +2187,10 @@ const Sankey = (function () {
           sw = Math.max(2, w * scale - Math.min(LINK_GAP, w * scale * 0.45));
         } else {
           // multi : on répartit DANS la largeur tracée de la bande (swFull) → les fils REMPLISSENT le
-          // segment, séparés par un fin écart (1,5px) au lieu du gros retrait → « tout Comet » = bande pleine.
+          // segment, CONTIGUS (aucune séparation) ; seule la couleur d'outil les distingue → « tout Comet » = bande pleine.
           const swFull = Math.max(2.5, L.width - Math.min(LINK_GAP, L.width * 0.45)), lscale = swFull / L.value;
           dY = (off + w / 2 - L.value / 2) * lscale;
-          sw = Math.max(2, w * lscale - 1.5);
+          sw = Math.max(2, w * lscale);
         }
         const d = ribbonPath(L.points.map(p => [p[0], p[1] + dY]));
         const col = L.tool === '—' ? '#9ca3af' : venueColor(L.tool);
