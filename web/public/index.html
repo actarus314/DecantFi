@@ -1479,11 +1479,12 @@ const VENUE_META = {
 
 function venueCard(id, name) {
   const meta = VENUE_META[id];
-  if (!meta) return name; // composite / inconnu → pas de carte
+  if (!meta) return escapeHtml(name); // composite / inconnu → pas de carte
   const m = meta[lang] || meta.en;
   const L = t('venue_cols');
-  return `<span class="tip-wrap vname"><span class="srcname">${name}</span>` +
-    `<span class="tip-box vcard"><b>${name}</b>` +
+  const eName = escapeHtml(name);
+  return `<span class="tip-wrap vname"><span class="srcname">${eName}</span>` +
+    `<span class="tip-box vcard"><b>${eName}</b>` +
     `<span class="vgrid"><span>${L[0]}</span><span>${m.type}</span>` +
     `<span>${L[1]}</span><span>${m.couche}</span>` +
     `<span>${L[2]}</span><span>${m.liquidite}</span>` +
@@ -1505,7 +1506,7 @@ function noteLabel(note) {
 // Route lisible : rend le glyphe nuage ☁ (hops xBull inaccessibles) en pastille avec infobulle.
 function renderRoute(s) {
   if (!s) return '—';
-  return s.split('☁').join(`<span class="hops-hidden" title="${t('hops_hidden')}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span>`);
+  return s.split('☁').map(f => escapeHtml(f)).join(`<span class="hops-hidden" title="${t('hops_hidden')}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span>`);
 }
 
 // ─── Timezone client ──────────────────────────────────────────────────────────
@@ -1741,7 +1742,7 @@ function ladderRows(rows, u, down) {
     const trClass = [r.winner ? 'win' : '', isSel ? 'sel' : ''].filter(Boolean).join(' ');
     const sid = r.sourceId ? r.sourceId.replace(/'/g, "\\'") : '';
     return `<tr class="${trClass}" style="cursor:pointer" onclick="selectSource('${sid}')">
-      <td>${venueCard(r.sourceId, r.display)}${r.note ? ` <span class="muted">· ${noteLabel(r.note)}</span>` : ''}</td>
+      <td>${venueCard(r.sourceId, r.display)}${r.note ? ` <span class="muted">· ${escapeHtml(noteLabel(r.note))}</span>` : ''}</td>
       <td>${fmt3(r.net)}</td>
       <td class="${deltaClass}">${delta}</td>
       <td><span class="chip ${r.chip}">${chipLabel(r.chip)}</span></td>
@@ -2093,9 +2094,9 @@ function buildHealthPage(topbarHtml) {
     else if (trend === 'down') trendArrow = `<span style="color:var(--red);font-weight:700">↘</span>`;
     else trendArrow = `<span style="color:var(--caption)">&#61;</span>`;
 
-    const pairNote = s.pairNote ? ` <span class="muted" style="font-size:12px">· ${s.pairNote}</span>` : '';
+    const pairNote = s.pairNote ? ` <span class="muted" style="font-size:12px">· ${escapeHtml(s.pairNote)}</span>` : '';
     return `<tr>
-      <td style="white-space:nowrap"><span class="srcname">${s.display}</span>${pairNote}</td>
+      <td style="white-space:nowrap"><span class="srcname">${escapeHtml(s.display)}</span>${pairNote}</td>
       <td>${cohCell}</td>
       <td style="color:var(--caption);font-variant-numeric:tabular-nums">${execCell}</td>
       <td><span class="days">${dots}</span> <span style="margin-left:1rem;font-size:12px;color:var(--caption);font-variant-numeric:tabular-nums;white-space:nowrap">${s.uptimePct.toFixed(0)} % ${trendArrow}</span></td>
@@ -2153,7 +2154,7 @@ function buildHealthPage(topbarHtml) {
       const reqTotal = (r.reqTotal != null && r.reqTotal > 0) ? r.reqTotal.toLocaleString() : '—';
       const reqPerSec = (r.reqPerSec != null && r.reqPerSec > 0) ? r.reqPerSec : '—';
       return `<tr${r.active ? ' class="win"' : ''}>
-        <td>${r.host}</td>
+        <td>${escapeHtml(r.host)}</td>
         <td>${activeTxt}</td>
         <td>${latency}</td>
         <td>${ledger}</td>
@@ -2597,18 +2598,18 @@ const Sankey = (function () {
     const dir = tableSort.dir === 'asc' ? 1 : -1;
     const sv = r => tableSort.col === 'marge' ? (r.marginPct == null ? -Infinity : r.marginPct) : r.winPct;
     const ind = c => tableSort.col === c ? (tableSort.dir === 'desc' ? ' ▾' : ' ▴') : '';
-    const venueCell = tools => tools.split(' + ').map(p => `<span class="sk-dot" style="background:${venueColor(p)}"></span>${toolDisplay(p)}`).join('<span class="sk-plus">+</span>');
+    const venueCell = tools => tools.split(' + ').map(p => `<span class="sk-dot" style="background:${venueColor(p)}"></span>${escapeHtml(toolDisplay(p))}`).join('<span class="sk-plus">+</span>');
     const rows = routes.map((r, idx) => ({ r, idx })).sort((a, b) => (sv(a.r) - sv(b.r)) * dir).map(({ r, idx }) => {
       const isGray = r.tools === 'autres', isTwoTx = r.composite === true, mc = marginColor(r.marginPct);
       const hasTail = isGray && Array.isArray(r.tail) && r.tail.length > 0;
       const venueHtml = venueCell(r.tools) + (hasTail ? ` <span class="sk-caret">${tailOpen ? '▾' : '▸'}</span> <span class="muted">(${r.tail.length})</span>` : '');
       const rkey = keyOf(r);
       let row = `<tr data-rk="${idx}"${hasTail ? ' data-sk-tail="1"' : ''} data-sk-key="${rkey.replace(/"/g, '&quot;')}" class="${selKeys.has(rkey) ? 'sk-sel' : ''}" style="cursor:pointer"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
-        + `<td class="sk-route">${r.steps.join(' → ')}</td>`
+        + `<td class="sk-route">${escapeHtml(r.steps.join(' → '))}</td>`
         + `<td>${(isGray || r.marginPct == null) ? '<span class="muted">—</span>' : `<span style="color:${mc};font-weight:700">${fmtMargin(r.marginPct, lang)}</span>`}</td>`
         + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b>${r.trend==='up'?'<span class="sk-tr sk-up">▲</span>':r.trend==='down'?'<span class="sk-tr sk-down">▼</span>':r.trend==='flat'?'<span class="sk-tr sk-flat">→</span>':''}</span></td></tr>`;
       if (hasTail && tailOpen) {
-        row += r.tail.slice().sort((a, b) => b.winPct - a.winPct).map(tr => `<tr class="sk-tail-row"><td><span class="sk-venue">${venueCell(tr.tools)}${tr.composite ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td><td class="sk-route">${tr.steps.join(' → ')}</td><td><span class="muted">—</span></td><td><b>${fmtPct(tr.winPct)}</b></td></tr>`).join('');
+        row += r.tail.slice().sort((a, b) => b.winPct - a.winPct).map(tr => `<tr class="sk-tail-row"><td><span class="sk-venue">${venueCell(tr.tools)}${tr.composite ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td><td class="sk-route">${escapeHtml(tr.steps.join(' → '))}</td><td><span class="muted">—</span></td><td><b>${fmtPct(tr.winPct)}</b></td></tr>`).join('');
       }
       return row;
     }).join('');
@@ -2621,10 +2622,10 @@ const Sankey = (function () {
   function showTip(event, lk, routes, s) {
     const tt = document.getElementById('sk-tip'); if (!tt) return;
     const through = lk.idxs.map(i => routes[i]).sort((a, b) => b.winPct - a.winPct);
-    const segTool = lk.tool === '—' ? s.others : toolDisplay(lk.tool);
-    let html = `<div class="sk-tt-h">${segTool} <span class="muted" style="font-weight:500;font-size:11px">· ${lk.source.name} → ${lk.target.name}</span></div>`;
-    if (through.length === 1) { const r = through[0]; html += `<div class="sk-tt-r">${r.steps.join(' → ')}</div><div class="sk-tt-row"><span>${s.freq}</span><b>${fmtPct(r.winPct)} ${s.freqOf}</b></div>`; }
-    else { html += `<div class="sk-tt-r">${s.through(through.length)}</div>`; through.forEach(r => { const nm = toolDisplay(r.tools) + (r.composite ? ' <span style="color:var(--teal);font-weight:700">2 tx</span>' : ''); html += `<div class="sk-tt-row"><span>${nm}</span><b>${fmtPct(r.winPct)}</b></div>`; }); html += `<div class="sk-tt-row sk-tt-total"><span>${s.total}</span><b>${fmtPct(lk.value)}</b></div>`; }
+    const segTool = lk.tool === '—' ? s.others : escapeHtml(toolDisplay(lk.tool));
+    let html = `<div class="sk-tt-h">${segTool} <span class="muted" style="font-weight:500;font-size:11px">· ${escapeHtml(lk.source.name)} → ${escapeHtml(lk.target.name)}</span></div>`;
+    if (through.length === 1) { const r = through[0]; html += `<div class="sk-tt-r">${escapeHtml(r.steps.join(' → '))}</div><div class="sk-tt-row"><span>${s.freq}</span><b>${fmtPct(r.winPct)} ${s.freqOf}</b></div>`; }
+    else { html += `<div class="sk-tt-r">${s.through(through.length)}</div>`; through.forEach(r => { const nm = escapeHtml(toolDisplay(r.tools)) + (r.composite ? ' <span style="color:var(--teal);font-weight:700">2 tx</span>' : ''); html += `<div class="sk-tt-row"><span>${nm}</span><b>${fmtPct(r.winPct)}</b></div>`; }); html += `<div class="sk-tt-row sk-tt-total"><span>${s.total}</span><b>${fmtPct(lk.value)}</b></div>`; }
     tt.innerHTML = html; tt.style.display = 'block'; moveTip(event);
   }
   function moveTip(event) { const tt = document.getElementById('sk-tip'); if (!tt) return; const x = event.clientX + 14, y = event.clientY - 10, tw = tt.offsetWidth; tt.style.left = ((x + tw > window.innerWidth - 10) ? x - tw - 28 : x) + 'px'; tt.style.top = y + 'px'; }
@@ -3356,6 +3357,7 @@ function coherenceModalHtml() {
 function execModal() {
   if (!execState) return '';
   const { phase, build, hash, errorMsg, executed } = execState;
+  const safeHash = /^[0-9a-fA-F]{64}$/.test(hash) ? hash : '';
   const comp = execState.comp || null;
 
   // Badge d'étape composite (affiché dans review / signing / submitting)
@@ -3443,7 +3445,7 @@ function execModal() {
       </div>
       ${compBlock}
       <div style="display:flex;gap:.55rem;margin-top:1rem;align-items:center;justify-content:flex-end;flex-wrap:wrap">
-        <a class="btn openlink" href="https://stellar.expert/explorer/public/tx/${hash}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:.3rem">${t('exec_view')}</a>
+        <a class="btn openlink" href="https://stellar.expert/explorer/public/tx/${encodeURIComponent(safeHash)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:.3rem">${t('exec_view')}</a>
         <button class="btn primary" onclick="cancelExecute()">${t('exec_close')}</button>
       </div>`;
   } else if (phase === 'trustline_adding') {

@@ -39,9 +39,10 @@ function sendStatic(
   res: ServerResponse,
   a: ReturnType<typeof staticAsset>,
   cacheControl: string,
+  extraHeaders?: Record<string, string>,
 ): void {
   if (req.headers['if-none-match'] === a.etag) {
-    res.writeHead(304, { 'ETag': a.etag, 'Cache-Control': cacheControl });
+    res.writeHead(304, { 'ETag': a.etag, 'Cache-Control': cacheControl, ...extraHeaders });
     res.end();
     return;
   }
@@ -56,6 +57,7 @@ function sendStatic(
     'Cache-Control': cacheControl,
     'ETag': a.etag,
     'Vary': 'Accept-Encoding',
+    ...extraHeaders,
   };
   if (enc) hdrs['Content-Encoding'] = enc;
   res.writeHead(200, hdrs);
@@ -108,6 +110,32 @@ function json(res: ServerResponse, req: IncomingMessage, status: number, data: u
   res.end(out);
 }
 
+// C1 — En-têtes de sécurité
+const SECURITY_HEADERS: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+};
+
+// C4 — Redaction de l'URL RPC (protocol+host uniquement, sans le path qui peut contenir une clé API)
+function redactRpcUrl(u: string): string {
+  try { const x = new URL(u); return x.protocol + '//' + x.host; } catch { return 'invalid'; }
+}
+
+// C5 — Rate-limiting en mémoire (token-bucket par IP)
+const rlBuckets = new Map<string, { count: number; resetAt: number }>();
+function rateLimited(ip: string, max: number, windowMs: number): boolean {
+  const now = Date.now();
+  const e = rlBuckets.get(ip);
+  if (!e || now > e.resetAt) { rlBuckets.set(ip, { count: 1, resetAt: now + windowMs }); return false; }
+  if (e.count >= max) return true;
+  e.count++; return false;
+}
+
+// C5 — Cooldown refresh
+let lastRefreshAt = 0;
+
 function parsePair(raw: string | null): 'USDC' | 'EURC' | null {
   if (raw === 'USDC' || raw === 'EURC') return raw;
   return null;
@@ -140,7 +168,7 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString('utf-8')); // throws on invalid JSON → caught by handle()
 }
 
-function isStellarPubkey(s: unknown): s is string { return typeof s === 'string' && /^G[A-Z2-7]{55}$/.test(s); }
+function isStellarPubkey(s: unknown): s is string { return typeof s === 'string' && s.length === 56 && /^G[A-Z2-7]{55}$/.test(s); }
 
 function execStatus(code: ExecError['code']): number { return code === 'down' ? 502 : 400; }
 
@@ -156,23 +184,23 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
   try {
     if (req.method === 'GET' && path === '/') {
-      sendStatic(req, res, htmlAsset, 'no-cache');
+      sendStatic(req, res, htmlAsset, 'no-cache', SECURITY_HEADERS);
       return;
     }
 
     if (req.method === 'GET' && path === '/walletkit.js') {
-      sendStatic(req, res, walletkitAsset, 'no-cache');
+      sendStatic(req, res, walletkitAsset, 'no-cache', { 'X-Content-Type-Options': 'nosniff' });
       return;
     }
 
     // B10 : /version.js supprimé (APP_REV inliné dans le HTML au boot)
 
     if (req.method === 'GET' && path === '/favicon.svg') {
-      sendStatic(req, res, faviconAsset, 'public, max-age=86400');
+      sendStatic(req, res, faviconAsset, 'public, max-age=86400', { 'X-Content-Type-Options': 'nosniff' });
       return;
     }
     if (req.method === 'GET' && path === '/logo.svg') {
-      sendStatic(req, res, logoAsset, 'public, max-age=86400');
+      sendStatic(req, res, logoAsset, 'public, max-age=86400', { 'X-Content-Type-Options': 'nosniff' });
       return;
     }
 
@@ -190,6 +218,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         json(res, req, 400, { error: 'paramètre venue manquant' });
         return;
       }
+      if (!/^[a-z]{1,20}$/.test(venue)) { json(res, req, 400, { error: 'venue invalide' }); return; }
       const now = new Date();
       const windowStart = new Date(now.getTime() - 7 * 86_400_000).toISOString();
       const rows = readCoherenceProbesByVenue(db, venue, windowStart);
@@ -232,6 +261,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     if (req.method === 'GET' && path === '/api/quote') {
+      const ip = req.socket.remoteAddress ?? 'unknown';
+      if (rateLimited(ip, 120, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const pairRaw = query['pair'] ?? 'USDC';
       const pair = parsePair(pairRaw);
       if (!pair) {
@@ -273,7 +304,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         try {
           appendRpcCallLog(cfg.dbPath, {
             at: new Date(quoteStart).toISOString(),
-            url: logUrl,
+            url: redactRpcUrl(logUrl),
             kind: 'quote',
             calls: rpcCalls,
             dur_ms: elapsed,
@@ -315,6 +346,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         json(res, req, 429, { error: 'refresh déjà en cours' });
         return;
       }
+      if (Date.now() - lastRefreshAt < 15_000) {
+        json(res, req, 429, { error: 'refresh en cooldown' });
+        return;
+      }
+      lastRefreshAt = Date.now();
       const pair = parsePair(query['pair'] ?? 'USDC') ?? 'USDC';
       const tzoffRaw = Number(query['tzoff'] ?? '0');
       const offsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
@@ -326,6 +362,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     if (req.method === 'POST' && path === '/api/build') {
+      const ip = req.socket.remoteAddress ?? 'unknown';
+      if (rateLimited(ip, 30, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       const pair = parsePair(typeof b.pair === 'string' ? b.pair : null);
@@ -382,7 +420,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       if (!isVenue(b.venue)) { json(res, req, 400, { error: 'venue invalide' }); return; }
-      if (typeof b.signedXdr !== 'string' || b.signedXdr.length === 0) { json(res, req, 400, { error: 'signedXdr manquant' }); return; }
+      if (typeof b.signedXdr !== 'string' || b.signedXdr.length === 0 || b.signedXdr.length > 65536) { json(res, req, 400, { error: 'signedXdr manquant ou invalide' }); return; }
       if (b.venue === 'xbull' && typeof b.id !== 'string') { json(res, req, 400, { error: 'id requis pour xbull' }); return; }
       try {
         const result = await submit(b.venue, { id: b.id as string | undefined, signedXdr: b.signedXdr }, cfg);
@@ -398,7 +436,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     process.stderr.write(`ERROR ${path}: ${msg}\n`);
-    json(res, req, 500, { error: msg });
+    json(res, req, 500, { error: 'internal error' });
   }
 }
 
