@@ -304,13 +304,7 @@ details[open] .hops-arrow::before{content:'▴'}
 .sk-flow{animation:skFlow 2.6s linear infinite}
 @media(prefers-reduced-motion:reduce){.sk-flow{animation:none}}
 #route-sankey{width:100%; height:auto; display:block; overflow:visible}
-.sk-wrap{border-radius:10px; padding:6px 4px; transition:background .15s}
 .sk-sub{font-size:12px; color:var(--caption); line-height:1.55; margin:0 0 .55rem}
-.sk-ctl{display:flex; align-items:center; flex-wrap:wrap; gap:5px; margin:0 0 .55rem; font-size:12px; color:var(--caption)}
-.sk-ctl > span{font-weight:600}
-.sk-ctl-sep{margin-left:10px}
-.sk-ctl button{font-size:12px; padding:2px 9px; border-radius:6px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--caption); cursor:pointer}
-.sk-ctl button.sk-on{background:var(--teal); color:#fff; border-color:var(--teal)}
 #sk-tip{position:fixed; pointer-events:none; background:var(--card-bg); border:1px solid var(--card-border); border-radius:10px; padding:10px 12px; font-size:12px; line-height:1.6; max-width:280px; z-index:99999; box-shadow:0 8px 32px rgba(0,0,0,.35); display:none; color:var(--val)}
 .sk-tt-h{font-weight:700; font-size:13px; color:var(--val); margin-bottom:4px}
 .sk-tt-r{color:var(--caption); margin-bottom:8px; font-size:11px}
@@ -1844,10 +1838,8 @@ const Sankey = (function () {
 
   const TAIL_PCT = 3; // traîne < ce % agrégée en « autres » — SAUF si la route n'emprunte que des bandes déjà tracées (cf. routesFor)
 
-  // Sélecteurs de TEST : fond du graphe (gris d'intensités) + couleur du nœud de départ. État module, pilotés par Sankey.setBg/setStart.
-  const BG = { auto: null, g1: '#1b2433', g2: '#141c2b', g3: '#0d1320' };
-  let gBg = 'auto';
-  let gStart = 'slate'; // 'amber' | 'slate' — défaut ardoise (décision Romain) ; sélecteur gardé pour test
+  // Décisions FIGÉES (Romain) : fond = thème de la page (blanc en clair) · départ BLND = ARDOISE.
+  // Les sélecteurs de test (fond gris / ambre-ardoise) ont été retirés.
 
   // Strings i18n locales au module (aucun ajout au gros STRINGS de la prod).
   const STR = {
@@ -1855,13 +1847,13 @@ const Sankey = (function () {
           tail:`Routes &lt; ${TAIL_PCT} % des relevés regroupées en « Autres » — sauf si elles n'empruntent que des bandes déjà tracées.`,
           detail:'Détail des routes', venue:'Venue', route:'Route', marge:'Marge au 2ᵉ', freq:'Fréquence',
           others:'autres', freqOf:'des relevés', total:'Total', nodata:'Pas encore de données pour cette sonde',
-          fond:'Fond', depart:'Départ', amber:'ambre', slate:'ardoise',
+          margeTip:'Marge au 2ᵉ : de combien (%) le net de la route gagnante a dépassé la 2ᵉ meilleure cotation du même relevé — médiane sur la période.',
           through:n=>`${n} routes passent par cette étape` },
     en: { sub:'<b>Width</b> = win frequency · <b>Path</b> = route and steps · <b>Color</b> = swap tool',
           tail:`Routes &lt; ${TAIL_PCT}% of readings grouped into "Others" — unless they only use already-drawn bands.`,
           detail:'Route detail', venue:'Venue', route:'Route', marge:'2nd-best margin', freq:'Frequency',
           others:'others', freqOf:'of readings', total:'Total', nodata:'No data yet for this probe',
-          fond:'Background', depart:'Start', amber:'amber', slate:'slate',
+          margeTip:'2nd-best margin: by how much (%) the winning route beat the 2nd-best quote of the same reading — median over the period.',
           through:n=>`${n} routes pass through this step` }
   };
   const tr = lang => STR[lang === 'en' ? 'en' : 'fr'];
@@ -2073,12 +2065,9 @@ const Sankey = (function () {
 
   // ── HTML émis par buildPage (string) ──
   function graphHTML(lang) {
-    const s = tr(lang), bg = BG[gBg];
-    const bgBtns = Object.keys(BG).map(k => `<button class="${gBg===k?'sk-on':''}" onclick="Sankey.setBg('${k}')">${k==='auto'?'auto':k.slice(1)}</button>`).join('');
-    const stBtns = ['amber','slate'].map(k => `<button class="${gStart===k?'sk-on':''}" onclick="Sankey.setStart('${k}')">${s[k]}</button>`).join('');
+    const s = tr(lang);
     return `<p class="sk-sub">${s.sub}<br>${s.tail}</p>`
-      + `<div class="sk-ctl"><span>${s.fond}</span>${bgBtns}<span class="sk-ctl-sep">${s.depart}</span>${stBtns}</div>`
-      + `<div class="sk-wrap"${bg ? ` style="background:${bg}"` : ''}><svg id="route-sankey" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"></svg></div>`;
+      + `<svg id="route-sankey" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"></svg>`;
   }
   function tableHTML(pair, sonde, lang) {
     const s = tr(lang), routes = routesFor(sonde);
@@ -2095,7 +2084,7 @@ const Sankey = (function () {
         + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b></span></td></tr>`;
     }).join('');
     return `<table class="sk-table"><thead><tr><th>${s.venue}</th><th>${s.route}</th>`
-      + `<th class="sk-sortable" data-sk-sort="marge">${s.marge}<span class="sk-ind">${ind('marge')}</span></th>`
+      + `<th class="sk-sortable" data-sk-sort="marge"><span class="tip-wrap" style="display:inline-flex;align-items:center">${s.marge}<span class="tip-icon">ⓘ</span><span class="tip-box">${s.margeTip}</span></span><span class="sk-ind">${ind('marge')}</span></th>`
       + `<th class="sk-sortable" data-sk-sort="freq">${s.freq}<span class="sk-ind">${ind('freq')}</span></th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
@@ -2117,8 +2106,7 @@ const Sankey = (function () {
   function draw(pair, sonde, dark, lang) {
     const svg = document.getElementById('route-sankey'); if (!svg) return;
     while (svg.firstChild) svg.removeChild(svg.firstChild);
-    dark = dark || gBg !== 'auto'; // fond gris de test → rendu en couleurs sombres (texte lisible)
-    const s = tr(lang), routes = routesFor(sonde);
+    const s = tr(lang), routes = routesFor(sonde); // fond = thème de la page (blanc en clair)
     if (routes.length === 0) {
       const txt = E('text', { x:W/2, y:H/2, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':14, fill: dark ? '#94a3b8' : '#64748b' });
       txt.textContent = s.nodata; svg.appendChild(txt); return;
@@ -2127,18 +2115,17 @@ const Sankey = (function () {
     const sourceNode = routes[0].steps[0];
     const targetSet = new Set(routes.map(r => r.steps[r.steps.length - 1]));
     const textFill = dark ? '#e2e8f0' : '#0f172a', labelFill = dark ? '#f8fafc' : '#0f172a';
-    // Couleurs par RÔLE : départ (BLND, ambre/ardoise selon sélecteur) · arrivée (cible, vert sarcelle)
-    // · pivot USDC au milieu (bleu) · intermédiaires (gris). EURC n'est jamais qu'une arrivée → vert.
+    // Couleurs par RÔLE : départ (BLND) = ardoise · arrivée (cible) = vert sarcelle (= sortie simulateur)
+    // · pivot USDC au milieu = bleu · intermédiaires = gris. EURC n'est jamais qu'une arrivée → vert.
     const C = {
-      departAmber: dark ? { fill:'#3a2c0c', stroke:'#f59e0b' } : { fill:'#fef3c7', stroke:'#d97706' },
-      departSlate: dark ? { fill:'#334155', stroke:'#94a3b8' } : { fill:'#cbd5e1', stroke:'#475569' },
-      arrival:     dark ? { fill:'#0f3b38', stroke:'#14b8a6' } : { fill:'#ccfbf1', stroke:'#0d9488' },
-      pivot:       dark ? { fill:'#162740', stroke:'#3b82f6' } : { fill:'#dbeafe', stroke:'#3b82f6' },
-      inter:       dark ? { fill:'#1e293b', stroke:'#4b5e72' } : { fill:'#f1f5f9', stroke:'#94a3b8' },
+      depart:  dark ? { fill:'#334155', stroke:'#94a3b8' } : { fill:'#cbd5e1', stroke:'#475569' },
+      arrival: dark ? { fill:'#0f3b38', stroke:'#14b8a6' } : { fill:'#ccfbf1', stroke:'#0d9488' },
+      pivot:   dark ? { fill:'#1e3a5f', stroke:'#60a5fa' } : { fill:'#dbeafe', stroke:'#3b82f6' }, // USDC sombre éclairci (contraste)
+      inter:   dark ? { fill:'#1e293b', stroke:'#4b5e72' } : { fill:'#f1f5f9', stroke:'#94a3b8' },
     };
     const nodeColors = name => {
-      if (name === sourceNode) return gStart === 'slate' ? C.departSlate : C.departAmber;
-      if (targetSet.has(name)) return C.arrival;     // cible finale (USDC ou EURC) = vert sarcelle
+      if (name === sourceNode) return C.depart;       // BLND = ardoise
+      if (targetSet.has(name)) return C.arrival;      // cible finale (USDC ou EURC) = vert sarcelle
       if (name === 'USDC') return C.pivot;            // USDC pivot au milieu d'un composite = bleu
       return C.inter;
     };
@@ -2207,11 +2194,7 @@ const Sankey = (function () {
     document.querySelectorAll('.sk-table th[data-sk-sort]').forEach(th => { th.style.cursor = 'pointer'; th.addEventListener('click', () => { const c = th.getAttribute('data-sk-sort'); if (tableSort.col === c) tableSort.dir = tableSort.dir === 'desc' ? 'asc' : 'desc'; else tableSort = { col: c, dir: 'desc' }; renderApp(); }); });
   }
 
-  // Sélecteurs de test (fond / couleur de départ) : maj de l'état module puis re-rendu (pattern prod).
-  const setBg = v => { if (v in BG) { gBg = v; renderApp(); } };
-  const setStart = v => { gStart = (v === 'slate') ? 'slate' : 'amber'; renderApp(); };
-
-  return { graphHTML, tableHTML, draw, setBg, setStart };
+  return { graphHTML, tableHTML, draw };
 })();
 
 function renderApp() {
