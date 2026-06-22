@@ -25,8 +25,8 @@ body{margin:0; background:var(--bg); color:var(--val);
 .page{max-width:1180px; margin:0 auto; padding:1.1rem 1.25rem 5rem;}
 
 .topbar{display:flex; align-items:center; gap:.7rem; margin-bottom:1rem; flex-wrap:wrap; position:sticky; top:0; z-index:50; background:var(--bg); border-bottom:1px solid var(--card-border); padding:.55rem 0;}
-.brand{font-size:15px; font-weight:700; letter-spacing:-.01em;}
-.brand .dim{color:var(--caption); font-weight:600;}
+.brand{font-size:19px; font-weight:700; letter-spacing:-.01em;}
+.brand .dim{color:var(--caption); font-weight:600; font-size:15px;}
 .brand-logo{display:block; flex:none; margin-right:-.3rem; border-radius:7px; padding:3px; box-sizing:border-box; transition:background .15s ease;}
 .brand-link{display:inline-flex; align-items:center; gap:.4rem; text-decoration:none; color:inherit;}
 .brand-link:hover .brand-logo{background:#0f172a;}
@@ -1763,7 +1763,7 @@ function buildPage() {
   const topbarHtml = `
   <div class="topbar">
     <a class="brand-link" href="/" aria-label="decant.fi">
-      <img class="brand-logo" src="/favicon.svg" width="36" height="36" alt="">
+      <img class="brand-logo" src="/favicon.svg" width="44" height="44" alt="">
       <span class="brand">decant<span style="color:var(--teal)">.fi</span> <span class="dim">· ${t('brand_dim')}</span></span>
     </a>
     ${view === 'dashboard' ? `<span class="pagenav" style="margin-left:.3rem">
@@ -1862,7 +1862,7 @@ const Sankey = (function () {
   };
   const tr = lang => STR[lang === 'en' ? 'en' : 'fr'];
   let tableSort = { col:'freq', dir:'desc' }; // tri du tableau : Fréquence (défaut) ou Marge
-  let selKey = null;                          // route sélectionnée durablement (clé stable tools|chemin) ; comme l'échelle des sources
+  const selKeys = new Set();                  // routes sélectionnées durablement (MULTI ; clés stables tools|chemin)
   const keyOf = r => r.tools + '|' + r.steps.join('>');
 
   function interpolateHex(a, b, t) {
@@ -2086,7 +2086,7 @@ const Sankey = (function () {
       const isGray = r.tools === 'autres', isTwoTx = r.composite === true, mc = marginColor(r.marginPct);
       const venueHtml = r.tools.split(' + ').map(p => `<span class="sk-dot" style="background:${venueColor(p)}"></span>${toolDisplay(p)}`).join('<span class="sk-plus">+</span>');
       const rkey = keyOf(r);
-      return `<tr data-rk="${idx}" data-sk-key="${rkey.replace(/"/g, '&quot;')}" class="${rkey === selKey ? 'sk-sel' : ''}" style="cursor:pointer"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
+      return `<tr data-rk="${idx}" data-sk-key="${rkey.replace(/"/g, '&quot;')}" class="${selKeys.has(rkey) ? 'sk-sel' : ''}" style="cursor:pointer"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
         + `<td class="sk-route">${r.steps.join(' → ')}</td>`
         + `<td>${(isGray || r.marginPct == null) ? '<span class="muted">—</span>' : `<span style="color:${mc};font-weight:700">${fmtMargin(r.marginPct, lang)}</span>`}</td>`
         + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b>${r.trend==='up'?'<span class="sk-tr sk-up">▲</span>':r.trend==='down'?'<span class="sk-tr sk-down">▼</span>':r.trend==='flat'?'<span class="sk-tr sk-flat">→</span>':''}</span></td></tr>`;
@@ -2156,15 +2156,15 @@ const Sankey = (function () {
       const txt = E('text', { x:(n.x0 + n.x1) / 2, y:(n.y0 + n.y1) / 2, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':isInter ? 12 : 14, 'font-weight':'700', fill:textFill }); txt.textContent = n.name; nodeG.appendChild(txt);
     });
     const topG = E('g', { 'pointer-events':'none' }); svg.appendChild(topG);
-    function setActive(idxSet, on) {
+    function setActive(idxSet, on, sub) {
       while (topG.firstChild) topG.removeChild(topG.firstChild);
-      const single = on && idxSet.size === 1; // 1 route (ligne du tableau, ou bande à route unique) → sous-tranche
+      const subMode = on && (sub || idxSet.size === 1); // sélection MULTI, ou 1 route → sous-tranche(s) honnête(s)
       linkEls.forEach(({ path, lk, baseOp }) => {
         const linked = lk.idxs && lk.idxs.some(i => idxSet.has(i));
-        // mode sous-tranche : tout estompé (le fil fin ressort) ; sinon : matching gardés, autres estompés
-        path.setAttribute('stroke-opacity', on ? (single ? baseOp * 0.45 : (linked ? baseOp : baseOp * 0.5)) : baseOp);
+        // mode sous-tranche : tout estompé (les fils fins ressortent) ; sinon : matching gardés, autres estompés
+        path.setAttribute('stroke-opacity', on ? (subMode ? baseOp * 0.45 : (linked ? baseOp : baseOp * 0.5)) : baseOp);
       });
-      if (single) drawSubSlice([...idxSet][0]);
+      if (subMode) idxSet.forEach(i => drawSubSlice(i));
       else if (on) linkEls.forEach(({ lk, color, sw, d }) => { if (lk.idxs && lk.idxs.some(i => idxSet.has(i))) topG.appendChild(E('path', { d, fill:'none', stroke:color, 'stroke-width':sw, 'stroke-opacity':0.95, 'pointer-events':'none' })); });
     }
     // Éclairage PARTIEL d'UNE route : ruban de largeur = SA fréquence (constante = flux conservé), posé à
@@ -2189,8 +2189,8 @@ const Sankey = (function () {
       }
     }
     // Sélection DURABLE (comme l'échelle des sources) : route sélectionnée → sous-tranche persistante.
-    const selIdx = selKey ? routes.findIndex(r => keyOf(r) === selKey) : -1;
-    const applyActive = () => { if (selIdx >= 0) setActive(new Set([selIdx]), true); else setActive(new Set(), false); };
+    const selIdxs = new Set(); routes.forEach((r, i) => { if (selKeys.has(keyOf(r))) selIdxs.add(i); });
+    const applyActive = () => { if (selIdxs.size) setActive(selIdxs, true, true); else setActive(new Set(), false); };
     // badges = nom d'outil (ancré après le nœud source ; anti-collision en X)
     const labG = E('g', { 'pointer-events':'none' }); svg.appendChild(labG);
     const labs = [];
@@ -2205,7 +2205,7 @@ const Sankey = (function () {
       const idx = +tr.getAttribute('data-rk');
       tr.addEventListener('mouseenter', () => setActive(new Set([idx]), true));
       tr.addEventListener('mouseleave', () => applyActive());
-      tr.addEventListener('click', () => { const k = tr.getAttribute('data-sk-key'); selKey = (selKey === k) ? null : k; renderApp(); });
+      tr.addEventListener('click', () => { const k = tr.getAttribute('data-sk-key'); if (selKeys.has(k)) selKeys.delete(k); else selKeys.add(k); renderApp(); });
     });
     document.querySelectorAll('.sk-table th[data-sk-sort]').forEach(th => { th.style.cursor = 'pointer'; th.addEventListener('click', () => { const c = th.getAttribute('data-sk-sort'); if (tableSort.col === c) tableSort.dir = tableSort.dir === 'desc' ? 'asc' : 'desc'; else tableSort = { col: c, dir: 'desc' }; renderApp(); }); });
     applyActive(); // applique la sélection durable au (re)rendu
