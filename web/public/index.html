@@ -2164,13 +2164,13 @@ const Sankey = (function () {
         // mode sous-tranche : tout estompé (les fils fins ressortent) ; sinon : matching gardés, autres estompés
         path.setAttribute('stroke-opacity', on ? (subMode ? baseOp * 0.45 : (linked ? baseOp : baseOp * 0.5)) : baseOp);
       });
-      if (subMode) idxSet.forEach(i => drawSubSlice(i));
+      if (subMode) { const solo = idxSet.size === 1; idxSet.forEach(i => drawSubSlice(i, solo)); }
       else if (on) linkEls.forEach(({ lk, color, sw, d }) => { if (lk.idxs && lk.idxs.some(i => idxSet.has(i))) topG.appendChild(E('path', { d, fill:'none', stroke:color, 'stroke-width':sw, 'stroke-opacity':0.95, 'pointer-events':'none' })); });
     }
     // Éclairage PARTIEL d'UNE route : ruban de largeur = SA fréquence (constante = flux conservé), posé à
     // son OFFSET empilé DANS CHAQUE bande fusionnée. ⚠ l'offset/la fraction sont PROPRES à chaque bande
     // (la part globale 4 % ne « remplit » pas un segment, elle en occupe sa juste tranche) → le fil weave.
-    function drawSubSlice(ri) {
+    function drawSubSlice(ri, solo) {
       const r = routes[ri]; if (!r) return;
       const scale = graph.links.length ? (graph.links[0].width / graph.links[0].value) : 1;
       const w = r.winPct;
@@ -2180,11 +2180,21 @@ const Sankey = (function () {
         if (!L) continue;
         const members = L.idxs.slice().sort((a, b) => (routes[b].winPct - routes[a].winPct) || (a - b));
         let off = 0; for (const m of members) { if (m === ri) break; off += routes[m].winPct; }
-        const dY = (off + w / 2 - L.value / 2) * scale; // décalage de la centrale de bande → centre de la sous-tranche
-        const sw = Math.max(2, w * scale - Math.min(LINK_GAP, w * scale * 0.45));
+        let dY, sw;
+        if (solo) {
+          // 1 route : fil aminci qui « tisse » à son offset dans la part pleine + halo contrasté (validé)
+          dY = (off + w / 2 - L.value / 2) * scale;
+          sw = Math.max(2, w * scale - Math.min(LINK_GAP, w * scale * 0.45));
+        } else {
+          // multi : on répartit DANS la largeur tracée de la bande (swFull) → les fils REMPLISSENT le
+          // segment, séparés par un fin écart (1,5px) au lieu du gros retrait → « tout Comet » = bande pleine.
+          const swFull = Math.max(2.5, L.width - Math.min(LINK_GAP, L.width * 0.45)), lscale = swFull / L.value;
+          dY = (off + w / 2 - L.value / 2) * lscale;
+          sw = Math.max(2, w * lscale - 1.5);
+        }
         const d = ribbonPath(L.points.map(p => [p[0], p[1] + dY]));
         const col = L.tool === '—' ? '#9ca3af' : venueColor(L.tool);
-        topG.appendChild(E('path', { d, fill:'none', stroke: dark ? 'rgba(248,250,252,0.6)' : 'rgba(15,23,42,0.45)', 'stroke-width': sw + 3, 'pointer-events':'none' })); // liseré contrasté = pop
+        if (solo) topG.appendChild(E('path', { d, fill:'none', stroke: dark ? 'rgba(248,250,252,0.6)' : 'rgba(15,23,42,0.45)', 'stroke-width': sw + 3, 'pointer-events':'none' })); // halo = pop d'un fil isolé
         topG.appendChild(E('path', { d, fill:'none', stroke: col, 'stroke-width': sw, 'stroke-opacity': 0.98, 'pointer-events':'none' }));
       }
     }
