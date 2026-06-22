@@ -249,6 +249,8 @@ describe('bestRoutes', () => {
     }
     // La graine pose rank0=1.0, rank1=0.998 → marge gagnant ≈ 0,2 %.
     expect(routes[0]!.marginPct!).toBeGreaterThan(0.05);
+    // Évolution : valeur valide pour chaque route.
+    for (const r of routes) expect(['up', 'down', 'flat', null]).toContain(r.trend);
   });
 });
 

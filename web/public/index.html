@@ -327,6 +327,8 @@ details[open] .hops-arrow::before{content:'▴'}
 .sk-freq{display:flex; align-items:center; gap:8px}
 .sk-freqbg{width:60px; height:5px; border-radius:3px; background:var(--card-border); overflow:hidden; display:inline-block}
 .sk-freqfill{height:100%; border-radius:3px; background:var(--teal); opacity:.7; display:block}
+.sk-tr{font-size:10px; margin-left:5px; vertical-align:middle}
+.sk-up{color:var(--green)} .sk-down{color:var(--red)} .sk-flat{color:var(--sub)}
 </style>
 </head>
 <body>
@@ -2030,7 +2032,8 @@ const Sankey = (function () {
     let hopTools;
     if (legs.length <= 1) hopTools = new Array(hops).fill(legs[0] || r.tools || '—');
     else { const piv = steps.indexOf('USDC'); hopTools = []; for (let i = 0; i < hops; i++) hopTools.push((piv > 0 && i >= piv) ? legs[1] : legs[0]); }
-    return { tools: r.tools, winPct: r.winPct, marginPct: (typeof r.marginPct === 'number' ? r.marginPct : null), composite: legs.length > 1, steps, hopTools };
+    const trend = (r.trend === 'up' || r.trend === 'down' || r.trend === 'flat') ? r.trend : null;
+    return { tools: r.tools, winPct: r.winPct, marginPct: (typeof r.marginPct === 'number' ? r.marginPct : null), trend, composite: legs.length > 1, steps, hopTools };
   }
   // Lit l'overview courant (déjà spécifique à la paire) ; agrège la traîne < TAIL_PCT en bande « autres ».
   function routesFor(sonde) {
@@ -2058,7 +2061,7 @@ const Sankey = (function () {
     if (tail.length) {
       const SRC = mapped[0].steps[0], TGT = mapped[0].steps[mapped[0].steps.length - 1];
       const sum = Math.round(tail.reduce((s, r) => s + r.winPct, 0) * 10) / 10;
-      keep.push({ tools: 'autres', winPct: sum, marginPct: null, composite: false, steps: [SRC, TGT], hopTools: ['—'] });
+      keep.push({ tools: 'autres', winPct: sum, marginPct: null, trend: null, composite: false, steps: [SRC, TGT], hopTools: ['—'] });
     }
     return keep;
   }
@@ -2081,7 +2084,7 @@ const Sankey = (function () {
       return `<tr data-rk="${idx}"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
         + `<td class="sk-route">${r.steps.join(' → ')}</td>`
         + `<td>${(isGray || r.marginPct == null) ? '<span class="muted">—</span>' : `<span style="color:${mc};font-weight:700">${fmtMargin(r.marginPct, lang)}</span>`}</td>`
-        + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b></span></td></tr>`;
+        + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b>${r.trend==='up'?'<span class="sk-tr sk-up">▲</span>':r.trend==='down'?'<span class="sk-tr sk-down">▼</span>':r.trend==='flat'?'<span class="sk-tr sk-flat">→</span>':''}</span></td></tr>`;
     }).join('');
     return `<table class="sk-table"><thead><tr><th>${s.venue}</th><th>${s.route}</th>`
       + `<th class="sk-sortable" data-sk-sort="marge"><span class="tip-wrap" style="display:inline-flex;align-items:center">${s.marge}<span class="tip-icon">ⓘ</span><span class="tip-box">${s.margeTip}</span></span><span class="sk-ind">${ind('marge')}</span></th>`

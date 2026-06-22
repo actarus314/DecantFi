@@ -48,6 +48,7 @@ export interface RouteRank {
   wins: number;
   winPct: number;
   marginPct: number | null;  // marge au 2ᵉ : médiane sur les ticks gagnés de (net_gagnant−net_2ᵉ)/net_gagnant ×100 ; null si non calculable
+  trend: 'up' | 'down' | 'flat' | null;  // évolution : part de victoires sur la 2e moitié de la fenêtre vs la 1ère ; null si données insuffisantes
 }
 
 export interface Overview {
@@ -333,6 +334,38 @@ function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string, am
     return med == null ? null : Math.round(med * 100) / 100;
   };
 
+  // ─── Évolution de la Fréquence : part de victoires 2e moitié de la fenêtre vs 1ère.
+  // mid = timestamp médian PRIS DANS la DB (format identique → comparaison string sûre).
+  const tStmt = prepBig(db, `
+    SELECT DISTINCT t.started_at AS sa
+    FROM quote q JOIN tick t ON t.id = q.tick_id
+    WHERE q.is_winner = 1 AND q.pair = ? AND t.ok = 1 AND t.started_at >= ?${amountIn != null ? ' AND q.amount_in = ?' : ''}
+    ORDER BY t.started_at
+  `);
+  const times = (amountIn != null ? tStmt.all(pair, windowStart, amountIn) : tStmt.all(pair, windowStart)).map((x) => String((x as Record<string, unknown>)['sa']));
+  const trendMap = new Map<string, 'up' | 'down' | 'flat'>();
+  if (times.length >= 4) {
+    const mid = times[Math.floor(times.length / 2)]!;
+    const hStmt = prepBig(db, `
+      SELECT q.source_id, q.route_summary,
+        SUM(CASE WHEN t.started_at >= ? THEN 1 ELSE 0 END) AS rec,
+        SUM(CASE WHEN t.started_at <  ? THEN 1 ELSE 0 END) AS old
+      FROM quote q JOIN tick t ON t.id = q.tick_id
+      WHERE q.is_winner = 1 AND q.pair = ? AND t.ok = 1 AND t.started_at >= ?${amountIn != null ? ' AND q.amount_in = ?' : ''}
+      GROUP BY q.source_id, q.route_summary
+    `);
+    const hRows = (amountIn != null ? hStmt.all(mid, mid, pair, windowStart, amountIn) : hStmt.all(mid, mid, pair, windowStart)) as Array<Record<string, unknown>>;
+    let totRec = 0, totOld = 0;
+    for (const x of hRows) { totRec += Number(x['rec'] as bigint); totOld += Number(x['old'] as bigint); }
+    if (totRec > 0 && totOld > 0) {
+      for (const x of hRows) {
+        const d = Number(x['rec'] as bigint) / totRec - Number(x['old'] as bigint) / totOld;
+        trendMap.set(String(x['source_id'] ?? '') + ' ' + String(x['route_summary'] ?? ''), d > 0.02 ? 'up' : d < -0.02 ? 'down' : 'flat');
+      }
+    }
+  }
+  const trendOf = (sourceId: string, routeSummary: string): 'up' | 'down' | 'flat' | null => trendMap.get(sourceId + ' ' + routeSummary) ?? null;
+
   return rows.map((r) => {
     const wins = Number(r['wins'] as bigint);
     const sourceId = String(r['source_id'] ?? '');
@@ -343,6 +376,7 @@ function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string, am
       wins,
       winPct: Math.round((wins / totalNum) * 1000) / 10,
       marginPct: marginFor(sourceId, routeSummary),
+      trend: trendOf(sourceId, routeSummary),
     };
   });
 }
