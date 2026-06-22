@@ -1,80 +1,102 @@
-# stellar-swap
+**English** · [Français](README.fr.md)
 
-Outil de **recommandation de route** pour swapper le token **BLND** vers **USDC** ou **EURC** sur Stellar. Il méta-agrège plusieurs sources de cotation indépendantes et classe les routes par **meilleur retour net** (frais d'agrégateur + frais de pool + gas + impact de prix).
+# decant.fi — stellar-swap
 
-**v1 : CLI en lecture seule** — il *recommande* la meilleure route ; il ne signe ni ne soumet aucune transaction. L'exécution se fait dans votre propre wallet.
+**Route recommender** for swapping **BLND → USDC or EURC** on Stellar. It meta-aggregates several independent quoting sources and ranks routes by **best net return** (aggregator fees + pool fees + price impact).
 
-## Prérequis
-- Node 24+ — la CLI de cotation tourne dès Node 20, mais le **collecteur Phase 2** requiert Node ≥ 24 (`node:sqlite` intégré). Développé et testé sous Node 26.
+**Read-only** — it *recommends* the best route; it never signs or submits any transaction. Execution happens in your own wallet. **Private keys are never requested or handled.**
 
-## Installation
+## Prerequisites
+
+- **Docker** — for self-hosted deployment (collector + web dashboard)
+- **Node ≥ 24** — for local development (the collector uses `node:sqlite`; developed and tested on Node 26)
+
+## Quickstart — self-host with Docker
+
 ```bash
-cp .env.example .env      # tout est optionnel (voir Config)
+cp .env.example .env        # adjust if needed (optional Soroswap key, data path, etc.)
+docker compose build
+docker compose up -d
+# Web UI: http://localhost:8080
+```
+
+Two services start:
+- **collector** — periodically quotes BLND→USDC/EURC and persists results to SQLite (historical data, retention tiers)
+- **web** — live simulator + dashboard served at port 8080
+
+### Configurable data path
+
+Set `STELLARSWAP_DATA` in your `.env` to control where the database is stored on the host:
+
+```bash
+STELLARSWAP_DATA=./data                          # default (relative to the repo)
+STELLARSWAP_DATA=/docker/stellarswap/backend/data  # example: NUC / server path
+```
+
+## CLI (development / scripting)
+
+```bash
 npm install
+npm run quote -- 1000 USDC              # best route BLND -> USDC for 1000 BLND
+npm run quote -- 1000 EURC              # to EURC: direct vs via-USDC, best net kept
+npm run quote -- 1000 USDC --split      # split analysis (25 / 50 / 100 %)
+npm run quote -- 500 USDC --slippage 30 # 0.3 % tolerance (30 bps)
+npm run quote -- 1000 USDC --json       # raw JSON output (for scripts)
 ```
 
-## Usage
-```bash
-npm run quote -- 1000 USDC              # meilleure route BLND -> USDC pour 1000 BLND
-npm run quote -- 1000 EURC              # vers EURC : direct vs via-USDC, le meilleur net est retenu
-npm run quote -- 1000 USDC --split      # ajoute l'analyse de fractionnement (25/50/100 %)
-npm run quote -- 500 USDC --slippage 30 # tolérance 0,3 % (30 bps)
-npm run quote -- 1000 USDC --json       # sortie JSON brute (pour scripts / future app)
-```
-Options : `--from <ASSET>` (défaut BLND), `--slippage <bps>` (défaut 50), `--split`, `--json`, `--balance` (cote la balance BLND **live** du wallet au lieu d'un montant), `--help`.
+Options: `--from <ASSET>` (default BLND), `--slippage <bps>` (default 50), `--split`, `--json`, `--balance` (quotes the live BLND wallet balance instead of a fixed amount), `--help`.
 
-Sortie : tableau classé par **net reçu** (frais d'agrégateur + frais de pool + gas + impact de prix),
-ligne de recommandation, plancher Horizon (valeur ajoutée des agrégateurs), et pour EURC le duel
-direct / via-USDC. **Rien n'est signé ni soumis** — l'exécution se fait dans votre wallet.
+Output: table ranked by **net received** (aggregator fees + pool fees + price impact), recommendation line, Horizon floor (value added by aggregators), and for EURC the direct vs via-USDC duel. **Nothing is signed or submitted** — execution is in your wallet.
 
-## Config (`.env`, tout optionnel)
-- `SOROSWAP_API_KEY` — non requis (Soroswap tourne en keyless via `soroswap-router-sdk` local).
-- `STELLAR_RPC_URL` / `STELLAR_HORIZON_URL` — surchargent les endpoints publics par défaut.
-- `WALLET_ADDRESS` — adresse **publique** (jamais de clé privée). Non requise pour les cotations ;
-  réservée à l'affichage de la position Blend (ultérieur). La sonde Comet n'en dépend pas.
+## Config (`.env`, all optional)
 
-## Limites connues (v1)
-- **Slippage par leg (EURC via-USDC)** : la tolérance `--slippage` n'est pas répartie entre les 2 legs.
-  Sans effet en v1 (seul StellarBroker consomme ce paramètre, les autres sources l'ignorent) ; à
-  implémenter quand l'exécution multi-leg arrivera.
-- **Soroswap keyless** : route sur la **paire directe** uniquement (réserves lues en live). Le multi-hop
-  Soroswap complet nécessiterait la clé API ou l'alimentation de plus de paires — la méta-agrégation des
-  autres sources compense.
-- **Prix spot** : récupérés via DefiLlama (impact de prix indicatif) ; si indisponible, la colonne Δspot
-  s'efface — le classement par net reste valable.
-- **EURC direct ≈ via-USDC** : quand la même source gagne les deux, les nets sont identiques — il n'existe
-  pas de marché BLND/EURC indépendant, tout passe par USDC. Le via-USDC ne gagne que si des sources
-  **différentes** sont meilleures sur chaque leg. L'outil signale ce cas explicitement.
-- **Comet** : sonde de prix du pool backstop (BLND↔USDC), via une simulation read-only avec un compte
-  témoin détenant du BLND ; peut se retirer pour de très gros montants (solde du témoin).
+- `SOROSWAP_API_KEY` — not required (Soroswap runs keyless via local `soroswap-router-sdk`).
+- `STELLAR_RPC_URL` / `STELLAR_HORIZON_URL` — override the default public endpoints.
+- `WALLET_ADDRESS` — **public** address only (never a private key). Not required for quoting; reserved for future Blend position display.
+- `STELLARSWAP_DATA` — host data directory (default `./data`; e.g. `/docker/stellarswap/backend/data` on a NUC).
+- `IMAGE_OWNER` — GHCR image owner (default `actarus314`; set to your account if you fork).
 
-## Collecteur (Phase 2)
+## Quoting sources
 
-Daemon de logging des quotes : cote périodiquement BLND→USDC/EURC (sondes **250/750 BLND**) et persiste chaque mesure dans SQLite (`node:sqlite`), avec **rétention à paliers** (raw 90 j → structuré 1 an → rollup horaire). Base de la future UI de stats « meilleurs créneaux ».
+xBull, Aquarius, Soroswap, StellarBroker, Ultra Stellar (StellarTerm), Horizon, and a direct Comet pool probe (BLND/USDC) — queried **in parallel** and **fault-tolerant** (one unavailable source does not block ranking).
+
+## Collector (Phase 2)
+
+Logging daemon: quotes BLND→USDC/EURC periodically (**250/750 BLND** probes) and persists each measurement to SQLite with **tiered retention** (raw 90 d → structured 1 yr → hourly rollup).
 
 ```bash
-npm run collector                 # daemon (scheduler interne, cadence .env, défaut 15 min)
-npm run tick:once                 # un tick réel → DB + résumé console
-npm run history                   # journal des derniers ticks (gagnant par sonde)
-npm run export -- csv             # export CSV (ou: npm run export -- json)
-npm run quote -- --balance USDC   # cote la balance BLND live (nécessite WALLET_ADDRESS)
+npm run collector          # daemon (internal scheduler, cadence from .env, default 15 min)
+npm run tick:once          # one real tick → DB + console summary
+npm run history            # log of last ticks (winner per probe)
+npm run export -- csv      # CSV export (or: npm run export -- json)
 ```
 
-Config `.env` : `COLLECTOR_CADENCE_SEC`, `COLLECTOR_SIZES_BLND`, `COLLECTOR_PAIRS`, `COLLECTOR_DB_PATH`, `RAW_RETENTION_DAYS`, `ROLLUP_AFTER_DAYS` (voir `.env.example`).
+Collector `.env` keys: `COLLECTOR_CADENCE_SEC`, `COLLECTOR_SIZES_BLND`, `COLLECTOR_PAIRS`, `COLLECTOR_DB_PATH`, `RAW_RETENTION_DAYS`, `ROLLUP_AFTER_DAYS`.
 
-**Déploiement (NUC, Docker)** : `sudo mkdir -p /docker/stellarswap-collector/data` puis `sudo docker compose up -d`. Service durci (root:root + `cap_drop`/`read_only`/`no-new-privileges`/limites, sans port exposé). En prod, épingler `IMAGE_TAG` dans `.env` (jamais `:latest`) ; image publiée sur ghcr.io via CI sur tag `v*`. `trivy image` avant prod.
+**Production (Docker):** pin `IMAGE_TAG` in `.env` (never `:latest`); image published to ghcr.io on tag `v*` via CI. Run `trivy image` before production.
 
-## Tests
+## Known limits (v1)
+
+- **Per-leg slippage (EURC via-USDC)**: `--slippage` is not split across the 2 legs. No effect in v1 (only StellarBroker uses this parameter); to be implemented when multi-leg execution arrives.
+- **Soroswap keyless**: routes on the **direct pair** only. The full multi-hop Soroswap would need the API key or more pair feeds — meta-aggregation from other sources compensates.
+- **Spot price**: retrieved via DefiLlama (indicative price impact); if unavailable, the Δspot column hides — net ranking remains valid.
+- **EURC direct ≈ via-USDC**: when the same source wins both, nets are identical — there is no independent BLND/EURC market. The tool signals this case explicitly.
+- **Comet**: read-only pool price probe (BLND↔USDC) via a witness account; may retract for very large amounts (witness balance).
+
+## Development
+
 ```bash
-npm test         # tests unitaires (adapters figés sur fixtures réelles, normalisation, classement, collecteur, DB…)
+npm test           # unit tests (adapters frozen on real fixtures, normalisation, ranking, collector, DB…)
 npm run typecheck
 ```
 
-## Structure
-- `core/` — moteur pur réutilisable : adapters de sources, normalisation en net réel, classement, analyse de fractionnement, logique EURC (direct vs via-USDC), gas, prix, lecture de balance.
-- `cli/` — interface ligne de commande (cotation + journal).
-- `collector/` + `db/` — daemon de logging des quotes + base SQLite (Phase 2 : historique, rétention).
-- *(ultérieur)* `web/` — UI self-hosted de stats « meilleurs créneaux » + alertes.
+## Project structure
 
-## Sources de cotation
-xBull, Aquarius, Soroswap, StellarBroker, Ultra Stellar (StellarTerm), Horizon, et une sonde directe du pool Comet (BLND/USDC) — interrogées **en parallèle** et **tolérantes aux pannes** (une source indisponible ne bloque pas le classement).
+- `core/` — pure reusable engine: source adapters, net normalisation, ranking, split analysis, EURC logic, gas, prices, balance reading.
+- `cli/` — command-line interface (quoting + history).
+- `collector/` + `db/` — quote-logging daemon + SQLite database (Phase 2: history, retention).
+- `web/` — self-hosted stats UI (live simulator + Sankey route graph + historical dashboard).
+
+## License
+
+GPL-3.0-or-later — see [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.

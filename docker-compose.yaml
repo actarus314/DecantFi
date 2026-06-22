@@ -1,7 +1,7 @@
 name: stellarswap
 services:
   collector:
-    image: ghcr.io/actarus314/stellarswap-collector:${IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_OWNER:-actarus314}/stellarswap-collector:${IMAGE_TAG:-latest}
     build:
       context: .
       args:
@@ -16,7 +16,7 @@ services:
     pids_limit: 256
     mem_limit: 512m
     volumes:
-      - /docker/stellarswap/backend/data:/app/data
+      - ${STELLARSWAP_DATA:-./data}:/app/data
     env_file: .env
     environment:
       - COLLECTOR_DB_PATH=/app/data/quotes.db
@@ -31,7 +31,7 @@ services:
     # backend pur : AUCUN bloc ports (n'expose rien).
 
   web:
-    image: ghcr.io/actarus314/stellarswap-collector:${IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_OWNER:-actarus314}/stellarswap-collector:${IMAGE_TAG:-latest}
     build:
       context: .
       args:
@@ -49,7 +49,7 @@ services:
     ports:
       - "${WEB_HOST_PORT:-8080}:8080"   # NUC = 8080 ; surchargeable (port hôte occupé en dev)
     volumes:
-      - /docker/stellarswap/backend/data:/app/data
+      - ${STELLARSWAP_DATA:-./data}:/app/data
     env_file: .env
     environment:
       - COLLECTOR_DB_PATH=/app/data/quotes.db

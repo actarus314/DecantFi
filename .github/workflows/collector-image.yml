@@ -6,7 +6,19 @@ permissions:
   contents: read
   packages: write
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+
   build-push:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +30,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/actarus314/stellarswap-collector
+          images: ghcr.io/${{ github.repository_owner }}/stellarswap-collector
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
