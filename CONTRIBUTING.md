@@ -50,6 +50,18 @@ Both must be green before opening a PR.
 
 When you update documentation, update **both** language versions.
 
+## Vendored bundle: walletkit.js
+
+`web/public/walletkit.js` is a **vendored bundle** of `@creit.tech/stellar-wallets-kit`, built with esbuild from `web/walletkit.entry.js`. It is committed to the repository and tracked by Dependabot.
+
+After upgrading that dependency:
+
+1. Run `npm run build:walletkit` — this regenerates `web/public/walletkit.js` and `web/public/walletkit.js.sha256`.
+2. Commit **both** files together.
+3. **Re-test the wallet in a browser** (connect + sign a transaction) before opening the PR.
+
+The CI `security` job verifies the committed bundle matches its recorded checksum (`sha256sum -c web/public/walletkit.js.sha256`). Any mismatch will block the build.
+
 ## Zero-secret rule
 
 **Never commit secrets.**
@@ -118,6 +130,18 @@ Les deux doivent être verts avant d'ouvrir une PR.
 - `CONTRIBUTING.md` — les deux langues dans un seul fichier (anglais d'abord, puis français, séparés par `---`)
 
 En cas de mise à jour de la documentation, mettre à jour **les deux** versions linguistiques.
+
+## Bundle vendoré : walletkit.js
+
+`web/public/walletkit.js` est un **bundle vendoré** de `@creit.tech/stellar-wallets-kit`, généré avec esbuild depuis `web/walletkit.entry.js`. Il est commité dans le dépôt et suivi par Dependabot.
+
+Après une mise à jour de cette dépendance :
+
+1. Lancer `npm run build:walletkit` — cela régénère `web/public/walletkit.js` et `web/public/walletkit.js.sha256`.
+2. Committer **les deux fichiers** ensemble.
+3. **Re-tester le wallet au navigateur** (connexion + signature d'une transaction) avant d'ouvrir la PR.
+
+Le job CI `security` vérifie que le bundle commité correspond à son checksum enregistré (`sha256sum -c web/public/walletkit.js.sha256`). Tout écart bloque le build.
 
 ## Règle zéro-secret
 
