@@ -27,6 +27,12 @@ body{margin:0; background:var(--bg); color:var(--val);
 .topbar{display:flex; align-items:center; gap:.7rem; margin-bottom:1rem; flex-wrap:wrap; position:sticky; top:0; z-index:50; background:var(--bg); border-bottom:1px solid var(--card-border); padding:.55rem 0;}
 .brand{font-size:19px; font-weight:700; letter-spacing:-.01em;}
 .brand .dim{color:var(--caption); font-weight:600; font-size:15px;}
+.lang-menu{position:relative; display:inline-block}
+.lang-menu>summary{list-style:none; cursor:pointer}
+.lang-menu>summary::-webkit-details-marker{display:none}
+.lang-pop{position:absolute; right:0; top:calc(100% + 4px); z-index:50; display:flex; flex-direction:column; gap:2px; min-width:138px; padding:4px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.lang-pop button{display:flex; align-items:center; gap:.5rem; width:100%; text-align:left; background:none; border:none; color:inherit; padding:.4rem .55rem; border-radius:6px; cursor:pointer; font-size:13px; white-space:nowrap}
+.lang-pop button:hover{background:color-mix(in srgb, var(--teal) 14%, transparent)}
 .brand-logo{display:block; flex:none; margin-right:-.3rem; border-radius:7px; padding:3px; box-sizing:border-box; transition:background .15s ease;}
 .brand-link{display:inline-flex; align-items:center; gap:.4rem; text-decoration:none; color:inherit;}
 .brand-link:hover .brand-logo{background:#0f172a;}
@@ -349,10 +355,9 @@ const STRINGS = {
     tz_note: (z) => `UTC stocké · affiché en heure locale (${z})`,
     theme_dark: '🌙',
     theme_light: '☀️',
-    lang_fr: '🇫🇷',
-    lang_en: '🇬🇧',
-    lang_fr_title: 'Français',
-    lang_en_title: 'English',
+    venue_cols: ['Type', 'Couche', 'Liquidité', 'Note'],
+    route_detail: 'Détail des routes',
+    net_fee_label: 'Frais réseau (réel / max)',
 
     // Fraîcheur / countdown
     fresh_none: 'aucun tick',
@@ -613,10 +618,9 @@ const STRINGS = {
     tz_note: (z) => `UTC stored · displayed in local time (${z})`,
     theme_dark: '🌙',
     theme_light: '☀️',
-    lang_fr: '🇫🇷',
-    lang_en: '🇬🇧',
-    lang_fr_title: 'Français',
-    lang_en_title: 'English',
+    venue_cols: ['Type', 'Layer', 'Liquidity', 'Note'],
+    route_detail: 'Route detail',
+    net_fee_label: 'Network fee (real / max)',
 
     // Fraîcheur / countdown
     fresh_none: 'no tick yet',
@@ -895,11 +899,15 @@ let view = 'dashboard'; // 'dashboard' | 'health'
 let health = null;      // données de /api/health
 let target = 'USDC';
 // Langue par défaut = navigateur (FR si la préférence commence par "fr", sinon EN) ; un choix explicite reste persisté
+const LOCALE = { fr: 'fr-FR', en: 'en-US', es: 'es-ES', pt: 'pt-BR' };
 let lang = (() => {
   const saved = localStorage.getItem('lang');
-  if (saved === 'fr' || saved === 'en') return saved;
-  const nav = (navigator.languages && navigator.languages[0]) || navigator.language || '';
-  return nav.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+  if (['fr', 'en', 'es', 'pt'].includes(saved)) return saved;
+  const nav = ((navigator.languages && navigator.languages[0]) || navigator.language || '').toLowerCase();
+  if (nav.startsWith('fr')) return 'fr';
+  if (nav.startsWith('es')) return 'es';
+  if (nav.startsWith('pt')) return 'pt';
+  return 'en';
 })();
 let ladderSonde = 250;
 let selDay = -1;       // jour affiché dans le zoom (init = aujourd'hui au 1er rendu)
@@ -943,8 +951,9 @@ let refreshCooldown = 0;   // secondes restantes ; 0 = bouton actif
 let refreshTimer = null;   // setInterval handle
 
 function t(key, ...args) {
-  const s = STRINGS[lang];
-  const v = s ? s[key] : undefined;
+  const s = STRINGS[lang] || STRINGS.en;
+  let v = s ? s[key] : undefined;
+  if (v === undefined) v = STRINGS.en[key];   // fallback EN si la clé manque (es/pt incomplets)
   if (typeof v === 'function') return v(...args);
   return v !== undefined ? v : key;
 }
@@ -984,8 +993,8 @@ const VENUE_META = {
 function venueCard(id, name) {
   const meta = VENUE_META[id];
   if (!meta) return name; // composite / inconnu → pas de carte
-  const m = meta[lang === 'en' ? 'en' : 'fr'];
-  const L = lang === 'en' ? ['Type', 'Layer', 'Liquidity', 'Note'] : ['Type', 'Couche', 'Liquidité', 'Note'];
+  const m = meta[lang] || meta.en;
+  const L = t('venue_cols');
   return `<span class="tip-wrap vname"><span class="srcname">${name}</span>` +
     `<span class="tip-box vcard"><b>${name}</b>` +
     `<span class="vgrid"><span>${L[0]}</span><span>${m.type}</span>` +
@@ -1029,21 +1038,21 @@ function rotateHeatUtc(heat, offsetH) {
 }
 
 // ─── Formatage ────────────────────────────────────────────────────────────────
-const fmt = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmt3 = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const fmt = n => n.toLocaleString(LOCALE[lang], { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt3 = n => n.toLocaleString(LOCALE[lang], { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 // Montants de route : jusqu'à 3 décimales, zéros inutiles supprimés, séparateur localisé.
-const fmtRoute = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { maximumFractionDigits: 3 });
+const fmtRoute = n => n.toLocaleString(LOCALE[lang], { maximumFractionDigits: 3 });
 // Taux : jusqu'à 6 décimales, séparateur localisé (cohérent avec le reste du simulateur).
-const fmtRate = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { maximumFractionDigits: 6 });
+const fmtRate = n => n.toLocaleString(LOCALE[lang], { maximumFractionDigits: 6 });
 // Parse un nombre saisi selon la LANGUE de l'app (déterministe via le toggle FR/EN, pas la locale OS).
 // FR : ',' = décimale, espaces (y c. fines insécables) = milliers. EN : '.' = décimale, ',' = milliers → retirées.
 // Corrige le bug « 12,000 » saisi en EN qui devenait 12 (virgule traitée à tort comme décimale).
 function parseAmount(v) {
   let s = String(v).replace(/\s/g, '');
-  s = lang === 'fr' ? s.replace(',', '.') : s.replace(/,/g, '');
+  s = lang === 'en' ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.'); // en : virgule=millier ; fr/es/pt : point=millier (retiré) + virgule=décimale
   return parseFloat(s);
 }
-const fmt0 = n => n.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { maximumFractionDigits: 0 });
+const fmt0 = n => n.toLocaleString(LOCALE[lang], { maximumFractionDigits: 0 });
 
 function freshLabel(lastTickAt) {
   const hint = t('countdown_refresh_hint');
@@ -1759,9 +1768,7 @@ function buildPage() {
   const isDark = document.documentElement.classList.contains('dark');
   const themeGlyph = isDark ? t('theme_light') : t('theme_dark');
 
-  // Glyphe langue : affiche la cible (langue vers laquelle on bascule)
-  const langGlyph = lang === 'fr' ? t('lang_en') : t('lang_fr');
-  const langTitle = lang === 'fr' ? t('lang_en_title') : t('lang_fr_title');
+  const FLAG = { fr: '🇫🇷', en: '🇬🇧', es: '🇪🇸', pt: '🇧🇷' };
 
   const topbarHtml = `
   <div class="topbar">
@@ -1782,7 +1789,12 @@ function buildPage() {
            </span>`
         : `<button class="ctrl-btn" onclick="connectWallet()">${t('connect_wallet')}</button>`}
       <button class="ctrl-btn" onclick="toggleTheme()" title="${isDark ? t('theme_light') : t('theme_dark')}">${themeGlyph}</button>
-      <button class="ctrl-btn" onclick="toggleLang()" title="${langTitle}" style="font-size:18px;line-height:1;padding:1px 7px">${langGlyph}</button>
+      <details class="lang-menu"><summary class="ctrl-btn" style="font-size:16px;line-height:1;padding:1px 7px">${FLAG[lang]} <span style="font-size:10px">▾</span></summary><div class="lang-pop">
+        <button onclick="setLang('fr')">🇫🇷 Français</button>
+        <button onclick="setLang('en')">🇬🇧 English</button>
+        <button onclick="setLang('es')">🇪🇸 Español</button>
+        <button onclick="setLang('pt')">🇧🇷 Português</button>
+      </div></details>
     </span>
   </div>`;
 
@@ -1821,7 +1833,7 @@ function buildPage() {
       <div class="card" style="overflow-x:auto">${Sankey.graphHTML(lang)}</div>
     </div>
 
-    <div class="zone"><div class="zone-h">${lang==='en'?'Route detail':'Détail des routes'}</div>
+    <div class="zone"><div class="zone-h">${t('route_detail')}</div>
       <div class="card" style="overflow-x:auto">${Sankey.tableHTML(target, ladderSonde, lang)}</div>
     </div>
   </div>
@@ -1863,7 +1875,7 @@ const Sankey = (function () {
           margeTip:'2nd-best margin: by how much (%) the winning route beat the 2nd-best quote of the same reading — median over the period.',
           through:n=>`${n} routes pass through this step` }
   };
-  const tr = lang => STR[lang === 'en' ? 'en' : 'fr'];
+  const tr = lang => STR[lang] || STR.en;
   let tableSort = { col:'freq', dir:'desc' }; // tri du tableau : Fréquence (défaut) ou Marge
   const selKeys = new Set();                  // routes sélectionnées durablement (MULTI ; clés stables tools|chemin)
   let tailOpen = false;                       // drawer « Autres » déplié ? (persiste au re-rendu)
@@ -2742,10 +2754,10 @@ function reviewTableHtml(rv, tgt, showSimDelta, sendAsset = 'BLND') {
     }
   }
   const feeXlm = rv.gasFeeXlm ?? 0;
-  const feeStr = feeXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
+  const feeStr = feeXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
   const realXlm = rv.gasRealXlm;
-  const realStr = realXlm != null ? realXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
-  const feeLabel = lang === 'fr' ? 'Frais réseau (réel / max)' : 'Network fee (real / max)';
+  const realStr = realXlm != null ? realXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
+  const feeLabel = t('net_fee_label');
   const feeDisplay = realStr != null
     ? `${realStr} XLM <span style="font-size:12px;color:var(--caption)">(max&nbsp;${feeStr})</span>`
     : `${feeStr} XLM`;
@@ -2913,11 +2925,11 @@ function execModal() {
         deltaChip = `<div style="display:inline-flex;align-items:center;gap:.3rem;background:${col}22;color:${col};border:1px solid ${col}55;border-radius:999px;padding:.2rem .75rem;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:.5rem">${sign}${fmt3(d)} ${doneTarget} ${t('exec_delta')}</div>`;
       }
       const doneFeeXlm = rv.gasFeeXlm ?? 0;
-      const doneFeeStr = doneFeeXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
+      const doneFeeStr = doneFeeXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
       const doneRealXlm = rv.gasRealXlm;
-      const doneRealStr = doneRealXlm != null ? doneRealXlm.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
+      const doneRealStr = doneRealXlm != null ? doneRealXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
       const doneFeeDisplay = doneRealStr != null ? `${doneRealStr} XLM <span style="font-size:12px;color:var(--caption)">(max&nbsp;${doneFeeStr})</span>` : `${doneFeeStr} XLM`;
-      const doneFeeLabel = lang === 'fr' ? 'Frais réseau (réel / max)' : 'Network fee (real / max)';
+      const doneFeeLabel = t('net_fee_label');
       compBlock = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:.9rem 0 .3rem">
         <tr><td style="padding:5px 0;color:var(--caption)">${t('exec_quoted')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.netOut)} ${doneTarget}</td></tr>
         <tr><td style="padding:5px 0;color:var(--caption)">${t('review_receive_min')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.minReceived)} ${doneTarget}</td></tr>
@@ -2991,8 +3003,8 @@ function toggleTheme() {
   renderApp();
 }
 
-function toggleLang() {
-  lang = lang === 'fr' ? 'en' : 'fr';
+function setLang(l) {
+  lang = l;
   localStorage.setItem('lang', lang);
   renderApp();
 }
