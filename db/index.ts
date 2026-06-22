@@ -181,19 +181,33 @@ export interface RpcCallLogRow {
   dur_ms: number;
 }
 
+// Connexion d'écriture singleton pour appendRpcCallLog (évite open/close à chaque appel).
+// Keyée par chemin : si le chemin change (tests multi-DB) une nouvelle connexion est ouverte.
+let _rpcLogDb: DatabaseSync | null = null;
+let _rpcLogDbPath = '';
+let _rpcLogStmt: ReturnType<DatabaseSync['prepare']> | null = null;
+
+function rpcLogConn(dbPath: string): { db: DatabaseSync; stmt: ReturnType<DatabaseSync['prepare']> } {
+  if (!_rpcLogDb || _rpcLogDbPath !== dbPath) {
+    _rpcLogDb = new DatabaseSync(dbPath);
+    _rpcLogDb.exec('PRAGMA journal_mode = WAL');
+    _rpcLogDb.exec('PRAGMA busy_timeout = 5000');
+    _rpcLogStmt = _rpcLogDb.prepare(
+      `INSERT INTO rpc_call_log (at, url, kind, calls, dur_ms) VALUES (?, ?, ?, ?, ?)`,
+    );
+    _rpcLogDbPath = dbPath;
+  }
+  return { db: _rpcLogDb, stmt: _rpcLogStmt! };
+}
+
 /**
  * Insère une ligne dans rpc_call_log en best-effort (fire-and-forget).
- * Ouvre une connexion RW sans migrate (table neuve → toujours présente), insert, ferme.
+ * Réutilise une connexion singleton pour éviter l'overhead open/close WAL à chaque appel.
  * Un échec est sans gravité (perdre une ligne de log acceptable).
  */
 export function appendRpcCallLog(dbPath: string, row: RpcCallLogRow): void {
   try {
-    const db = new DatabaseSync(dbPath);
-    db.exec('PRAGMA journal_mode = WAL');
-    db.exec('PRAGMA busy_timeout = 5000');
-    db.prepare(
-      `INSERT INTO rpc_call_log (at, url, kind, calls, dur_ms) VALUES (?, ?, ?, ?, ?)`,
-    ).run(row.at, row.url, row.kind, row.calls, row.dur_ms);
-    db.close();
+    const { stmt } = rpcLogConn(dbPath);
+    stmt.run(row.at, row.url, row.kind, row.calls, row.dur_ms);
   } catch { /* best-effort : perdre une ligne de log est sans gravité */ }
 }

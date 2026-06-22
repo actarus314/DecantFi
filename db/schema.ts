@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS rollup_hourly (
 );
 CREATE INDEX IF NOT EXISTS idx_quote_tick        ON quote(tick_id);
 CREATE INDEX IF NOT EXISTS idx_quote_pair_winner ON quote(pair, is_winner);
+CREATE INDEX IF NOT EXISTS idx_quote_tick_pair_amount_net ON quote(tick_id, pair, amount_in, net_out);
 CREATE INDEX IF NOT EXISTS idx_tick_started      ON tick(started_at);
 CREATE INDEX IF NOT EXISTS idx_rollup_bucket     ON rollup_hourly(pair, amount_in, hour_utc);
 CREATE TABLE IF NOT EXISTS rpc_probe (

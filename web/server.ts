@@ -88,6 +88,11 @@ const logoAsset = staticAsset(readFileSync(logoPath), 'image/svg+xml; charset=ut
 let overviewCache: { key: string; at: number; data: unknown } | null = null;
 const OVERVIEW_TTL_MS = 60_000;
 
+// --- Cache mémoire TTL pour /api/health (D3) ---
+
+let healthCache: { key: string; at: number; data: unknown } | null = null;
+const HEALTH_TTL_MS = 30_000;
+
 // --- Réponse JSON avec compression conditionnelle (B6) ---
 
 function json(res: ServerResponse, req: IncomingMessage, status: number, data: unknown): void {
@@ -205,10 +210,18 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     if (req.method === 'GET' && path === '/api/health') {
-      const now = new Date();
-      const windowStart = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+      const nowMs = Date.now();
+      const cacheKey = 'health';
+      if (healthCache && healthCache.key === cacheKey && nowMs - healthCache.at < HEALTH_TTL_MS) {
+        json(res, req, 200, healthCache.data);
+        return;
+      }
+      const now = new Date(nowMs);
+      const windowStart = new Date(nowMs - 7 * 86_400_000).toISOString();
       const result = buildSourceHealth(db, windowStart, now);
-      json(res, req, 200, { ...result, generatedAt: now.toISOString() });
+      const data = { ...result, generatedAt: now.toISOString() };
+      healthCache = { key: cacheKey, at: nowMs, data };
+      json(res, req, 200, data);
       return;
     }
 
@@ -355,8 +368,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const tzoffRaw = Number(query['tzoff'] ?? '0');
       const offsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
       const refresh = await manualRefresh(cfg);
-      // B3 : invalide le cache overview après un refresh (les données changent)
+      // B3/D3 : invalide les caches après un refresh (les données changent)
       overviewCache = null;
+      healthCache = null;
       json(res, req, 200, { refresh, overview: overview(db, pair, cfg, undefined, offsetH) });
       return;
     }
