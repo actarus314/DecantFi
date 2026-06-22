@@ -207,19 +207,23 @@ export async function resimAquariusXbull(
   let xbullHops: RouteHop[] | undefined;
 
   // B4 — lancer Aquarius + xBull en parallèle (pools disjoints, indépendants)
-  const t0 = Date.now();
-  const [aqSimResult, xbSimResult] = await Promise.all([
+  // Wrapper de chronométrage par promesse (mesure la durée individuelle même en parallèle)
+  const timed = <T>(p: Promise<T>): Promise<{ r: T; ms: number }> => {
+    const t = Date.now();
+    return p.then((r) => ({ r, ms: Date.now() - t }));
+  };
+  const [aqT, xbT] = await Promise.all([
     (aqRanked && rawXdr)
-      ? simFnAq(String(rawXdr), amountStroops, BLND.sac, { rpcUrl: cfg.rpcUrl }).catch(() => null)
-      : Promise.resolve(null),
+      ? timed(simFnAq(String(rawXdr), amountStroops, BLND.sac, { rpcUrl: cfg.rpcUrl }).catch(() => null))
+      : Promise.resolve({ r: null as bigint | null, ms: 0 }),
     (xbRanked && route)
-      ? simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null)
-      : Promise.resolve(null),
+      ? timed(simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null))
+      : Promise.resolve({ r: null as Awaited<ReturnType<typeof simFnXb>> | null, ms: 0 }),
   ]);
-  const elapsed = Date.now() - t0;
-  // Durées individuelles non mesurables en parallèle — on attribue le temps total aux deux
-  const aqSimMs = (aqRanked && rawXdr) ? elapsed : 0;
-  const xbSimMs = (xbRanked && route) ? elapsed : 0;
+  const aqSimResult = aqT.r;
+  const aqSimMs = aqT.ms;
+  const xbSimResult = xbT.r;
+  const xbSimMs = xbT.ms;
 
   if (aqRanked && rawXdr) {
     const simNet = aqSimResult;
