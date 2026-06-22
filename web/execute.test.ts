@@ -25,6 +25,87 @@ import {
 } from './execute.js';
 import { BLND, USDC, EURC } from '../core/assets.js';
 import { toNumber, toStroops } from '../core/amount.js';
+import {
+  TransactionBuilder,
+  Networks,
+  Operation,
+  Asset as SdkAsset,
+  Keypair,
+  Account,
+} from '@stellar/stellar-sdk';
+
+// ─── Helpers pour construire de vraies transactions de test ──────────────────
+
+const TEST_KP = Keypair.random();
+
+/** Construit et signe une transaction avec une seule opération. */
+function buildSignedXdr(op: Parameters<TransactionBuilder['addOperation']>[0], seqOffset = 0): string {
+  const account = new Account(TEST_KP.publicKey(), String(100 + seqOffset));
+  const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: Networks.PUBLIC })
+    .addOperation(op)
+    .setTimeout(30)
+    .build();
+  tx.sign(TEST_KP);
+  return tx.toXDR();
+}
+
+/** XDR d'une tx pathPaymentStrictSend (opération autorisée). */
+function xdrPathPayment(): string {
+  return buildSignedXdr(
+    Operation.pathPaymentStrictSend({
+      sendAsset: SdkAsset.native(),
+      sendAmount: '1',
+      destination: TEST_KP.publicKey(),
+      destAsset: SdkAsset.native(),
+      destMin: '0.9',
+      path: [],
+    }),
+    0,
+  );
+}
+
+/** XDR d'une tx changeTrust (opération autorisée — trustline EURC). */
+function xdrChangeTrust(): string {
+  const asset = new SdkAsset('USDC', 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN');
+  return buildSignedXdr(Operation.changeTrust({ asset }), 1);
+}
+
+/** XDR d'une tx payment (opération interdite). */
+function xdrPayment(): string {
+  return buildSignedXdr(
+    Operation.payment({
+      destination: TEST_KP.publicKey(),
+      asset: SdkAsset.native(),
+      amount: '1',
+    }),
+    2,
+  );
+}
+
+/** XDR d'une FeeBumpTransaction enveloppant une tx payment (opération interdite). */
+function xdrFeeBumpPayment(): string {
+  const account = new Account(TEST_KP.publicKey(), '103');
+  const inner = new TransactionBuilder(account, { fee: '100', networkPassphrase: Networks.PUBLIC })
+    .addOperation(
+      Operation.payment({
+        destination: TEST_KP.publicKey(),
+        asset: SdkAsset.native(),
+        amount: '1',
+      }),
+    )
+    .setTimeout(30)
+    .build();
+  inner.sign(TEST_KP);
+
+  const feeBump = TransactionBuilder.buildFeeBumpTransaction(
+    TEST_KP.publicKey(),
+    '200',
+    inner,
+    Networks.PUBLIC,
+  );
+  feeBump.sign(TEST_KP);
+  return feeBump.toXDR();
+}
 
 // ─── minReceivedStroops ──────────────────────────────────────────────────────
 
@@ -551,14 +632,14 @@ describe('pickExecutableVenue', () => {
 describe('submit', () => {
   it('xBull ok → retourne hash', async () => {
     const deps = fakeDeps({ xbullSubmit: { success: true, hash: 'abc123' } });
-    const result = await submit('xbull', { id: 'q1', signedXdr: 'xdr…' }, { rpcUrl: 'r' }, deps);
+    const result = await submit('xbull', { id: 'q1', signedXdr: xdrPathPayment() }, { rpcUrl: 'r' }, deps);
     expect(result).toEqual({ hash: 'abc123' });
   });
 
   it('xBull success:false → ExecError down', async () => {
     const deps = fakeDeps({ xbullSubmit: { success: false, hash: '' } });
     await expect(
-      submit('xbull', { id: 'q1', signedXdr: 'xdr…' }, { rpcUrl: 'r' }, deps),
+      submit('xbull', { id: 'q1', signedXdr: xdrPathPayment() }, { rpcUrl: 'r' }, deps),
     ).rejects.toMatchObject({ code: 'down' });
   });
 
@@ -566,7 +647,7 @@ describe('submit', () => {
     const deps = fakeDeps({ soroSend: { txHash: 'def456', success: true } });
     const result = await submit(
       'soroswap',
-      { signedXdr: 'xdr…' },
+      { signedXdr: xdrPathPayment() },
       { rpcUrl: 'r', soroswapApiKey: 'k' },
       deps,
     );
@@ -576,15 +657,63 @@ describe('submit', () => {
   it('soroswap success:false → ExecError down', async () => {
     const deps = fakeDeps({ soroSend: { txHash: 'x', success: false } });
     await expect(
-      submit('soroswap', { signedXdr: 'xdr…' }, { rpcUrl: 'r', soroswapApiKey: 'k' }, deps),
+      submit('soroswap', { signedXdr: xdrPathPayment() }, { rpcUrl: 'r', soroswapApiKey: 'k' }, deps),
     ).rejects.toMatchObject({ code: 'down' });
   });
 
   it('soroswap send() lève → ExecError classé (jamais un 500 opaque post-signature)', async () => {
     const deps = fakeDeps({ soroSend: new Error('missing trustline for asset') });
     await expect(
-      submit('soroswap', { signedXdr: 'xdr…' }, { rpcUrl: 'r', soroswapApiKey: 'k' }, deps),
+      submit('soroswap', { signedXdr: xdrPathPayment() }, { rpcUrl: 'r', soroswapApiKey: 'k' }, deps),
     ).rejects.toMatchObject({ name: 'ExecError', code: 'trustline' });
+  });
+});
+
+// ─── assertAllowedOps (via submit) ───────────────────────────────────────────
+
+describe('assertAllowedOps (defense-in-depth)', () => {
+  // Pour les cas rejetés, aucun dep réseau ne doit être sollicité.
+  // fakeDeps() sans option ne stubera rien de réseau réel.
+  const depsNoNet = fakeDeps({});
+
+  it('pathPaymentStrictSend → passe la validation', async () => {
+    // submit xbull : retournera un hash si assertAllowedOps ne rejette pas
+    const deps = fakeDeps({ xbullSubmit: { success: true, hash: 'ok-path' } });
+    const result = await submit('xbull', { id: 'q1', signedXdr: xdrPathPayment() }, { rpcUrl: 'r' }, deps);
+    expect(result.hash).toBe('ok-path');
+  });
+
+  it('changeTrust → passe la validation', async () => {
+    const deps = fakeDeps({ xbullSubmit: { success: true, hash: 'ok-trust' } });
+    const result = await submit('xbull', { id: 'q2', signedXdr: xdrChangeTrust() }, { rpcUrl: 'r' }, deps);
+    expect(result.hash).toBe('ok-trust');
+  });
+
+  it('payment (op interdite) → rejeté ExecError bad_request, message contient le type', async () => {
+    await expect(
+      submit('xbull', { id: 'q3', signedXdr: xdrPayment() }, { rpcUrl: 'r' }, depsNoNet),
+    ).rejects.toMatchObject({ code: 'bad_request', message: expect.stringContaining('payment') });
+  });
+
+  it("payment (op interdite) → aucun appel réseau n'a lieu", async () => {
+    const deps = fakeDeps({});
+    await expect(
+      submit('xbull', { id: 'q4', signedXdr: xdrPayment() }, { rpcUrl: 'r' }, deps),
+    ).rejects.toMatchObject({ code: 'bad_request' });
+    // fetchJson ne doit pas avoir été appelé
+    expect((deps.fetchJson as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
+  });
+
+  it('XDR malformé → rejeté ExecError bad_request "XDR illisible"', async () => {
+    await expect(
+      submit('xbull', { id: 'q5', signedXdr: 'ceci-n-est-pas-un-xdr' }, { rpcUrl: 'r' }, depsNoNet),
+    ).rejects.toMatchObject({ code: 'bad_request', message: 'XDR illisible' });
+  });
+
+  it('FeeBumpTransaction enveloppant une op interdite → rejeté ExecError bad_request', async () => {
+    await expect(
+      submit('xbull', { id: 'q6', signedXdr: xdrFeeBumpPayment() }, { rpcUrl: 'r' }, depsNoNet),
+    ).rejects.toMatchObject({ code: 'bad_request', message: expect.stringContaining('payment') });
   });
 });
 

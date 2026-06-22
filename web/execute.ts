@@ -24,7 +24,7 @@ const I128_MAX = 170141183460469231731687303715884105727n;
 
 export class ExecError extends Error {
   constructor(
-    public code: 'trustline' | 'funds' | 'slippage' | 'down' | 'no-route',
+    public code: 'trustline' | 'funds' | 'slippage' | 'down' | 'no-route' | 'bad_request',
     message: string,
     /** Pour les erreurs trustline : le CODE de l'actif réellement manquant (USDC au leg1, EURC au leg2…).
      *  Indispensable au front pour ajouter/relancer la BONNE trustline (le `target` global ≠ l'actif de la jambe). */
@@ -1270,6 +1270,45 @@ export async function pickExecutableVenue(
   throw new ExecError('down', 'aucune route buildable');
 }
 
+// ─── Garde d'opérations autorisées ───────────────────────────────────────────
+
+/** Types d'opérations que l'app émet : PathPaymentStrictSend (SDEX/Ultra), InvokeHostFunction
+ *  (contrats Soroban : Comet / Aquarius / Soroswap), ChangeTrust (trustline EURC).
+ *  Toute autre opération est rejetée avant d'atteindre le réseau. */
+const ALLOWED_OP_TYPES = new Set<string>([
+  'pathPaymentStrictSend',
+  'invokeHostFunction',
+  'changeTrust',
+]);
+
+/** Vérifie que toutes les opérations du XDR signé appartiennent à l'allowlist.
+ *  Déballe les FeeBumpTransaction. Lance ExecError 'bad_request' en cas de violation. */
+async function assertAllowedOps(signedXdr: string): Promise<void> {
+  const sdk = await import('@stellar/stellar-sdk');
+  const { TransactionBuilder, Networks, FeeBumpTransaction } = sdk;
+
+  let tx: ReturnType<typeof TransactionBuilder.fromXDR>;
+  try {
+    tx = TransactionBuilder.fromXDR(signedXdr, Networks.PUBLIC);
+  } catch {
+    throw new ExecError('bad_request', 'XDR illisible');
+  }
+
+  // Déballe le fee-bump si nécessaire
+  const inner = tx instanceof FeeBumpTransaction ? tx.innerTransaction : tx;
+  const ops = (inner as { operations: Array<{ type: string }> }).operations;
+
+  if (!ops || ops.length === 0) {
+    throw new ExecError('bad_request', 'tx sans opération');
+  }
+
+  for (const op of ops) {
+    if (!ALLOWED_OP_TYPES.has(op.type)) {
+      throw new ExecError('bad_request', `opération non autorisée : ${op.type}`);
+    }
+  }
+}
+
 // ─── Submit ───────────────────────────────────────────────────────────────────
 
 export async function submit(
@@ -1279,6 +1318,9 @@ export async function submit(
   depsOverride?: Partial<ExecDeps>,
 ): Promise<{ hash: string }> {
   const deps: ExecDeps = { ...defaultDeps(cfg.timeoutMs), ...depsOverride };
+
+  // Garde defense-in-depth : vérifie le type d'opération AVANT tout appel réseau.
+  await assertAllowedOps(payload.signedXdr);
 
   if (venue === 'xbull') {
     const res = await deps.fetchJson(`${XBULL_BASE}/swaps/submit`, {

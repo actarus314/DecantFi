@@ -175,7 +175,7 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 
 function isStellarPubkey(s: unknown): s is string { return typeof s === 'string' && s.length === 56 && /^G[A-Z2-7]{55}$/.test(s); }
 
-function execStatus(code: ExecError['code']): number { return code === 'down' ? 502 : 400; }
+function execStatus(code: ExecError['code']): number { return code === 'down' ? 502 : 400; } // bad_request → 400 (client error)
 
 const VENUES: readonly Venue[] = ['xbull', 'soroswap', 'horizon', 'aquarius', 'comet', 'ultrastellar'];
 function isVenue(v: unknown): v is Venue { return typeof v === 'string' && (VENUES as readonly string[]).includes(v); }
