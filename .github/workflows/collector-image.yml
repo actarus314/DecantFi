@@ -69,3 +69,25 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  release:
+    needs: build-push
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # créer la GitHub Release
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # Changelog auto-généré par GitHub (PRs/commits depuis le tag précédent) + pointeur image.
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          notes=$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="${GITHUB_REF_NAME}" --jq .body)
+          gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes "## Image
+
+          \`\`\`yaml
+          image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/decantfi-collector:${GITHUB_REF_NAME#v}
+          \`\`\`
+
+          ${notes}"
