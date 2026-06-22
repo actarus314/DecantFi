@@ -4,13 +4,13 @@
 
 # DecantFi
 
-### BLND swaps — accurately decanted · décantés avec précision
+### BLND swaps — décantés avec précision
 
 Un outil auto-hébergé qui trouve la **meilleure route nette** pour swapper **BLND → USDC ou EURC** sur Stellar, en recoupant plusieurs sources de cotation indépendantes et en les classant sur ce que vous **recevriez réellement**.
 
 Conçu pour les personnes qui sortent de positions [Blend](https://www.blend.capital/) et veulent le vrai chiffre, pas un chiffre optimiste.
 
-![Tableau de bord DecantFi](docs/img/decantfi-dashboard-fr.png)
+![Simulation live DecantFi](docs/img/decantfi-dashboard-fr.png)
 
 </div>
 
@@ -20,30 +20,66 @@ Différentes sources cotent le même swap différemment, et le chiffre affiché 
 
 Il est délibérément étroit : BLND → USDC/EURC, le swap dont la plupart des utilisateurs de Blend ont réellement besoin. Il fait ça avec soin.
 
-## Ce qu'il fait
+## L'application
 
-- **Méta-agrège** plusieurs sources Stellar vérifiées (voir [Sources](#sources)) en parallèle, et est **tolérant aux pannes** — une source hors ligne ne bloque jamais le classement.
-- **Classe sur le net reçu** — les frais d'agrégateur, les frais de pool et l'impact de prix sont tous pris en compte. Le gas est payé séparément en XLM (variable par transaction, affiché à part — jamais caché dans le net).
-- **Re-cote en live** dans le simulateur web, et re-simule les sources dont la cote affichée et le fill réel peuvent diverger, de sorte que le chiffre affiché est celui que vous obtenez.
-- **Gère EURC de deux façons** — BLND→EURC direct versus composite via-USDC — et garde celui qui rapporte le plus, en exposant honnêtement le cas quand les deux se valent.
-- **Enregistre l'historique** — un collecteur en arrière-plan journalise les cotes dans le temps pour que le tableau de bord puisse mettre en avant les routes gagnantes et les fenêtres plus calmes pour trader.
+### Simulateur live
 
-## Honnête par conception
+Saisissez un montant en BLND, appuyez sur **Simulate**, et DecantFi cote chaque source en direct et les classe par sortie nette — la capture d'écran ci-dessus est une vraie exécution `1 000 BLND → USDC`. Les sources sont interrogées **en parallèle** et le simulateur est **tolérant aux pannes** : une source hors ligne ne bloque jamais le classement.
 
-Le graphe de routes montre où la valeur circule sur les 7 derniers jours — **la largeur des bandes = fréquence de victoire d'une route**, **couleur = l'outil de swap**, les routes peu fréquentes étant regroupées dans « Autres ». Aucun chiffre inventé, aucun flux fusionné-mais-incompatible.
+### La confiance, affichée honnêtement
+
+Chaque cote porte un indicateur de confiance, parce que tous les chiffres ne sont pas également fiables :
+
+- **Observé** — un fill réel constaté en simulation live (une route exécutable).
+- **Estimé** — un plancher/plafond, ou une route qui n'a pas pu être simulée.
+- **Indispo** — source injoignable.
+
+Le classement fait confiance à **Observé** avant **Estimé**, de sorte qu'un chiffre optimiste en vitrine ne l'emporte jamais sur un fill vérifié. C'est le cœur du projet : classer sur le fill réel, pas sur la cote.
+
+### Deux tailles de sonde (250 / 750 BLND)
+
+La route gagnante *et* l'impact de prix dépendent tous deux de la taille de la transaction — une source qui est la meilleure pour une petite sortie peut perdre pour une plus grande. DecantFi sonde à **250 et 750 BLND** pour que le tableau de bord puisse montrer comment la réponse change avec la taille ; basculez entre les deux avec le sélecteur de taille. (Le simulateur live cote n'importe quel montant que vous saisissez.)
+
+### EURC : direct vs composite via-USDC
+
+Il n'existe pas de marché profond direct BLND/EURC, donc la meilleure sortie vers EURC est souvent **BLND → USDC → EURC** — un composite de deux swaps — plutôt que direct. DecantFi cote les deux et conserve celui qui rapporte le plus. Ici, le gagnant est un composite `Comet + Ultra Stellar` routé via USDC :
+
+![Simulation composite EURC](docs/img/decantfi-sim-eurc-composite-en.png)
+
+### Double impact de prix (Local vs EVM)
+
+Pour EURC, l'impact de prix est affiché de deux façons — basculez depuis l'en-tête de colonne :
+
+- **Local** — écart par rapport au prix de l'EURC **sur Stellar** (le carnet d'ordres SDEX). Ce qui compte si vous prévoyez de **rester sur Stellar**.
+- **EVM** — écart par rapport au prix **global** de l'EURC (Base / Ethereum). Ce qui compte si vous prévoyez de **bridger**, car la prime ou la décote de Stellar par rapport au prix mondial devient alors un vrai gain ou une vraie perte.
+
+(USDC est identique dans les deux modes.) Positif = vous recevez moins, négatif = vous recevez plus.
+
+### Graphe de routes
+
+Le tableau de bord trace le cheminement de la valeur sur les 7 derniers jours — **la largeur des bandes = fréquence de victoire d'une route**, **couleur = l'outil de swap**, les routes peu fréquentes regroupées dans « Autres ». Aucun chiffre inventé, aucun flux fusionné-mais-incompatible.
 
 ![Graphe de routes](docs/img/decantfi-route-graph.png)
 
-Deux principes sur lesquels le projet ne transige pas :
+### Stabilité des sources
 
-1. **Classer sur le fill réel, pas sur la cote.** Lorsque la sortie annoncée par une source diffère de ce que sa transaction retourne effectivement, DecantFi classe et affiche le **fill simulé réel**.
-2. **Le net, c'est ce que vous recevez.** Les frais de swap et l'impact de prix sont dans le net ; **le gas (XLM) est affiché séparément**, exactement comme votre wallet et un explorateur de blocs le rapportent.
+DecantFi est aussi honnête sur sa propre plomberie : une page de stabilité affiche la disponibilité par source et les pannes, ainsi que la santé du Soroban RPC dont il dépend.
+
+![Stabilité des sources](docs/img/decantfi-stability-en.png)
+
+### Thème clair / sombre · quatre langues
+
+Un thème clair et un thème sombre, et une interface disponible en **anglais, français, espagnol et portugais** (détectée automatiquement, commutable).
+
+![Thème sombre](docs/img/decantfi-dark-eurc-en.png)
 
 ## Sécurité & sûreté
 
 Gérer les swaps de tierces personnes est une position de confiance, et le projet la traite comme telle.
 
-**Non-custodial par construction.** DecantFi **ne demande jamais, ne stocke jamais et ne manipule jamais votre clé privée.** Le CLI est strictement en lecture seule — il recommande et ne signe rien. Dans l'application web, les transactions sont **signées dans votre propre wallet** (Freighter, xBull, Lobstr, Albedo, Rabet, Hana) ; le serveur se contente de relayer une transaction **que vous avez déjà signée**, et valide qu'il s'agit d'un swap ou d'une opération trustline avant de la relayer — il ne peut jamais être détourné en un autre type de transaction.
+**Non-custodial par construction.** DecantFi **ne demande jamais, ne stocke jamais et ne manipule jamais votre clé privée.** Le CLI est strictement en lecture seule. Dans l'application web, les transactions sont **signées dans votre propre wallet** (Freighter, xBull, Lobstr, Albedo, Rabet, Hana) ; le serveur se contente de relayer une transaction **que vous avez déjà signée**, et valide qu'il s'agit d'un swap ou d'une opération trustline avant de la relayer — il ne peut jamais être détourné en un autre type de transaction.
+
+![Connexion wallet — signature non-custodiale](docs/img/decantfi-wallet-connect-en.png)
 
 **Durcissement effectué avant l'ouverture du code source** (un audit ciblé, tout sur `main`) :
 
@@ -55,42 +91,61 @@ Gérer les swaps de tierces personnes est une position de confiance, et le proje
 
 `npm audit --omit=dev` en production est **propre**. Voir la [FAQ](FAQ.fr.md) pour le modèle de menace et ce qui est explicitement hors périmètre.
 
-Le tableau de bord est aussi honnête sur sa propre plomberie — une **page de stabilité** affiche la disponibilité par source et les pannes, ainsi que la santé du Soroban RPC dont il dépend :
-
-![Stabilité des sources](docs/img/decantfi-stability-en.png)
-
 ## Sources
 
 Interrogées en parallèle, tolérantes aux pannes : **xBull**, **Aquarius**, **Soroswap** (keyless, via le `soroswap-router-sdk` local), **Ultra Stellar** (StellarTerm), **Horizon** strict-send (un plancher fiable), et une sonde directe de la pool **Comet** (BLND/USDC).
 
 > **StellarBroker** est actuellement **déconnecté** : son endpoint keyless est soumis à un rate-limiting sous interrogation automatique répétée. Il reviendra via une intégration authentifiée par clé — voir la [FAQ](FAQ.fr.md).
 
-## Auto-hébergement
+## Installation — auto-hébergement avec Docker
 
-**Prérequis :** Docker (déploiement) · Node ≥ 24 pour le développement local (le collecteur utilise `node:sqlite` ; développé et testé sur Node 26).
+**Prérequis :** Docker + Docker Compose. (Node ≥ 24 n'est nécessaire que pour le développement local / le CLI ; le collecteur utilise `node:sqlite`, développé et testé sur Node 26.)
 
 ```bash
-cp .env.example .env        # ajuster si nécessaire (chemin des données, clés optionnelles)
+git clone https://github.com/actarus314/DecantFi.git
+cd DecantFi
+cp .env.example .env          # toutes les clés sont optionnelles — voir le tableau ci-dessous
 docker compose build
 docker compose up -d
-# Interface web : http://localhost:8080
 ```
 
-Deux services démarrent : un **collecteur** qui cote périodiquement BLND→USDC/EURC et persiste les résultats dans SQLite (rétention étagée), et un **tableau de bord web** + simulateur live sur le port 8080.
+Puis ouvrez **http://localhost:8080**.
 
-Définissez le répertoire de données hôte avec `DECANTFI_DATA` (défaut `./data` ; ex. `/docker/decantfi/backend/data` sur un serveur). Si vous forkez, définissez `IMAGE_OWNER` sur votre compte. Toutes les clés `.env` sont optionnelles et documentées dans [`.env.example`](.env.example) et la [FAQ](FAQ.fr.md).
+**Ce qui tourne** — deux services :
+- **collector** — cote périodiquement BLND→USDC/EURC (sondes à 250/750 BLND) et persiste chaque mesure dans SQLite, avec une rétention étagée (brut → structuré → rollup horaire).
+- **web** — le tableau de bord + simulateur live, sur le port 8080.
 
-> Exposé publiquement ? Mettez-le derrière un reverse proxy avec TLS (Caddy / nginx) — l'application parle HTTP simple et est conçue pour s'appuyer sur un proxy.
+**Configuration** (`.env`, toutes les clés sont optionnelles) :
+
+| Clé | Rôle |
+|-----|------|
+| `DECANTFI_DATA` | Répertoire hôte pour la base de données SQLite (défaut `./data` ; ex. `/docker/decantfi/backend/data` sur un serveur). |
+| `SOROSWAP_API_KEY` | Optionnel ; utilisé uniquement par le chemin d'**exécution** pour construire les transactions Soroswap. La cotation est keyless. |
+| `STELLAR_RPC_URL` / `STELLAR_HORIZON_URL` | Remplacent les endpoints publics par défaut (un RPC dédié est recommandé sous charge). |
+| `IMAGE_OWNER` | Propriétaire de l'image GHCR (défaut `actarus314` ; définissez votre compte si vous forkez et publiez). |
+| `COLLECTOR_CADENCE_SEC` · `COLLECTOR_SIZES_BLND` · `COLLECTOR_PAIRS` | Cadence du collecteur (défaut 900 s), tailles de sonde (`250,750`), paires (`USDC,EURC`). |
+
+**Opérations courantes :**
+
+```bash
+docker compose logs -f web          # suivre les logs web
+docker compose ps                   # statut des services
+docker compose pull && docker compose up -d   # mettre à jour (si image publiée)
+# ou, en buildant localement après un git pull :
+git pull && docker compose build && docker compose up -d --force-recreate
+```
+
+> **Vous l'exposez publiquement ?** Mettez-le derrière un reverse proxy avec TLS (Caddy / nginx) — l'application parle HTTP simple par conception et embarque un rate-limiting par IP ; le proxy ajoute le TLS et est le bon endroit pour tout contrôle d'accès.
 
 ## CLI (développement / scripts)
 
 ```bash
 npm install
-npm run quote -- 1000 USDC              # meilleure route BLND -> USDC pour 1000 BLND
-npm run quote -- 1000 EURC              # vers EURC : direct vs via-USDC, meilleur net conservé
-npm run quote -- 1000 USDC --split      # analyse en split (25 / 50 / 100 %)
-npm run quote -- 500 USDC --slippage 30 # tolérance 0,3 % (30 bps)
-npm run quote -- 1000 USDC --json       # JSON brut (pour les scripts)
+npm run quote -- 1000 USDC              # best route BLND -> USDC for 1000 BLND
+npm run quote -- 1000 EURC              # to EURC: direct vs via-USDC, best net kept
+npm run quote -- 1000 USDC --split      # split analysis (25 / 50 / 100 %)
+npm run quote -- 500 USDC --slippage 30 # 0.3 % tolerance (30 bps)
+npm run quote -- 1000 USDC --json       # raw JSON (for scripts)
 ```
 
 Options : `--from <ASSET>` (défaut BLND), `--slippage <bps>` (défaut 50), `--split`, `--json`, `--balance`, `--help`. Le CLI **ne signe et ne soumet rien** — il classe les routes ; l'exécution reste dans votre wallet.

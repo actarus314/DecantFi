@@ -50,6 +50,14 @@ Because that is how it actually settles. Swap fees and price impact are taken ou
 
 There is no deep direct BLND/EURC market, so the best exit to EURC is often **BLND → USDC → EURC** (a composite, two transactions) rather than direct. DecantFi quotes both and keeps whichever nets more. When the same source wins both, the nets are identical and the tool says so rather than inventing a difference.
 
+### Why two probe sizes (250 and 750 BLND)?
+
+Both the winning route and the price impact depend on trade size — a venue that's best for a small exit can lose for a larger one, because price impact grows with the amount you push through a pool. Probing at two representative sizes (250 and 750 BLND) shows how the answer shifts with size, so a single number never misleads you. The live simulator quotes any amount you type; the 250/750 toggle applies to the historical dashboard.
+
+### What is the dual price impact (Local vs EVM)?
+
+For EURC only, price impact is shown two ways (toggle from the column header). **Local** compares against the EURC price on Stellar's SDEX order book — the right reference if you intend to stay on Stellar. **EVM** compares against the global EURC price on Base/Ethereum — the right reference if you intend to bridge out, because then Stellar's premium or discount over the global price becomes a real gain or loss. USDC is identical in both modes. Positive = you receive less, negative = you receive more.
+
 ### Why is StellarBroker disconnected, and why do some sources fail sometimes?
 
 StellarBroker's keyless endpoint sits behind Cloudflare and gets rate-limited / IP-blocked under repeated automated polling (the dashboard's stability page shows the resulting failures). Rather than risk a harder block, it is **disconnected pending an authenticated, key-based integration** — which will also make its fee transparent. Other sources can fail transiently (timeouts, endpoint hiccups); that is expected, and the aggregator is built to rank fine without any single one.

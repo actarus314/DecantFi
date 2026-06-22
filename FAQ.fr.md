@@ -50,6 +50,14 @@ Parce que c'est ainsi que ça se règle réellement. Les frais de swap et l'impa
 
 Il n'existe pas de marché profond direct BLND/EURC, donc la meilleure sortie vers EURC est souvent **BLND → USDC → EURC** (un composite, deux transactions) plutôt que direct. DecantFi cote les deux et garde celui qui rapporte le plus. Quand la même source gagne les deux, les nets sont identiques et l'outil le dit plutôt que d'inventer une différence.
 
+### Pourquoi deux tailles de sonde (250 et 750 BLND) ?
+
+La route gagnante et l'impact de prix dépendent tous deux de la taille de la transaction — une source qui est la meilleure pour une petite sortie peut perdre pour une plus grande, parce que l'impact de prix croît avec le montant que vous poussez à travers une pool. Sonder à deux tailles représentatives (250 et 750 BLND) montre comment la réponse évolue avec la taille, pour qu'un seul chiffre ne vous induise jamais en erreur. Le simulateur live cote n'importe quel montant que vous saisissez ; le sélecteur 250/750 s'applique au tableau de bord historique.
+
+### Qu'est-ce que le double impact de prix (Local vs EVM) ?
+
+Pour EURC uniquement, l'impact de prix est affiché de deux façons (basculez depuis l'en-tête de colonne). **Local** compare par rapport au prix de l'EURC sur le carnet d'ordres SDEX de Stellar — la bonne référence si vous prévoyez de rester sur Stellar. **EVM** compare par rapport au prix global de l'EURC sur Base/Ethereum — la bonne référence si vous prévoyez de bridger, car la prime ou la décote de Stellar par rapport au prix mondial devient alors un vrai gain ou une vraie perte. USDC est identique dans les deux modes. Positif = vous recevez moins, négatif = vous recevez plus.
+
 ### Pourquoi StellarBroker est-il déconnecté, et pourquoi certaines sources échouent-elles parfois ?
 
 L'endpoint keyless de StellarBroker est derrière Cloudflare et se retrouve soumis à un rate-limiting / blocage IP sous interrogation automatique répétée (la page de stabilité du tableau de bord montre les échecs qui en résultent). Plutôt que de risquer un blocage plus sévère, il est **déconnecté dans l'attente d'une intégration authentifiée par clé** — qui rendra aussi ses frais transparents. D'autres sources peuvent échouer de façon transitoire (timeouts, problèmes d'endpoint) ; c'est attendu, et l'agrégateur est conçu pour classer correctement même sans l'une d'elles.

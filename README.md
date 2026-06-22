@@ -10,7 +10,7 @@ A self-hosted tool that finds the **best net route** to swap **BLND → USDC or 
 
 Built for people exiting [Blend](https://www.blend.capital/) positions who want the real number, not an optimistic one.
 
-![DecantFi dashboard](docs/img/decantfi-dashboard-en.png)
+![DecantFi live simulation](docs/img/decantfi-sim-usdc-en.png)
 
 </div>
 
@@ -20,44 +20,76 @@ Different venues quote the same swap differently, and the headline number a venu
 
 It is deliberately narrow: BLND → USDC/EURC, the swap most Blend users actually need. It does that one thing carefully.
 
-## What it does
+## The app
 
-- **Meta-aggregates** several verified Stellar sources (see [Sources](#sources)) in parallel, and is **fault-tolerant** — one source being down never blocks the ranking.
-- **Ranks on net return** — aggregator fees + pool fees + price impact are all accounted for. Gas is paid separately in XLM (variable per transaction, shown on its own — never hidden inside the net).
-- **Re-quotes live** in the web simulator, and re-simulates the venues whose advertised quote and real fill can diverge, so the number you see is the number you get.
-- **Handles EURC two ways** — direct BLND→EURC versus composite via-USDC — and keeps whichever nets more, stating the case honestly when they tie.
-- **Records history** — a background collector logs quotes over time so the dashboard can surface the routes that win and the calmer windows to trade in.
+### Live simulator
 
-## Honest by design
+Type a BLND amount, hit **Simulate**, and DecantFi quotes every source live and ranks them by net output — the screenshot above is a real `1,000 BLND → USDC` run. Sources are queried **in parallel** and the simulator is **fault-tolerant**: a source being down never blocks the ranking.
 
-The route graph shows where value flows over the last 7 days — **band width = how often a route wins**, **colour = the swap tool**, with low-frequency routes grouped into "Others". No invented numbers, no merged-but-incompatible flows.
+### Confidence, shown honestly
+
+Every quote carries a confidence flag, because not all numbers are equally trustworthy:
+
+- **Observed** — a real fill seen in live simulation (an executable route).
+- **Estimated** — a floor/ceiling, or a route that couldn't be simulated.
+- **Unavailable** — source unreachable.
+
+The ranking trusts **Observed** over **Estimated**, so an optimistic headline never outranks a verified fill. This is the core of the project: rank on the real fill, not the quote.
+
+### Two probe sizes (250 / 750 BLND)
+
+The winning route *and* the price impact both depend on trade size — a venue that's best for a small exit can lose for a larger one. DecantFi probes at **250 and 750 BLND** so the dashboard can show how the answer changes with size; flip between them with the size toggle. (The live simulator quotes any amount you type.)
+
+### EURC: direct vs composite via-USDC
+
+There is no deep direct BLND/EURC market, so the best exit to EURC is often **BLND → USDC → EURC** — a composite of two swaps — rather than direct. DecantFi quotes both and keeps whichever nets more. Here the winner is a `Comet + Ultra Stellar` composite routed through USDC:
+
+![EURC composite simulation](docs/img/decantfi-sim-eurc-composite-en.png)
+
+### Dual price impact (Local vs EVM)
+
+For EURC, price impact is shown two ways — toggle it from the column header:
+
+- **Local** — gap vs the EURC price **on Stellar** (the SDEX order book). What matters if you plan to **stay on Stellar**.
+- **EVM** — gap vs the **global** EURC price (Base / Ethereum). What matters if you plan to **bridge out**, where Stellar's premium or discount becomes a real gain or loss.
+
+(USDC is identical in both modes.) Positive = you receive less, negative = you receive more.
+
+### Route graph
+
+The dashboard graphs where value flows over the last 7 days — **band width = how often a route wins**, **colour = the swap tool**, low-frequency routes grouped into "Others". No invented numbers, no merged-but-incompatible flows.
 
 ![Route graph](docs/img/decantfi-route-graph.png)
 
-Two principles the project does not bend on:
+### Source stability
 
-1. **Rank on the real fill, not the quote.** Where a venue's advertised output differs from what its transaction actually returns, DecantFi ranks and displays the **simulated real fill**.
-2. **Net is what you receive.** Swap fees and price impact are inside the net; **gas (XLM) is shown separately**, exactly as your wallet and a block explorer report it.
+DecantFi is honest about its own plumbing too: a stability page shows per-source uptime and failures, plus the health of the Soroban RPC it depends on.
+
+![Source stability](docs/img/decantfi-stability-en.png)
+
+### Light / dark theme · four languages
+
+A light and a dark theme, and a UI available in **English, French, Spanish and Portuguese** (auto-detected, switchable).
+
+![Dark theme](docs/img/decantfi-dark-eurc-en.png)
 
 ## Security & safety
 
 Handling other people's swaps is a position of trust, so the project treats it like one.
 
-**Non-custodial by construction.** DecantFi **never requests, stores, or handles your private key.** The CLI is strictly read-only — it recommends and signs nothing. In the web app, transactions are **signed inside your own wallet** (Freighter, xBull, Lobstr, Albedo, Rabet, Hana); the server only relays a transaction **you already signed**, and validates that it is a swap or trustline operation before relaying it — it can never be turned into a different kind of transaction.
+**Non-custodial by construction.** DecantFi **never requests, stores, or handles your private key.** The CLI is strictly read-only. In the web app, transactions are **signed inside your own wallet** (Freighter, xBull, Lobstr, Albedo, Rabet, Hana); the server only relays a transaction **you already signed**, and validates that it is a swap or trustline operation before relaying it — it can never be turned into a different kind of transaction.
 
-**Hardening done before opening the source** (a focused audit pass, all of it on `main`):
+![Connect wallet — non-custodial signing](docs/img/decantfi-wallet-connect-en.png)
+
+**Hardening done before opening the source** (a focused audit pass, all on `main`):
 
 - **Web headers** — Content-Security-Policy, `X-Frame-Options`, `X-Content-Type-Options`, referrer policy; output-escaped on every API-fed sink.
 - **Abuse resistance** — per-IP rate-limiting on quote/build/submit endpoints, refresh cooldown, hard caps on input sizes, allow-listed assets and venues.
-- **Secret hygiene** — RPC API keys are redacted from logs and the database; generic `500`s to clients with detail kept server-side; **zero secrets** in the repo (full git-history scan + `gitleaks` in CI).
-- **Supply chain** — base image pinned by digest, GitHub Actions pinned by SHA, the one vendored browser bundle ships with a checksum and a reproducible build script, `npm audit` + `gitleaks` gate every push, and Dependabot keeps dependencies current (verified, never blind-merged).
+- **Secret hygiene** — RPC API keys redacted from logs and the database; generic `500`s to clients with detail kept server-side; **zero secrets** in the repo (full git-history scan + `gitleaks` in CI).
+- **Supply chain** — base image pinned by digest, GitHub Actions pinned by SHA, the one vendored browser bundle ships with a checksum and a reproducible build script, `npm audit` + `gitleaks` gate every push, Dependabot keeps dependencies current (verified, never blind-merged).
 - **Container** — multi-stage build, `--omit=dev`, `read_only` root filesystem, dropped capabilities, `no-new-privileges`.
 
 Production `npm audit --omit=dev` is **clean**. See the [FAQ](FAQ.md) for the threat model and what is explicitly out of scope.
-
-The dashboard is also honest about its own plumbing — a **stability page** shows per-source uptime and failures, and the health of the Soroban RPC it depends on:
-
-![Source stability](docs/img/decantfi-stability-en.png)
 
 ## Sources
 
@@ -65,22 +97,45 @@ Queried in parallel, fault-tolerant: **xBull**, **Aquarius**, **Soroswap** (keyl
 
 > **StellarBroker** is currently **disconnected**: its keyless endpoint is rate-limited under automated polling. It will return through an authenticated, key-based integration — see the [FAQ](FAQ.md).
 
-## Self-hosting
+## Install — self-host with Docker
 
-**Prerequisites:** Docker (deployment) · Node ≥ 24 for local development (the collector uses `node:sqlite`; developed and tested on Node 26).
+**Prerequisites:** Docker + Docker Compose. (Node ≥ 24 is only needed for local development / the CLI; the collector uses `node:sqlite`, developed and tested on Node 26.)
 
 ```bash
-cp .env.example .env        # adjust if needed (data path, optional keys)
+git clone https://github.com/actarus314/DecantFi.git
+cd DecantFi
+cp .env.example .env          # all keys optional — see the table below
 docker compose build
 docker compose up -d
-# Web UI: http://localhost:8080
 ```
 
-Two services start: a **collector** that periodically quotes BLND→USDC/EURC and persists results to SQLite (tiered retention), and a **web** dashboard + live simulator on port 8080.
+Then open **http://localhost:8080**.
 
-Set the host data directory with `DECANTFI_DATA` (default `./data`; e.g. `/docker/decantfi/backend/data` on a server). If you fork, set `IMAGE_OWNER` to your account. All `.env` keys are optional and documented in [`.env.example`](.env.example) and the [FAQ](FAQ.md).
+**What runs** — two services:
+- **collector** — periodically quotes BLND→USDC/EURC (250/750 BLND probes) and persists each measurement to SQLite, with tiered retention (raw → structured → hourly rollup).
+- **web** — the dashboard + live simulator, on port 8080.
 
-> Publicly exposed? Put it behind a reverse proxy with TLS (Caddy / nginx) — the app speaks plain HTTP and is designed to sit behind one.
+**Configuration** (`.env`, every key optional):
+
+| Key | Purpose |
+|-----|---------|
+| `DECANTFI_DATA` | Host directory for the SQLite database (default `./data`; e.g. `/docker/decantfi/backend/data` on a server). |
+| `SOROSWAP_API_KEY` | Optional; only used by the **execution** path to build Soroswap transactions. Quoting is keyless. |
+| `STELLAR_RPC_URL` / `STELLAR_HORIZON_URL` | Override the default public endpoints (a dedicated RPC is recommended under load). |
+| `IMAGE_OWNER` | GHCR image owner (default `actarus314`; set to your account if you fork and publish). |
+| `COLLECTOR_CADENCE_SEC` · `COLLECTOR_SIZES_BLND` · `COLLECTOR_PAIRS` | Collector cadence (default 900 s), probe sizes (`250,750`), pairs (`USDC,EURC`). |
+
+**Common operations:**
+
+```bash
+docker compose logs -f web          # follow web logs
+docker compose ps                   # service status
+docker compose pull && docker compose up -d   # update (if using a published image)
+# or, building locally after a git pull:
+git pull && docker compose build && docker compose up -d --force-recreate
+```
+
+> **Exposing it publicly?** Put it behind a reverse proxy with TLS (Caddy / nginx) — the app speaks plain HTTP by design and ships per-IP rate-limiting; the proxy adds TLS and is the right place for any access control.
 
 ## CLI (development / scripting)
 

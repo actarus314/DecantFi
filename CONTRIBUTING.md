@@ -50,6 +50,11 @@ Both must be green before opening a PR.
 
 When you update documentation, update **both** language versions.
 
+## Language conventions
+
+- **Code, comments, commit messages, PR titles & descriptions, and the changelog are written in English.**
+- **User-facing docs** (README, FAQ) are **bilingual** (French + English), per the rule above.
+
 ## Vendored bundle: walletkit.js
 
 `web/public/walletkit.js` is a **vendored bundle** of `@creit.tech/stellar-wallets-kit`, built with esbuild from `web/walletkit.entry.js`. It is committed to the repository and tracked by Dependabot.
