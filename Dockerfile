@@ -1,4 +1,5 @@
-FROM node:24-slim AS build
+# node:24-slim (linux/amd64 + linux/arm64), index multi-arch OCI, pinné 2026-06-22 — Dependabot met à jour
+FROM node:24-slim@sha256:c2d5ade763cacfb03fe9cb8e8af5d1be5041ff331921fa26a9b231ca3a4f780a AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -10,7 +11,7 @@ COPY cli ./cli
 COPY web ./web
 RUN npm run build
 
-FROM node:24-slim AS runtime
+FROM node:24-slim@sha256:c2d5ade763cacfb03fe9cb8e8af5d1be5041ff331921fa26a9b231ca3a4f780a AS runtime
 ARG REV
 ENV APP_REV=${REV:-dev}
 WORKDIR /app
