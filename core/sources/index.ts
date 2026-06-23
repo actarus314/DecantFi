@@ -7,6 +7,7 @@ import { comet } from './comet.js';
 import { ultrastellar } from './ultrastellar.js';
 import { stellarbroker } from './stellarbroker.js';
 import { horizon } from './horizon.js';
+import { phoenix } from './phoenix.js';
 
 export const ADAPTERS: SourceAdapter[] = [
   xbull,
@@ -18,6 +19,12 @@ export const ADAPTERS: SourceAdapter[] = [
   // under collector polling (sustained 4xx). Re-enable via the key-based path once STELLARBROKER_API_KEY
   // is wired — see TODO in stellarbroker.ts.
   horizon,
+  // phoenix — NOT ACTIVE: Phoenix has no BLND pool on mainnet, so it's inert for DecantFi's
+  // current BLND→USDC/EURC pairs (supports() returns false → never quoted, no Stability-page noise).
+  // The adapter is written + tested, ready to activate (uncomment) when DecantFi covers pairs Phoenix
+  // serves (XLM/USDC, XLM/EURC, …) — e.g. for cross-checking that an aggregator routing through
+  // Phoenix isn't skimming on top of Phoenix's own fee.
+  // phoenix,
 ];
 
 /** IDs of the currently active adapters — single source of truth for "which venues exist now".
@@ -25,5 +32,5 @@ export const ADAPTERS: SourceAdapter[] = [
  *  pending its API key) drops off automatically and reappears when re-added to ADAPTERS. */
 export const ACTIVE_SOURCE_IDS = ADAPTERS.map((a) => a.id);
 
-export { xbull, soroswap, aquarius, comet, ultrastellar, stellarbroker, horizon };
+export { xbull, soroswap, aquarius, comet, ultrastellar, stellarbroker, horizon, phoenix };
 export type { SourceAdapter };

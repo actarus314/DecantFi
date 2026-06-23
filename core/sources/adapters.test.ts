@@ -13,6 +13,7 @@ import { parseStellarbroker } from './stellarbroker.js';
 import { parseUltrastellar } from './ultrastellar.js';
 import { parseSoroswapRoute } from './soroswap.js';
 import { decodeCometOut } from './comet.js';
+import { decodePhoenixOut } from './phoenix.js';
 
 const req: QuoteRequest = { sellAsset: BLND, buyAsset: USDC, amountIn: toStroops('1000'), slippageBps: 50 };
 
@@ -107,6 +108,18 @@ describe('soroswap', () => {
     expect(q.route[0]).toMatchObject({ sell: 'BLND', buy: 'USDC' });
     expect(q.route[1]).toMatchObject({ sell: 'USDC', buy: 'EURC' });
     expect(q.netOut).toBe(439000000n);
+  });
+});
+
+describe('phoenix', () => {
+  it('decodePhoenixOut → ask_amount (déjà net de commission)', () => {
+    expect(decodePhoenixOut({ ask_amount: 194227186n, commission_amount: 976016n, spread_amount: 4980n, total_return: 195208182n })).toBe(194227186n);
+  });
+  it('decodePhoenixOut → null si absent / ≤0 / non-objet', () => {
+    expect(decodePhoenixOut(null)).toBeNull();
+    expect(decodePhoenixOut({})).toBeNull();
+    expect(decodePhoenixOut({ ask_amount: 0n })).toBeNull();
+    expect(decodePhoenixOut('nope')).toBeNull();
   });
 });
 
