@@ -9,6 +9,7 @@ import {
   routeLabel,
   pickExecutableVenue,
   submit,
+  txStatus,
   ExecError,
   quoteHorizon,
   horizonPathSymbols,
@@ -22,6 +23,7 @@ import {
   type ExecDeps,
   type FetchResult,
   type SoroswapClient,
+  type SendStatus,
 } from './execute.js';
 import { BLND, USDC, EURC } from '../core/assets.js';
 import { toNumber, toStroops } from '../core/amount.js';
@@ -345,6 +347,10 @@ function fakeDeps(opts: {
     makeSoroswap,
     simulateComet: vi.fn(async () => opts.cometOut ?? null),
     simulateXbullNet: vi.fn(async () => null),
+    makeRpc: () => ({
+      send: async () => { throw new Error('makeRpc.send() not stubbed'); },
+      status: async () => { throw new Error('makeRpc.status() not stubbed'); },
+    }),
   };
 }
 
@@ -965,5 +971,62 @@ describe('minReceivedStroops — borne haute', () => {
     // slippageBps = 9999 is valid (< 10000); result = net * 1 / 10000
     expect(() => minReceivedStroops(100_0000000n, 9999)).not.toThrow();
     expect(minReceivedStroops(100_0000000n, 9999)).toBe(100000n); // 100 * 1/10000 = 0.01 USDC in stroops
+  });
+});
+
+// ─── submit Soroban : fire-and-poll ──────────────────────────────────────────
+describe('submit (Soroban fire-and-poll)', () => {
+  type StatusFn = (_hash: string) => Promise<{ status: 'SUCCESS' | 'NOT_FOUND' | 'FAILED' }>;
+  const rpcDeps = (
+    send: { status: SendStatus; hash: string; errorResult?: unknown },
+    statusFn?: StatusFn,
+  ): Partial<ExecDeps> => ({
+    makeRpc: () => ({
+      send: async () => send,
+      status: statusFn ?? (async () => { throw new Error('status() ne doit PAS être appelé au submit (fire-and-poll)'); }),
+    }),
+  });
+
+  it('aquarius PENDING → FIRE et rend {hash,status:pending} sans poller la confirmation', async () => {
+    let statusCalled = false;
+    const statusFn: StatusFn = async () => { statusCalled = true; return { status: 'SUCCESS' }; };
+    const result = await submit('aquarius', { signedXdr: xdrPathPayment() }, { rpcUrl: 'r' },
+      rpcDeps({ status: 'PENDING', hash: 'deadbeef' }, statusFn));
+    expect(result).toEqual({ hash: 'deadbeef', status: 'pending' });
+    expect(statusCalled).toBe(false);
+  });
+
+  it('comet DUPLICATE → traité comme fired (pending)', async () => {
+    const result = await submit('comet', { signedXdr: xdrPathPayment() }, { rpcUrl: 'r' },
+      rpcDeps({ status: 'DUPLICATE', hash: 'abc123' }));
+    expect(result).toEqual({ hash: 'abc123', status: 'pending' });
+  });
+
+  it('ERROR → ExecError (down)', async () => {
+    await expect(
+      submit('aquarius', { signedXdr: xdrPathPayment() }, { rpcUrl: 'r' },
+        rpcDeps({ status: 'ERROR', hash: '', errorResult: { x: 1 } })),
+    ).rejects.toThrow(ExecError);
+  });
+
+  it('TRY_AGAIN_LATER → ExecError (down)', async () => {
+    await expect(
+      submit('comet', { signedXdr: xdrPathPayment() }, { rpcUrl: 'r' },
+        rpcDeps({ status: 'TRY_AGAIN_LATER', hash: '' })),
+    ).rejects.toThrow(ExecError);
+  });
+});
+
+// ─── txStatus : mapping getTransaction → success/failed/pending ───────────────
+describe('txStatus', () => {
+  const mk = (s: 'SUCCESS' | 'NOT_FOUND' | 'FAILED'): Partial<ExecDeps> => ({
+    makeRpc: () => ({ send: async () => ({ status: 'PENDING' as const, hash: '' }), status: async () => ({ status: s }) }),
+  });
+  it('SUCCESS → success', async () => expect(await txStatus('h', { rpcUrl: 'r' }, mk('SUCCESS'))).toEqual({ status: 'success' }));
+  it('FAILED → failed', async () => expect(await txStatus('h', { rpcUrl: 'r' }, mk('FAILED'))).toEqual({ status: 'failed' }));
+  it('NOT_FOUND → pending', async () => expect(await txStatus('h', { rpcUrl: 'r' }, mk('NOT_FOUND'))).toEqual({ status: 'pending' }));
+  it('RPC error → pending (re-poll, pas un échec)', async () => {
+    const deps: Partial<ExecDeps> = { makeRpc: () => ({ send: async () => ({ status: 'PENDING' as const, hash: '' }), status: async () => { throw new Error('rpc down'); } }) };
+    expect(await txStatus('h', { rpcUrl: 'r' }, deps)).toEqual({ status: 'pending' });
   });
 });

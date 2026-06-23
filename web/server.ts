@@ -11,7 +11,7 @@ import { overview, buildSourceHealth, latestChosenRpc } from './stats.js';
 import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
 import { appendRpcCallLog } from '../db/index.js';
 import { resetRpc, readRpc, rpcAls } from '../core/rpc-meter.js';
-import { pickExecutableVenue, submit, buildChangeTrust, ExecError, type Venue } from './execute.js';
+import { pickExecutableVenue, submit, txStatus, buildChangeTrust, ExecError, type Venue } from './execute.js';
 import { manualRefresh, refreshBusy } from './refresh.js';
 import { toStroops, toNumber } from '../core/amount.js';
 import { readBlndBalance, readAssetBalance } from '../core/balance.js';
@@ -462,6 +462,23 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       if (b.venue === 'xbull' && typeof b.id !== 'string') { json(res, req, 400, { error: 'id requis pour xbull' }); return; }
       try {
         const result = await submit(b.venue, { id: b.id as string | undefined, signedXdr: b.signedXdr }, cfg);
+        json(res, req, 200, result);
+      } catch (e) {
+        if (e instanceof ExecError) { json(res, req, execStatus(e.code), { error: e.message, code: e.code }); return; }
+        throw e;
+      }
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/api/tx-status') {
+      const ip = req.socket.remoteAddress ?? 'unknown';
+      if (rateLimited(ip, 90, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      const venue = query['venue'];
+      if (venue !== 'aquarius' && venue !== 'comet') { json(res, req, 400, { error: 'venue invalide (tx-status réservé aux venues Soroban)' }); return; }
+      const hash = query['hash'];
+      if (typeof hash !== 'string' || !/^[0-9a-f]{64}$/i.test(hash)) { json(res, req, 400, { error: 'hash invalide' }); return; }
+      try {
+        const result = await txStatus(hash, cfg);
         json(res, req, 200, result);
       } catch (e) {
         if (e instanceof ExecError) { json(res, req, execStatus(e.code), { error: e.message, code: e.code }); return; }

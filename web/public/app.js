@@ -139,6 +139,9 @@ const STRINGS = {
     // États d'exécution
     exec_signing_wallet: 'Signature dans le wallet…',
     exec_submitting: 'Soumission…',
+    exec_confirming: 'Confirmation on-chain…',
+    exec_pending_title: 'Soumis — confirmation en cours',
+    exec_pending: 'La transaction est soumise mais pas encore confirmée. Ça peut prendre un instant — vérifie sur l\'explorateur.',
     exec_restore: 'Étape de restauration d\'état requise (coût de stockage ponctuel) — signe-la, puis on reconstruit le swap.',
     exec_success: 'Swap soumis',
     exec_view: 'Voir sur stellar.expert ↗',
@@ -391,6 +394,9 @@ const STRINGS = {
     // Execution states
     exec_signing_wallet: 'Signing in your wallet…',
     exec_submitting: 'Submitting…',
+    exec_confirming: 'Confirming on-chain…',
+    exec_pending_title: 'Submitted — confirming',
+    exec_pending: 'Your transaction is submitted but not yet confirmed. It may take a moment — check the explorer.',
     exec_restore: 'A state restore step is required (one-time storage cost) — sign it, then we rebuild the swap.',
     exec_success: 'Swap submitted',
     exec_view: 'View on stellar.expert ↗',
@@ -643,6 +649,9 @@ const STRINGS = {
     // Execution states
     exec_signing_wallet: 'Firmando en su wallet…',
     exec_submitting: 'Enviando…',
+    exec_confirming: 'Confirmando on-chain…',
+    exec_pending_title: 'Enviado — confirmando',
+    exec_pending: 'Su transacción está enviada pero aún sin confirmar. Puede tardar un momento — verifíquela en el explorador.',
     exec_restore: 'Se requiere un paso de restauración de estado (coste único de almacenamiento) — fírmelo y luego reconstruimos el swap.',
     exec_success: 'Swap enviado',
     exec_view: 'Ver en stellar.expert ↗',
@@ -858,6 +867,9 @@ const STRINGS = {
     review_sim_was: 'sim',
     exec_signing_wallet: 'Assinando na sua carteira…',
     exec_submitting: 'Enviando…',
+    exec_confirming: 'Confirmando on-chain…',
+    exec_pending_title: 'Enviado — confirmando',
+    exec_pending: 'Sua transação foi enviada mas ainda não confirmada. Pode levar um instante — verifique no explorador.',
     exec_restore: 'Uma etapa de restauração de estado é necessária (custo único de armazenamento) — assine-a e depois reconstruímos o swap.',
     exec_success: 'Swap enviado',
     exec_view: 'Ver no stellar.expert ↗',
@@ -2654,6 +2666,24 @@ async function startCompositeLeg1(winRow) {
   renderApp();
 }
 
+// Fire-and-poll : confirme une tx Soroban via /api/tx-status. → 'success' | 'failed' | 'pending' | 'aborted'.
+// 'pending' = encore en vol après le cap (PAS un échec : la tx peut encore se poser). 'aborted' = modal fermé.
+async function pollTxStatus(venue, hash, alive, tries = 20, intervalMs = 1500) {
+  for (let i = 0; i < tries; i++) {
+    if (alive && !alive()) return 'aborted';
+    try {
+      const r = await fetch(`/api/tx-status?venue=${encodeURIComponent(venue)}&hash=${encodeURIComponent(hash)}`);
+      if (r.ok) {
+        const j = await r.json();
+        if (j.status === 'success') return 'success';
+        if (j.status === 'failed') return 'failed';
+      }
+    } catch (_) { /* re-poll */ }
+    await new Promise(res => setTimeout(res, intervalMs));
+  }
+  return 'pending';
+}
+
 async function confirmExecute() {
   const build = execState && execState.build; if (!build) return;
   const comp = execState.comp || null;
@@ -2677,6 +2707,23 @@ async function confirmExecute() {
     if (!r.ok) {
       execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, asset: j.asset, ...(comp ? { comp } : {}) };
       renderApp(); return;
+    }
+    // ─── Fire-and-poll : venues Soroban (aquarius/comet) ──────────────────────
+    // /api/submit a FIRÉ la tx (status:'pending') sans attendre la confirmation. On
+    // confirme ICI, avant tout consommateur (restore, leg1→leg2, done) : sinon on agirait
+    // sur une tx non posée (re-restore en boucle, montant leg2 fabriqué). Cf. audit fire-and-poll.
+    if (j.status === 'pending') {
+      execState = { phase: 'confirming', build, hash: j.hash, ...(comp ? { comp } : {}) }; renderApp();
+      const st = await pollTxStatus(build.venue, j.hash,
+        () => !!execState && execState.phase === 'confirming' && execState.hash === j.hash);
+      if (st === 'aborted') return;                        // modal fermé / phase changée
+      if (st === 'failed') {
+        execState = { phase: 'error', errorMsg: t('exec_failed'), ...(comp ? { comp } : {}) }; renderApp(); return;
+      }
+      if (st === 'pending') {                              // encore en vol après le cap → pas un échec
+        execState = { phase: 'pending', hash: j.hash, venue: build.venue, build, ...(comp ? { comp } : {}) }; renderApp(); return;
+      }
+      // st === 'success' → poursuite du flux normal ci-dessous (restore / leg1 / done).
     }
     if (build.type === 'restore') {
       // la tx restore est soumise ; reconstruire le vrai swap puis revenir à la revue.
@@ -3027,6 +3074,21 @@ function execModal() {
       <p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem">${t('exec_submitting')}</p>
       ${restoreNote}
       ${dimTable}`;
+  } else if (phase === 'confirming') {
+    const rv = build && build.review;
+    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, legTarget, false, sendAsset)}</div>` : '';
+    content = `
+      ${stepBadge}
+      <p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem"><span class="pulse">${t('exec_confirming')}</span></p>
+      ${dimTable}`;
+  } else if (phase === 'pending') {
+    content = `
+      <div style="font-size:15px;font-weight:700;color:var(--amber);margin-bottom:.5rem">${t('exec_pending_title')}</div>
+      <p class="help" style="margin:0 0 .9rem">${t('exec_pending')}</p>
+      <div style="display:flex;gap:.55rem;align-items:center;justify-content:flex-end">
+        <a class="btn openlink" href="https://stellar.expert/explorer/public/tx/${encodeURIComponent(safeHash)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:.3rem">${t('exec_view')}</a>
+        <button class="btn" data-act="cancelExecute">${t('review_cancel')}</button>
+      </div>`;
   } else if (phase === 'leg1_confirming') {
     content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0">${t('comp_leg1_confirming')}</p>`;
   } else if (phase === 'done') {
