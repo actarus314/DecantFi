@@ -1,0 +1,3271 @@
+// ─── i18n ─────────────────────────────────────────────────────────────────────
+const STRINGS = {
+  fr: {
+    // Topbar / brand
+    brand_dim: 'BLND swaps - décantés avec précision',
+    tz_note: (z) => `UTC stocké · affiché en heure locale (${z})`,
+    theme_dark: '🌙',
+    theme_light: '☀️',
+    venue_cols: ['Type', 'Couche', 'Liquidité', 'Note'],
+    route_detail: 'Détail des routes',
+    net_fee_label: 'Frais réseau (réel / max)',
+
+    // Fraîcheur / countdown
+    fresh_none: 'aucun tick',
+    countdown_label: (m, s) => `prochain relevé dans ${m}:${String(s).padStart(2,'0')}`,
+    countdown_imminent: 'imminent',
+    countdown_overdue: 'relevé en retard',
+    countdown_refresh_hint: 'Cliquer pour forcer un relevé maintenant',
+
+    // Refresh
+    refresh_loading: 'Relevé en cours…',
+    refresh_429: 'Relevé déjà en cours, veuillez patienter.',
+    refresh_note: 'Rafraîchissement manuel provisoire — remplacé au prochain relevé programmé.',
+
+    // Paire / nav
+    pair_usdc: 'USDC',
+    pair_eurc: 'EURC',
+
+    // Sections
+    section_sim: 'Simulateur',
+    section_ladder: 'Échelle des sources',
+    section_slots: (u) => `Meilleurs créneaux — net BLND → ${u}`,
+    slots_help: 'L\'<b>efficience</b> = part du prix de référence (DefiLlama) réellement obtenue, frais et slippage déduits — 100 % = exécution parfaite. Mesurée sur le meilleur devis de la sonde choisie (≈ 4 relevés/heure). Chaque <b>case</b> compare cette efficience à la moyenne des 7 derniers jours : <b>vert = mieux que la semaine, rouge = moins bien</b>. C\'est <b>relatif</b> — une case verte peut rester médiocre dans l\'absolu si toute la semaine est mauvaise. La <b>note du jour</b> = efficience moyenne du jour, en %.',
+    section_hourly: 'Zoom journalier',
+    section_hourly_note: '▼ heure en cours',
+    section_routes: 'Meilleures routes (7 j)',
+    section_who: 'Qui gagne le plus souvent (7 j)',
+    routes_wins: 'victoires',
+    routes_empty: 'Historique limité — le classement se remplira avec les ticks.',
+
+    // Simulateur
+    sim_placeholder: 'montant BLND',
+    sim_wallet_ok: (n) => `Solde wallet (${n} BLND)`,
+    sim_wallet_ko: 'Solde wallet (non configuré)',
+    sim_btn_simulate: 'Simuler',
+    sim_btn_refresh: 'Rafraîchir',
+    sim_btn_refresh_wait: (s) => `Rafraîchir (${s}s)`,
+    sim_btn_clear: 'Vider',
+    sim_loading: 'Cotation en cours…',
+    sim_min: (u) => `Reçu min (${u})`,
+
+    // Tableau ladder
+    ladder_col_tool: 'Outil de swap',
+    ladder_col_net: (u) => `${u}`,
+    ladder_col_delta: 'Δ gagnant',
+    ladder_col_chip: 'Confiance',
+    ladder_col_impact: 'Impact',
+    ladder_col_impact_evm: 'Impact EVM',
+    ladder_col_route: 'Route',
+    ladder_tip_chip: 'Observé = fill vu en simulation (route exécutable)<br>Estimé = pas de fill simulé : borne/plancher ou simulation indisponible<br>Indispo = source injoignable',
+    ladder_tip_impact: '<b>Mode LOCAL (défaut)</b> : écart vs le prix de l\'EURC <i>sur Stellar</i> (carnet SDEX EURC/USDC). Prévaut si tu comptes <b>rester sur Stellar</b>.<br><br><b>Mode EVM</b> : écart vs le prix de l\'EURC <i>global</i> (Base/Ethereum). Prévaut si tu comptes <b>bridger vers EVM</b> — la prime/décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>Ne concerne que l\'<b>EURC</b> (USDC : identique dans les deux modes).<br><br>Clique le titre de colonne pour basculer. Positif = tu reçois moins. Négatif = tu reçois plus.',
+    impact_evm_notice_title: 'Passer en mode Impact EVM ?',
+    impact_evm_notice_body: 'En mode <b>EVM</b>, l\'impact est calculé vs le prix de l\'EURC <b>global (Base/Ethereum)</b> : prévaut si tu comptes <b>bridger vers EVM</b>. La prime ou décote du marché Stellar compte alors comme un vrai gain ou une perte.<br><br>En mode <b>Local</b> (défaut), l\'impact est calculé vs le prix EURC sur le <b>SDEX Stellar</b> : prévaut si tu comptes <b>rester sur Stellar</b>.<br><br>Ce réglage ne concerne que l\'<b>EURC</b> (le swap vers USDC est identique dans les deux modes).',
+    impact_evm_confirm: 'Passer en mode EVM',
+    impact_evm_dismiss: 'Ne plus me montrer',
+    spot_eurc_stellar: 'EURC@Stellar',
+    spot_eurc_evm: 'EURC@EVM',
+    ladder_empty: 'Aucune donnée',
+    ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
+
+    // Chips
+    chip_obs: 'observé',
+    chip_est: 'estimé',
+    chip_down: 'indispo',
+    hops_hidden: 'Chemin non communiqué par xBull',
+
+    // Heatmap / profil
+    hmap_insufficient: 'Données insuffisantes',
+    days: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
+    hour_now_suffix: ' · maintenant',
+
+    // Callout meilleurs créneaux
+    slot_best: 'Meilleur créneau',
+    slot_gain: 'Gain vs moyenne',
+    slot_avoid: 'À éviter',
+    slot_gap: 'Écart',
+    encart_best_day: 'Meilleur jour',
+    encart_now: 'Maintenant',
+    day_avg: 'Moyenne du jour',
+    vs_week: 'vs semaine',
+    vs_day_avg: 'vs moy. du jour',
+    per_week: '/ sem.',
+    today_badge: 'auj.',
+    vs_week_line: 'moy. 7 j',
+    zoom_legend: 'Les 96 relevés de 15 min du jour choisi (clique une ligne du tableau). L\'<b>aire</b> = écart à la moyenne <b>du jour</b> (vert au-dessus, rouge en-dessous) → la forme intraday. La <b>ligne tirets</b> = moyenne 7 j, pour situer la journée. Le jour en cours <b>s\'arrête à maintenant</b> (sa moyenne se construit au fil des relevés).',
+
+    // Notes
+    limited_note: (n) => `historique limité : ${n} tick${n > 1 ? 's' : ''} ok`,
+    no_data_waiting: 'En attente du collecteur (aucun tick ok).',
+
+    // Distribution note
+    dist_note_usdc: '<b>xBull</b> domine habituellement ; <b>Comet</b> ne concourt que sur USDC (pool backstop). <b>Diversité = robustesse aux pannes.</b>',
+    dist_note_eurc: '<b>Pas de pool BLND/EURC profond</b> : les lignes « BLND → EURC » sont des <b>swaps atomiques routés en interne</b> via USDC/XLM (Soroswap affiche BLND → USDC → EURC, Aquarius via sUSD, Ultra Stellar via XLM ; <b>seul xBull masque son chemin</b>). La route <b>via-USDC explicite (2 swaps) les bat souvent</b>.',
+
+    // Divers
+    loading: 'Chargement…',
+    no_data: 'Aucune donnée',
+    last_tick_ago: (n) => `il y a ${n} min`,
+
+    // Carte dernier relevé
+    last_release_ago: (n) => `il y a ${n} min`,
+
+    // Wallet connect
+    connect_wallet: 'Connecter le wallet',
+    wallet_disconnect: 'Déconnecter',
+
+    // Exécution swap
+    exec_btn: 'Exécuter le swap',
+    exec_connect_first: 'Connecte ton wallet pour exécuter',
+    slippage_label: 'Slippage',
+
+    // Revue avant signature
+    review_title: 'Vérifier avant signature',
+    review_send: 'Tu envoies',
+    review_receive_min: 'Tu reçois au minimum',
+    review_expected: 'Estimé',
+    review_venue: 'Exécuté via',
+    review_route: 'Route',
+    review_slippage: 'Tolérance slippage',
+    review_fidelity: (winner, net) => `Le meilleur affiché était ${winner} (net ${net}) — non exécutable en 1 clic ; on exécute la meilleure route exécutable.`,
+    review_network_fee: 'Frais réseau (max)',
+    review_network_fee_note: 'Frais max affichés par le wallet ; la part de loyer (rent) non consommée est remboursée.',
+    review_confirm: 'Confirmer & signer',
+    review_cancel: 'Annuler',
+
+    // Revue sim-delta
+    review_sim_was: 'sim',
+
+    // États d'exécution
+    exec_signing_wallet: 'Signature dans le wallet…',
+    exec_submitting: 'Soumission…',
+    exec_restore: 'Étape de restauration d\'état requise (coût de stockage ponctuel) — signe-la, puis on reconstruit le swap.',
+    exec_success: 'Swap soumis',
+    exec_view: 'Voir sur stellar.expert ↗',
+    exec_close: 'Fermer',
+    exec_failed: 'Échec',
+    exec_rejected: 'Signature refusée dans le wallet.',
+    exec_quoted: 'Attendu (coté)',
+    exec_executed: 'Reçu (exécuté)',
+    exec_reading: 'lecture en cours…',
+    exec_delta: 'écart',
+
+    // Erreurs exec
+    err_trustline: (tgt, issuer) => `Trustline ${tgt} absente. Pour la recevoir : dans ton wallet, ajoute l'actif ${tgt} (émetteur ${issuer}) — opération changeTrust, ~0,5 XLM de réserve. Puis relance.`,
+    err_funds: 'Solde BLND liquide insuffisant (ton BLND est peut-être staké dans Blend — retire-le d\'abord).',
+    err_slippage: 'Le prix a bougé au-delà de ta tolérance — réessaie ou augmente le slippage.',
+    err_down: 'Source d\'exécution indisponible, réessaie.',
+    err_noroute: 'Aucune route exécutable pour ce montant.',
+    // Trustline in-app
+    trustline_title: 'Trustline requise',
+    trustline_need: (tgt) => `Ton compte n'a pas de trustline ${tgt} — obligatoire pour recevoir l'${tgt}. Ajoute-la en un clic ci-dessous (~0,5 XLM de réserve immobilisée, récupérable si tu la retires plus tard).`,
+    trustline_add_btn: (tgt) => `Ajouter la trustline ${tgt}`,
+    trustline_adding: 'Ajout de la trustline…',
+    trustline_added: (tgt) => `Trustline ${tgt} ajoutée`,
+    trustline_added_hint: 'Tu peux maintenant lancer le swap.',
+
+    // Composite 2-tx
+    comp_step: (n) => `Étape ${n} / 2`,
+    comp_leg1_confirming: 'Leg 1 confirmé — préparation du leg 2…',
+    comp_leg2_failed: (x) => `Leg 1 réussi : ${x} USDC reçus. Le leg 2 a échoué — tu détiens ces USDC.`,
+    comp_retry_leg2: 'Relancer le leg 2',
+
+    tx_label: 'Tx',
+    hops_label: (n) => `${n} saut${n > 1 ? 's' : ''}`,
+
+    // Footer ②
+    footer_readings: (n, nOk, cadenceHuman, perDay, coverH) =>
+      `${n} relevés (${nOk} valides) · 1 toutes les ${cadenceHuman} ≈ ${perDay}/j · ~${coverH} h de couverture`,
+    footer_health_link: 'Stabilité des sources →',
+
+    // Page santé ④
+    health_title: 'Stabilité des sources — 7 derniers jours',
+    health_col_source: 'Source',
+    health_col_uptime: 'Disponibilité',
+    health_col_days: '7 jours',
+    health_col_fails: 'Échecs',
+    health_col_last: 'Dernière panne',
+    health_legend_ok: 'ok',
+    health_legend_warn: '< 25 % d\'échecs',
+    health_legend_bad: '≥ 25 % d\'échecs',
+    health_legend_null: 'aucun relevé',
+    health_auto_only: 'Seuls les relevés automatiques (1 toutes les 15 min) sont pris en compte ici — les rafraîchissements manuels sont exclus du calcul de stabilité.',
+    health_kpi_readings: 'Relevés valides',
+    health_kpi_valid: (p) => `${p} % valides`,
+    health_kpi_cadence: 'Cadence',
+    health_kpi_perday: (n) => `≈ ${n}/j`,
+    health_kpi_coverage: 'Couverture',
+    health_never: '—',
+    health_ago_min: (n) => `il y a ${n} min`,
+    health_ago_h: (n) => `il y a ${n} h`,
+    health_ago_j: (n) => `il y a ${n} j`,
+    // Causes d'échec ③-bis
+    chip_health_fail: 'échec',
+    reason_timeout: 'timeout',
+    reason_http: 'erreur HTTP',
+    reason_indisponible: 'indisponible',
+    'reason_rate-limit': 'RPC saturé (429)',
+    reason_rpc: 'erreur RPC',
+    reason_simulation: 'simulation',
+    // Colonnes Cohérence / Exécution + modal trace
+    health_col_coherence: 'Cohérence',
+    health_coh_col_tip: 'Sondes de cohérence : la cote affichée est comparée à un fill re-simulé on-chain. ✓ = toutes cohérentes ; ⚠ = cotes suspectes (écart anormal coté/simulé), cliquer pour le détail.',
+    health_col_exec: 'Exécution',
+    health_total: 'Total (tick)',
+    health_total_tip: "Durée d'un tick complet (médiane 7 j) : sélection RPC, prix, cotations en parallèle, re-simulations, classement et écriture. Pas la somme des venues.",
+    health_coh_none: 'aucune sonde',
+    health_coh_ok: (n) => `${n} sondes, toutes cohérentes`,
+    health_coh_suspect: (s, t) => `${s} suspecte(s) sur ${t}`,
+    health_coh_modal_title: (d) => `Sondes de cohérence — ${d}`,
+    health_coh_modal_recap: (n, s) => `${n} sonde(s) sur 7 j, ${s} suspecte(s)`,
+    health_coh_modal_none: 'Aucune sonde suspecte sur la période.',
+    health_coh_modal_loading: 'Chargement…',
+    health_coh_col_date: 'Date',
+    health_coh_col_pair: 'Paire',
+    health_coh_col_amount: 'Montant',
+    health_coh_col_reason: 'Raison',
+    health_coh_col_route: 'Route',
+    health_coh_col_delta: 'Écart',
+    health_coh_col_quoted: 'Coté',
+    health_coh_col_simulated: 'Simulé',
+    health_coh_close: 'Fermer',
+    // RPC health
+    health_rpc_title: 'Santé des RPC Soroban — 7 derniers jours',
+    health_rpc_col_rpc: 'RPC',
+    health_rpc_col_actif: 'Statut',
+    health_rpc_col_latence: 'Latence (sonde)',
+    health_rpc_col_ledger: 'Ledger',
+    health_rpc_col_dispo: 'Dispo 7j',
+    health_rpc_col_echecs: 'Échecs',
+    health_rpc_col_simerr: 'Err. sim',
+    health_rpc_col_req7j: 'Req 7j',
+    health_rpc_col_reqps: 'Req/s',
+    health_rpc_active_yes: 'actif',
+    health_rpc_active_no: 'fallback',
+    health_rpc_note: 'Sonde réalisée au démarrage de chaque tick. Le RPC actif est celui retenu pour ce tick.',
+    health_sources_scope: 'Statistiques calculées sur les relevés automatiques et les rafraîchissements manuels, pas les devis manuels.',
+    health_rpc_scope: 'Charge calculée sur l\'ensemble des requêtes RPC : relevés automatiques, rafraîchissements manuels et devis manuels. Disponibilité et latence mesurées par sonde au début de chaque tick.',
+    nav_back: '← Tableau de bord',
+    // click-to-select
+    exec_via: (tool) => 'Exécuter via ' + tool,
+    exec_composite: 'Exécuter (2 transactions)',
+    exec_integrated_soon: 'Exécution intégrée à venir pour cet outil.',
+    ladder_pick_hint: 'Cliquez une ligne pour exécuter via cet outil (re-clic = retour au choix auto).',
+  },
+  en: {
+    // Topbar / brand
+    brand_dim: 'BLND swaps - accurately decanted',
+    tz_note: (z) => `UTC stored · displayed in local time (${z})`,
+    theme_dark: '🌙',
+    theme_light: '☀️',
+    venue_cols: ['Type', 'Layer', 'Liquidity', 'Note'],
+    route_detail: 'Route detail',
+    net_fee_label: 'Network fee (real / max)',
+
+    // Fraîcheur / countdown
+    fresh_none: 'no tick yet',
+    countdown_label: (m, s) => `next update in ${m}:${String(s).padStart(2,'0')}`,
+    countdown_imminent: 'imminent',
+    countdown_overdue: 'update overdue',
+    countdown_refresh_hint: 'Click to force a reading now',
+
+    // Refresh
+    refresh_loading: 'Fetching…',
+    refresh_429: 'Fetch already in progress, please wait.',
+    refresh_note: 'Manual refresh is provisional — replaced at next scheduled tick.',
+
+    // Paire / nav
+    pair_usdc: 'USDC',
+    pair_eurc: 'EURC',
+
+    // Sections
+    section_sim: 'Simulator',
+    section_ladder: 'Source ladder',
+    section_slots: (u) => `Best time slots — net BLND → ${u}`,
+    slots_help: '<b>Efficiency</b> = the share of the reference price (DefiLlama) actually obtained, fees and slippage deducted — 100 % = perfect execution. Measured on the best quote for the selected probe (≈ 4 readings/hour). Each <b>cell</b> compares this efficiency to the 7-day average: <b>green = better than the week, red = worse</b>. It\'s <b>relative</b> — a green cell can still be poor in absolute terms if the whole week is bad. The <b>day\'s note</b> = the day\'s average efficiency, in %.',
+    section_hourly: 'Daily zoom',
+    section_hourly_note: '▼ current hour',
+    section_routes: 'Best routes (7 d)',
+    section_who: 'Who wins most often (7 d)',
+    routes_wins: 'wins',
+    routes_empty: 'Limited history — ranking fills up as ticks accumulate.',
+
+    // Simulateur
+    sim_placeholder: 'BLND amount',
+    sim_wallet_ok: (n) => `Wallet balance (${n} BLND)`,
+    sim_wallet_ko: 'Wallet balance (not configured)',
+    sim_btn_simulate: 'Simulate',
+    sim_btn_refresh: 'Refresh',
+    sim_btn_refresh_wait: (s) => `Refresh (${s}s)`,
+    sim_btn_clear: 'Clear',
+    sim_loading: 'Fetching quote…',
+    sim_min: (u) => `Min received (${u})`,
+
+    // Tableau ladder
+    ladder_col_tool: 'Swap tool',
+    ladder_col_net: (u) => `${u}`,
+    ladder_col_delta: 'Δ winner',
+    ladder_col_chip: 'Confidence',
+    ladder_col_impact: 'Impact',
+    ladder_col_impact_evm: 'Impact EVM',
+    ladder_col_route: 'Route',
+    ladder_tip_chip: 'Observed = fill seen in simulation (executable route)<br>Estimated = no simulated fill: floor/ceiling or simulation unavailable<br>Unavailable = source unreachable',
+    ladder_tip_impact: '<b>LOCAL mode (default)</b>: gap vs the EURC price <i>on Stellar</i> (SDEX EURC/USDC order book). Use it if you plan to <b>stay on Stellar</b>.<br><br><b>EVM mode</b>: gap vs the <i>global</i> EURC price (Base/Ethereum). Use it if you plan to <b>bridge to EVM</b> — the Stellar market premium/discount then counts as a real gain or loss.<br><br>Only affects <b>EURC</b> (USDC: identical in both modes).<br><br>Click the column header to toggle. Positive = you receive less. Negative = you receive more.',
+    impact_evm_notice_title: 'Switch to EVM Impact mode?',
+    impact_evm_notice_body: 'In <b>EVM</b> mode, impact is measured against the <b>global EURC price (Base/Ethereum)</b>: use it if you plan to <b>bridge to EVM</b>. The Stellar market premium or discount then counts as a real gain or loss.<br><br>In <b>Local</b> mode (default), impact is measured against the EURC price on the <b>Stellar SDEX</b>: use it if you plan to <b>stay on Stellar</b>.<br><br>This setting only affects <b>EURC</b> (swapping to USDC is identical in both modes).',
+    impact_evm_confirm: 'Switch to EVM mode',
+    impact_evm_dismiss: 'Don\'t show again',
+    spot_eurc_stellar: 'EURC@Stellar',
+    spot_eurc_evm: 'EURC@EVM',
+    ladder_empty: 'No data',
+    ladder_sim_tag: (n, u) => `simulation · ${n} BLND → ${u}`,
+
+    // Chips
+    chip_obs: 'observed',
+    chip_est: 'estimated',
+    chip_down: 'unavailable',
+    hops_hidden: 'Path not disclosed by xBull',
+
+    // Heatmap / profil
+    hmap_insufficient: 'Insufficient data',
+    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    hour_now_suffix: ' · now',
+
+    // Callout meilleurs créneaux
+    slot_best: 'Best slot',
+    slot_gain: 'Gain vs avg',
+    slot_avoid: 'Avoid',
+    slot_gap: 'Gap',
+    encart_best_day: 'Best day',
+    encart_now: 'Now',
+    day_avg: 'Day average',
+    vs_week: 'vs week',
+    vs_day_avg: 'vs day avg',
+    per_week: '/ wk',
+    today_badge: 'today',
+    vs_week_line: '7-d avg',
+    zoom_legend: 'The 96 fifteen-minute readings of the selected day (click a table row). The <b>area</b> = deviation from the <b>day</b> average (green above, red below) → the intraday shape. The <b>dashed line</b> = 7-day average, to place the day. Today <b>stops at now</b> (its average builds up as readings arrive).',
+
+    // Notes
+    limited_note: (n) => `limited history: ${n} tick${n > 1 ? 's' : ''} ok`,
+    no_data_waiting: 'Waiting for collector (no ok tick yet).',
+
+    // Distribution note
+    dist_note_usdc: '<b>xBull</b> usually dominates; <b>Comet</b> only competes on USDC (backstop pool). <b>Diversity = resilience to failures.</b>',
+    dist_note_eurc: '<b>No deep BLND/EURC pool</b>: the "BLND → EURC" rows are <b>atomic swaps routed internally</b> via USDC/XLM (Soroswap shows BLND → USDC → EURC, Aquarius via sUSD, Ultra Stellar via XLM; <b>only xBull hides its path</b>). The explicit <b>via-USDC route (2 swaps) often beats them</b>.',
+
+    // Divers
+    loading: 'Loading…',
+    no_data: 'No data',
+    last_tick_ago: (n) => `${n} min ago`,
+
+    // Carte dernier relevé
+    last_release_ago: (n) => `${n} min ago`,
+
+    // Wallet connect
+    connect_wallet: 'Connect wallet',
+    wallet_disconnect: 'Disconnect',
+
+    // Swap execution
+    exec_btn: 'Execute swap',
+    exec_connect_first: 'Connect your wallet to execute',
+    slippage_label: 'Slippage',
+
+    // Review before signing
+    review_title: 'Review before signing',
+    review_send: 'You send',
+    review_receive_min: 'You receive at least',
+    review_expected: 'Expected',
+    review_venue: 'Executed via',
+    review_route: 'Route',
+    review_slippage: 'Slippage tolerance',
+    review_fidelity: (winner, net) => `The best displayed was ${winner} (net ${net}) — not executable in 1 click; we execute the best executable route.`,
+    review_network_fee: 'Network fee (max)',
+    review_network_fee_note: 'Max fees shown by the wallet; unused rent is refunded.',
+    review_confirm: 'Confirm & sign',
+    review_cancel: 'Cancel',
+
+    // Review sim-delta
+    review_sim_was: 'sim',
+
+    // Execution states
+    exec_signing_wallet: 'Signing in your wallet…',
+    exec_submitting: 'Submitting…',
+    exec_restore: 'A state restore step is required (one-time storage cost) — sign it, then we rebuild the swap.',
+    exec_success: 'Swap submitted',
+    exec_view: 'View on stellar.expert ↗',
+    exec_close: 'Close',
+    exec_failed: 'Failed',
+    exec_rejected: 'Signature rejected in the wallet.',
+    exec_quoted: 'Expected (quoted)',
+    exec_executed: 'Received (executed)',
+    exec_reading: 'reading…',
+    exec_delta: 'delta',
+
+    // Exec errors
+    err_trustline: (tgt, issuer) => `${tgt} trustline missing. To receive it: in your wallet, add the ${tgt} asset (issuer ${issuer}) — changeTrust operation, ~0.5 XLM reserve. Then retry.`,
+    err_funds: 'Insufficient liquid BLND (your BLND may be staked in Blend — withdraw it first).',
+    err_slippage: 'Price moved beyond your tolerance — retry or raise slippage.',
+    err_down: 'Execution source unavailable, try again.',
+    err_noroute: 'No executable route for this amount.',
+    // In-app trustline
+    trustline_title: 'Trustline required',
+    trustline_need: (tgt) => `Your account has no ${tgt} trustline — required to receive ${tgt}. Add it in one click below (~0.5 XLM reserve locked, refundable if you remove it later).`,
+    trustline_add_btn: (tgt) => `Add ${tgt} trustline`,
+    trustline_adding: 'Adding trustline…',
+    trustline_added: (tgt) => `${tgt} trustline added`,
+    trustline_added_hint: 'You can now run the swap.',
+
+    // Composite 2-tx
+    comp_step: (n) => `Step ${n} / 2`,
+    comp_leg1_confirming: 'Leg 1 confirmed — preparing leg 2…',
+    comp_leg2_failed: (x) => `Leg 1 succeeded: ${x} USDC received. Leg 2 failed — you hold these USDC.`,
+    comp_retry_leg2: 'Retry leg 2',
+
+    tx_label: 'Tx',
+    hops_label: (n) => `${n} hop${n > 1 ? 's' : ''}`,
+
+    // Footer ②
+    footer_readings: (n, nOk, cadenceHuman, perDay, coverH) =>
+      `${n} readings (${nOk} valid) · 1 every ${cadenceHuman} ≈ ${perDay}/d · ~${coverH} h coverage`,
+    footer_health_link: 'Source stability →',
+
+    // Health page ④
+    health_title: 'Source stability — last 7 days',
+    health_col_source: 'Source',
+    health_col_uptime: 'Availability',
+    health_col_days: '7 days',
+    health_col_fails: 'Failures',
+    health_col_last: 'Last failure',
+    health_legend_ok: 'ok',
+    health_legend_warn: '< 25% failures',
+    health_legend_bad: '≥ 25% failures',
+    health_legend_null: 'no readings',
+    health_auto_only: 'Only automatic measurements (one every 15 min) are counted here — manual refreshes are excluded from the stability stats.',
+    health_kpi_readings: 'Valid readings',
+    health_kpi_valid: (p) => `${p}% valid`,
+    health_kpi_cadence: 'Cadence',
+    health_kpi_perday: (n) => `≈ ${n}/d`,
+    health_kpi_coverage: 'Coverage',
+    health_never: '—',
+    health_ago_min: (n) => `${n} min ago`,
+    health_ago_h: (n) => `${n} h ago`,
+    health_ago_j: (n) => `${n} d ago`,
+    // Failure causes ③-bis
+    chip_health_fail: 'failed',
+    reason_timeout: 'timeout',
+    reason_http: 'HTTP error',
+    reason_indisponible: 'unavailable',
+    'reason_rate-limit': 'RPC throttled (429)',
+    reason_rpc: 'RPC error',
+    reason_simulation: 'simulation',
+    // Coherence / Execution columns + trace modal
+    health_col_coherence: 'Coherence',
+    health_coh_col_tip: 'Coherence probes: the displayed quote of a source is compared to an on-chain re-simulated fill. ✓ = all coherent; ⚠ = suspect quotes (abnormal quoted/simulated gap), click for details.',
+    health_col_exec: 'Execution',
+    health_total: 'Total (tick)',
+    health_total_tip: 'Full tick time (7-day median): RPC selection, prices, parallel quotes, re-simulations, ranking and write. Not the sum of venues.',
+    health_coh_none: 'no probes',
+    health_coh_ok: (n) => `${n} probes, all coherent`,
+    health_coh_suspect: (s, t) => `${s} suspect(s) out of ${t}`,
+    health_coh_modal_title: (d) => `Coherence probes — ${d}`,
+    health_coh_modal_recap: (n, s) => `${n} probe(s) over 7 d, ${s} suspect(s)`,
+    health_coh_modal_none: 'No suspect probes in the period.',
+    health_coh_modal_loading: 'Loading…',
+    health_coh_col_date: 'Date',
+    health_coh_col_pair: 'Pair',
+    health_coh_col_amount: 'Amount',
+    health_coh_col_reason: 'Reason',
+    health_coh_col_route: 'Route',
+    health_coh_col_delta: 'Delta',
+    health_coh_col_quoted: 'Quoted',
+    health_coh_col_simulated: 'Simulated',
+    health_coh_close: 'Close',
+    // RPC health
+    health_rpc_title: 'Soroban RPC health — last 7 days',
+    health_rpc_col_rpc: 'RPC',
+    health_rpc_col_actif: 'Status',
+    health_rpc_col_latence: 'Latency (probe)',
+    health_rpc_col_ledger: 'Ledger',
+    health_rpc_col_dispo: 'Uptime 7d',
+    health_rpc_col_echecs: 'Failures',
+    health_rpc_col_simerr: 'Sim errors',
+    health_rpc_col_req7j: 'Req 7d',
+    health_rpc_col_reqps: 'Req/s',
+    health_rpc_active_yes: 'active',
+    health_rpc_active_no: 'fallback',
+    health_rpc_note: 'Probed at the start of each tick. The active RPC is the one selected for that tick.',
+    health_sources_scope: 'Statistics computed from automatic readings and manual refreshes, not manual quotes.',
+    health_rpc_scope: 'Load computed across all RPC requests: automatic readings, manual refreshes and manual quotes. Availability and latency measured by probe at the start of each tick.',
+    nav_back: '← Dashboard',
+    // click-to-select
+    exec_via: (tool) => 'Execute via ' + tool,
+    exec_composite: 'Execute (2 transactions)',
+    exec_integrated_soon: 'Integrated execution coming soon for this tool.',
+    ladder_pick_hint: 'Click a row to execute via that tool (click again to revert to auto).',
+  },
+  es: {
+    // Topbar / brand
+    brand_dim: 'BLND swaps - con precisión',
+    tz_note: (z) => `UTC almacenado · mostrado en hora local (${z})`,
+    theme_dark: '🌙',
+    theme_light: '☀️',
+    venue_cols: ['Tipo', 'Capa', 'Liquidez', 'Nota'],
+    route_detail: 'Detalle de ruta',
+    net_fee_label: 'Comisión de red (real / máx)',
+
+    // Fraîcheur / countdown
+    fresh_none: 'sin datos aún',
+    countdown_label: (m, s) => `próxima actualización en ${m}:${String(s).padStart(2,'0')}`,
+    countdown_imminent: 'inminente',
+    countdown_overdue: 'actualización atrasada',
+    countdown_refresh_hint: 'Clic para forzar una lectura ahora',
+
+    // Refresh
+    refresh_loading: 'Cargando…',
+    refresh_429: 'Actualización ya en curso, por favor espere.',
+    refresh_note: 'La actualización manual es provisional — se reemplaza en el próximo ciclo programado.',
+
+    // Paire / nav
+    pair_usdc: 'USDC',
+    pair_eurc: 'EURC',
+
+    // Sections
+    section_sim: 'Simulador',
+    section_ladder: 'Clasificación de fuentes',
+    section_slots: (u) => `Mejores franjas horarias — neto BLND → ${u}`,
+    slots_help: '<b>Eficiencia</b> = porcentaje del precio de referencia (DefiLlama) realmente obtenido, con comisiones y slippage deducidos — 100 % = ejecución perfecta. Medida sobre la mejor cotización para la sonda seleccionada (≈ 4 lecturas/hora). Cada <b>celda</b> compara esta eficiencia con el promedio de 7 días: <b>verde = mejor que la semana, rojo = peor</b>. Es <b>relativa</b> — una celda verde puede ser mala en términos absolutos si toda la semana es mala. La <b>nota del día</b> = eficiencia media del día, en %.',
+    section_hourly: 'Zoom diario',
+    section_hourly_note: '▼ hora actual',
+    section_routes: 'Mejores rutas (7 d)',
+    section_who: 'Quién gana con más frecuencia (7 d)',
+    routes_wins: 'victorias',
+    routes_empty: 'Historial limitado — el ranking se completa a medida que se acumulan los ciclos.',
+
+    // Simulateur
+    sim_placeholder: 'Cantidad BLND',
+    sim_wallet_ok: (n) => `Saldo del wallet (${n} BLND)`,
+    sim_wallet_ko: 'Saldo del wallet (no configurado)',
+    sim_btn_simulate: 'Simular',
+    sim_btn_refresh: 'Actualizar',
+    sim_btn_refresh_wait: (s) => `Actualizar (${s}s)`,
+    sim_btn_clear: 'Limpiar',
+    sim_loading: 'Obteniendo cotización…',
+    sim_min: (u) => `Mínimo recibido (${u})`,
+
+    // Tableau ladder
+    ladder_col_tool: 'Herramienta de swap',
+    ladder_col_net: (u) => `${u}`,
+    ladder_col_delta: 'Δ ganador',
+    ladder_col_chip: 'Confianza',
+    ladder_col_impact: 'Impacto',
+    ladder_col_impact_evm: 'Impacto EVM',
+    ladder_col_route: 'Ruta',
+    ladder_tip_chip: 'Observado = fill visto en simulación (ruta ejecutable)<br>Estimado = sin fill simulado: suelo/techo o simulación no disponible<br>No disponible = fuente inaccesible',
+    ladder_tip_impact: '<b>Modo LOCAL (por defecto)</b>: diferencia respecto al precio EURC <i>en Stellar</i> (libro de órdenes SDEX EURC/USDC). Úselo si planea <b>quedarse en Stellar</b>.<br><br><b>Modo EVM</b>: diferencia respecto al precio EURC <i>global</i> (Base/Ethereum). Úselo si planea <b>hacer bridge a EVM</b> — la prima o descuento del mercado Stellar cuenta entonces como ganancia o pérdida real.<br><br>Solo afecta a <b>EURC</b> (USDC: idéntico en ambos modos).<br><br>Haga clic en el encabezado de columna para alternar. Positivo = recibe menos. Negativo = recibe más.',
+    impact_evm_notice_title: '¿Cambiar al modo Impacto EVM?',
+    impact_evm_notice_body: 'En modo <b>EVM</b>, el impacto se mide respecto al <b>precio global de EURC (Base/Ethereum)</b>: úselo si planea <b>hacer bridge a EVM</b>. La prima o descuento del mercado Stellar cuenta entonces como ganancia o pérdida real.<br><br>En modo <b>Local</b> (por defecto), el impacto se mide respecto al precio de EURC en el <b>SDEX de Stellar</b>: úselo si planea <b>quedarse en Stellar</b>.<br><br>Este ajuste solo afecta a <b>EURC</b> (el swap a USDC es idéntico en ambos modos).',
+    impact_evm_confirm: 'Cambiar a modo EVM',
+    impact_evm_dismiss: 'No mostrar de nuevo',
+    spot_eurc_stellar: 'EURC@Stellar',
+    spot_eurc_evm: 'EURC@EVM',
+    ladder_empty: 'Sin datos',
+    ladder_sim_tag: (n, u) => `simulación · ${n} BLND → ${u}`,
+
+    // Chips
+    chip_obs: 'observado',
+    chip_est: 'estimado',
+    chip_down: 'no disponible',
+    hops_hidden: 'Ruta no revelada por xBull',
+
+    // Heatmap / profil
+    hmap_insufficient: 'Datos insuficientes',
+    days: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
+    hour_now_suffix: ' · ahora',
+
+    // Callout meilleurs créneaux
+    slot_best: 'Mejor franja',
+    slot_gain: 'Ganancia vs promedio',
+    slot_avoid: 'Evitar',
+    slot_gap: 'Diferencia',
+    encart_best_day: 'Mejor día',
+    encart_now: 'Ahora',
+    day_avg: 'Promedio del día',
+    vs_week: 'vs semana',
+    vs_day_avg: 'vs prom. día',
+    per_week: '/ sem',
+    today_badge: 'hoy',
+    vs_week_line: 'prom. 7 días',
+    zoom_legend: 'Las 96 lecturas de quince minutos del día seleccionado (haga clic en una fila de la tabla). El <b>área</b> = desviación respecto al promedio del <b>día</b> (verde por encima, rojo por debajo) → la forma intradía. La <b>línea discontinua</b> = promedio de 7 días, para situar el día. Hoy <b>se detiene en este momento</b> (su promedio se va completando a medida que llegan las lecturas).',
+
+    // Notes
+    limited_note: (n) => `historial limitado: ${n} ciclo${n > 1 ? 's' : ''} ok`,
+    no_data_waiting: 'Esperando al recolector (aún no hay ciclo válido).',
+
+    // Distribution note
+    dist_note_usdc: '<b>xBull</b> suele dominar; <b>Comet</b> solo compite en USDC (pool de respaldo). <b>Diversidad = resiliencia ante fallos.</b>',
+    dist_note_eurc: '<b>Sin pool profunda BLND/EURC</b>: las filas "BLND → EURC" son <b>swaps atómicos enrutados internamente</b> vía USDC/XLM (Soroswap muestra BLND → USDC → EURC, Aquarius vía sUSD, Ultra Stellar vía XLM; <b>solo xBull oculta su ruta</b>). La <b>ruta explícita via-USDC (2 swaps) suele superarlos</b>.',
+
+    // Divers
+    loading: 'Cargando…',
+    no_data: 'Sin datos',
+    last_tick_ago: (n) => `hace ${n} min`,
+
+    // Carte dernier relevé
+    last_release_ago: (n) => `hace ${n} min`,
+
+    // Wallet connect
+    connect_wallet: 'Conectar wallet',
+    wallet_disconnect: 'Desconectar',
+
+    // Swap execution
+    exec_btn: 'Ejecutar swap',
+    exec_connect_first: 'Conecte su wallet para ejecutar',
+    slippage_label: 'Slippage',
+
+    // Review before signing
+    review_title: 'Revisar antes de firmar',
+    review_send: 'Usted envía',
+    review_receive_min: 'Recibirá al menos',
+    review_expected: 'Esperado',
+    review_venue: 'Ejecutado vía',
+    review_route: 'Ruta',
+    review_slippage: 'Tolerancia de slippage',
+    review_fidelity: (winner, net) => `El mejor mostrado fue ${winner} (neto ${net}) — no ejecutable en 1 clic; ejecutamos la mejor ruta ejecutable.`,
+    review_network_fee: 'Comisión de red (máx)',
+    review_network_fee_note: 'Comisiones máximas mostradas por el wallet; el alquiler no utilizado se reembolsa.',
+    review_confirm: 'Confirmar y firmar',
+    review_cancel: 'Cancelar',
+
+    // Review sim-delta
+    review_sim_was: 'sim',
+
+    // Execution states
+    exec_signing_wallet: 'Firmando en su wallet…',
+    exec_submitting: 'Enviando…',
+    exec_restore: 'Se requiere un paso de restauración de estado (coste único de almacenamiento) — fírmelo y luego reconstruimos el swap.',
+    exec_success: 'Swap enviado',
+    exec_view: 'Ver en stellar.expert ↗',
+    exec_close: 'Cerrar',
+    exec_failed: 'Error',
+    exec_rejected: 'Firma rechazada en el wallet.',
+    exec_quoted: 'Esperado (cotizado)',
+    exec_executed: 'Recibido (ejecutado)',
+    exec_reading: 'leyendo…',
+    exec_delta: 'delta',
+
+    // Exec errors
+    err_trustline: (tgt, issuer) => `Trustline de ${tgt} ausente. Para recibirlo: en su wallet, añada el activo ${tgt} (emisor ${issuer}) — operación changeTrust, reserva ~0,5 XLM. Luego vuelva a intentarlo.`,
+    err_funds: 'BLND líquido insuficiente (su BLND puede estar en staking en Blend — retírelo primero).',
+    err_slippage: 'El precio se ha movido más allá de su tolerancia — vuelva a intentarlo o aumente el slippage.',
+    err_down: 'Fuente de ejecución no disponible, inténtelo de nuevo.',
+    err_noroute: 'No hay ruta ejecutable para esta cantidad.',
+    // In-app trustline
+    trustline_title: 'Trustline requerida',
+    trustline_need: (tgt) => `Su cuenta no tiene trustline de ${tgt} — necesaria para recibir ${tgt}. Añádala con un clic a continuación (~0,5 XLM de reserva bloqueada, reembolsable si la elimina más adelante).`,
+    trustline_add_btn: (tgt) => `Añadir trustline de ${tgt}`,
+    trustline_adding: 'Añadiendo trustline…',
+    trustline_added: (tgt) => `Trustline de ${tgt} añadida`,
+    trustline_added_hint: 'Ya puede ejecutar el swap.',
+
+    // Composite 2-tx
+    comp_step: (n) => `Paso ${n} / 2`,
+    comp_leg1_confirming: 'Tramo 1 confirmado — preparando tramo 2…',
+    comp_leg2_failed: (x) => `Tramo 1 exitoso: ${x} USDC recibidos. Tramo 2 fallido — conserva estos USDC.`,
+    comp_retry_leg2: 'Reintentar tramo 2',
+
+    tx_label: 'Tx',
+    hops_label: (n) => `${n} salto${n > 1 ? 's' : ''}`,
+
+    // Footer ②
+    footer_readings: (n, nOk, cadenceHuman, perDay, coverH) =>
+      `${n} lecturas (${nOk} válidas) · 1 cada ${cadenceHuman} ≈ ${perDay}/d · ~${coverH} h de cobertura`,
+    footer_health_link: 'Estabilidad de fuentes →',
+
+    // Health page ④
+    health_title: 'Estabilidad de fuentes — últimos 7 días',
+    health_col_source: 'Fuente',
+    health_col_uptime: 'Disponibilidad',
+    health_col_days: '7 días',
+    health_col_fails: 'Fallos',
+    health_col_last: 'Último fallo',
+    health_legend_ok: 'ok',
+    health_legend_warn: '< 25% fallos',
+    health_legend_bad: '≥ 25% fallos',
+    health_legend_null: 'sin lecturas',
+    health_auto_only: 'Solo se cuentan aquí las mediciones automáticas (una cada 15 min) — las actualizaciones manuales quedan excluidas de las estadísticas de estabilidad.',
+    health_kpi_readings: 'Lecturas válidas',
+    health_kpi_valid: (p) => `${p}% válidas`,
+    health_kpi_cadence: 'Cadencia',
+    health_kpi_perday: (n) => `≈ ${n}/d`,
+    health_kpi_coverage: 'Cobertura',
+    health_never: '—',
+    health_ago_min: (n) => `hace ${n} min`,
+    health_ago_h: (n) => `hace ${n} h`,
+    health_ago_j: (n) => `hace ${n} d`,
+    // Failure causes ③-bis
+    chip_health_fail: 'fallida',
+    reason_timeout: 'tiempo de espera agotado',
+    reason_http: 'error HTTP',
+    reason_indisponible: 'no disponible',
+    'reason_rate-limit': 'RPC limitado (429)',
+    reason_rpc: 'error RPC',
+    reason_simulation: 'simulación',
+    // Coherence / Execution columns + trace modal
+    health_col_coherence: 'Coherencia',
+    health_coh_col_tip: 'Sondas de coherencia: la cotización mostrada se compara con un fill re-simulado on-chain. ✓ = todas coherentes; ⚠ = cotizaciones sospechosas (desviación anómala cotizado/simulado), haga clic para ver el detalle.',
+    health_col_exec: 'Ejecución',
+    health_total: 'Total (ciclo)',
+    health_total_tip: 'Tiempo total del ciclo (mediana 7 días): selección de RPC, precios, cotizaciones paralelas, re-simulaciones, clasificación y escritura. No es la suma de las fuentes.',
+    health_coh_none: 'sin sondas',
+    health_coh_ok: (n) => `${n} sondas, todas coherentes`,
+    health_coh_suspect: (s, t) => `${s} sospechosa${s > 1 ? 's' : ''} de ${t}`,
+    health_coh_modal_title: (d) => `Sondas de coherencia — ${d}`,
+    health_coh_modal_recap: (n, s) => `${n} sonda${n > 1 ? 's' : ''} en 7 d, ${s} sospechosa${s > 1 ? 's' : ''}`,
+    health_coh_modal_none: 'No hay sondas sospechosas en el período.',
+    health_coh_modal_loading: 'Cargando…',
+    health_coh_col_date: 'Fecha',
+    health_coh_col_pair: 'Par',
+    health_coh_col_amount: 'Cantidad',
+    health_coh_col_reason: 'Motivo',
+    health_coh_col_route: 'Ruta',
+    health_coh_col_delta: 'Delta',
+    health_coh_col_quoted: 'Cotizado',
+    health_coh_col_simulated: 'Simulado',
+    health_coh_close: 'Cerrar',
+    // RPC health
+    health_rpc_title: 'Salud del RPC Soroban — últimos 7 días',
+    health_rpc_col_rpc: 'RPC',
+    health_rpc_col_actif: 'Estado',
+    health_rpc_col_latence: 'Latencia (sonda)',
+    health_rpc_col_ledger: 'Ledger',
+    health_rpc_col_dispo: 'Disponibilidad 7d',
+    health_rpc_col_echecs: 'Fallos',
+    health_rpc_col_simerr: 'Errores sim',
+    health_rpc_col_req7j: 'Req 7d',
+    health_rpc_col_reqps: 'Req/s',
+    health_rpc_active_yes: 'activo',
+    health_rpc_active_no: 'respaldo',
+    health_rpc_note: 'Sondeo al inicio de cada ciclo. El RPC activo es el seleccionado para ese ciclo.',
+    health_sources_scope: 'Estadísticas calculadas a partir de lecturas automáticas y actualizaciones manuales, no de cotizaciones manuales.',
+    health_rpc_scope: 'Carga calculada sobre todas las solicitudes RPC: lecturas automáticas, actualizaciones manuales y cotizaciones manuales. Disponibilidad y latencia medidas por sonda al inicio de cada ciclo.',
+    nav_back: '← Panel',
+    // click-to-select
+    exec_via: (tool) => 'Ejecutar vía ' + tool,
+    exec_composite: 'Ejecutar (2 transacciones)',
+    exec_integrated_soon: 'Ejecución integrada próximamente para esta herramienta.',
+    ladder_pick_hint: 'Haga clic en una fila para ejecutar vía esa herramienta (haga clic de nuevo para volver a automático).',
+  },
+  pt: {
+    brand_dim: 'BLND swaps - com precisão',
+    tz_note: (z) => `UTC armazenado · exibido no horário local (${z})`,
+    theme_dark: '🌙',
+    theme_light: '☀️',
+    venue_cols: ['Tipo', 'Camada', 'Liquidez', 'Nota'],
+    route_detail: 'Detalhe da rota',
+    net_fee_label: 'Taxa de rede (real / máx.)',
+    fresh_none: 'nenhum ciclo ainda',
+    countdown_label: (m, s) => `próxima atualização em ${m}:${String(s).padStart(2,'0')}`,
+    countdown_imminent: 'iminente',
+    countdown_overdue: 'atualização atrasada',
+    countdown_refresh_hint: 'Clique para forçar uma leitura agora',
+    refresh_loading: 'Buscando…',
+    refresh_429: 'Busca já em andamento, aguarde.',
+    refresh_note: 'Atualização manual é provisória — substituída no próximo ciclo agendado.',
+    pair_usdc: 'USDC',
+    pair_eurc: 'EURC',
+    section_sim: 'Simulador',
+    section_ladder: 'Escala de fontes',
+    section_slots: (u) => `Melhores horários — líquido BLND → ${u}`,
+    slots_help: '<b>Eficiência</b> = a proporção do preço de referência (DefiLlama) efetivamente obtida, descontadas as taxas e o slippage — 100% = execução perfeita. Medida na melhor cotação para a sonda selecionada (≈ 4 leituras/hora). Cada <b>célula</b> compara essa eficiência à média dos 7 dias: <b>verde = melhor que a semana, vermelho = pior</b>. É <b>relativa</b> — uma célula verde pode ser fraca em termos absolutos se toda a semana for ruim. A <b>nota do dia</b> = eficiência média do dia, em %.',
+    section_hourly: 'Zoom diário',
+    section_hourly_note: '▼ hora atual',
+    section_routes: 'Melhores rotas (7 d)',
+    section_who: 'Quem vence com mais frequência (7 d)',
+    routes_wins: 'vitórias',
+    routes_empty: 'Histórico limitado — o ranking vai se formando conforme os ciclos se acumulam.',
+    sim_placeholder: 'Quantidade de BLND',
+    sim_wallet_ok: (n) => `Saldo da carteira (${n} BLND)`,
+    sim_wallet_ko: 'Saldo da carteira (não configurado)',
+    sim_btn_simulate: 'Simular',
+    sim_btn_refresh: 'Atualizar',
+    sim_btn_refresh_wait: (s) => `Atualizar (${s}s)`,
+    sim_btn_clear: 'Limpar',
+    sim_loading: 'Buscando cotação…',
+    sim_min: (u) => `Mínimo recebido (${u})`,
+    ladder_col_tool: 'Ferramenta de swap',
+    ladder_col_net: (u) => `${u}`,
+    ladder_col_delta: 'Δ vencedor',
+    ladder_col_chip: 'Confiança',
+    ladder_col_impact: 'Impacto',
+    ladder_col_impact_evm: 'Impacto EVM',
+    ladder_col_route: 'Rota',
+    ladder_tip_chip: 'Observado = fill visto na simulação (rota executável)<br>Estimado = sem fill simulado: piso/teto ou simulação indisponível<br>Indisponível = fonte inacessível',
+    ladder_tip_impact: '<b>Modo LOCAL (padrão)</b>: diferença em relação ao preço do EURC <i>na Stellar</i> (livro de ordens SDEX EURC/USDC). Use se planeja <b>permanecer na Stellar</b>.<br><br><b>Modo EVM</b>: diferença em relação ao preço <i>global</i> do EURC (Base/Ethereum). Use se planeja <b>migrar para EVM</b> — o prêmio ou desconto do mercado Stellar conta como ganho ou perda real.<br><br>Afeta apenas o <b>EURC</b> (USDC: idêntico nos dois modos).<br><br>Clique no cabeçalho da coluna para alternar. Positivo = você recebe menos. Negativo = você recebe mais.',
+    impact_evm_notice_title: 'Alternar para o modo Impacto EVM?',
+    impact_evm_notice_body: 'No modo <b>EVM</b>, o impacto é medido em relação ao <b>preço global do EURC (Base/Ethereum)</b>: use se planeja <b>migrar para EVM</b>. O prêmio ou desconto do mercado Stellar conta como ganho ou perda real.<br><br>No modo <b>Local</b> (padrão), o impacto é medido em relação ao preço do EURC no <b>SDEX Stellar</b>: use se planeja <b>permanecer na Stellar</b>.<br><br>Esta configuração afeta apenas o <b>EURC</b> (swap para USDC é idêntico nos dois modos).',
+    impact_evm_confirm: 'Alternar para modo EVM',
+    impact_evm_dismiss: 'Não mostrar novamente',
+    spot_eurc_stellar: 'EURC@Stellar',
+    spot_eurc_evm: 'EURC@EVM',
+    ladder_empty: 'Sem dados',
+    ladder_sim_tag: (n, u) => `simulação · ${n} BLND → ${u}`,
+    chip_obs: 'observado',
+    chip_est: 'estimado',
+    chip_down: 'indisponível',
+    hops_hidden: 'Caminho não divulgado pelo xBull',
+    hmap_insufficient: 'Dados insuficientes',
+    days: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'],
+    hour_now_suffix: ' · agora',
+    slot_best: 'Melhor horário',
+    slot_gain: 'Ganho vs média',
+    slot_avoid: 'Evitar',
+    slot_gap: 'Diferença',
+    encart_best_day: 'Melhor dia',
+    encart_now: 'Agora',
+    day_avg: 'Média do dia',
+    vs_week: 'vs semana',
+    vs_day_avg: 'vs média do dia',
+    per_week: '/ sem',
+    today_badge: 'hoje',
+    vs_week_line: 'média 7 d',
+    zoom_legend: 'As 96 leituras de quinze minutos do dia selecionado (clique em uma linha da tabela). A <b>área</b> = desvio em relação à média do <b>dia</b> (verde acima, vermelho abaixo) → o perfil intradiário. A <b>linha tracejada</b> = média de 7 dias, para situar o dia. Hoje <b>para no momento atual</b> (a média se constrói conforme as leituras chegam).',
+    limited_note: (n) => `histórico limitado: ${n} ciclo${n > 1 ? 's' : ''} válido${n > 1 ? 's' : ''}`,
+    no_data_waiting: 'Aguardando o coletor (nenhum ciclo válido ainda).',
+    dist_note_usdc: '<b>xBull</b> geralmente domina; <b>Comet</b> só compete no USDC (pool backstop). <b>Diversidade = resiliência a falhas.</b>',
+    dist_note_eurc: '<b>Sem pool profunda BLND/EURC</b>: as linhas "BLND → EURC" são <b>swaps atômicos roteados internamente</b> via USDC/XLM (Soroswap mostra BLND → USDC → EURC, Aquarius via sUSD, Ultra Stellar via XLM; <b>somente o xBull oculta seu caminho</b>). A <b>rota explícita via-USDC (2 swaps) frequentemente supera as demais</b>.',
+    loading: 'Carregando…',
+    no_data: 'Sem dados',
+    last_tick_ago: (n) => `há ${n} min`,
+    last_release_ago: (n) => `há ${n} min`,
+    connect_wallet: 'Conectar carteira',
+    wallet_disconnect: 'Desconectar',
+    exec_btn: 'Executar swap',
+    exec_connect_first: 'Conecte sua carteira para executar',
+    slippage_label: 'Slippage',
+    review_title: 'Revisar antes de assinar',
+    review_send: 'Você envia',
+    review_receive_min: 'Você recebe no mínimo',
+    review_expected: 'Esperado',
+    review_venue: 'Executado via',
+    review_route: 'Rota',
+    review_slippage: 'Tolerância de slippage',
+    review_fidelity: (winner, net) => `O melhor exibido foi ${winner} (líquido ${net}) — não executável em 1 clique; executamos a melhor rota executável.`,
+    review_network_fee: 'Taxa de rede (máx.)',
+    review_network_fee_note: 'Taxas máximas mostradas pela carteira; o saldo não utilizado é reembolsado.',
+    review_confirm: 'Confirmar e assinar',
+    review_cancel: 'Cancelar',
+    review_sim_was: 'sim',
+    exec_signing_wallet: 'Assinando na sua carteira…',
+    exec_submitting: 'Enviando…',
+    exec_restore: 'Uma etapa de restauração de estado é necessária (custo único de armazenamento) — assine-a e depois reconstruímos o swap.',
+    exec_success: 'Swap enviado',
+    exec_view: 'Ver no stellar.expert ↗',
+    exec_close: 'Fechar',
+    exec_failed: 'Falhou',
+    exec_rejected: 'Assinatura rejeitada na carteira.',
+    exec_quoted: 'Esperado (cotado)',
+    exec_executed: 'Recebido (executado)',
+    exec_reading: 'lendo…',
+    exec_delta: 'delta',
+    err_trustline: (tgt, issuer) => `Trustline ${tgt} ausente. Para receber: na sua carteira, adicione o ativo ${tgt} (emissor ${issuer}) — operação changeTrust, ~0,5 XLM de reserva. Tente novamente.`,
+    err_funds: 'BLND líquido insuficiente (seu BLND pode estar em staking no Blend — retire-o primeiro).',
+    err_slippage: 'O preço se moveu além da sua tolerância — tente novamente ou aumente o slippage.',
+    err_down: 'Fonte de execução indisponível, tente novamente.',
+    err_noroute: 'Nenhuma rota executável para este valor.',
+    trustline_title: 'Trustline necessária',
+    trustline_need: (tgt) => `Sua conta não tem trustline ${tgt} — necessária para receber ${tgt}. Adicione com um clique abaixo (~0,5 XLM de reserva bloqueada, reembolsável se removida depois).`,
+    trustline_add_btn: (tgt) => `Adicionar trustline ${tgt}`,
+    trustline_adding: 'Adicionando trustline…',
+    trustline_added: (tgt) => `Trustline ${tgt} adicionada`,
+    trustline_added_hint: 'Agora você pode executar o swap.',
+    comp_step: (n) => `Etapa ${n} / 2`,
+    comp_leg1_confirming: 'Leg 1 confirmada — preparando leg 2…',
+    comp_leg2_failed: (x) => `Leg 1 concluída: ${x} USDC recebidos. Leg 2 falhou — você possui esses USDC.`,
+    comp_retry_leg2: 'Tentar leg 2 novamente',
+    tx_label: 'Tx',
+    hops_label: (n) => `${n} hop${n > 1 ? 's' : ''}`,
+    footer_readings: (n, nOk, cadenceHuman, perDay, coverH) =>
+      `${n} leituras (${nOk} válidas) · 1 a cada ${cadenceHuman} ≈ ${perDay}/d · ~${coverH} h de cobertura`,
+    footer_health_link: 'Estabilidade das fontes →',
+    health_title: 'Estabilidade das fontes — últimos 7 dias',
+    health_col_source: 'Fonte',
+    health_col_uptime: 'Disponibilidade',
+    health_col_days: '7 dias',
+    health_col_fails: 'Falhas',
+    health_col_last: 'Última falha',
+    health_legend_ok: 'ok',
+    health_legend_warn: '< 25% de falhas',
+    health_legend_bad: '≥ 25% de falhas',
+    health_legend_null: 'sem leituras',
+    health_auto_only: 'Apenas as medições automáticas (uma a cada 15 min) são contadas aqui — atualizações manuais são excluídas das estatísticas de estabilidade.',
+    health_kpi_readings: 'Leituras válidas',
+    health_kpi_valid: (p) => `${p}% válidas`,
+    health_kpi_cadence: 'Cadência',
+    health_kpi_perday: (n) => `≈ ${n}/d`,
+    health_kpi_coverage: 'Cobertura',
+    health_never: '—',
+    health_ago_min: (n) => `há ${n} min`,
+    health_ago_h: (n) => `há ${n} h`,
+    health_ago_j: (n) => `há ${n} d`,
+    chip_health_fail: 'falhou',
+    reason_timeout: 'timeout',
+    reason_http: 'erro HTTP',
+    reason_indisponible: 'indisponível',
+    'reason_rate-limit': 'RPC limitado (429)',
+    reason_rpc: 'erro RPC',
+    reason_simulation: 'simulação',
+    health_col_coherence: 'Coerência',
+    health_coh_col_tip: 'Sondas de coerência: a cotação exibida é comparada a um fill re-simulado on-chain. ✓ = todas coerentes; ⚠ = cotações suspeitas (desvio anormal cotado/simulado), clique para detalhes.',
+    health_col_exec: 'Execução',
+    health_total: 'Total (ciclo)',
+    health_total_tip: 'Tempo total do ciclo (mediana de 7 dias): seleção de RPC, preços, cotações paralelas, re-simulações, ranking e gravação. Não é a soma das venues.',
+    health_coh_none: 'sem sondas',
+    health_coh_ok: (n) => `${n} sondas, todas coerentes`,
+    health_coh_suspect: (s, t) => `${s} suspeita(s) de ${t}`,
+    health_coh_modal_title: (d) => `Sondas de coerência — ${d}`,
+    health_coh_modal_recap: (n, s) => `${n} sonda(s) em 7 d, ${s} suspeita(s)`,
+    health_coh_modal_none: 'Nenhuma sonda suspeita no período.',
+    health_coh_modal_loading: 'Carregando…',
+    health_coh_col_date: 'Data',
+    health_coh_col_pair: 'Par',
+    health_coh_col_amount: 'Valor',
+    health_coh_col_reason: 'Motivo',
+    health_coh_col_route: 'Rota',
+    health_coh_col_delta: 'Delta',
+    health_coh_col_quoted: 'Cotado',
+    health_coh_col_simulated: 'Simulado',
+    health_coh_close: 'Fechar',
+    health_rpc_title: 'Saúde do Soroban RPC — últimos 7 dias',
+    health_rpc_col_rpc: 'RPC',
+    health_rpc_col_actif: 'Status',
+    health_rpc_col_latence: 'Latência (sonda)',
+    health_rpc_col_ledger: 'Ledger',
+    health_rpc_col_dispo: 'Uptime 7d',
+    health_rpc_col_echecs: 'Falhas',
+    health_rpc_col_simerr: 'Erros de sim',
+    health_rpc_col_req7j: 'Req 7d',
+    health_rpc_col_reqps: 'Req/s',
+    health_rpc_active_yes: 'ativo',
+    health_rpc_active_no: 'fallback',
+    health_rpc_note: 'Sondado no início de cada ciclo. O RPC ativo é o selecionado para aquele ciclo.',
+    health_sources_scope: 'Estatísticas calculadas a partir de leituras automáticas e atualizações manuais, não de cotações manuais.',
+    health_rpc_scope: 'Carga calculada sobre todas as requisições RPC: leituras automáticas, atualizações manuais e cotações manuais. Disponibilidade e latência medidas por sonda no início de cada ciclo.',
+    nav_back: '← Painel',
+    exec_via: (tool) => 'Executar via ' + tool,
+    exec_composite: 'Executar (2 transações)',
+    exec_integrated_soon: 'Execução integrada em breve para esta ferramenta.',
+    ladder_pick_hint: 'Clique em uma linha para executar via essa ferramenta (clique novamente para voltar ao automático).',
+  },
+};
+
+// ─── Stellar Wallets Kit — module-level cache ─────────────────────────────────
+let kitReady = null; // promise cache
+let SWK = null, KIT_NET = null;
+
+async function ensureKit() {
+  if (!kitReady) kitReady = (async () => {
+    // Bundle self-hosté servi par le serveur (cf. web/walletkit.entry.js).
+    const m = await import('/walletkit.js');
+    m.StellarWalletsKit.init({
+      network: m.Networks.PUBLIC,
+      modules: [ new m.xBullModule(), new m.FreighterModule(), new m.LobstrModule(), new m.AlbedoModule(), new m.RabetModule(), new m.HanaModule() ],
+    });
+    SWK = m.StellarWalletsKit; KIT_NET = m.Networks.PUBLIC;
+  })();
+  await kitReady;
+}
+
+// ─── État global ──────────────────────────────────────────────────────────────
+let view = 'dashboard'; // 'dashboard' | 'health'
+let health = null;      // données de /api/health
+let target = 'USDC';
+// Langue par défaut = navigateur (FR si la préférence commence par "fr", sinon EN) ; un choix explicite reste persisté
+const LOCALE = { fr: 'fr-FR', en: 'en-US', es: 'es-ES', pt: 'pt-BR' };
+let lang = (() => {
+  const saved = localStorage.getItem('lang');
+  if (['fr', 'en', 'es', 'pt'].includes(saved)) return saved;
+  const nav = ((navigator.languages && navigator.languages[0]) || navigator.language || '').toLowerCase();
+  if (nav.startsWith('fr')) return 'fr';
+  if (nav.startsWith('es')) return 'es';
+  if (nav.startsWith('pt')) return 'pt';
+  return 'en';
+})();
+let ladderSonde = 250;
+let selDay = -1;       // jour affiché dans le zoom (init = aujourd'hui au 1er rendu)
+let zoomDev = [];      // écarts horaires du jour affiché (pour le survol)
+let simAmt = 0;
+let simActive = false;
+let simLoading = false;
+let walletBlnd = 0;
+let walletConfigured = false;
+let overview = null; // données de /api/overview
+let simResult = null; // données de /api/quote (live)
+let refreshing = false;
+let refreshMsg = '';
+
+// Wallet
+let walletAddress = localStorage.getItem('walletAddress') || null;
+// Exécution swap
+let execState = null; // null | { phase:'review'|'signing'|'submitting'|'done'|'error', build?, hash?, venue?, errorMsg? }
+let execSlippagePct = (() => { const s = parseFloat(localStorage.getItem('slippagePct')); return (!isNaN(s) && s >= 0 && s <= 50) ? s : 0.5; })(); // UI %, → bps = Math.round(execSlippagePct*100)
+// click-to-select : sourceId sélectionné (null = auto)
+let selectedSource = null;
+// Modal cohérence : null = fermée, sinon { venue, loading, data }
+let coherenceModal = null;
+// Mode d'affichage de l'impact : 'local' (défaut) | 'evm'
+let impactMode = (() => { const v = localStorage.getItem('impactMode'); return v === 'evm' ? 'evm' : 'local'; })();
+// Modal avertissement passage en EVM : null = fermée, sinon 'pending'
+let impactEvmModalOpen = false;
+
+function selectSource(id) {
+  selectedSource = (selectedSource === id) ? null : id; // re-clic = désélection
+  renderApp();
+}
+
+// Compte à rebours : nextTickAt en ms depuis epoch (null = inconnu)
+let nextTickAt = null;
+let countdownInterval = null;
+let lastImminentPollAt = 0;
+
+// Cooldown bouton Rafraîchir (10 s après une sim réussie)
+let refreshCooldown = 0;   // secondes restantes ; 0 = bouton actif
+let refreshTimer = null;   // setInterval handle
+
+function t(key, ...args) {
+  const s = STRINGS[lang] || STRINGS.en;
+  let v = s ? s[key] : undefined;
+  if (v === undefined) v = STRINGS.en[key];   // fallback EN si la clé manque (es/pt incomplets)
+  if (typeof v === 'function') return v(...args);
+  return v !== undefined ? v : key;
+}
+
+// ─── Cartes d'identité de venue ───────────────────────────────────────────────
+const VENUE_META = {
+  xbull: {
+    fr: { type: 'Agrégateur', couche: 'SDEX + AMM Soroban', liquidite: 'meilleur chemin multi-venues (swap-kit, sans clé)', note: 'prélève 0,1 % — classé sur le fill réellement simulé' },
+    en: { type: 'Aggregator', couche: 'SDEX + Soroban AMMs', liquidite: 'best multi-venue path (swap-kit, keyless)', note: 'skims 0.1% — ranked on the actually simulated fill' },
+    es: { type: 'Agregador', couche: 'SDEX + AMMs Soroban', liquidite: 'mejor ruta multi-fuente (swap-kit, sin clave)', note: 'descuenta 0,1% — clasificado sobre el fill realmente simulado' },
+    pt: { type: 'Agregador', couche: 'SDEX + AMMs Soroban', liquidite: 'melhor rota multi-venue (swap-kit, sem chave)', note: 'desconta 0,1% — classificado sobre o fill realmente simulado' },
+  },
+  soroswap: {
+    fr: { type: 'Agrégateur', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: 'frais protocole inclus dans le fill simulé' },
+    en: { type: 'Aggregator', couche: 'Soroban', liquidite: 'Soroswap AMM (router)', note: 'protocol fees included in the simulated fill' },
+    es: { type: 'Agregador', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: 'comisiones del protocolo incluidas en el fill simulado' },
+    pt: { type: 'Agregador', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: 'taxas do protocolo incluídas no fill simulado' },
+  },
+  aquarius: {
+    fr: { type: 'Agrégateur', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + carnet SDEX (find-path)', note: 'find-path sur-cote parfois (3-hop via XLM) → re-simulé' },
+    en: { type: 'Aggregator', couche: 'AMM + SDEX', liquidite: 'Aquarius pools + SDEX book (find-path)', note: 'find-path sometimes over-quotes (3-hop via XLM) → re-simulated' },
+    es: { type: 'Agregador', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + libro SDEX (find-path)', note: 'find-path a veces sobrecotiza (3 saltos vía XLM) → re-simulado' },
+    pt: { type: 'Agregador', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + livro SDEX (find-path)', note: 'find-path às vezes supercotiza (3 hops via XLM) → re-simulado' },
+  },
+  stellarbroker: {
+    fr: { type: 'Agrégateur (RFQ)', couche: 'hors-chaîne', liquidite: 'agrège des market makers', note: 'frais opaques → classé en plancher (borne basse)' },
+    en: { type: 'Aggregator (RFQ)', couche: 'off-chain', liquidite: 'aggregates market makers', note: 'opaque fees → treated as a floor (lower bound)' },
+    es: { type: 'Agregador (RFQ)', couche: 'fuera de cadena', liquidite: 'agrega creadores de mercado', note: 'comisiones opacas → tratado como suelo (límite inferior)' },
+    pt: { type: 'Agregador (RFQ)', couche: 'off-chain', liquidite: 'agrega formadores de mercado', note: 'taxas opacas → tratado como piso (limite inferior)' },
+  },
+  ultrastellar: {
+    fr: { type: 'Carnet SDEX', couche: 'SDEX classique', liquidite: "carnet d'ordres natif Stellar", note: 'path payment, frais 0' },
+    en: { type: 'SDEX order book', couche: 'classic SDEX', liquidite: 'native Stellar order book', note: 'path payment, 0 fee' },
+    es: { type: 'Libro de órdenes SDEX', couche: 'SDEX clásico', liquidite: 'libro de órdenes nativo de Stellar', note: 'path payment, 0 comisión' },
+    pt: { type: 'Livro de ordens SDEX', couche: 'SDEX clássico', liquidite: 'livro de ordens nativo da Stellar', note: 'path payment, taxa 0' },
+  },
+  horizon: {
+    fr: { type: 'Carnet SDEX', couche: 'SDEX classique', liquidite: "carnet d'ordres natif (strict-send)", note: 'plancher garanti (path payment direct)' },
+    en: { type: 'SDEX order book', couche: 'classic SDEX', liquidite: 'native order book (strict-send)', note: 'guaranteed floor (direct path payment)' },
+    es: { type: 'Libro de órdenes SDEX', couche: 'SDEX clásico', liquidite: 'libro de órdenes nativo (strict-send)', note: 'suelo garantizado (path payment directo)' },
+    pt: { type: 'Livro de ordens SDEX', couche: 'SDEX clássico', liquidite: 'livro de ordens nativo (strict-send)', note: 'piso garantido (path payment direto)' },
+  },
+  comet: {
+    fr: { type: 'Pool (source unique)', couche: 'Soroban', liquidite: 'pool backstop Blend 80/20 (BLND/USDC)', note: 'cote indépendante du solde ; BLND→USDC seulement' },
+    en: { type: 'Pool (single source)', couche: 'Soroban', liquidite: 'Blend 80/20 backstop pool (BLND/USDC)', note: 'balance-independent quote; BLND→USDC only' },
+    es: { type: 'Pool (fuente única)', couche: 'Soroban', liquidite: 'pool de respaldo Blend 80/20 (BLND/USDC)', note: 'cotización independiente del saldo; solo BLND→USDC' },
+    pt: { type: 'Pool (fonte única)', couche: 'Soroban', liquidite: 'pool backstop Blend 80/20 (BLND/USDC)', note: 'cotização independente do saldo; apenas BLND→USDC' },
+  },
+};
+
+function venueCard(id, name) {
+  const meta = VENUE_META[id];
+  if (!meta) return escapeHtml(name); // composite / inconnu → pas de carte
+  const m = meta[lang] || meta.en;
+  const L = t('venue_cols');
+  const eName = escapeHtml(name);
+  return `<span class="tip-wrap vname"><span class="srcname">${eName}</span>` +
+    `<span class="tip-box vcard"><b>${eName}</b>` +
+    `<span class="vgrid"><span>${L[0]}</span><span>${m.type}</span>` +
+    `<span>${L[1]}</span><span>${m.couche}</span>` +
+    `<span>${L[2]}</span><span>${m.liquidite}</span>` +
+    `<span>${L[3]}</span><span>${m.note}</span></span></span></span>`;
+}
+
+function chipLabel(chip) {
+  const map = { obs: t('chip_obs'), est: t('chip_est'), down: t('chip_down') };
+  return map[chip] || chip;
+}
+
+// Notes generated backend-side (FR): translate fragments to display language. Closed vocabulary.
+function noteLabel(note) {
+  if (!note || lang === 'fr') return note;
+  const maps = {
+    en: { 'gagnant': 'winner', 'plancher (fee opaque)': 'floor (opaque fee)', 'plancher DEX': 'DEX floor' },
+    es: { 'gagnant': 'ganador', 'plancher (fee opaque)': 'suelo (comisión opaca)', 'plancher DEX': 'suelo DEX' },
+    pt: { 'gagnant': 'vencedor', 'plancher (fee opaque)': 'piso (taxa opaca)', 'plancher DEX': 'piso DEX' },
+  };
+  const map = maps[lang] || maps.en;
+  return note.split(' · ').map((f) => map[f] || f).join(' · ');
+}
+
+// Route lisible : rend le glyphe nuage ☁ (hops xBull inaccessibles) en pastille avec infobulle.
+function renderRoute(s) {
+  if (!s) return '—';
+  return s.split('☁').map(f => escapeHtml(f)).join(`<span class="hops-hidden" title="${t('hops_hidden')}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span>`);
+}
+
+// ─── Timezone client ──────────────────────────────────────────────────────────
+function localOffset(){ return -Math.round(new Date().getTimezoneOffset()/60); }
+function nowLocalHour(){ return new Date().getHours(); }
+function todayLocalDow(){ return (new Date().getDay()+6)%7; } // 0=Lun..6=Dim
+
+function rotateUtc(arr, offsetH) {
+  if (!arr || arr.length !== 24) return arr;
+  const r = new Array(24);
+  for (let h = 0; h < 24; h++) r[(h + offsetH + 24) % 24] = arr[h];
+  return r;
+}
+function rotateHeatUtc(heat, offsetH) {
+  if (!heat || heat.length !== 7) return heat;
+  return heat.map(row => rotateUtc(row, offsetH));
+}
+
+// ─── Formatage ────────────────────────────────────────────────────────────────
+const fmt = n => n.toLocaleString(LOCALE[lang], { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt3 = n => n.toLocaleString(LOCALE[lang], { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+// Montants de route : jusqu'à 3 décimales, zéros inutiles supprimés, séparateur localisé.
+const fmtRoute = n => n.toLocaleString(LOCALE[lang], { maximumFractionDigits: 3 });
+// Taux : jusqu'à 6 décimales, séparateur localisé (cohérent avec le reste du simulateur).
+const fmtRate = n => n.toLocaleString(LOCALE[lang], { maximumFractionDigits: 6 });
+// Parse un nombre saisi selon la LANGUE de l'app (déterministe via le toggle FR/EN, pas la locale OS).
+// FR : ',' = décimale, espaces (y c. fines insécables) = milliers. EN : '.' = décimale, ',' = milliers → retirées.
+// Corrige le bug « 12,000 » saisi en EN qui devenait 12 (virgule traitée à tort comme décimale).
+function parseAmount(v) {
+  let s = String(v).replace(/\s/g, '');
+  s = lang === 'en' ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.'); // en : virgule=millier ; fr/es/pt : point=millier (retiré) + virgule=décimale
+  return parseFloat(s);
+}
+const fmt0 = n => n.toLocaleString(LOCALE[lang], { maximumFractionDigits: 0 });
+
+function freshLabel(lastTickAt) {
+  const hint = t('countdown_refresh_hint');
+  if (!lastTickAt) return `<span class="fresh" onclick="doRefresh()" title="${hint}"><span class="dot" style="background:var(--amber)"></span>${t('fresh_none')}</span>`;
+  const diff = (Date.now() - new Date(lastTickAt).getTime()) / 60000;
+  const color = diff < 30 ? 'var(--green)' : diff < 120 ? 'var(--amber)' : 'var(--red)';
+  // Countdown text — rendered in a placeholder updated by setInterval
+  return `<span class="fresh" onclick="doRefresh()" title="${hint}"><span class="dot" style="background:${color}"></span><span id="countdown">${computeCountdownText()}</span></span>`;
+}
+
+function computeNextTickAt(meta) {
+  if (!meta) return null;
+  const last = meta.lastTickAt ? new Date(meta.lastTickAt).getTime() : 0;
+  if (meta.nextTickAt) {
+    const t = new Date(meta.nextTickAt).getTime();
+    if (!isNaN(t) && t > last) return t; // prévision daemon (jitter + durée connus) — préférée
+  }
+  if (last && meta.cadenceSec) return last + meta.cadenceSec * 1000; // fallback : estimation nominale
+  return null;
+}
+
+function computeCountdownText() {
+  // Daemon stale: no successful tick within ~2 cadences → collector is behind/stopped, not
+  // "imminent". Show an honest "overdue" instead of a countdown frozen forever on imminent.
+  const mt = (typeof overview !== 'undefined' && overview) ? overview.meta : null;
+  if (mt && mt.lastTickAt && mt.cadenceSec) {
+    const sinceLastSec = (Date.now() - new Date(mt.lastTickAt).getTime()) / 1000;
+    if (sinceLastSec > mt.cadenceSec * 2) return t('countdown_overdue');
+  }
+  if (nextTickAt === null) {
+    // If we have meta, show elapsed ago instead (fallback pre-nextTickAt set)
+    return t('countdown_imminent');
+  }
+  const secLeft = Math.round((nextTickAt - Date.now()) / 1000);
+  if (secLeft <= 0) return t('countdown_imminent');
+  const m = Math.floor(secLeft / 60);
+  const s = secLeft % 60;
+  return t('countdown_label', m, s);
+}
+
+function agoLabel(lastTickAt) {
+  if (!lastTickAt) return '';
+  const diff = Math.round((Date.now() - new Date(lastTickAt).getTime()) / 60000);
+  return t('last_release_ago', diff);
+}
+
+function tool(name) { return `<span class="tool">${name}</span>`; }
+
+// ─── Ruban de route ───────────────────────────────────────────────────────────
+function routeFromParts(parts, big) {
+  if (!parts || parts.length === 0) return '';
+  const assetSpan = (p) => {
+    const qtyClass = `qty${p.out ? ' o' : ''}${big ? ' big' : ''}`;
+    const qtyStr = p.amt != null ? `${fmtRoute(p.amt)} ${p.asset}` : '';
+    return `<span class="rasset"><span class="asset${p.out ? ' out' : ''}">${p.asset}</span>${qtyStr ? `<span class="${qtyClass}">${qtyStr}</span>` : ''}</span>`;
+  };
+  // Cartouche d'outil UNIQUE entre l'entrée et la sortie. Les jetons traversés ne sont
+  // jamais répétés : groupés dans le niveau 2 d'un cartouche 2 niveaux si multi-hop.
+  // Une seule venue par appel (best / ligne sélectionnée / leg composite). Repli sur le
+  // rendu plat si plusieurs outils distincts (cas non attendu).
+  const assets = parts.filter(p => p.asset !== undefined);
+  const tools = parts.filter(p => p.tool !== undefined).map(p => p.tool);
+  const uniform = tools.length > 0 && tools.every(tn => tn === tools[0]);
+  if (assets.length >= 2 && uniform) {
+    const mids = assets.slice(1, -1).map(a => a.asset);
+    const cart = mids.length > 0
+      ? `<span class="cart2"><span class="lvl1">${tools[0]}</span><span class="lvl2">via ${mids.join(' · ')}</span></span>`
+      : `<span class="tool">${tools[0]}</span>`;
+    const ar = '<span class="ar2">→</span>';
+    return `<div class="routeline">${assetSpan(assets[0])}${ar}${cart}${ar}${assetSpan(assets[assets.length - 1])}</div>`;
+  }
+  return '<div class="routeline">' + parts.map(p => {
+    if (p.tool !== undefined) return `<span class="leg">${tool(p.tool)}<span class="ar">→</span></span>`;
+    return assetSpan(p);
+  }).join('') + '</div>';
+}
+
+function routeSimple(amtIn, netVal, src, pairUi, big) {
+  const tgt = pairUi === 'USDC' ? 'USDC' : 'EURC';
+  const hops = [{ asset: 'BLND', amt: amtIn }, { tool: src }, { asset: tgt, amt: netVal, out: true }];
+  return routeFromParts(hops, big);
+}
+
+// ─── Cadence lisible (② footer) ──────────────────────────────────────────────
+function cadenceHuman(sec) {
+  if (sec < 3600) return `${sec / 60} min`;
+  return `${sec / 3600} h`;
+}
+
+// ─── Temps relatif pour la page santé ④ ──────────────────────────────────────
+function healthAgo(isoStr) {
+  if (!isoStr) return t('health_never');
+  const diffMs = Date.now() - new Date(isoStr).getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  if (diffMin < 60) return t('health_ago_min', diffMin);
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return t('health_ago_h', diffH);
+  return t('health_ago_j', Math.round(diffH / 24));
+}
+
+// ─── Libellé d'une cause d'échec ③-bis (timeout/http/indisponible) ────────────
+function reasonLabel(code) {
+  if (!code) return '';
+  const lab = t('reason_' + code);
+  return lab === 'reason_' + code ? code : lab; // fallback : code brut si non mappé
+}
+
+// ─── Échelle de sources ───────────────────────────────────────────────────────
+function ladderHead(u) {
+  const isEurc = (typeof target !== 'undefined' && target === 'EURC');
+  const impactLabel = impactMode === 'evm' ? t('ladder_col_impact_evm') : t('ladder_col_impact');
+  const impactStyle = 'cursor:pointer;user-select:none;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;';
+  // Le toggle local/EVM ne concerne que l'EURC (USDC : identique). Hors EURC : en-tête simple, non cliquable, sans tooltip.
+  const impactTh = isEurc
+    ? `<th onclick="toggleImpactMode()" style="${impactStyle}">
+      <div class="tip-wrap" style="display:inline-flex;align-items:center;">
+        ${impactLabel}<span style="font-size:10px;margin-left:2px;opacity:.7">▾</span><span class="tip-icon">ⓘ</span>
+        <span class="tip-box up">${t('ladder_tip_impact')}</span>
+      </div>
+    </th>`
+    : `<th>${t('ladder_col_impact')}</th>`;
+  return `<thead><tr>
+    <th>${t('ladder_col_tool')}</th>
+    <th>${t('ladder_col_net', u)}</th>
+    <th>${t('ladder_col_delta')}</th>
+    <th>
+      <div class="tip-wrap" style="display:inline-flex;align-items:center;">
+        ${t('ladder_col_chip')}<span class="tip-icon">ⓘ</span>
+        <span class="tip-box">${t('ladder_tip_chip')}</span>
+      </div>
+    </th>
+    ${impactTh}
+    <th class="left">${t('ladder_col_route')}</th>
+  </tr></thead>`;
+}
+
+function getImpactVal(row) {
+  if (impactMode === 'evm') return row.impactPct != null ? row.impactPct : null;
+  // mode local : préfère impactLocalPct, repli sur impactPct si indisponible (ex. USDC = identique)
+  if (row.impactLocalPct !== undefined) return row.impactLocalPct != null ? row.impactLocalPct : null;
+  return row.impactPct != null ? row.impactPct : null;
+}
+
+function impactStr(row) {
+  const v = getImpactVal(row);
+  return v != null ? fmt(v) + ' %' : '—';
+}
+
+function toggleImpactMode() {
+  const tp = document.getElementById('tipPortal'); if (tp) { tp.style.display = 'none'; tp.innerHTML = ''; }
+  if (impactMode === 'evm') {
+    // evm → local : silencieux
+    impactMode = 'local';
+    localStorage.setItem('impactMode', 'local');
+    renderApp();
+  } else {
+    // local → evm : popup si jamais vu
+    const dismissed = localStorage.getItem('impactEvmNoticeDismissed');
+    if (dismissed) {
+      impactMode = 'evm';
+      localStorage.setItem('impactMode', 'evm');
+      renderApp();
+    } else {
+      impactEvmModalOpen = true;
+      renderApp();
+    }
+  }
+}
+
+function confirmImpactEvm(dismiss) {
+  if (dismiss) localStorage.setItem('impactEvmNoticeDismissed', '1');
+  impactEvmModalOpen = false;
+  impactMode = 'evm';
+  localStorage.setItem('impactMode', 'evm');
+  renderApp();
+}
+
+function cancelImpactEvm() {
+  impactEvmModalOpen = false;
+  renderApp();
+}
+
+function impactEvmModalHtml() {
+  if (!impactEvmModalOpen) return '';
+  return `<div class="modal-overlay">
+    <div class="modal-card">
+      <div style="font-size:14px;font-weight:700;margin-bottom:.75rem">${t('impact_evm_notice_title')}</div>
+      <p style="font-size:13px;color:var(--caption);line-height:1.55;margin:0 0 1rem">${t('impact_evm_notice_body')}</p>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
+        <button class="btn" onclick="cancelImpactEvm()">${t('review_cancel')}</button>
+        <button class="btn" onclick="confirmImpactEvm(true)" style="font-size:12px">${t('impact_evm_dismiss')}</button>
+        <button class="btn primary" onclick="confirmImpactEvm(false)">${t('impact_evm_confirm')}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function ladderRows(rows, u, down) {
+  if (!rows || rows.length === 0) return `<tr><td colspan="6" class="muted" style="text-align:center;padding:1.2rem">${t('ladder_empty')}</td></tr>`;
+  let html = rows.map(r => {
+    const delta = r.deltaVsWinner === 0 ? '—' : `−${fmt3(Math.abs(r.deltaVsWinner))}`;
+    const deltaClass = r.deltaVsWinner < 0 ? 'neg' : 'muted';
+    const impact = impactStr(r);
+    const routeText = renderRoute(r.route);
+    const isSel = r.sourceId && r.sourceId === selectedSource;
+    const trClass = [r.winner ? 'win' : '', isSel ? 'sel' : ''].filter(Boolean).join(' ');
+    const sid = r.sourceId ? r.sourceId.replace(/\\/g, '\\\\').replace(/'/g, "\\'") : '';
+    return `<tr class="${trClass}" style="cursor:pointer" onclick="selectSource('${sid}')">
+      <td>${venueCard(r.sourceId, r.display)}${r.note ? ` <span class="muted">· ${escapeHtml(noteLabel(r.note))}</span>` : ''}</td>
+      <td>${fmt3(r.net)}</td>
+      <td class="${deltaClass}">${delta}</td>
+      <td><span class="chip ${r.chip}">${chipLabel(r.chip)}</span></td>
+      <td>${impact}</td>
+      <td class="left">${routeText}</td></tr>`;
+  }).join('');
+  // Lignes de sources en échec (axe santé, distinct des chips confiance) — ponytail: health axis
+  if (down && down.length > 0) {
+    html += down.map(d =>
+      `<tr><td><span class="muted">${venueCard(d.sourceId, d.display)}</span></td>
+      <td class="muted">—</td>
+      <td class="muted">—</td>
+      <td><span class="chip down">${t('chip_health_fail')} · ${reasonLabel(d.reason)}</span></td>
+      <td class="muted">—</td>
+      <td class="left muted">—</td></tr>`
+    ).join('');
+  }
+  return html;
+}
+
+function ladderTable(rows, u, down) {
+  return `<div style="overflow-x:auto"><table class="flt">${ladderHead(u)}<tbody>${ladderRows(rows, u, down)}</tbody></table></div>`;
+}
+
+// ─── Carte "Meilleures routes (7 j)" ──────────────────────────────────────────
+function bestRoutesCard(sk) {
+  const routes = overview && overview.bestRoutes ? (overview.bestRoutes[sk] || []) : [];
+  if (routes.length === 0) {
+    return `<p class="help">${t('routes_empty')}</p>`;
+  }
+  const top = routes.slice(0, 6);
+  const maxPct = Math.max(...top.map(r => r.winPct));
+  return `<div class="rk">${top.map((r) => `
+    <div class="rrow">
+      <span class="rlabel"><span class="rpath">${renderRoute(r.path)}</span><span class="rtools"> · ${r.tools}</span></span>
+      <span class="rbar"><span style="width:${maxPct > 0 ? r.winPct / maxPct * 100 : 0}%"></span></span>
+      <span class="rpct">${r.winPct.toFixed(1)} %</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ─── Simulateur ───────────────────────────────────────────────────────────────
+function simCard() {
+  const walletLabel = walletConfigured
+    ? t('sim_wallet_ok', fmtRoute(walletBlnd))
+    : t('sim_wallet_ko');
+  const simInput = simActive ? fmtRoute(simAmt) : '';
+
+  let resultHtml = '';
+  if (simLoading) {
+    resultHtml = `<p class="help" style="margin:.7rem 0 0">${t('sim_loading')}</p>`;
+  } else if (simResult && simActive) {
+    const b = simResult.best;
+    // #5 — sélection dans le ladder : si une ligne non-gagnante est sélectionnée,
+    // afficher le détail de CETTE source (route + net + impact) et non ceux du gagnant.
+    const selRow = selectedSource
+      ? (simResult.ladder || []).find(r => r.sourceId === selectedSource)
+      : null;
+    const displayRow = selRow && !selRow.winner ? selRow : null; // non-gagnant sélectionné → détail spécifique
+    const winRow = (simResult.ladder || []).find(r => r.winner);
+    let route, rateStr, impactMeta, minReceived;
+    if (displayRow) {
+      // #7 — harmonise le rendu de la ligne non-gagnante avec le gagnant
+      route = displayRow.routeParts && displayRow.routeParts.length > 0
+        ? routeFromParts(displayRow.routeParts, true)
+        : renderRoute(displayRow.route);
+      const rowRate = simAmt > 0 ? displayRow.net / simAmt : 0;
+      rateStr = rowRate > 0 ? fmtRate(rowRate) + ' ' + target + '/BLND' : '';
+      { const v = getImpactVal(displayRow); impactMeta = v != null ? ` · impact ${fmt(v)} %` : ''; }
+      minReceived = displayRow.net * (1 - execSlippagePct / 100);
+    } else {
+      route = b.route && b.route.length > 0
+        ? routeFromParts(b.route, true)
+        : routeSimple(simAmt, b.net, b.display, target, true);
+      rateStr = b.rate > 0 ? fmtRate(b.rate) + ' ' + target + '/BLND' : '';
+      { const v = getImpactVal(b); impactMeta = v != null ? ` · impact ${fmt(v)} %` : ''; }
+      minReceived = b.net * (1 - execSlippagePct / 100);
+    }
+    const minStr = `<span style="color:var(--caption)">${t('sim_min', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(minReceived)} ${target}</span>`;
+    // Nom de l'outil retiré ici : il est désormais porté par le bouton « Exécuter via [outil] ».
+    const legsData = (displayRow || b).legs;
+    const routeDiv = legsData
+      ? '<div class="complegs">' + legsData.map((leg, i) =>
+          `<div class="legblock"><span class="txbadge">${t('tx_label')} ${i + 1}</span>${routeFromParts(leg.routeParts, false)}</div>`
+        ).join('') + '</div>'
+      : `<div style="overflow-x:auto;overflow-y:hidden">${route}</div>`;
+    resultHtml = `<div class="result">
+      <div style="flex:1 1 100%;min-width:0">${routeDiv}</div>
+      <span class="meta" style="flex:1 1 100%; margin-top:.4rem">${rateStr}${impactMeta}</span>
+      <span class="meta" style="flex:1 1 100%; margin-top:${target === 'EURC' ? '0' : '.2rem'}">${minStr}</span>
+    </div>`;
+    // Exec row
+    if (legsData) {
+      // Composite EURC affiché (best ou ligne sélectionnée) → exécution 2-tx guidée.
+      resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+        <button class="btn primary" onclick="doExecuteComposite()">${t('exec_composite')}</button>
+      </div>`;
+    } else if (selRow && !selRow.executable) {
+      // Venue non intégré : pas d'exécution, message seul (plus de deep-link)
+      resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--caption)">${t('exec_integrated_soon')}</span>
+      </div>`;
+    } else {
+      const execLabel = selRow ? t('exec_via', selRow.display)
+        : (winRow && winRow.executable && !winRow.sourceId.includes('+') ? t('exec_via', winRow.display) : t('exec_btn'));
+      resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+        <button class="btn primary" onclick="doExecute()">${execLabel}</button>
+      </div>`;
+    }
+  }
+
+  // Bouton Simuler / Rafraîchir selon l'état
+  const { label: simBtnLabel, disabled: simBtnDisabled } = simBtnState();
+
+  return `<div class="sim">
+    <div class="controls">
+      <input id="simAmt" type="text" value="${simInput}" placeholder="${t('sim_placeholder')}" oninput="onAmt(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();doSim();}">
+      <span class="suffix">BLND</span>
+      <button class="btn" onclick="useWallet()" ${!walletConfigured ? 'disabled' : ''}>${walletLabel}</button>
+      <button id="simBtn" class="btn primary" onclick="doSim()" ${simBtnDisabled ? 'disabled' : ''}>${simBtnLabel}</button>
+      <button class="btn" onclick="clearSim()">${t('sim_btn_clear')}</button>
+      <span style="color:var(--card-border);margin:0 .4rem;user-select:none">—</span>
+      <span style="font-size:12px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
+      <span style="display:inline-flex;align-items:stretch;border:1px solid var(--card-border);border-radius:.4rem;overflow:hidden;background:var(--section-bg)">
+        <input id="execSlippage" type="text" inputmode="decimal" value="${fmtRoute(execSlippagePct)}"
+          style="width:40px;font-size:13px;padding:.35rem .1rem .35rem .4rem;border:0;background:transparent;color:var(--val);text-align:right"
+          onchange="onExecSlippage(this.value)">
+        <span style="display:flex;align-items:center;padding:0 .35rem 0 .1rem;font-size:13px;color:var(--caption);user-select:none">%</span>
+        <span style="display:flex;flex-direction:column;border-left:1px solid var(--card-border)">
+          <button type="button" onclick="nudgeSlippage(0.1)" tabindex="-1" style="flex:1;border:0;border-bottom:1px solid var(--card-border);background:transparent;color:var(--caption);cursor:pointer;font-size:8px;line-height:1;padding:0 .35rem">▲</button>
+          <button type="button" onclick="nudgeSlippage(-0.1)" tabindex="-1" style="flex:1;border:0;background:transparent;color:var(--caption);cursor:pointer;font-size:8px;line-height:1;padding:0 .35rem">▼</button>
+        </span>
+      </span>
+    </div>
+    <div id="simOut">${resultHtml}</div></div>`;
+}
+
+// ─── Distribution gagnants ────────────────────────────────────────────────────
+function distBars(winnerDist) {
+  if (!winnerDist || winnerDist.length === 0) return `<p class="help">${t('no_data')}</p>`;
+  const max = Math.max(...winnerDist.map(d => d.pct));
+  return `<div class="dist">${winnerDist.map(d =>
+    `<div class="drow"><span class="dname">${venueCard(d.sourceId, d.display)}</span>
+    <span class="dbar"><span style="width:${max > 0 ? d.pct/max*100 : 0}%"></span></span>
+    <span class="dpct">${d.pct.toFixed(1)} %</span></div>`
+  ).join('')}</div>`;
+}
+
+// ─── Section temporelle : modèle + rendu (encart / hebdo / zoom) ────────────────
+const hh2 = x => String(x).padStart(2, '0') + (lang === 'fr' || lang === 'pt' ? ' h' : ':00');
+const pctTxt = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)} %`;
+
+function timeModel(heatEffLocal, weekAvg) {
+  const wk = (weekAvg && weekAvg > 0) ? weekAvg : null;
+  const cellPct = heatEffLocal.map(row => row.map(v => (v == null || !wk) ? null : (v / wk - 1) * 100));
+  const dayEff = heatEffLocal.map(row => { const v = row.filter(x => x != null); return v.length ? v.reduce((a, x) => a + x, 0) / v.length : null; });
+  const dayVs = dayEff.map(e => (e == null || !wk) ? null : (e / wk - 1) * 100);
+  let bestDay = -1, worstDay = -1, bv = -Infinity, wv = Infinity;
+  dayEff.forEach((e, i) => { if (e == null) return; if (e > bv) { bv = e; bestDay = i; } if (e < wv) { wv = e; worstDay = i; } });
+  let bestCell = null, worstCell = null, bc = -Infinity, wc = Infinity;
+  cellPct.forEach((row, d) => row.forEach((v, h) => { if (v == null) return; if (v > bc) { bc = v; bestCell = { d, h, v }; } if (v < wc) { wc = v; worstCell = { d, h, v }; } }));
+  return { cellPct, dayEff, dayVs, weekAvg: wk, bestDay, worstDay, bestCell, worstCell };
+}
+
+function encartHtml(m, today, nowHour) {
+  const days = t('days');
+  const nowVal = (m.cellPct[today] && m.cellPct[today][nowHour] != null) ? m.cellPct[today][nowHour] : null;
+  const slot = m.bestCell ? `
+    <div class="enck"><div class="l">${t('slot_best')}</div>
+      <div class="v g">${days[m.bestCell.d]} ${hh2(m.bestCell.h)}</div><div class="s">${pctTxt(m.bestCell.v)} ${t('vs_week')}</div>
+      <div class="sub2">${t('slot_avoid')} : <span class="r">${days[m.worstCell.d]} ${hh2(m.worstCell.h)} · ${pctTxt(m.worstCell.v)}</span></div></div>` : '';
+  const day = m.bestDay >= 0 ? `
+    <div class="enck"><div class="l">${t('encart_best_day')}</div>
+      <div class="v g">${days[m.bestDay]}</div><div class="s">${fmt(m.dayEff[m.bestDay] * 100)} % · ${pctTxt(m.dayVs[m.bestDay])} ${t('per_week')}</div>
+      <div class="sub2">${t('slot_avoid')} : <span class="r">${days[m.worstDay]} · ${pctTxt(m.dayVs[m.worstDay])} ${t('per_week')}</span></div></div>` : '';
+  const now = `
+    <div class="enck"><div class="l">${t('encart_now')}</div>
+      <div class="v ${nowVal == null ? '' : nowVal >= 0 ? 'g' : 'r'}">${days[today]} ${hh2(nowHour)}</div>
+      <div class="s">${nowVal == null ? '—' : pctTxt(nowVal) + ' ' + t('vs_week')}</div></div>`;
+  return `<div class="enc">${slot}${day}${now}</div>`;
+}
+
+function hebdoHtml(m, today, sel) {
+  const days = t('days');
+  const allv = []; for (const row of m.cellPct) for (const v of row) if (v != null) allv.push(v);
+  if (allv.length === 0) return `<p class="help">${t('hmap_insufficient')}</p>`;
+  const lo = Math.min(...allv), hi = Math.max(...allv), rg = (hi - lo) || 1;
+  const col = x => `hsl(${Math.round(8 + (x - lo) / rg * 125)} 60% 46%)`;
+  let html = '';
+  for (let d = 0; d < 7; d++) {
+    const cells = (m.cellPct[d] || []).map((v, h) => v == null
+      ? `<span class="hc" style="background:var(--card-border)"></span>`
+      : `<span class="hc" style="background:${col(v)}" title="${days[d]} ${hh2(h)} · ${v > 0 ? '+' : ''}${v.toFixed(2)} %"></span>`).join('');
+    const meanTxt = m.dayEff[d] == null ? '—' : `${fmt(m.dayEff[d] * 100)} %<small>${m.dayVs[d] >= 0 ? '+' : ''}${m.dayVs[d].toFixed(2)} % ${t('per_week')}</small>`;
+    html += `<div class="hrow${d === sel ? ' sel' : ''}" onclick="selectDay(${d})">
+      <div class="hlbl${d === m.bestDay ? ' best' : ''}">
+        <span class="hday">${days[d]}${d === m.bestDay ? ' ★' : ''}</span>
+        <span class="hmean">${meanTxt}</span>
+        ${d === today ? `<span class="htd">${t('today_badge')}</span>` : ''}
+      </div><div class="hcells">${cells}</div></div>`;
+  }
+  return `<div class="heb">${html}</div>`;
+}
+
+function zoomHtml(m, series, sel, today, nowSlot, u) {
+  const days = t('days');
+  const meanLine = m.dayEff[sel] == null ? '—' : `${fmt(m.dayEff[sel] * 100)} %`;
+  const vsLine = m.dayVs[sel] == null ? '' : `${m.dayVs[sel] >= 0 ? '+' : ''}${m.dayVs[sel].toFixed(2)} % ${t('vs_week')}`;
+  const kpi = `<div class="zmk"><span class="k">${t('day_avg')} · ${days[sel]}</span><span class="v">${meanLine}</span><span class="s" style="color:${(m.dayVs[sel] || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${vsLine}</span></div>`;
+  zoomDev = series ? series.slice() : [];
+  const axis = `<div class="zaxis"><span>00</span><span>03</span><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span></div>`;
+  const present = (series || []).map((v, i) => (v == null ? null : { i, v })).filter(Boolean);
+  if (present.length === 0) return `<div class="zm">${kpi}<div><p class="help">${t('hmap_insufficient')}</p></div></div>`;
+  const wk = m.weekAvg;
+  const effv = present.map(p => p.v);
+  const dayMean = effv.reduce((a, x) => a + x, 0) / effv.length;
+  let lo = Math.min(...effv), hi = Math.max(...effv);
+  if (wk != null) { lo = Math.min(lo, wk); hi = Math.max(hi, wk); }
+  const pad = (hi - lo) * 0.18 || 0.001; lo -= pad; hi += pad;
+  const span = (hi - lo) || 1;
+  const W = 520, H = 120, n = 96, sx = W / (n - 1);
+  const yOf = v => H * (1 - (v - lo) / span);
+  const baseY = yOf(dayMean);
+  const pts = present.map(p => [p.i * sx, yOf(p.v)]);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const area = `M${pts[0][0].toFixed(1)},${baseY.toFixed(1)} ` + pts.map(p => 'L' + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + ` L${pts[pts.length - 1][0].toFixed(1)},${baseY.toFixed(1)} Z`;
+  const wkY = wk != null ? yOf(wk) : null;
+  // Point pulsant ancré sur le DERNIER relevé du jour ≤ créneau courant (et non le créneau courant
+  // EXACT, vide entre deux relevés de 15 min → le point disparaissait par intermittence). present est
+  // trié ascendant : le dernier p.i ≤ nowSlot est le relevé le plus récent à ne pas dépasser maintenant.
+  const nowIdx = sel === today ? present.reduce((acc, p) => (p.i <= nowSlot ? p.i : acc), -1) : -1;
+  const showNow = nowIdx >= 0;
+  const nowX = showNow ? (nowIdx / (n - 1) * 100).toFixed(2) : 0;
+  const nowY = showNow ? (yOf(series[nowIdx]) / H * 100).toFixed(2) : 0;
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="180" preserveAspectRatio="none" style="display:block;overflow:visible">
+    <defs><clipPath id="zab"><rect x="0" y="0" width="${W}" height="${baseY.toFixed(1)}"/></clipPath><clipPath id="zbe"><rect x="0" y="${baseY.toFixed(1)}" width="${W}" height="${(H - baseY).toFixed(1)}"/></clipPath></defs>
+    <path d="${area}" fill="var(--green)" fill-opacity=".4" clip-path="url(#zab)"/>
+    <path d="${area}" fill="var(--red)" fill-opacity=".4" clip-path="url(#zbe)"/>
+    ${wkY != null ? `<line x1="0" y1="${wkY.toFixed(1)}" x2="${W}" y2="${wkY.toFixed(1)}" stroke="var(--caption)" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"/>` : ''}
+    <path d="${line}" fill="none" stroke="var(--heading)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+  const nowDot = showNow ? `<span class="zdot pulse" style="left:${nowX}%;top:${nowY}%"></span>` : '';
+  const wkTag = wkY != null ? `<span style="position:absolute;right:3px;top:${(wkY / H * 100).toFixed(1)}%;transform:translateY(-50%);font-size:9px;font-weight:600;color:var(--caption);background:var(--card-bg);padding:0 3px;border-radius:3px">${t('vs_week_line')}</span>` : '';
+  return `<div class="zm">${kpi}<div><div class="zwrap" onmousemove="zoomMove(event,this)" onmouseleave="zoomLeave()">${svg}${nowDot}${wkTag}<div class="zcursor" id="zcur"></div><div class="ztip" id="ztip"></div></div>${axis}<p class="help" style="margin:.45rem 0 0;font-size:12px">${t('zoom_legend')}</p></div></div>`;
+}
+
+function selectDay(d) { selDay = d; renderApp(); }
+function zoomMove(e, el) {
+  const r = el.getBoundingClientRect();
+  const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  const s = Math.round(frac * 95);
+  const cur = document.getElementById('zcur'), tip = document.getElementById('ztip');
+  if (!cur || !tip || zoomDev[s] == null) { if (cur) cur.style.display = 'none'; if (tip) tip.style.display = 'none'; return; }
+  const left = (s / 95 * 100) + '%';
+  cur.style.left = left; cur.style.display = 'block';
+  tip.style.left = left; tip.style.display = 'block';
+  const hh = String(Math.floor(s / 4)).padStart(2, '0'), mm = String((s % 4) * 15).padStart(2, '0');
+  tip.textContent = `${hh}:${mm} · ${zoomDev[s].toFixed(3)}`;
+}
+function zoomLeave() { const c = document.getElementById('zcur'), p = document.getElementById('ztip'); if (c) c.style.display = 'none'; if (p) p.style.display = 'none'; }
+
+// ─── Page santé ④ ─────────────────────────────────────────────────────────────
+function buildHealthPage(topbarHtml) {
+  if (!health) {
+    return `${topbarHtml}<p class="help" style="margin:1rem 0">${t('loading')}</p>`;
+  }
+  const rows = health.sources || [];
+  // KPI repris du pied de page du tableau de bord (mêmes chiffres, depuis meta)
+  const meta = overview ? overview.meta : null;
+  const kpiHtml = meta ? (() => {
+    const perDay = Math.round(86400 / meta.cadenceSec);
+    const coverH = Math.round(meta.nTicks * meta.cadenceSec / 3600);
+    const cadH = cadenceHuman(meta.cadenceSec);
+    const pct = meta.nTicks ? Math.round(meta.nTicksOk / meta.nTicks * 100) : 0;
+    // mêmes seuils que les barres de dispo : ≥98 % vert, ≥90 % ambre, sinon rouge
+    const okCls = pct >= 98 ? 'green' : pct >= 90 ? 'warn' : 'bad';
+    const coverVal = coverH >= 24
+      ? `${Math.floor(coverH / 24)}<span class="u same">j</span> ${coverH % 24}<span class="u same">h</span>`
+      : `${coverH}<span class="u same">h</span>`;
+    return `<div class="kpi-row">
+      <div class="kpi"><span class="c">${t('health_kpi_readings')}</span><span class="v ${okCls}">${meta.nTicksOk}<span class="u">/ ${meta.nTicks}</span></span><span class="sub">${t('health_kpi_valid', pct)}</span></div>
+      <div class="kpi"><span class="c">${t('health_kpi_cadence')}</span><span class="v">${cadH}</span><span class="sub">${t('health_kpi_perday', perDay)}</span></div>
+      <div class="kpi"><span class="c">${t('health_kpi_coverage')}</span><span class="v">${coverVal}</span></div>
+    </div>`;
+  })() : '';
+  // cause de panne (timeout/http/indisponible) capturée côté backend (③-bis) ; legacy = horodatage seul
+  const tableRows = rows.map(s => {
+    const elH = (health && health.todayElapsedH) || 0;
+    // Vue semaine Lun→Dim : passé (disques pleins) | aujourd'hui (pie) | futur (gris)
+    // todayLocalDow() = 0=Lun … 6=Dim ; s.days[0]=aujourd'hui, s.days[1]=hier, etc.
+    const todayDow = todayLocalDow();
+    // Secteurs pie SVG 11×11, r=5.5 → diamètre=11px = même taille que <i> (cx=cy=5.5)
+    const PIE = [
+      '',
+      'M 5.5 5.5 L 5.5 0 A 5.5 5.5 0 0 1 11 5.5 Z',
+      'M 5.5 5.5 L 5.5 0 A 5.5 5.5 0 0 1 11 5.5 A 5.5 5.5 0 0 1 5.5 11 Z',
+      'M 5.5 5.5 L 5.5 0 A 5.5 5.5 0 0 1 11 5.5 A 5.5 5.5 0 0 1 5.5 11 A 5.5 5.5 0 0 1 0 5.5 Z',
+    ];
+    const quarters = Math.min(Math.floor(elH / 6), 4);
+    const todayStatus = s.days[0];
+    const todayColor = todayStatus === 'ok' ? 'var(--green)' : todayStatus === 'warn' ? 'var(--amber)' : todayStatus === 'bad' ? 'var(--tool)' : 'var(--card-border)';
+    const todayDot = quarters === 4
+      ? `<i class="${todayStatus === 'ok' ? '' : todayStatus === 'warn' ? 'w' : todayStatus === 'bad' ? 'b' : 'g'}" title="${todayStatus ?? t('health_legend_null')}"></i>`
+      : `<svg width="11" height="11" viewBox="0 0 11 11" title="${todayStatus ?? t('health_legend_null')}">
+          <circle cx="5.5" cy="5.5" r="5.5" fill="var(--card-border)"/>
+          ${PIE[quarters] ? `<path d="${PIE[quarters]}" fill="${todayColor}"/>` : ''}
+        </svg>`;
+    const dots = Array.from({ length: 7 }, (_, d) => {
+      if (d < todayDow) {
+        const pastStatus = s.days[todayDow - d] ?? null;
+        const cls = pastStatus === 'ok' ? '' : pastStatus === 'warn' ? ' w' : pastStatus === 'bad' ? ' b' : ' g';
+        return `<i class="${cls.trim()}" title="${pastStatus ?? t('health_legend_null')}"></i>`;
+      }
+      if (d === todayDow) return todayDot;
+      return `<i class="g" title="${t('health_legend_null')}"></i>`;  // futur
+    }).join('');
+    // Colonne Cohérence
+    const coh = s.coherence || { tests: 0, suspects: 0, lastSuspectAt: null };
+    let cohCell;
+    if (coh.tests === 0) {
+      cohCell = `<span style="color:var(--caption)" title="${t('health_coh_none')}">—</span>`;
+    } else if (coh.suspects === 0) {
+      cohCell = `<span style="color:var(--green)" title="${t('health_coh_ok', coh.tests)}">✓ ${coh.tests}</span>`;
+    } else {
+      // Rouge si > 25 % de suspectes, sinon ambre
+      const ratio = coh.suspects / coh.tests;
+      const col = ratio > 0.25 ? 'var(--red)' : 'var(--amber)';
+      cohCell = `<span style="color:${col};cursor:pointer" title="${t('health_coh_suspect', coh.suspects, coh.tests)}" onclick="openCoherence('${s.id}')">⚠ ${coh.suspects}/${coh.tests}</span>`;
+    }
+
+    // Colonne Exécution (durée médiane)
+    const execMs = s.execMs;
+    let execCell;
+    if (execMs == null) {
+      execCell = '<span style="color:var(--caption)">—</span>';
+    } else if (execMs < 1000) {
+      execCell = `${execMs} ms`;
+    } else {
+      execCell = `${(execMs / 1000).toFixed(1)} s`;
+    }
+
+    // Flèche de tendance pour la colonne 7 jours
+    const trend = s.uptimeTrend || 'flat';
+    let trendArrow;
+    if (trend === 'up') trendArrow = `<span style="color:var(--green);font-weight:700">↗</span>`;
+    else if (trend === 'down') trendArrow = `<span style="color:var(--red);font-weight:700">↘</span>`;
+    else trendArrow = `<span style="color:var(--caption)">&#61;</span>`;
+
+    const pairNote = s.pairNote ? ` <span class="muted" style="font-size:12px">· ${escapeHtml(s.pairNote)}</span>` : '';
+    return `<tr>
+      <td style="white-space:nowrap"><span class="srcname">${escapeHtml(s.display)}</span>${pairNote}</td>
+      <td>${cohCell}</td>
+      <td style="color:var(--caption);font-variant-numeric:tabular-nums">${execCell}</td>
+      <td class="left"><span class="days">${dots}</span> <span style="margin-left:1rem;font-size:12px;color:var(--caption);font-variant-numeric:tabular-nums;white-space:nowrap">${s.uptimePct.toFixed(0)} % ${trendArrow}</span></td>
+      <td>${s.failedTicks}</td>
+      <td class="muted">${healthAgo(s.lastFailureAt)}${s.lastFailureAt && s.lastFailureReason ? ' · ' + reasonLabel(s.lastFailureReason) : ''}</td>
+    </tr>`;
+  }).join('');
+
+  return `${topbarHtml}
+  <button class="backlink" onclick="setView('dashboard')">${t('nav_back')}</button>
+  <div class="zone-group"><div class="zone">
+    <div class="zone-h">${t('health_title')}</div>
+    ${kpiHtml}
+    <div style="overflow-x:auto"><table class="flt">
+      <thead><tr>
+        <th>${t('health_col_source')}</th>
+        <th><span class="tip-wrap" style="display:inline-flex;align-items:center">${t('health_col_coherence')}<span class="tip-icon">ⓘ</span><span class="tip-box">${t('health_coh_col_tip')}</span></span></th>
+        <th>${t('health_col_exec')}</th>
+        <th class="left">${t('health_col_days')}</th>
+        <th>${t('health_col_fails')}</th>
+        <th>${t('health_col_last')}</th>
+      </tr></thead>
+      <tbody>${tableRows}</tbody>
+      <tfoot><tr>
+        <td style="font-weight:700;color:var(--caption);font-size:12px;border-top:2px solid var(--card-border);background:var(--section-bg)"><span class="tip-wrap" style="display:inline-flex;align-items:center">${t('health_total')}<span class="tip-icon">ⓘ</span><span class="tip-box up">${t('health_total_tip')}</span></span></td>
+        <td style="border-top:2px solid var(--card-border);background:var(--section-bg)"></td>
+        <td style="color:var(--caption);font-variant-numeric:tabular-nums;font-size:12px;border-top:2px solid var(--card-border);background:var(--section-bg)">${(() => {
+          const ms = health && health.execTotalMs;
+          if (ms == null) return '—';
+          return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
+        })()}</td>
+        <td colspan="3" style="border-top:2px solid var(--card-border);background:var(--section-bg)"></td>
+      </tr></tfoot>
+    </table></div>
+    <p class="help" style="margin:.6rem 0 0;font-size:12px">${t('health_sources_scope')}</p>
+    <p class="help" style="margin:.7rem 0 0;font-size:12px">
+      <span class="days" style="vertical-align:middle;margin-right:.3rem"><i></i></span>${t('health_legend_ok')} &nbsp;
+      <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="w"></i></span>${t('health_legend_warn')} &nbsp;
+      <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="b"></i></span>${t('health_legend_bad')} &nbsp;
+      <span class="days" style="vertical-align:middle;margin-right:.3rem"><i class="g"></i></span>${t('health_legend_null')}
+    </p>
+  </div></div>
+  ${(() => {
+    const rpcs = (health && health.rpcs) || [];
+    if (rpcs.length === 0) return '';
+    const rpcRows = rpcs.map(r => {
+      const latency = r.latencyMsP50 != null ? `${r.latencyMsP50} ms` : t('health_never');
+      const ledger = r.lastLedger != null
+        ? `${r.lastLedger}${r.ledgerLag > 0 ? ` <span class="muted">−${r.ledgerLag}</span>` : ''}`
+        : t('health_never');
+      const activeTxt = r.active
+        ? `<span style="color:var(--green)">${t('health_rpc_active_yes')}</span>`
+        : `<span class="muted">${t('health_rpc_active_no')}</span>`;
+      const simTip = r.simErrors > 0 ? ` title="sim errors: ${r.simErrors}"` : '';
+      const reqTotal = (r.reqTotal != null && r.reqTotal > 0) ? r.reqTotal.toLocaleString() : '—';
+      const reqPerSec = (r.reqPerSec != null && r.reqPerSec > 0) ? r.reqPerSec : '—';
+      return `<tr${r.active ? ' class="win"' : ''}>
+        <td>${escapeHtml(r.host)}</td>
+        <td>${activeTxt}</td>
+        <td>${latency}</td>
+        <td>${ledger}</td>
+        <td>${r.uptimePct.toFixed(0)} %</td>
+        <td>${r.failures}</td>
+        <td${simTip}>${r.simErrors > 0 ? `<span style="color:var(--amber)">${r.simErrors}</span>` : '0'}</td>
+        <td>${reqTotal}</td>
+        <td>${reqPerSec}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="zone-group"><div class="zone">
+    <div class="zone-h">${t('health_rpc_title')}</div>
+    <div style="overflow-x:auto"><table class="flt">
+      <thead><tr>
+        <th>${t('health_rpc_col_rpc')}</th>
+        <th>${t('health_rpc_col_actif')}</th>
+        <th>${t('health_rpc_col_latence')}</th>
+        <th>${t('health_rpc_col_ledger')}</th>
+        <th>${t('health_rpc_col_dispo')}</th>
+        <th>${t('health_rpc_col_echecs')}</th>
+        <th title="${t('health_rpc_col_simerr')}">${t('health_rpc_col_simerr')}</th>
+        <th>${t('health_rpc_col_req7j')}</th>
+        <th>${t('health_rpc_col_reqps')}</th>
+      </tr></thead>
+      <tbody>${rpcRows}</tbody>
+    </table></div>
+    <p class="help" style="margin:.7rem 0 0;font-size:12px">${t('health_rpc_note')}</p>
+    <p class="help" style="margin:.6rem 0 0;font-size:12px">${t('health_rpc_scope')}</p>
+  </div></div>`;
+  })()}
+  ${coherenceModalHtml()}`;
+}
+
+// ─── Page principale ──────────────────────────────────────────────────────────
+function buildPage() {
+  const u = target;
+  const meta = overview ? overview.meta : null;
+  const nTicksOk = meta ? meta.nTicksOk : 0;
+  const limitedNote = nTicksOk < 24
+    ? `<p class="limited-note">${t('limited_note', nTicksOk)}</p>`
+    : '';
+  const noData = nTicksOk === 0
+    ? `<p class="help" style="margin:.6rem 0">${t('no_data_waiting')}</p>`
+    : null;
+
+  // Met à jour nextTickAt depuis le meta (fait une fois par render)
+  const computedNext = computeNextTickAt(meta);
+  if (computedNext !== null) nextTickAt = computedNext;
+
+  // Timezone locale
+  const offsetH = localOffset();
+  const NOW_HOUR = nowLocalHour();
+  const TODAY = todayLocalDow();
+
+  if (selDay < 0 || selDay > 6) selDay = TODAY;
+
+  // Sondes dynamiques depuis meta (fallback [250,750] si pas encore chargé)
+  const sondes = meta && meta.sondes && meta.sondes.length > 0 ? meta.sondes : [250, 750];
+
+  // Réconcilier ladderSonde avec les sondes disponibles
+  if (!sondes.includes(ladderSonde)) ladderSonde = sondes[0];
+
+  const NOW_SLOT = nowLocalHour() * 4 + Math.floor(new Date().getMinutes() / 15);
+  const sondeKey = String(ladderSonde);
+  const sondeSeg = sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('');
+  const EMPTY24 = Array.from({length:7}, () => new Array(24).fill(null));
+  const EMPTY96 = Array.from({length:7}, () => new Array(96).fill(null));
+  const useStellar = (typeof impactMode !== 'undefined' && impactMode === 'local');
+  const heatEffLocal = useStellar
+    ? rotateHeatUtc((overview && overview.heatEffUtcStellar && overview.heatEffUtcStellar[sondeKey]) || EMPTY24, offsetH)
+    : rotateHeatUtc((overview && overview.heatEffUtc && overview.heatEffUtc[sondeKey]) || EMPTY24, offsetH);
+  const intraday = useStellar
+    ? ((overview && overview.intradayStellar && overview.intradayStellar[sondeKey]) || EMPTY96)
+    : ((overview && overview.intradayLocal && overview.intradayLocal[sondeKey]) || EMPTY96);
+  const weekAvg = useStellar
+    ? (overview && overview.effWeekAvgStellar ? overview.effWeekAvgStellar[sondeKey] : null)
+    : (overview && overview.effWeekAvg ? overview.effWeekAvg[sondeKey] : null);
+  const tm = timeModel(heatEffLocal, weekAvg);
+
+  // Échelle courante
+  let ladderZoneTitle = t('section_ladder');
+  let ladderZoneRight = '';
+  let ladderContent = '';
+  if (simActive && simResult) {
+    ladderZoneRight = `<span class="tag">${t('ladder_sim_tag', fmt0(simAmt), u)}</span>`;
+    ladderContent = ladderTable(simResult.ladder, u, simResult.downSources);
+  } else {
+    ladderZoneRight = `<span class="seg">${sondeSeg}</span>`;
+    const rows = overview ? overview.ladders[String(ladderSonde)] : null;
+    ladderContent = ladderTable(rows || [], u);
+  }
+
+  const dist = overview && overview.winnerDist ? (overview.winnerDist[sondeKey] || []) : [];
+
+  // Fraîcheur + compte à rebours
+  const freshHtml = meta ? freshLabel(meta.lastTickAt) : `<span class="fresh">${t('loading')}</span>`;
+
+  // Glyphe thème : reflète l'action (clic vers l'autre thème)
+  const isDark = document.documentElement.classList.contains('dark');
+  const themeGlyph = isDark ? t('theme_light') : t('theme_dark');
+
+  const FLAG = { fr: '🇫🇷', en: '🇬🇧', es: '🇪🇸', pt: '🇧🇷' };
+
+  const topbarHtml = `
+  <div class="topbar">
+    <a class="brand-link" href="/" aria-label="decant.fi">
+      <img class="brand-logo" src="/logo.svg" width="44" height="44" alt="">
+      <span class="brand">decant<span style="color:var(--teal)">.fi</span> <span class="dim">· ${t('brand_dim')}</span></span>
+    </a>
+    ${view === 'dashboard' ? `<span class="pagenav" style="margin-left:.3rem">
+      <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
+      <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
+    </span>` : ''}
+    ${freshHtml}
+    <span class="topbar-right">
+      ${walletAddress
+        ? `<span style="display:inline-flex;align-items:center;gap:.35rem">
+            <span class="ctrl-btn" style="cursor:default;font-variant-numeric:tabular-nums">${shortAddr(walletAddress)}</span>
+            <button class="ctrl-btn" onclick="disconnectWallet()">${t('wallet_disconnect')}</button>
+           </span>`
+        : `<button class="ctrl-btn" onclick="connectWallet()">${t('connect_wallet')}</button>`}
+      <button class="ctrl-btn" onclick="toggleTheme()" title="${isDark ? t('theme_light') : t('theme_dark')}">${themeGlyph}</button>
+      <details class="lang-menu"><summary class="ctrl-btn" style="font-size:16px;line-height:1;padding:1px 7px">${FLAG[lang]} <span style="font-size:10px">▾</span></summary><div class="lang-pop">
+        <button onclick="setLang('fr')">🇫🇷 Français</button>
+        <button onclick="setLang('en')">🇬🇧 English</button>
+        <button onclick="setLang('es')">🇪🇸 Español</button>
+        <button onclick="setLang('pt')">🇧🇷 Português</button>
+      </div></details>
+    </span>
+  </div>`;
+
+  if (view === 'health') return buildHealthPage(topbarHtml);
+
+  // ② Footer : compute footer data from meta
+  const footerHtml = meta ? (() => {
+    const perDay = Math.round(86400 / meta.cadenceSec);
+    const coverH = Math.round(meta.nTicks * meta.cadenceSec / 3600);
+    const cadH = cadenceHuman(meta.cadenceSec);
+    // GitHub icon + FAQ link are language-neutral: rendered once, outside i18n strings
+    const ghIcon = `<svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true" style="vertical-align:-4px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path></svg>`;
+    return `<div class="page-footer">${t('footer_readings', meta.nTicks, meta.nTicksOk, cadH, perDay, coverH)} · <button onclick="setView('health')">${t('footer_health_link')}</button> · <a href="https://github.com/actarus314/DecantFi" target="_blank" rel="noopener noreferrer" title="GitHub" style="color:var(--sub);text-decoration:none;display:inline-flex;align-items:center;" onmouseover="this.style.color='var(--caption)'" onmouseout="this.style.color='var(--sub)'">${ghIcon}</a> · <a href="https://github.com/actarus314/DecantFi/blob/main/FAQ.md" target="_blank" rel="noopener noreferrer" style="color:var(--sub);text-underline-offset:2px;" onmouseover="this.style.color='var(--caption)'" onmouseout="this.style.color='var(--sub)'">FAQ</a><span style="color:var(--sub);font-size:11px;opacity:.7"> · ${(()=>{const v=window.__VERSION||'dev';const r=window.__REV||'dev';const vLabel=/^\d/.test(v)?'v'+v:v;const commit7=r!=='dev'?r.slice(0,7):null;return commit7?(vLabel+' · '+commit7):vLabel;})()}</span></div>`;
+  })() : '';
+
+  return `${topbarHtml}
+
+  <div class="zone-group">
+    <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}</div>${simCard()}</div>
+
+    <div class="zone"><div class="zone-h">${ladderZoneTitle} <span class="right">${ladderZoneRight}</span></div>
+      <div class="ladder-wrap${simLoading || refreshing ? ' refreshing' : ''}"><div class="ladder-inner">${ladderContent}</div>${simLoading || refreshing ? `<div class="refresh-overlay"><span class="refresh-spinner"></span>${simLoading ? t('sim_loading') : t('refresh_loading')}</div>` : ''}</div>
+      ${simActive && simResult ? `<p class="help" style="margin:.5rem 0 0;font-size:12px">${t('ladder_pick_hint')}</p>` : ''}</div>
+  </div>
+
+  <div class="zone-group">
+    <div class="zone"><div class="zone-h">${t('section_slots', u)} <span class="right"><span class="seg">${sondeSeg}</span></span></div>
+      <div class="card">
+        ${noData || `${encartHtml(tm, TODAY, NOW_HOUR)}${hebdoHtml(tm, TODAY, selDay)}<p class="help" style="margin:.7rem 0 0;font-size:12px;line-height:1.55">${t('slots_help')}</p>${limitedNote}`}
+      </div></div>
+
+    <div class="zone"><div class="zone-h">${t('section_hourly')} <span class="tznote" style="text-transform:none;letter-spacing:0;font-weight:400">${t('tz_note', Intl.DateTimeFormat().resolvedOptions().timeZone)}</span></div>
+      <div class="card">${noData || zoomHtml(tm, intraday[selDay], selDay, TODAY, NOW_SLOT, u) + limitedNote}</div></div>
+  </div>
+
+  <div class="zone-group">
+    <div class="zone"><div class="zone-h">${t('section_routes')} <span class="right"><span class="seg">${sondeSeg}</span></span></div>
+      <div class="card" style="overflow-x:auto">${Sankey.graphHTML(lang)}</div>
+    </div>
+
+    <div class="zone"><div class="zone-h">${t('route_detail')}</div>
+      <div class="card" style="overflow-x:auto">${Sankey.tableHTML(target, ladderSonde, lang)}</div>
+    </div>
+  </div>
+  ${footerHtml}
+  ${execModal()}
+  ${impactEvmModalHtml()}`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Sankey des routes — moteur de layout MAISON (zéro-dépendance) + rendu SVG vanilla.
+// Alimenté par la VRAIE BDD : overview.bestRoutes[sonde] (RouteRank) mappé en routes
+// du moteur (cf. mapRank/routesFor). marge-au-2ᵉ absente du backend → colonne retirée ;
+// traîne < 3 % agrégée en « autres ». ⚠ stats 7j polluées jusqu'à ~2026-06-27.
+// Reste phase 2 : réutiliser #tipPortal au lieu du #sk-tip dédié. Module ISOLÉ (IIFE) →
+// un seul global, aucune collision. ribbonPath pinné ≡ d3.curveBumpX.
+// ════════════════════════════════════════════════════════════════════════════
+const Sankey = (function () {
+  const NS = 'http://www.w3.org/2000/svg';
+  const W = 960, H = 620, LINK_GAP = 16; // viewBox ; le SVG est responsive (CSS width:100% + height:auto → remplit la box sans letterbox)
+  const LY = { VM: 24, GAP: 14, MIN_H: 10, PAD: 24, NODE_W: 50 };
+
+  const TAIL_PCT = 3; // traîne < ce % agrégée en « autres » — SAUF si la route n'emprunte que des bandes déjà tracées (cf. routesFor)
+
+  // Décisions FIGÉES (Romain) : fond = thème de la page (blanc en clair) · départ BLND = ARDOISE.
+  // Les sélecteurs de test (fond gris / ambre-ardoise) ont été retirés.
+
+  // Strings i18n locales au module (aucun ajout au gros STRINGS de la prod).
+  const STR = {
+    fr: { sub:'<b>Largeur</b> = fréquence de victoire · <b>Tracé</b> = route et étapes · <b>Couleur</b> = outil de swap',
+          tail:`Routes &lt; ${TAIL_PCT} % des relevés regroupées en « Autres » — sauf si elles n'empruntent que des bandes déjà tracées.`,
+          detail:'Détail des routes', venue:'Venue', route:'Route', marge:'Marge au 2ᵉ', freq:'Fréquence',
+          others:'autres', freqOf:'des relevés', total:'Total', nodata:'Pas encore de données pour cette sonde',
+          margeTip:'Marge au 2ᵉ : de combien (%) le net de la route gagnante a dépassé la 2ᵉ meilleure cotation du même relevé — médiane sur la période.',
+          through:n=>`${n} routes passent par cette étape` },
+    en: { sub:'<b>Width</b> = win frequency · <b>Path</b> = route and steps · <b>Color</b> = swap tool',
+          tail:`Routes &lt; ${TAIL_PCT}% of readings grouped into "Others" — unless they only use already-drawn bands.`,
+          detail:'Route detail', venue:'Venue', route:'Route', marge:'2nd-best margin', freq:'Frequency',
+          others:'others', freqOf:'of readings', total:'Total', nodata:'No data yet for this probe',
+          margeTip:'2nd-best margin: by how much (%) the winning route beat the 2nd-best quote of the same reading — median over the period.',
+          through:n=>`${n} routes pass through this step` },
+    es: { sub:'<b>Grosor</b> = frecuencia de victoria · <b>Ruta</b> = recorrido y pasos · <b>Color</b> = herramienta de swap',
+          tail:`Rutas &lt; ${TAIL_PCT}% de lecturas agrupadas en "Otros" — salvo que solo usen bandas ya dibujadas.`,
+          detail:'Detalle de ruta', venue:'Fuente', route:'Ruta', marge:'Margen sobre el 2.º mejor', freq:'Frecuencia',
+          others:'otros', freqOf:'de lecturas', total:'Total', nodata:'Aún sin datos para esta sonda',
+          margeTip:'Margen sobre el 2.º mejor: en qué porcentaje (%) la ruta ganadora superó la 2.ª mejor cotización de la misma lectura — mediana del período.',
+          through:n=>`${n} rutas pasan por este paso` },
+    pt: { sub:'<b>Largura</b> = frequência de vitória · <b>Caminho</b> = rota e etapas · <b>Cor</b> = ferramenta de swap',
+          tail:`Rotas &lt; ${TAIL_PCT}% das leituras agrupadas em "Outros" — exceto se usarem apenas bandas já desenhadas.`,
+          detail:'Detalhe da rota', venue:'Venue', route:'Rota', marge:'Margem sobre o 2.º melhor', freq:'Frequência',
+          others:'outros', freqOf:'das leituras', total:'Total', nodata:'Sem dados ainda para esta sonda',
+          margeTip:'Margem sobre o 2.º melhor: em quanto (%) a rota vencedora superou a 2.ª melhor cotação da mesma leitura — mediana do período.',
+          through:n=>`${n} rotas passam por esta etapa` }
+  };
+  const tr = lang => STR[lang] || STR.en;
+  let tableSort = { col:'freq', dir:'desc' }; // tri du tableau : Fréquence (défaut) ou Marge
+  const selKeys = new Set();                  // routes sélectionnées durablement (MULTI ; clés stables tools|chemin)
+  let tailOpen = false;                       // drawer « Autres » déplié ? (persiste au re-rendu)
+  const keyOf = r => r.tools + '|' + r.steps.join('>');
+
+  function interpolateHex(a, b, t) {
+    const ah = parseInt(a.slice(1), 16), bh = parseInt(b.slice(1), 16);
+    const ar = (ah>>16)&0xff, ag = (ah>>8)&0xff, ab = ah&0xff;
+    const br = (bh>>16)&0xff, bg = (bh>>8)&0xff, bb = bh&0xff;
+    const rr = Math.round(ar+(br-ar)*t), rg = Math.round(ag+(bg-ag)*t), rb = Math.round(ab+(bb-ab)*t);
+    return `rgb(${rr},${rg},${rb})`;
+  }
+  function marginColor(m) {
+    if (m === null || m === undefined) return "#6b7280";
+    if (m <= 0.05) return interpolateHex("#dc2626", "#f59e0b", (m/0.05)*0.3);
+    if (m <= 0.15) return interpolateHex("#dc2626", "#f59e0b", 0.3+((m-0.05)/0.10)*0.7);
+    if (m <= 0.30) return interpolateHex("#f59e0b", "#14b8a6", (m-0.15)/0.15);
+    return "#14b8a6";
+  }
+  function venueColor(tools) {
+    if (!tools) return "#8b9ab0";
+    const t = tools.toLowerCase();
+    if (t.includes("comet"))    return "#14b8a6";
+    if (t.includes("xbull"))    return "#3b82f6";
+    if (t.includes("aquarius")) return "#d9a441";
+    if (t.includes("ultra"))    return "#a78bfa";
+    if (t.includes("soroswap")) return "#f472b6";
+    if (t === "autres")         return "#6b7280";
+    const FB = ["#22d3ee","#fb923c","#84cc16","#e879f9","#facc15"];
+    const code = [...tools].reduce((s, c) => s + c.charCodeAt(0), 0);
+    return FB[code % FB.length];
+  }
+  const toolDisplay = name => name ? name.replace(/\bUltra\b(?!\s+Stellar)/g, "Ultra Stellar") : name;
+  const LOCALE_MAP = { fr: 'fr-FR', en: 'en-US', es: 'es-ES', pt: 'pt-BR' };
+  const fmtMargin = (m, lang) => (m === null || m === undefined) ? "—"
+    : "+" + m.toLocaleString(LOCALE_MAP[lang] || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " %";
+  const fmtPct = p => p.toFixed(0) + " %";
+
+  // ── buildGraph : fusion (from|to|tool) + rang complexité-first (copie verbatim maquette) ──
+  function buildGraph(routes) {
+    const nodeSet = new Set();
+    routes.forEach(r => r.steps.forEach(s => nodeSet.add(s)));
+    const rawNodes = [...nodeSet].map(name => ({ name }));
+    const isLast = r => r.tools === "autres" || r.hopTools.includes("—");
+    const hops = r => r.steps.length - 1;
+    const rank = new Map();
+    routes.map((r, i) => ({ i, r }))
+      .sort((a, b) => (hops(a.r) - hops(b.r)) ||
+        ((isLast(a.r) === isLast(b.r)) ? 0 : (isLast(a.r) ? 1 : -1)) || (b.r.winPct - a.r.winPct))
+      .forEach((o, pos) => rank.set(o.i, pos));
+    const linkMap = new Map();
+    routes.forEach((r, ri) => {
+      const { steps, hopTools } = r;
+      for (let i = 0; i < steps.length - 1; i++) {
+        const key = steps[i] + "|" + steps[i + 1] + "|" + hopTools[i];
+        if (linkMap.has(key)) {
+          const lk = linkMap.get(key); lk.value += r.winPct; lk.idxs.push(ri); lk.order = Math.min(lk.order, rank.get(ri));
+        } else {
+          linkMap.set(key, { source: steps[i], target: steps[i + 1], tool: hopTools[i], value: r.winPct, idxs: [ri], order: rank.get(ri) });
+        }
+      }
+    });
+    return { rawNodes, rawLinks: [...linkMap.values()] };
+  }
+
+  // ── layout : moteur en couches MAISON, fonction PURE (copie verbatim maquette, self-check Node vert) ──
+  function layout(routes, W, H) {
+    const { rawNodes, rawLinks } = buildGraph(routes);
+    const names = rawNodes.map(n => n.name);
+    const { VM, GAP, MIN_H, PAD, NODE_W } = LY;
+    const innerH = H - 2 * VM;
+    const col = new Map(names.map(n => [n, 0]));
+    for (let it = 0; it < names.length; it++)
+      rawLinks.forEach(l => col.set(l.target, Math.max(col.get(l.target), col.get(l.source) + 1)));
+    let maxCol = 0; col.forEach(c => { if (c > maxCol) maxCol = c; });
+    const hasOut = new Set(rawLinks.map(l => l.source));
+    names.forEach(n => { if (!hasOut.has(n)) col.set(n, maxCol); });
+    const node = new Map(names.map(name => [name, { name, isReal: true, col: col.get(name) }]));
+    const itemsByCol = new Map();
+    const addItem = (c, item) => { (itemsByCol.get(c) || itemsByCol.set(c, []).get(c)).push(item); };
+    names.forEach(name => addItem(col.get(name), node.get(name)));
+    rawLinks.forEach(l => {
+      const c0 = col.get(l.source), c1 = col.get(l.target);
+      const chain = [node.get(l.source)];
+      for (let c = c0 + 1; c < c1; c++) { const relay = { dummy: true, link: l, col: c, value: l.value, isReal: false }; addItem(c, relay); chain.push(relay); }
+      chain.push(node.get(l.target)); l.chain = chain;
+    });
+    const inSum = new Map(), outSum = new Map();
+    rawLinks.forEach(l => { outSum.set(l.source, (outSum.get(l.source) || 0) + l.value); inSum.set(l.target, (inSum.get(l.target) || 0) + l.value); });
+    const flowOf = it => it.isReal ? Math.max(inSum.get(it.name) || 0, outSum.get(it.name) || 0) : it.value;
+    let scale = Infinity;
+    itemsByCol.forEach(items => { const flowSum = items.reduce((s, it) => s + flowOf(it), 0); const r = (innerH - (items.length - 1) * GAP) / flowSum; if (r < scale) scale = r; });
+    // Garde-fou MIN_H (vrais nœuds faible-trafic seulement ; les relais, invisibles, prennent leur épaisseur exacte).
+    // Réduit scale jusqu'à ce qu'aucune colonne ne déborde (data réelle = tailles imprévues). Converge (masse MIN_H fixe).
+    const colTotal = sc => { let mx = 0; itemsByCol.forEach(items => { const t = items.reduce((s, it) => s + (it.isReal ? Math.max(flowOf(it) * sc, MIN_H) : flowOf(it) * sc), 0) + (items.length - 1) * GAP; if (t > mx) mx = t; }); return mx; };
+    for (let p = 0; p < 24 && colTotal(scale) > innerH + 0.01; p++) scale *= innerH / colTotal(scale);
+    const linksOf = new Map(names.map(n => [n, []]));
+    rawLinks.forEach(l => { linksOf.get(l.source).push(l); linksOf.get(l.target).push(l); });
+    const seedKey = it => it.isReal ? Math.min(...linksOf.get(it.name).map(l => l.order)) : it.link.order;
+    itemsByCol.forEach(items => items.sort((a, b) => (seedKey(a) - seedKey(b)) || (flowOf(b) - flowOf(a))));
+    const colIdx = [...itemsByCol.keys()].sort((a, b) => a - b);
+    const preds = new Map(), succs = new Map();
+    itemsByCol.forEach(items => items.forEach(it => { preds.set(it, []); succs.set(it, []); }));
+    rawLinks.forEach(l => { for (let i = 0; i < l.chain.length - 1; i++) { succs.get(l.chain[i]).push(l.chain[i + 1]); preds.get(l.chain[i + 1]).push(l.chain[i]); } });
+    const indexInCol = () => { const m = new Map(); itemsByCol.forEach(items => items.forEach((it, i) => m.set(it, i))); return m; };
+    const countCrossings = () => {
+      const idx = indexInCol(); let total = 0;
+      for (let ci = 0; ci < colIdx.length - 1; ci++) {
+        const edges = [];
+        itemsByCol.get(colIdx[ci]).forEach(a => succs.get(a).forEach(b => edges.push([idx.get(a), idx.get(b)])));
+        for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) if ((edges[i][0] - edges[j][0]) * (edges[i][1] - edges[j][1]) < 0) total++;
+      }
+      return total;
+    };
+    const snapshot = () => new Map([...itemsByCol].map(([k, v]) => [k, v.slice()]));
+    const restore = snap => snap.forEach((v, k) => itemsByCol.set(k, v.slice()));
+    const bary = (it, nbm, idx) => { const ns = nbm.get(it); return ns.length ? ns.reduce((s, n) => s + idx.get(n), 0) / ns.length : idx.get(it); };
+    let best = snapshot(), bestX = countCrossings();
+    for (let pass = 0; pass < 8; pass++) {
+      let idx = indexInCol();
+      for (let ci = 1; ci < colIdx.length; ci++) { const items = itemsByCol.get(colIdx[ci]); const b = new Map(items.map(it => [it, bary(it, preds, idx)])); items.sort((x, y) => b.get(x) - b.get(y)); idx = indexInCol(); }
+      for (let ci = colIdx.length - 2; ci >= 0; ci--) { const items = itemsByCol.get(colIdx[ci]); const b = new Map(items.map(it => [it, bary(it, succs, idx)])); items.sort((x, y) => b.get(x) - b.get(y)); idx = indexInCol(); }
+      const x = countCrossings(); if (x < bestX) { bestX = x; best = snapshot(); }
+    }
+    restore(best);
+    const colX = c => PAD + (maxCol === 0 ? 0 : c * (W - 2 * PAD - NODE_W) / maxCol);
+    colIdx.forEach(c => {
+      const items = itemsByCol.get(c);
+      const heights = items.map(it => it.isReal ? Math.max(flowOf(it) * scale, MIN_H) : flowOf(it) * scale);
+      const total = heights.reduce((s, h) => s + h, 0) + (items.length - 1) * GAP;
+      let y = VM + (innerH - total) / 2;
+      items.forEach((it, i) => {
+        it.y0 = y; it.y1 = y + heights[i];
+        if (it.isReal) { it.x0 = colX(c); it.x1 = colX(c) + NODE_W; } else { it.xCenter = colX(c) + NODE_W / 2; it.yCenter = (it.y0 + it.y1) / 2; }
+        y += heights[i] + GAP;
+      });
+    });
+    const slotOut = new Map(), slotIn = new Map();
+    const midY = it => it.isReal ? (it.y0 + it.y1) / 2 : it.yCenter;
+    names.forEach(name => {
+      const n = node.get(name);
+      const place = (arr, nb, map) => {
+        arr.sort((a, b) => (midY(nb(a)) - midY(nb(b))) || (b.value - a.value));
+        const totalH = arr.reduce((s, l) => s + l.value * scale, 0);
+        let cur = (n.y0 + n.y1) / 2 - totalH / 2;
+        arr.forEach(l => { const h = l.value * scale; map.set(l, cur + h / 2); cur += h; });
+      };
+      place(rawLinks.filter(l => l.chain[0] === n), l => l.chain[1], slotOut);
+      place(rawLinks.filter(l => l.chain[l.chain.length - 1] === n), l => l.chain[l.chain.length - 2], slotIn);
+    });
+    rawLinks.forEach(l => {
+      const src = l.chain[0], tgt = l.chain[l.chain.length - 1];
+      const mids = l.chain.slice(1, -1).map(r => [r.xCenter, r.yCenter]);
+      l.points = [[src.x1, slotOut.get(l)], ...mids, [tgt.x0, slotIn.get(l)]];
+      l.width = l.value * scale; l.y0 = l.points[0][1]; l.source = src; l.target = tgt;
+    });
+    return { nodes: names.map(n => node.get(n)), links: rawLinks };
+  }
+
+  // ribbonPath — courbe lisse à tangentes horizontales (≡ d3.line().curve(d3.curveBumpX), pinné numériquement)
+  function ribbonPath(pts) {
+    let d = 'M' + pts[0][0] + ',' + pts[0][1];
+    for (let i = 1; i < pts.length; i++) { const x0 = pts[i-1][0], y0 = pts[i-1][1], x1 = pts[i][0], y1 = pts[i][1], xm = (x0 + x1) / 2; d += 'C' + xm + ',' + y0 + ' ' + xm + ',' + y1 + ' ' + x1 + ',' + y1; }
+    return d;
+  }
+  const E = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  // ── Données RÉELLES : overview.bestRoutes[sonde] (RouteRank {path,tools,winPct}) → routes du moteur.
+  // path 'BLND → USDC → EURC' → steps ; tools 'Comet + Aquarius' → legs ; hopTools dérivé (1 outil =
+  // tous les hops ; composite 2-tx = split au pivot USDC). marginPct absent du backend (colonne retirée).
+  function mapRank(r) {
+    const steps = String(r.path || '').split(/\s*→\s*/).map(s => s.trim()).filter(Boolean);
+    const legs = String(r.tools || '').split(' + ').map(s => s.trim()).filter(Boolean);
+    const hops = steps.length - 1;
+    let hopTools;
+    if (legs.length <= 1) hopTools = new Array(hops).fill(legs[0] || r.tools || '—');
+    else { const piv = steps.indexOf('USDC'); hopTools = []; for (let i = 0; i < hops; i++) hopTools.push((piv > 0 && i >= piv) ? legs[1] : legs[0]); }
+    const trend = (r.trend === 'up' || r.trend === 'down' || r.trend === 'flat') ? r.trend : null;
+    return { tools: r.tools, winPct: r.winPct, marginPct: (typeof r.marginPct === 'number' ? r.marginPct : null), trend, composite: legs.length > 1, steps, hopTools };
+  }
+  // Lit l'overview courant (déjà spécifique à la paire) ; agrège la traîne < TAIL_PCT en bande « autres ».
+  function routesFor(sonde) {
+    const ov = (typeof overview !== 'undefined') ? overview : null;
+    const raw = (ov && ov.bestRoutes && ov.bestRoutes[String(sonde)]) || [];
+    // DAG only : path valide, ≥2 nœuds, aucun nœud répété (sinon non layoutable proprement).
+    const valid = raw.filter(r => {
+      if (!r || !r.path || !String(r.path).includes('→')) return false;
+      const st = String(r.path).split(/\s*→\s*/).map(s => s.trim()).filter(Boolean);
+      return st.length >= 2 && new Set(st).size === st.length;
+    });
+    if (valid.length === 0) return [];
+    const mapped = valid.map(mapRank);
+    // Règle « Autres » affinée : on ne regroupe une route < TAIL_PCT QUE si elle introduit une arête
+    // (de|vers|outil) non déjà tracée par les routes ≥ TAIL_PCT. Si elle n'emprunte que des bandes
+    // déjà tracées, on la garde (elle épaissit une bande via la fusion, sans surcharger le graphe).
+    const edgesOf = r => { const k = []; for (let i = 0; i < r.steps.length - 1; i++) k.push(r.steps[i] + '|' + r.steps[i + 1] + '|' + r.hopTools[i]); return k; };
+    const bigEdges = new Set();
+    mapped.forEach(r => { if (r.winPct >= TAIL_PCT) edgesOf(r).forEach(k => bigEdges.add(k)); });
+    const keep = [], tail = [];
+    mapped.forEach(r => {
+      if (r.winPct >= TAIL_PCT || edgesOf(r).every(k => bigEdges.has(k))) keep.push(r);
+      else tail.push(r);
+    });
+    if (tail.length) {
+      const SRC = mapped[0].steps[0], TGT = mapped[0].steps[mapped[0].steps.length - 1];
+      const sum = Math.round(tail.reduce((s, r) => s + r.winPct, 0) * 10) / 10;
+      keep.push({ tools: 'autres', winPct: sum, marginPct: null, trend: null, composite: false, steps: [SRC, TGT], hopTools: ['—'], tail });
+    }
+    return keep;
+  }
+
+  // ── HTML émis par buildPage (string) ──
+  function graphHTML(lang) {
+    const s = tr(lang);
+    return `<p class="sk-sub">${s.sub}<br>${s.tail}</p>`
+      + `<svg id="route-sankey" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"></svg>`;
+  }
+  function tableHTML(pair, sonde, lang) {
+    const s = tr(lang), routes = routesFor(sonde);
+    if (routes.length === 0) return `<p class="help" style="margin:.4rem 0">${s.nodata}</p>`;
+    const dir = tableSort.dir === 'asc' ? 1 : -1;
+    const sv = r => tableSort.col === 'marge' ? (r.marginPct == null ? -Infinity : r.marginPct) : r.winPct;
+    const ind = c => tableSort.col === c ? (tableSort.dir === 'desc' ? ' ▾' : ' ▴') : '';
+    const venueCell = tools => tools.split(' + ').map(p => `<span class="sk-dot" style="background:${venueColor(p)}"></span>${escapeHtml(toolDisplay(p))}`).join('<span class="sk-plus">+</span>');
+    const rows = routes.map((r, idx) => ({ r, idx })).sort((a, b) => (sv(a.r) - sv(b.r)) * dir).map(({ r, idx }) => {
+      const isGray = r.tools === 'autres', isTwoTx = r.composite === true, mc = marginColor(r.marginPct);
+      const hasTail = isGray && Array.isArray(r.tail) && r.tail.length > 0;
+      const venueHtml = venueCell(r.tools) + (hasTail ? ` <span class="sk-caret">${tailOpen ? '▾' : '▸'}</span> <span class="muted">(${r.tail.length})</span>` : '');
+      const rkey = keyOf(r);
+      let row = `<tr data-rk="${idx}"${hasTail ? ' data-sk-tail="1"' : ''} data-sk-key="${rkey.replace(/"/g, '&quot;')}" class="${selKeys.has(rkey) ? 'sk-sel' : ''}" style="cursor:pointer"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
+        + `<td class="sk-route">${escapeHtml(r.steps.join(' → '))}</td>`
+        + `<td>${(isGray || r.marginPct == null) ? '<span class="muted">—</span>' : `<span style="color:${mc};font-weight:700">${fmtMargin(r.marginPct, lang)}</span>`}</td>`
+        + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b>${r.trend==='up'?'<span class="sk-tr sk-up">▲</span>':r.trend==='down'?'<span class="sk-tr sk-down">▼</span>':r.trend==='flat'?'<span class="sk-tr sk-flat">→</span>':''}</span></td></tr>`;
+      if (hasTail && tailOpen) {
+        row += r.tail.slice().sort((a, b) => b.winPct - a.winPct).map(tr => `<tr class="sk-tail-row"><td><span class="sk-venue">${venueCell(tr.tools)}${tr.composite ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td><td class="sk-route">${escapeHtml(tr.steps.join(' → '))}</td><td><span class="muted">—</span></td><td><b>${fmtPct(tr.winPct)}</b></td></tr>`).join('');
+      }
+      return row;
+    }).join('');
+    return `<table class="sk-table"><thead><tr><th>${s.venue}</th><th>${s.route}</th>`
+      + `<th class="sk-sortable" data-sk-sort="marge"><span class="tip-wrap" style="display:inline-flex;align-items:center">${s.marge}<span class="tip-icon">ⓘ</span><span class="tip-box">${s.margeTip}</span></span><span class="sk-ind">${ind('marge')}</span></th>`
+      + `<th class="sk-sortable" data-sk-sort="freq">${s.freq}<span class="sk-ind">${ind('freq')}</span></th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  // ── tooltip (div #sk-tip dédié en phase 1 ; #tipPortal réservé à la phase 2) ──
+  function showTip(event, lk, routes, s) {
+    const tt = document.getElementById('sk-tip'); if (!tt) return;
+    const through = lk.idxs.map(i => routes[i]).sort((a, b) => b.winPct - a.winPct);
+    const segTool = lk.tool === '—' ? s.others : escapeHtml(toolDisplay(lk.tool));
+    let html = `<div class="sk-tt-h">${segTool} <span class="muted" style="font-weight:500;font-size:11px">· ${escapeHtml(lk.source.name)} → ${escapeHtml(lk.target.name)}</span></div>`;
+    if (through.length === 1) { const r = through[0]; html += `<div class="sk-tt-r">${escapeHtml(r.steps.join(' → '))}</div><div class="sk-tt-row"><span>${s.freq}</span><b>${fmtPct(r.winPct)} ${s.freqOf}</b></div>`; }
+    else { html += `<div class="sk-tt-r">${s.through(through.length)}</div>`; through.forEach(r => { const nm = escapeHtml(toolDisplay(r.tools)) + (r.composite ? ' <span style="color:var(--teal);font-weight:700">2 tx</span>' : ''); html += `<div class="sk-tt-row"><span>${nm}</span><b>${fmtPct(r.winPct)}</b></div>`; }); html += `<div class="sk-tt-row sk-tt-total"><span>${s.total}</span><b>${fmtPct(lk.value)}</b></div>`; }
+    tt.innerHTML = html; tt.style.display = 'block'; moveTip(event);
+  }
+  function moveTip(event) { const tt = document.getElementById('sk-tip'); if (!tt) return; const x = event.clientX + 14, y = event.clientY - 10, tw = tt.offsetWidth; tt.style.left = ((x + tw > window.innerWidth - 10) ? x - tw - 28 : x) + 'px'; tt.style.top = y + 'px'; }
+  function hideTip() { const tt = document.getElementById('sk-tip'); if (tt) tt.style.display = 'none'; }
+  const hlRows = (idxs, on) => idxs.forEach(i => document.querySelectorAll('.sk-table tr[data-rk="' + i + '"]').forEach(tr => tr.classList.toggle('sk-hl', on)));
+
+  // ── DRAW : peuple le SVG (vanilla) + wire survol/tooltip/cross-hover/tri ──
+  function draw(pair, sonde, dark, lang) {
+    const svg = document.getElementById('route-sankey'); if (!svg) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    const s = tr(lang), routes = routesFor(sonde); // fond = thème de la page (blanc en clair)
+    if (routes.length === 0) {
+      const txt = E('text', { x:W/2, y:H/2, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':14, fill: dark ? '#94a3b8' : '#64748b' });
+      txt.textContent = s.nodata; svg.appendChild(txt); return;
+    }
+    const graph = layout(routes, W, H);
+    const sourceNode = routes[0].steps[0];
+    const targetSet = new Set(routes.map(r => r.steps[r.steps.length - 1]));
+    const textFill = dark ? '#e2e8f0' : '#0f172a', labelFill = dark ? '#f8fafc' : '#0f172a';
+    // Couleurs par RÔLE : départ (BLND) = ardoise · arrivée (cible) = vert sarcelle (= sortie simulateur)
+    // · pivot USDC au milieu = bleu · intermédiaires = gris. EURC n'est jamais qu'une arrivée → vert.
+    const C = {
+      depart:  dark ? { fill:'#334155', stroke:'#94a3b8' } : { fill:'#cbd5e1', stroke:'#475569' },
+      arrival: dark ? { fill:'#0f3b38', stroke:'#14b8a6' } : { fill:'#ccfbf1', stroke:'#0d9488' },
+      pivot:   dark ? { fill:'#1e3a5f', stroke:'#60a5fa' } : { fill:'#dbeafe', stroke:'#3b82f6' }, // USDC sombre éclairci (contraste)
+      inter:   dark ? { fill:'#1e293b', stroke:'#4b5e72' } : { fill:'#f1f5f9', stroke:'#94a3b8' },
+    };
+    const nodeColors = name => {
+      if (name === sourceNode) return C.depart;       // BLND = ardoise
+      if (targetSet.has(name)) return C.arrival;      // cible finale (USDC ou EURC) = vert sarcelle
+      if (name === 'USDC') return C.pivot;            // USDC pivot au milieu d'un composite = bleu
+      return C.inter;
+    };
+    const linkG = E('g', {}); svg.appendChild(linkG);
+    const linkEls = [];
+    graph.links.forEach(lk => {
+      const gray = lk.tool === '—', color = gray ? '#6b7280' : venueColor(lk.tool), baseOp = gray ? 0.35 : 0.55;
+      const sw = Math.max(2.5, lk.width - Math.min(LINK_GAP, lk.width * 0.45)), d = ribbonPath(lk.points);
+      const path = E('path', { d, fill:'none', stroke:color, 'stroke-width':sw, 'stroke-opacity':baseOp }); path.style.cursor = 'pointer';
+      path.addEventListener('mouseenter', e => { setActive(new Set(lk.idxs), true); showTip(e, lk, routes, s); hlRows(lk.idxs, true); });
+      path.addEventListener('mousemove', moveTip);
+      path.addEventListener('mouseleave', () => { applyActive(); hideTip(); hlRows(lk.idxs, false); });
+      linkG.appendChild(path); linkEls.push({ path, lk, baseOp, color, sw, d });
+      if (sw >= 7 && !gray) { const a = E('path', { d, fill:'none', stroke: dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.18)', 'stroke-width':Math.min(1.6, sw * 0.18), 'stroke-dasharray':'9 9', 'pointer-events':'none' }); a.setAttribute('class', 'sk-flow'); linkG.appendChild(a); }
+    });
+    const nodeG = E('g', {}); svg.appendChild(nodeG);
+    graph.nodes.forEach(n => {
+      const { fill, stroke } = nodeColors(n.name), isInter = !((n.name === sourceNode) || targetSet.has(n.name)), nodeH = Math.max(8, n.y1 - n.y0);
+      nodeG.appendChild(E('rect', { x:n.x0, y:n.y0, width:n.x1 - n.x0, height:nodeH, rx:isInter ? 5 : 7, fill, 'fill-opacity':1, stroke, 'stroke-width':isInter ? 1.8 : 1.5 }));
+      const txt = E('text', { x:(n.x0 + n.x1) / 2, y:(n.y0 + n.y1) / 2, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':isInter ? 12 : 14, 'font-weight':'700', fill:textFill }); txt.textContent = n.name; nodeG.appendChild(txt);
+    });
+    const topG = E('g', { 'pointer-events':'none' }); svg.appendChild(topG);
+    function setActive(idxSet, on, sub) {
+      while (topG.firstChild) topG.removeChild(topG.firstChild);
+      const subMode = on && (sub || idxSet.size === 1); // sélection MULTI, ou 1 route → sous-tranche(s) honnête(s)
+      linkEls.forEach(({ path, lk, baseOp }) => {
+        const linked = lk.idxs && lk.idxs.some(i => idxSet.has(i));
+        // mode sous-tranche : tout estompé (les fils fins ressortent) ; sinon : matching gardés, autres estompés
+        path.setAttribute('stroke-opacity', on ? (subMode ? baseOp * 0.45 : (linked ? baseOp : baseOp * 0.5)) : baseOp);
+      });
+      if (subMode) { const solo = idxSet.size === 1; idxSet.forEach(i => drawSubSlice(i, solo)); }
+      else if (on) linkEls.forEach(({ lk, color, sw, d }) => { if (lk.idxs && lk.idxs.some(i => idxSet.has(i))) topG.appendChild(E('path', { d, fill:'none', stroke:color, 'stroke-width':sw, 'stroke-opacity':0.95, 'pointer-events':'none' })); });
+    }
+    // Éclairage PARTIEL d'UNE route : ruban de largeur = SA fréquence (constante = flux conservé), posé à
+    // son OFFSET empilé DANS CHAQUE bande fusionnée. ⚠ l'offset/la fraction sont PROPRES à chaque bande
+    // (la part globale 4 % ne « remplit » pas un segment, elle en occupe sa juste tranche) → le fil weave.
+    function drawSubSlice(ri, solo) {
+      const r = routes[ri]; if (!r) return;
+      const scale = graph.links.length ? (graph.links[0].width / graph.links[0].value) : 1;
+      const w = r.winPct;
+      for (let i = 0; i < r.steps.length - 1; i++) {
+        const from = r.steps[i], to = r.steps[i + 1], tool = r.hopTools[i];
+        const L = graph.links.find(l => l.source.name === from && l.target.name === to && l.tool === tool);
+        if (!L) continue;
+        const members = L.idxs.slice().sort((a, b) => (routes[b].winPct - routes[a].winPct) || (a - b));
+        let off = 0; for (const m of members) { if (m === ri) break; off += routes[m].winPct; }
+        let dY, sw;
+        if (solo) {
+          // 1 route : fil aminci qui « tisse » à son offset dans la part pleine + halo contrasté (validé)
+          dY = (off + w / 2 - L.value / 2) * scale;
+          sw = Math.max(2, w * scale - Math.min(LINK_GAP, w * scale * 0.45));
+        } else {
+          // multi : on répartit DANS la largeur tracée de la bande (swFull) → les fils REMPLISSENT le
+          // segment, CONTIGUS (aucune séparation) ; seule la couleur d'outil les distingue → « tout Comet » = bande pleine.
+          const swFull = Math.max(2.5, L.width - Math.min(LINK_GAP, L.width * 0.45)), lscale = swFull / L.value;
+          dY = (off + w / 2 - L.value / 2) * lscale;
+          sw = Math.max(2, w * lscale);
+        }
+        const d = ribbonPath(L.points.map(p => [p[0], p[1] + dY]));
+        const col = L.tool === '—' ? '#9ca3af' : venueColor(L.tool);
+        if (solo) topG.appendChild(E('path', { d, fill:'none', stroke: dark ? 'rgba(248,250,252,0.6)' : 'rgba(15,23,42,0.45)', 'stroke-width': sw + 3, 'pointer-events':'none' })); // halo = pop d'un fil isolé
+        topG.appendChild(E('path', { d, fill:'none', stroke: col, 'stroke-width': sw, 'stroke-opacity': 0.98, 'pointer-events':'none' }));
+      }
+    }
+    // Sélection DURABLE (comme l'échelle des sources) : route sélectionnée → sous-tranche persistante.
+    const selIdxs = new Set(); routes.forEach((r, i) => { if (selKeys.has(keyOf(r))) selIdxs.add(i); });
+    const applyActive = () => { if (selIdxs.size) setActive(selIdxs, true, true); else setActive(new Set(), false); };
+    // badges = nom d'outil (ancré après le nœud source ; anti-collision en X)
+    const labG = E('g', { 'pointer-events':'none' }); svg.appendChild(labG);
+    const labs = [];
+    // Tous les outils sont étiquetés (même quand le nom dépasse la largeur de bande) ; anti-collision en Y.
+    graph.links.forEach(lk => { const nx = (lk.points && lk.points[1]) ? lk.points[1][0] : lk.target.x0; const off = Math.min(40, (nx - lk.source.x1) * 0.42); labs.push({ x:lk.source.x1 + off, adj:lk.y0, text:lk.tool === '—' ? s.others : toolDisplay(lk.tool) }); });
+    labs.sort((a, b) => a.adj - b.adj);
+    const MIN_LH = 14, XCLOSE = 96;
+    for (let i = 0; i < labs.length; i++) for (let j = 0; j < i; j++) if (Math.abs(labs[i].x - labs[j].x) < XCLOSE && Math.abs(labs[i].adj - labs[j].adj) < MIN_LH) labs[i].adj = labs[j].adj + MIN_LH;
+    labs.forEach(({ x, adj, text }) => { const t = E('text', { x, y:adj, 'text-anchor':'start', 'dominant-baseline':'middle', 'font-size':12, 'font-weight':'600', fill:labelFill, opacity:0.95 }); t.textContent = text; labG.appendChild(t); });
+    // cross-hover lignes → rubans (survol éclaire, mouseleave revient à la sélection) + CLIC = sélection durable
+    document.querySelectorAll('.sk-table tr[data-rk]').forEach(tr => {
+      const idx = +tr.getAttribute('data-rk');
+      tr.addEventListener('mouseenter', () => setActive(new Set([idx]), true));
+      tr.addEventListener('mouseleave', () => applyActive());
+      tr.addEventListener('click', () => { if (tr.hasAttribute('data-sk-tail')) { tailOpen = !tailOpen; renderApp(); return; } const k = tr.getAttribute('data-sk-key'); if (selKeys.has(k)) selKeys.delete(k); else selKeys.add(k); renderApp(); });
+    });
+    document.querySelectorAll('.sk-table th[data-sk-sort]').forEach(th => { th.style.cursor = 'pointer'; th.addEventListener('click', () => { const c = th.getAttribute('data-sk-sort'); if (tableSort.col === c) tableSort.dir = tableSort.dir === 'desc' ? 'asc' : 'desc'; else tableSort = { col: c, dir: 'desc' }; renderApp(); }); });
+    applyActive(); // applique la sélection durable au (re)rendu
+  }
+
+  return { graphHTML, tableHTML, draw };
+})();
+
+function renderApp() {
+  document.documentElement.lang = lang;
+  document.title = 'decant.fi — ' + t('brand_dim');
+  document.getElementById('app').innerHTML = buildPage();
+  // Graphe Sankey des routes (peuplé en DOM vanilla après l'innerHTML ; phase 1 = données de test)
+  if (view === 'dashboard' && document.getElementById('route-sankey'))
+    Sankey.draw(target, ladderSonde, document.documentElement.classList.contains('dark'), lang);
+}
+
+// ─── Navigation vue ───────────────────────────────────────────────────────────
+function setView(v) {
+  view = v;
+  // URL propre & partageable : ?view=health pour le status, ?pair=… pour le dashboard
+  history.replaceState(null, '', v === 'health' ? '?view=health' : '?pair=' + target);
+  if (v === 'health' && !health) void loadHealth();
+  else renderApp();
+}
+
+async function loadHealth() {
+  renderApp(); // affiche "Chargement…" immédiatement
+  try {
+    const r = await fetch('/api/health');
+    if (r.ok) health = await r.json();
+  } catch {}
+  renderApp();
+}
+
+// ─── Chargement des données ───────────────────────────────────────────────────
+async function loadOverview() {
+  try {
+    const r = await fetch(`/api/overview?pair=${target}&tzoff=${localOffset()}`);
+    if (r.ok) overview = await r.json();
+  } catch {}
+  renderApp();
+}
+
+// Poll pendant la fenêtre « imminent » : silencieux tant que le collecteur n'a pas tické.
+// Quand lastTickAt AVANCE (= vrai relevé), flash grisé unique pour signaler l'auto-refresh,
+// puis bascule les nouvelles données. Ne grise PAS à chaque poll (sinon la table clignote).
+async function pollForTick() {
+  const tgt = target;
+  let data;
+  try {
+    const r = await fetch(`/api/overview?pair=${target}&tzoff=${localOffset()}`);
+    if (!r.ok) return;
+    data = await r.json();
+  } catch { return; }
+  if (target !== tgt) return; // paire changée pendant le fetch
+  const prevTick = overview && overview.meta ? overview.meta.lastTickAt : null;
+  const newTick = data && data.meta ? data.meta.lastTickAt : null;
+  if (!newTick || newTick === prevTick) return; // pas de nouveau relevé : reste silencieux
+  // Nouveau relevé détecté : flash grisé puis swap des données.
+  refreshing = true;
+  renderApp();
+  await new Promise((res) => setTimeout(res, 400));
+  if (target !== tgt) { refreshing = false; return; } // paire changée pendant le hold
+  overview = data;
+  refreshing = false;
+  renderApp();
+}
+
+async function loadBalance() {
+  if (!walletAddress) { walletBlnd = 0; walletConfigured = false; renderApp(); return; }
+  try {
+    const r = await fetch(`/api/balance?address=${walletAddress}`);
+    if (r.ok) { const b = await r.json(); walletBlnd = b.blnd || 0; walletConfigured = b.configured !== false; }
+  } catch {}
+  renderApp();
+}
+
+// ─── Compte à rebours (setInterval unique) ───────────────────────────────────
+function startCountdownTick() {
+  if (countdownInterval) return; // déjà actif
+  countdownInterval = setInterval(() => {
+    const el = document.getElementById('countdown');
+    if (el) el.textContent = computeCountdownText();
+    // Échéance dépassée : re-fetch périodique jusqu'à ce que le collecteur ait tické,
+    // sinon le compte à rebours reste figé sur « imminent ».
+    if (nextTickAt !== null && Date.now() >= nextTickAt && Date.now() - lastImminentPollAt > 10000) {
+      lastImminentPollAt = Date.now();
+      void pollForTick();
+    }
+  }, 1000);
+}
+
+// ─── Actions utilisateur ──────────────────────────────────────────────────────
+function setTarget(t2) {
+  if (t2 === target) return;
+  const y = window.scrollY; // rester au même endroit (cf. thème/langue) : on garde overview pour ne pas réduire la page
+  target = t2;
+  simResult = null;
+  selectedSource = null;
+  refreshMsg = '';
+  history.replaceState(null, '', '?pair=' + target);
+  renderApp();
+  window.scrollTo(0, y);
+  void loadOverview().then(() => window.scrollTo(0, y));
+}
+
+function setSonde(n) {
+  ladderSonde = n;
+  renderApp();
+}
+
+function onAmt(v) {
+  const n = parseAmount(v);
+  if (!isNaN(n) && n > 0) { simAmt = n; simActive = true; }
+  else { simActive = false; selectedSource = null; }
+}
+
+function clearSim() {
+  simActive = false;
+  simResult = null;
+  selectedSource = null;
+  clearInterval(refreshTimer); refreshTimer = null; refreshCooldown = 0;
+  renderApp();
+}
+
+function useWallet() {
+  if (!walletConfigured || walletBlnd <= 0) return;
+  simAmt = walletBlnd;
+  simActive = true;
+  renderApp();
+  void doSim();
+}
+
+async function doSim() {
+  if (!simActive || simAmt <= 0) return;
+  if (simActive && refreshCooldown > 0) return; // cooldown actif (Enter ou clic parasite)
+  selectedSource = null;
+  simLoading = true;
+  simResult = null;
+  renderApp();
+  try {
+    const r = await fetch(`/api/quote?pair=${target}&amount=${simAmt}`);
+    if (r.ok) simResult = await r.json();
+  } catch {}
+  simLoading = false;
+  renderApp();
+  // Démarrer le cooldown bouton si la sim a réussi
+  if (simActive && simResult) {
+    startRefreshCooldown();
+  }
+}
+
+async function doRefresh() {
+  if (refreshing) return;
+  refreshing = true;
+  refreshMsg = '';
+  renderApp();
+  try {
+    const r = await fetch(`/api/refresh?pair=${target}`, { method: 'POST' });
+    if (r.status === 429) {
+      refreshMsg = t('refresh_429');
+    } else if (r.ok) {
+      const data = await r.json();
+      if (data.overview) {
+        overview = data.overview;
+        // Réinitialise nextTickAt depuis le nouveau overview
+        const computedNext = computeNextTickAt(overview.meta);
+        if (computedNext !== null) nextTickAt = computedNext;
+      }
+      refreshMsg = '';
+    }
+  } catch {}
+  refreshing = false;
+  renderApp();
+}
+
+// ─── Wallet helpers ───────────────────────────────────────────────────────────
+function shortAddr(a) {
+  return a.slice(0, 4) + '…' + a.slice(-4);
+}
+
+// Échappe le HTML : tout texte d'origine serveur (errorMsg) passe par là avant innerHTML.
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const TRUSTLINE_ISSUERS = {
+  USDC: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
+  EURC: 'GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2',
+};
+
+function mapExecError(code, fallback) {
+  if (code === 'trustline') return t('err_trustline', target, TRUSTLINE_ISSUERS[target] || target);
+  const key = 'err_' + String(code).replace('-', ''); // 'no-route' → clé 'err_noroute'
+  const s = STRINGS[lang];
+  if (s && s[key] !== undefined) return t(key);
+  return fallback || code;
+}
+
+async function connectWallet() {
+  try {
+    await ensureKit();
+    const { address } = await SWK.authModal();
+    walletAddress = address;
+    localStorage.setItem('walletAddress', address);
+    await loadBalance();
+    renderApp();
+  } catch (e) { /* user closed modal: ignore */ }
+}
+
+async function disconnectWallet() {
+  try { await ensureKit(); await SWK.disconnect(); } catch (e) { /* ignore */ }
+  walletAddress = null;
+  localStorage.removeItem('walletAddress');
+  walletBlnd = 0;
+  walletConfigured = false;
+  renderApp();
+}
+
+// ─── Exécution swap ───────────────────────────────────────────────────────────
+async function doExecute() {
+  if (!simResult || !simActive || simAmt <= 0) return;
+  if (!walletAddress) {
+    execState = { phase: 'error', errorMsg: t('exec_connect_first') };
+    renderApp();
+    return;
+  }
+  // Si une source exécutable est sélectionnée, forcer ce venue côté serveur
+  const selRow = selectedSource
+    ? (simResult.ladder || []).find(r => r.sourceId === selectedSource)
+    : null;
+  const winRow = (simResult.ladder || []).find(r => r.winner);
+  const isComposite = !!(winRow && winRow.sourceId && winRow.sourceId.includes('+'));
+  // Composite EURC → flux guidé 2 jambes
+  if (isComposite) {
+    await startCompositeLeg1(winRow);
+    return;
+  }
+  // Venue à forcer : la ligne sélectionnée si exécutable, sinon le GAGNANT affiché s'il est exécutable.
+  // Fini la bascule silencieuse vers une autre venue : le bouton dit « via [gagnant] », on exécute [gagnant]
+  // (l'alerte au quote prévient en amont s'il sur-cote). Gagnant non-exécutable → repli serveur.
+  const forceRow = (selRow && selRow.executable) ? selRow
+    : (winRow && winRow.executable ? winRow : null);
+  const body = {
+    pair: target,
+    amount: simAmt,
+    sender: walletAddress,
+    slippageBps: Math.round(execSlippagePct * 100),
+    ...(forceRow ? { venue: forceRow.sourceId.split('+')[0].trim() } : {}),
+  };
+  try {
+    const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code }; }
+    else { execState = { phase: 'review', build: j }; }
+  } catch (e) { execState = { phase: 'error', errorMsg: t('err_down') }; }
+  renderApp();
+}
+
+// Lance le flux composite 2-tx pour la ligne composite affichée (best OU sélectionnée).
+// Indépendant du flag `winner` du ladder : le headline peut être le composite alors que
+// raw[0] (winner) est une venue atomique → on cible la ligne dont le sourceId contient '+'.
+async function doExecuteComposite() {
+  if (!simResult || !simActive || simAmt <= 0) return;
+  if (!walletAddress) { execState = { phase: 'error', errorMsg: t('exec_connect_first') }; renderApp(); return; }
+  const compRow = (simResult.ladder || []).find(r => r.sourceId && r.sourceId.includes('+') && r.legs);
+  if (!compRow) { execState = { phase: 'error', errorMsg: t('exec_failed') }; renderApp(); return; }
+  await startCompositeLeg1(compRow);
+}
+
+async function startCompositeLeg1(winRow) {
+  const leg1Source = (winRow.legs && winRow.legs[0] && winRow.legs[0].sourceId)
+    || winRow.sourceId.split('+')[0].trim();
+  // Lire le solde USDC avant (non bloquant)
+  let usdcBefore = null;
+  if (walletAddress) {
+    try {
+      const br = await fetch(`/api/asset-balance?address=${walletAddress}&asset=USDC`);
+      if (br.ok) { const bj = await br.json(); usdcBefore = typeof bj.balance === 'number' ? bj.balance : null; }
+    } catch (_) { /* non bloquant */ }
+  }
+  // Build leg1 : BLND→USDC, venue forcée
+  try {
+    const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pair: 'USDC', amount: simAmt, sender: walletAddress, slippageBps: Math.round(execSlippagePct * 100), venue: leg1Source }) });
+    const j = await r.json();
+    const comp1 = { leg: 1, leg1Source, usdcBefore, usdcReceived: null, hash1: null };
+    // Erreur leg1 (typiquement trustline USDC manquante) : préserve comp{leg:1} + l'actif manquant
+    // (j.asset = USDC ici) → le front ajoute/relance la BONNE trustline, pas le target global (EURC).
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, asset: j.asset, comp: comp1 }; }
+    else { execState = { phase: 'review', build: j, comp: comp1 }; }
+  } catch (e) { execState = { phase: 'error', errorMsg: t('err_down') }; }
+  renderApp();
+}
+
+async function confirmExecute() {
+  const build = execState && execState.build; if (!build) return;
+  const comp = execState.comp || null;
+  execState = { phase: 'signing', build, ...(comp ? { comp } : {}) }; renderApp();
+  try {
+    // Lire le solde cible AVANT signature pour comparer après exécution (#3)
+    const asset = (build.review && build.review.target) || target;
+    let destBefore = null;
+    if (walletAddress) {
+      try {
+        const br = await fetch(`/api/asset-balance?address=${walletAddress}&asset=${asset}`);
+        if (br.ok) { const bj = await br.json(); destBefore = typeof bj.balance === 'number' ? bj.balance : null; }
+      } catch (_) { /* non bloquant */ }
+    }
+    await ensureKit();
+    const { signedTxXdr } = await SWK.signTransaction(build.xdr, { address: walletAddress, networkPassphrase: KIT_NET });
+    execState = { phase: 'submitting', build, ...(comp ? { comp } : {}) }; renderApp();
+    const r = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ venue: build.venue, id: build.id, signedXdr: signedTxXdr }) });
+    const j = await r.json();
+    if (!r.ok) {
+      execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, asset: j.asset, ...(comp ? { comp } : {}) };
+      renderApp(); return;
+    }
+    if (build.type === 'restore') {
+      // la tx restore est soumise ; reconstruire le vrai swap puis revenir à la revue.
+      // ponytail: branche restore best-effort, non testée en live (nécessite un contrat archivé).
+      await doExecute(); return;
+    }
+    // ─── Composite leg1 terminé : poll USDC puis enchaîner leg2 ─────────────
+    if (comp && comp.leg === 1) {
+      const hash1 = j.hash;
+      const usdcBefore = comp.usdcBefore;
+      execState = { phase: 'leg1_confirming', comp: { ...comp, hash1 } }; renderApp();
+      // Poll solde USDC jusqu'à réception (10 essais × 1,5 s)
+      let usdcReceived = null;
+      let initialBal = null;
+      for (let i = 0; i < 10; i++) {
+        await new Promise(res => setTimeout(res, 1500));
+        if (!execState || execState.phase !== 'leg1_confirming') return; // modal fermé
+        try {
+          const pr = await fetch(`/api/asset-balance?address=${walletAddress}&asset=USDC`);
+          if (!pr.ok) continue;
+          const pj = await pr.json();
+          const bal = typeof pj.balance === 'number' ? pj.balance : null;
+          if (bal == null) continue;
+          if (initialBal == null) initialBal = bal;
+          const ref = usdcBefore != null ? usdcBefore : initialBal;
+          if (bal > ref + 1e-7) {
+            usdcReceived = bal - (usdcBefore != null ? usdcBefore : initialBal);
+            break;
+          }
+        } catch (_) { /* continuer */ }
+      }
+      // Si on n'a pas détecté l'arrivée, best-effort : prendre la dernière balance connue - before
+      if (usdcReceived == null && initialBal != null && usdcBefore != null) {
+        usdcReceived = Math.max(0, initialBal - usdcBefore);
+      }
+      const newComp = { ...comp, hash1, usdcReceived };
+      execState = { phase: 'leg1_confirming', comp: newComp }; renderApp();
+      await buildCompositeLeg2(newComp);
+      return;
+    }
+    // ─── Mono ou composite leg2 : comportement done normal ───────────────────
+    const doneHash = j.hash;
+    execState = { phase: 'done', hash: doneHash, venue: build.venue, build, ...(comp ? { comp } : {}) }; renderApp();
+    // Poll du solde cible pour afficher le reçu on-chain (#3)
+    if (destBefore != null && walletAddress) {
+      (async () => {
+        for (let i = 0; i < 10; i++) {
+          await new Promise(res => setTimeout(res, 1500));
+          // Abandon si le modal a été fermé ou la phase a changé
+          if (!execState || execState.phase !== 'done' || execState.hash !== doneHash) return;
+          try {
+            const pr = await fetch(`/api/asset-balance?address=${walletAddress}&asset=${asset}`);
+            if (!pr.ok) continue;
+            const pj = await pr.json();
+            const bal = typeof pj.balance === 'number' ? pj.balance : null;
+            if (bal != null && bal > destBefore + 1e-7) {
+              if (execState && execState.phase === 'done' && execState.hash === doneHash) {
+                execState = { ...execState, executed: bal - destBefore };
+                renderApp();
+              }
+              return;
+            }
+          } catch (_) { /* continuer */ }
+        }
+      })();
+    }
+  } catch (e) {
+    const msg = (e && e.message) || '';
+    const errorMsg = /reject/i.test(msg) ? t('exec_rejected') : (msg || t('exec_failed'));
+    execState = { phase: 'error', errorMsg, ...(comp ? { comp } : {}) }; renderApp();
+  }
+}
+
+async function buildCompositeLeg2(comp) {
+  try {
+    const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pair: 'EURC', from: 'USDC', amount: comp.usdcReceived, sender: walletAddress, slippageBps: Math.round(execSlippagePct * 100) }) });
+    const j = await r.json();
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, asset: j.asset, comp: { ...comp, leg: 2 } }; }
+    else { execState = { phase: 'review', build: j, comp: { ...comp, leg: 2 } }; }
+  } catch (e) { execState = { phase: 'error', errorMsg: t('err_down'), comp: { ...comp, leg: 2 } }; }
+  renderApp();
+}
+
+async function retryCompositeLeg2() {
+  const comp = execState && execState.comp;
+  if (!comp || comp.usdcReceived == null) return;
+  execState = { phase: 'leg1_confirming', comp }; renderApp();
+  await buildCompositeLeg2(comp);
+}
+
+// Ajout de la trustline de sortie DEPUIS l'app : build changeTrust → signature wallet → submit Horizon.
+// Pas d'auto-retry du swap (read-after-write Horizon) : on revient à un clic d'exécution → quelques
+// secondes passent (lecture du succès + clic) = buffer de propagation, pas de faux « trustline absente ».
+// assetCode = l'actif RÉELLEMENT manquant (USDC au leg1, EURC au leg2/mono) ; défaut = target global.
+async function addTrustline(assetCode) {
+  if (!walletAddress) { execState = { phase: 'error', errorMsg: t('exec_connect_first') }; renderApp(); return; }
+  // Préserver le contexte composite : si la trustline manque au leg2 (leg1 déjà exécuté, USDC en main),
+  // après l'ajout on relance le LEG2 — JAMAIS doExecute() qui re-swapperait du BLND (double swap).
+  const comp = (execState && execState.comp) || null;
+  const asset = assetCode || (execState && execState.asset) || target; // pair à truster (USDC/EURC)
+  const keep = { ...(comp ? { comp } : {}), asset };
+  try {
+    execState = { phase: 'trustline_adding', ...keep }; renderApp();
+    const r = await fetch('/api/build-trustline', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pair: asset, sender: walletAddress }) });
+    const j = await r.json();
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, ...keep }; renderApp(); return; }
+    await ensureKit();
+    const { signedTxXdr } = await SWK.signTransaction(j.xdr, { address: walletAddress, networkPassphrase: KIT_NET });
+    const sr = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ venue: 'horizon', signedXdr: signedTxXdr }) });
+    const sj = await sr.json();
+    if (!sr.ok) { execState = { phase: 'error', errorMsg: mapExecError(sj.code, sj.error), code: sj.code, ...keep }; renderApp(); return; }
+    execState = { phase: 'trustline_added', ...keep }; renderApp();
+  } catch (e) {
+    const msg = (e && e.message) || '';
+    execState = { phase: 'error', errorMsg: /reject/i.test(msg) ? t('exec_rejected') : (msg || t('exec_failed')), ...keep }; renderApp();
+  }
+}
+
+function cancelExecute() {
+  execState = null;
+  renderApp();
+}
+
+function onModalBackdrop(e) {
+  if (e.target === e.currentTarget && execState && (execState.phase === 'done' || execState.phase === 'error')) {
+    cancelExecute();
+  }
+}
+
+// ─── Cooldown bouton Rafraîchir ───────────────────────────────────────────────
+function simBtnState() {
+  if (!simActive) return { label: t('sim_btn_simulate'), disabled: false };
+  if (refreshCooldown > 0) return { label: t('sim_btn_refresh_wait', refreshCooldown), disabled: true };
+  return { label: t('sim_btn_refresh'), disabled: false };
+}
+
+function updateSimBtn() {
+  const b = document.getElementById('simBtn');
+  if (!b) return;
+  const { label, disabled } = simBtnState();
+  b.textContent = label;
+  b.disabled = disabled;
+}
+
+function startRefreshCooldown() {
+  clearInterval(refreshTimer);
+  refreshCooldown = 10;
+  updateSimBtn();
+  refreshTimer = setInterval(() => {
+    refreshCooldown--;
+    if (refreshCooldown <= 0) {
+      refreshCooldown = 0;
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+    }
+    updateSimBtn();
+  }, 1000);
+}
+
+function onExecSlippage(v) {
+  const n = parseAmount(v);
+  execSlippagePct = isNaN(n) ? 0.5 : Math.max(0, Math.min(50, n));
+  localStorage.setItem('slippagePct', execSlippagePct);
+  renderApp();
+}
+
+// Flèches +/− du champ slippage (pas de 0,1 %, borné 0–50, arrondi pour éviter la dérive flottante).
+function nudgeSlippage(d) {
+  execSlippagePct = Math.max(0, Math.min(50, Math.round((execSlippagePct + d) * 10) / 10));
+  localStorage.setItem('slippagePct', execSlippagePct);
+  renderApp();
+}
+
+// ─── Helper : table de revue (partagée review / signing / submitting) ─────────
+function venueDisplay(id) {
+  return id === 'xbull' ? 'xBull' : id === 'soroswap' ? 'Soroswap' : id === 'horizon' ? 'Horizon' : id === 'aquarius' ? 'Aquarius' : id === 'comet' ? 'Comet' : id === 'ultrastellar' ? 'Ultra Stellar' : id;
+}
+
+function reviewTableHtml(rv, tgt, showSimDelta, sendAsset = 'BLND') {
+  const vl = venueDisplay(rv.venue);
+  // #3 — indicateur sim→build : compare le build (re-coté) au simulateur de la même venue
+  let simDeltaHtml = '';
+  if (showSimDelta) {
+    const simRow = (simResult && simResult.ladder) ? simResult.ladder.find(r => r.sourceId === rv.venue) : null;
+    const simNet = simRow ? simRow.net : null;
+    if (simNet != null) {
+      let arrow, col;
+      if (rv.netOut > simNet + 1e-6) { arrow = '↗'; col = 'var(--green)'; }
+      else if (rv.netOut < simNet - 1e-6) { arrow = '↘'; col = 'var(--red)'; }
+      else { arrow = '='; col = 'var(--caption)'; }
+      simDeltaHtml = ` <span style="color:${col};font-weight:700">${arrow}</span> <span style="color:var(--caption);font-size:12px">(${t('review_sim_was')} ${fmt3(simNet)})</span>`;
+    }
+  }
+  const feeXlm = rv.gasFeeXlm ?? 0;
+  const feeStr = feeXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
+  const realXlm = rv.gasRealXlm;
+  const realStr = realXlm != null ? realXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
+  const feeLabel = t('net_fee_label');
+  const feeDisplay = realStr != null
+    ? `${realStr} XLM <span style="font-size:12px;color:var(--caption)">(max&nbsp;${feeStr})</span>`
+    : `${feeStr} XLM`;
+  return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.4rem">
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} ${sendAsset}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${tgt}${simDeltaHtml}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt3(rv.minReceived)} ${tgt}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${feeLabel}</td><td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">${feeDisplay}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${vl}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
+  </table>
+  <p class="help" style="margin:0 0 .8rem;font-size:12px;color:var(--caption)">${t('review_network_fee_note')}</p>`;
+}
+
+// ─── Modal cohérence (sondes suspectes) ──────────────────────────────────────
+async function openCoherence(venue) {
+  coherenceModal = { venue, loading: true, data: null };
+  renderApp();
+  try {
+    const r = await fetch('/api/coherence?venue=' + venue);
+    coherenceModal.data = await r.json();
+  } catch {
+    coherenceModal.data = { venue, probes: [] };
+  }
+  coherenceModal.loading = false;
+  renderApp();
+}
+
+function closeCoherence() {
+  coherenceModal = null;
+  renderApp();
+}
+
+function coherenceModalHtml() {
+  if (!coherenceModal) return '';
+  const { venue, loading, data } = coherenceModal;
+  // Nom d'affichage de la venue
+  const dName = venue === 'xbull' ? 'xBull' : venue === 'soroswap' ? 'Soroswap' : venue === 'horizon' ? 'Horizon' : venue === 'aquarius' ? 'Aquarius' : venue === 'comet' ? 'Comet' : venue === 'ultrastellar' ? 'Ultra Stellar' : venue;
+
+  let body;
+  if (loading) {
+    body = `<p class="help">${t('health_coh_modal_loading')}</p>`;
+  } else {
+    const probes = (data && data.probes) || [];
+    const suspects = probes.filter(p => p.incoherent);
+    body = `<p style="margin:0 0 .7rem;font-size:13px">${t('health_coh_modal_recap', probes.length, suspects.length)}</p>`;
+    if (suspects.length === 0) {
+      body += `<p class="help">${t('health_coh_modal_none')}</p>`;
+    } else {
+      const suspectRows = suspects.map(p => {
+        // Montant : amount_in est en stroops (entier), /1e7 → BLND
+        const amtBlnd = p.amount_in != null ? (Number(p.amount_in) / 1e7).toFixed(0) + ' BLND' : '—';
+        const dateStr = p.created_at ? p.created_at.replace('T', ' ').slice(0, 16) : '—';
+        const route = (p.route && p.route.length > 0) ? p.route.join(' → ') : '—';
+        const delta = p.delta_bps != null ? `${p.delta_bps} bps` : '—';
+        const quoted = p.net_quoted != null ? (Number(p.net_quoted) / 1e7).toFixed(4) : '—';
+        const simulated = p.net_simulated != null ? (Number(p.net_simulated) / 1e7).toFixed(4) : '—';
+        const reason = p.reason || '—';
+        return `<tr>
+          <td style="white-space:nowrap;font-size:12px;color:var(--caption)">${dateStr}</td>
+          <td>${p.pair || '—'}</td>
+          <td style="font-variant-numeric:tabular-nums">${amtBlnd}</td>
+          <td style="font-size:12px;color:var(--amber)">${reason}</td>
+          <td style="font-size:12px">${route}</td>
+          <td style="font-variant-numeric:tabular-nums;color:var(--red)">${delta}</td>
+          <td style="font-variant-numeric:tabular-nums">${quoted}</td>
+          <td style="font-variant-numeric:tabular-nums">${simulated}</td>
+        </tr>`;
+      }).join('');
+      body += `<div style="overflow-x:auto"><table class="flt" style="font-size:12px">
+        <thead><tr>
+          <th>${t('health_coh_col_date')}</th>
+          <th>${t('health_coh_col_pair')}</th>
+          <th>${t('health_coh_col_amount')}</th>
+          <th>${t('health_coh_col_reason')}</th>
+          <th>${t('health_coh_col_route')}</th>
+          <th>${t('health_coh_col_delta')}</th>
+          <th>${t('health_coh_col_quoted')}</th>
+          <th>${t('health_coh_col_simulated')}</th>
+        </tr></thead>
+        <tbody>${suspectRows}</tbody>
+      </table></div>`;
+    }
+  }
+
+  return `<div class="modal-overlay" onclick="if(event.target===this)closeCoherence()"><div class="modal-card" style="max-width:780px;width:95vw">
+    <div style="font-size:14px;font-weight:700;margin-bottom:.8rem">${t('health_coh_modal_title', dName)}</div>
+    ${body}
+    <div style="display:flex;justify-content:flex-end;margin-top:.9rem">
+      <button class="btn" onclick="closeCoherence()">${t('health_coh_close')}</button>
+    </div>
+  </div></div>`;
+}
+
+// ─── Modal d'exécution ────────────────────────────────────────────────────────
+function execModal() {
+  if (!execState) return '';
+  const { phase, build, hash, errorMsg, executed } = execState;
+  const safeHash = /^[0-9a-fA-F]{64}$/.test(hash) ? hash : '';
+  const comp = execState.comp || null;
+
+  // Badge d'étape composite (affiché dans review / signing / submitting)
+  const stepBadge = (comp && (phase === 'review' || phase === 'signing' || phase === 'submitting'))
+    ? `<div style="display:inline-block;background:var(--teal);color:#fff;border-radius:999px;padding:.15rem .65rem;font-size:11px;font-weight:700;margin-bottom:.65rem">${t('comp_step', comp.leg)}</div>`
+    : '';
+
+  // Actif courant de la jambe (USDC au leg1, EURC au leg2 / mono)
+  const legTarget = (build && build.review && build.review.target) || target;
+  // Actif envoyé : USDC au leg2 du composite (on ne (re)vend pas du BLND), BLND sinon.
+  const sendAsset = (comp && comp.leg === 2) ? 'USDC' : 'BLND';
+
+  let content = '';
+  if (phase === 'review') {
+    const rv = build.review;
+    const fidelityNote = '';
+    // Disclosure restore AVANT signature : la 1re signature restaure l'état du contrat, le swap est rebuild + re-revu ensuite.
+    const restoreNote = build.type === 'restore'
+      ? `<p class="help" style="margin:.6rem 0 0;color:var(--amber)">${t('exec_restore')}</p>`
+      : '';
+    content = `
+      ${stepBadge}
+      <div style="font-size:14px;font-weight:700;margin-bottom:.9rem">${t('review_title')}</div>
+      ${reviewTableHtml(rv, legTarget, true, sendAsset)}
+      ${fidelityNote}
+      ${restoreNote}
+      <div style="display:flex;gap:.55rem;margin-top:.9rem;justify-content:flex-end">
+        <button class="btn" onclick="cancelExecute()">${t('review_cancel')}</button>
+        <button class="btn primary" onclick="confirmExecute()">${t('review_confirm')}</button>
+      </div>`;
+  } else if (phase === 'signing') {
+    const rv = build && build.review;
+    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, legTarget, false, sendAsset)}</div>` : '';
+    content = `
+      ${stepBadge}
+      <p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem">${t('exec_signing_wallet')}</p>
+      ${dimTable}`;
+  } else if (phase === 'submitting') {
+    const rv = build && build.review;
+    const dimTable = rv ? `<div style="opacity:.45;pointer-events:none;margin-top:.7rem">${reviewTableHtml(rv, legTarget, false, sendAsset)}</div>` : '';
+    const restoreNote = build && build.type === 'restore'
+      ? `<p class="help" style="margin:.5rem 0 0">${t('exec_restore')}</p>`
+      : '';
+    content = `
+      ${stepBadge}
+      <p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem">${t('exec_submitting')}</p>
+      ${restoreNote}
+      ${dimTable}`;
+  } else if (phase === 'leg1_confirming') {
+    content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0">${t('comp_leg1_confirming')}</p>`;
+  } else if (phase === 'done') {
+    const rv = build && build.review;
+    const doneTarget = (rv && rv.target) || target;
+    let compBlock = '';
+    if (rv) {
+      // Ligne "Reçu" : pulse si lecture en cours, valeur colorée si reçu
+      const execVal = executed != null
+        ? `<span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;color:${executed >= rv.netOut ? 'var(--green)' : 'var(--red)'}">${fmt3(executed)} ${doneTarget}</span>`
+        : `<span class="pulse" style="color:var(--caption);font-size:13px">${t('exec_reading')}</span>`;
+      // Chip d'écart proéminent (seulement quand reçu connu)
+      let deltaChip = '';
+      if (executed != null) {
+        const d = executed - rv.netOut;
+        const col = d >= 0 ? 'var(--green)' : 'var(--red)';
+        const sign = d >= 0 ? '+' : '';
+        deltaChip = `<div style="display:inline-flex;align-items:center;gap:.3rem;background:${col}22;color:${col};border:1px solid ${col}55;border-radius:999px;padding:.2rem .75rem;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:.5rem">${sign}${fmt3(d)} ${doneTarget} ${t('exec_delta')}</div>`;
+      }
+      const doneFeeXlm = rv.gasFeeXlm ?? 0;
+      const doneFeeStr = doneFeeXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
+      const doneRealXlm = rv.gasRealXlm;
+      const doneRealStr = doneRealXlm != null ? doneRealXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
+      const doneFeeDisplay = doneRealStr != null ? `${doneRealStr} XLM <span style="font-size:12px;color:var(--caption)">(max&nbsp;${doneFeeStr})</span>` : `${doneFeeStr} XLM`;
+      const doneFeeLabel = t('net_fee_label');
+      compBlock = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:.9rem 0 .3rem">
+        <tr><td style="padding:5px 0;color:var(--caption)">${t('exec_quoted')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.netOut)} ${doneTarget}</td></tr>
+        <tr><td style="padding:5px 0;color:var(--caption)">${t('review_receive_min')}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${fmt3(rv.minReceived)} ${doneTarget}</td></tr>
+        <tr><td style="padding:5px 0;color:var(--caption)">${doneFeeLabel}</td><td style="padding:5px 0;text-align:right;font-variant-numeric:tabular-nums">${doneFeeDisplay}</td></tr>
+        <tr style="border-top:1px solid var(--card-border)"><td style="padding:6px 0;color:var(--heading);font-weight:600">${t('exec_executed')}</td><td style="padding:6px 0;text-align:right">${execVal}</td></tr>
+      </table>${deltaChip}`;
+    }
+    content = `
+      <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.8rem">
+        <span style="font-size:22px;color:var(--green);line-height:1">✓</span>
+        <span style="font-size:15px;font-weight:700;color:var(--green)">${t('exec_success')}</span>
+      </div>
+      ${compBlock}
+      <div style="display:flex;gap:.55rem;margin-top:1rem;align-items:center;justify-content:flex-end;flex-wrap:wrap">
+        <a class="btn openlink" href="https://stellar.expert/explorer/public/tx/${encodeURIComponent(safeHash)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:.3rem">${t('exec_view')}</a>
+        <button class="btn primary" onclick="cancelExecute()">${t('exec_close')}</button>
+      </div>`;
+  } else if (phase === 'trustline_adding') {
+    content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0">${t('trustline_adding')}</p>`;
+  } else if (phase === 'trustline_added') {
+    // Reprise après ajout : leg2 → retryCompositeLeg2 (USDC en main) ; leg1 → doExecuteComposite
+    // (relance la jambe 1, JAMAIS doExecute() qui pourrait exécuter une venue atomique) ; mono → doExecute.
+    const resumeBtn = (comp && comp.leg === 2 && comp.usdcReceived != null)
+      ? `<button class="btn primary" onclick="retryCompositeLeg2()">${t('comp_retry_leg2')}</button>`
+      : (comp && comp.leg === 1)
+        ? `<button class="btn primary" onclick="doExecuteComposite()">${t('exec_btn')}</button>`
+        : `<button class="btn primary" onclick="doExecute()">${t('exec_btn')}</button>`;
+    content = `
+      <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.5rem">
+        <span style="font-size:20px;color:var(--green);line-height:1">✓</span>
+        <span style="font-size:14px;font-weight:700;color:var(--green)">${t('trustline_added', execState.asset || target)}</span>
+      </div>
+      <p class="help" style="margin:0 0 .9rem">${t('trustline_added_hint')}</p>
+      <div style="display:flex;gap:.55rem;justify-content:flex-end;flex-wrap:wrap">
+        <button class="btn" onclick="cancelExecute()">${t('exec_close')}</button>
+        ${resumeBtn}
+      </div>`;
+  } else if (phase === 'error') {
+    // Cas trustline absente : message clair + bouton d'ajout in-app (≠ « échec » dur).
+    const isTrust = execState.code === 'trustline';
+    // Cas composite leg2 récupérable : leg1 ok, USDC en main, leg2 échoué
+    const isLeg2Fail = comp && comp.leg === 2 && comp.usdcReceived != null;
+    // Actif réellement manquant (USDC au leg1, EURC au leg2/mono) — fourni par le backend, PAS le target global.
+    const missAsset = execState.asset || target;
+    const title = isTrust ? t('trustline_title') : t('exec_failed');
+    const titleColor = isTrust ? 'var(--amber)' : 'var(--red)';
+    // leg2 récupérable → message « leg1 ok, USDC en main » (prioritaire sur le générique trustline) ;
+    // si la trustline EURC manque, on garde le bouton d'ajout (l'ajout enchaîne sur retryCompositeLeg2).
+    const msg = isLeg2Fail ? t('comp_leg2_failed', fmt3(comp.usdcReceived))
+      : isTrust ? t('trustline_need', missAsset)
+      : escapeHtml(errorMsg);
+    const safeMissAsset = missAsset.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const trustBtn = isTrust ? `<button class="btn primary" onclick="addTrustline('${safeMissAsset}')">${t('trustline_add_btn', missAsset)}</button>` : '';
+    // Relance directe seulement si ce n'est PAS un manque de trustline (sinon il faut d'abord l'ajouter).
+    const retryLeg2Btn = (isLeg2Fail && !isTrust) ? `<button class="btn primary" onclick="retryCompositeLeg2()">${t('comp_retry_leg2')}</button>` : '';
+    content = `
+      <p style="font-size:14px;font-weight:700;color:${titleColor};margin:0 0 .5rem">${title}</p>
+      <p class="help" style="margin:0 0 .9rem;overflow-wrap:anywhere">${msg}</p>
+      <div style="display:flex;gap:.55rem;justify-content:flex-end;flex-wrap:wrap">
+        <button class="btn" onclick="cancelExecute()">${t('exec_close')}</button>
+        ${trustBtn}
+        ${retryLeg2Btn}
+      </div>`;
+  }
+
+  return `<div class="modal-overlay" onclick="onModalBackdrop(event)"><div class="modal-card">${content}</div></div>`;
+}
+
+function toggleTheme() {
+  document.documentElement.classList.toggle('dark');
+  localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+  renderApp();
+}
+
+function setLang(l) {
+  lang = l;
+  localStorage.setItem('lang', lang);
+  renderApp();
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+// Restitue le thème persisté (ou préférence système)
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme === 'dark' || (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+  document.documentElement.classList.add('dark');
+}
+
+// P1 : lire la paire depuis l'URL (?pair=EURC)
+(function() {
+  const p = new URLSearchParams(location.search).get('pair');
+  if (p === 'EURC' || p === 'USDC') target = p;
+})();
+
+// Deep-link vers la page status (?view=health)
+(function() {
+  if (new URLSearchParams(location.search).get('view') === 'health') view = 'health';
+})();
+
+renderApp();
+startCountdownTick();
+void Promise.all([loadOverview(), loadBalance()]);
+if (view === 'health') void loadHealth();
+
+// ─── Easter egg : scam-coin GeoCities derrière le konami code (↑↑↓↓←→←→ B A) ───
+function openScamEgg() {
+  if (document.getElementById('scam-egg')) return;
+  // Contenu suivant la langue sélectionnée (références culturelles adaptées : Kevin→Brayden, BCE→the Fed, etc.)
+  const L = (lang === 'fr') ? {
+    blink: `⚠️ DERNIÈRE CHANCE AVANT LE MOON ⚠️`,
+    marquee: `🚀🚀 CE QUE LES BANQUES, LA BCE ET LES REPTILIENS NE VEULENT PAS QUE VOUS SACHIEZ — ACHETEZ AVANT QU'IL NE SOIT TROP TARD — 🚀🚀`,
+    p1: `ON VOUS A MENTI.`,
+    p2: `Satoshi Nakamoto n'existe pas : c'est un pseudonyme des <b>FRANCS-MAÇONS</b>. Preuve mathématique IRRÉFUTABLE : SHA-<b>256</b> → 2+5+6 = <b>13</b>. Treize. Comme les 13 familles. Comme le billet de 1 $ (13 flèches, 13 étoiles, 13 bandes). COÏNCIDENCE ? <b>NOUS NE PENSONS PAS.</b>`,
+    p3: `Le BLND « classique » est contrôlé par la Réserve Fédérale lunaire 🌙. Seul <b>$BLND∞</b> échappe à la matrice — déployé sur la blockchain <b>QUANTIQUE post-einsteinienne</b> ✨.`,
+    stat1: `1 $BLND∞ = 1 LAMBO*`, stat2v: `+9 000 %`, stat2l: `cette milliseconde`, stat3v: `0 risque**`, stat3l: `garanti à 1000 %`,
+    visitor: `👁️ Vous êtes le visiteur n° `,
+    buy: `💰 ACHETER MAINTENANT 💰`, buyAlert: `Transaction en attente de validation par les Anciens... 🔺`,
+    wp: `📄 TÉLÉCHARGER LE WHITEPAPER.txt`, wpAlert: `whitepaper.txt : « trust me bro »`,
+    testimonial: `⭐⭐⭐⭐⭐ « J'ai investi mes économies ET ma belle-mère, je ne regrette rien. » — <i>Kevin, 14 ans, futur millionnaire</i>`,
+    foot: `🌐 Best viewed in Netscape Navigator 4.0 @ 800×600 · 📟 Signez mon livre d'or · 💍 Membre du WebRing Crypto™ · 🚧 SITE EN CONSTRUCTION 🚧`,
+    fine: `* garanti par contrat intelligent auto-réalisateur · ** le risque est une illusion entretenue par Big Banque`,
+    truth: `— — — Ceci est une <b>parodie</b> cachée. Rien ici n'est vrai (sauf cette phrase). Ne fais jamais confiance à une crypto à cause d'un site qui ressemble à ça. — — —`,
+    hint: `(Échap, ✕, ou re-konami pour revenir à la réalité)`, closeTitle: `Revenir à la réalité (Échap)`,
+  } : {
+    blink: `⚠️ LAST CHANCE BEFORE THE MOON ⚠️`,
+    marquee: `🚀🚀 WHAT THE BANKS, THE FED AND THE LIZARD PEOPLE DON'T WANT YOU TO KNOW — BUY BEFORE IT'S TOO LATE — 🚀🚀`,
+    p1: `YOU'VE BEEN LIED TO.`,
+    p2: `Satoshi Nakamoto doesn't exist: it's a pseudonym for the <b>FREEMASONS</b>. IRREFUTABLE mathematical proof: SHA-<b>256</b> → 2+5+6 = <b>13</b>. Thirteen. Like the 13 families. Like the $1 bill (13 arrows, 13 stars, 13 stripes). COINCIDENCE? <b>WE THINK NOT.</b>`,
+    p3: `Regular BLND is controlled by the lunar Federal Reserve 🌙. Only <b>$BLND∞</b> escapes the matrix — deployed on the <b>post-Einsteinian QUANTUM blockchain</b> ✨.`,
+    stat1: `1 $BLND∞ = 1 LAMBO*`, stat2v: `+9,000 %`, stat2l: `this millisecond`, stat3v: `0 risk**`, stat3l: `guaranteed 1000 %`,
+    visitor: `👁️ You are visitor no. `,
+    buy: `💰 BUY NOW 💰`, buyAlert: `Transaction pending approval by the Ancients... 🔺`,
+    wp: `📄 DOWNLOAD WHITEPAPER.txt`, wpAlert: `whitepaper.txt: "trust me bro"`,
+    testimonial: `⭐⭐⭐⭐⭐ "I invested my life savings AND my mother-in-law, no regrets." — <i>Brayden, 14, future millionaire</i>`,
+    foot: `🌐 Best viewed in Netscape Navigator 4.0 @ 800×600 · 📟 Sign my guestbook · 💍 Member of the Crypto WebRing™ · 🚧 UNDER CONSTRUCTION 🚧`,
+    fine: `* guaranteed by self-fulfilling smart contract · ** risk is an illusion maintained by Big Bank`,
+    truth: `— — — This is a hidden <b>parody</b>. Nothing here is true (except this sentence). Never trust a crypto because of a site that looks like this. — — —`,
+    hint: `(Esc, ✕, or re-konami to return to reality)`, closeTitle: `Return to reality (Esc)`,
+  };
+  const el = document.createElement('div');
+  el.id = 'scam-egg';
+  el.innerHTML = `
+    <button class="se-close" title="${L.closeTitle}">✕</button>
+    <h1>💎🙌 $BLND∞ — BlendCoin Infinity 🙌💎</h1>
+    <div class="se-blink">${L.blink}</div>
+    <div class="se-marquee"><span>${L.marquee}</span></div>
+    <div class="se-card">
+      <p><b>${L.p1}</b></p>
+      <p>${L.p2}</p>
+      <p>${L.p3}</p>
+    </div>
+    <hr>
+    <div class="se-stats">
+      <div class="se-stat"><div class="v">1 🏎️</div>${L.stat1}</div>
+      <div class="se-stat"><div class="v">${L.stat2v}</div>${L.stat2l}</div>
+      <div class="se-stat"><div class="v">${L.stat3v}</div>${L.stat3l}</div>
+    </div>
+    <p>${L.visitor}<span class="se-odo">00001337</span></p>
+    <div>
+      <button class="se-buy">${L.buy}</button>
+      <button class="se-wp">${L.wp}</button>
+    </div>
+    <div class="se-card" style="margin-top:1rem">${L.testimonial}</div>
+    <hr>
+    <div class="se-foot">${L.foot}</div>
+    <div class="se-fine">${L.fine}</div>
+    <p class="se-truth">${L.truth}</p>
+    <div class="se-hint">${L.hint}</div>`;
+  document.body.appendChild(el);
+  el.querySelector('.se-close').onclick = closeScamEgg;
+  el.querySelector('.se-buy').onclick = () => alert(L.buyAlert);
+  el.querySelector('.se-wp').onclick = () => alert(L.wpAlert);
+}
+function closeScamEgg() { const el = document.getElementById('scam-egg'); if (el) el.remove(); }
+function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() : openScamEgg(); }
+(function () {
+  const seq = ['arrowup','arrowup','arrowdown','arrowdown','arrowleft','arrowright','arrowleft','arrowright','b','a'];
+  let pos = 0;
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { if (impactEvmModalOpen) return; closeScamEgg(); return; }
+    const k = e.key.toLowerCase();
+    pos = (k === seq[pos]) ? pos + 1 : (k === seq[0] ? 1 : 0);
+    if (pos === seq.length) { pos = 0; toggleScamEgg(); }
+  });
+})();
+
+/* Tooltip portal : rend le contenu de .tip-box dans un noeud position:fixed au-dessus de tout,
+   flip bas→haut si pas la place. Immunise tous les tooltips contre le clipping overflow des tables. */
+(function () {
+  const portal = document.getElementById('tipPortal');
+  if (!portal) return;
+  function show(wrap) {
+    const box = wrap.querySelector('.tip-box');
+    if (!box) return;
+    portal.innerHTML = box.innerHTML;
+    portal.style.left = '-9999px'; portal.style.top = '0'; portal.style.display = 'block';
+    const r = wrap.getBoundingClientRect();
+    const pw = portal.offsetWidth, ph = portal.offsetHeight, M = 8;
+    const left = Math.max(M, Math.min(r.left, window.innerWidth - pw - M));
+    let top = r.bottom + 6;
+    if (top + ph > window.innerHeight - M) {
+      const above = r.top - ph - 6;
+      top = above >= M ? above : Math.max(M, window.innerHeight - ph - M);
+    }
+    portal.style.left = left + 'px'; portal.style.top = top + 'px';
+  }
+  function hide() { if (portal.style.display === 'none') return; portal.style.display = 'none'; portal.innerHTML = ''; }
+  document.addEventListener('mouseover', (e) => {
+    const w = e.target.closest ? e.target.closest('.tip-wrap') : null;
+    if (w) show(w);
+  });
+  document.addEventListener('mouseout', (e) => {
+    const w = e.target.closest ? e.target.closest('.tip-wrap') : null;
+    if (!w) return;
+    if (e.relatedTarget && w.contains(e.relatedTarget)) return;
+    hide();
+  });
+  window.addEventListener('scroll', hide, { capture: true, passive: true });
+})();

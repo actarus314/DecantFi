@@ -78,6 +78,10 @@ const htmlAsset = staticAsset(Buffer.from(htmlStr), 'text/html; charset=utf-8');
 const walletkitPath = fileURLToPath(new URL('./public/walletkit.js', import.meta.url));
 const walletkitAsset = staticAsset(readFileSync(walletkitPath), 'text/javascript; charset=utf-8');
 
+// App logic extracted from index.html (CSP: served as 'self', no inline script needed).
+const appJsPath = fileURLToPath(new URL('./public/app.js', import.meta.url));
+const appJsAsset = staticAsset(readFileSync(appJsPath), 'text/javascript; charset=utf-8');
+
 const faviconPath = fileURLToPath(new URL('./public/favicon.svg', import.meta.url));
 const faviconAsset = staticAsset(readFileSync(faviconPath), 'image/svg+xml; charset=utf-8');
 
@@ -210,6 +214,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/walletkit.js') {
       sendStatic(req, res, walletkitAsset, 'no-cache', { 'X-Content-Type-Options': 'nosniff' });
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/app.js') {
+      sendStatic(req, res, appJsAsset, 'no-cache', { 'X-Content-Type-Options': 'nosniff' });
       return;
     }
 
