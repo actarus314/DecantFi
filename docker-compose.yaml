@@ -9,7 +9,7 @@ services:
     restart: unless-stopped
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:noexec,nosuid,nodev,size=64m   # harden the read_only escape hatch: no exec, bounded size
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
@@ -40,7 +40,7 @@ services:
     restart: unless-stopped
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:noexec,nosuid,nodev,size=64m   # harden the read_only escape hatch: no exec, bounded size
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
