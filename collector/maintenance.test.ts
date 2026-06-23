@@ -55,6 +55,16 @@ describe('runMaintenance', () => {
     db.close();
   });
 
+  it('rawRetentionDays=0 skips raw purge entirely (0 = off, symmetric with rollup)', () => {
+    const db = openDb(':memory:');
+    insertAt(db, daysAgo(120), '12.0'); // old row — must NOT be purged when rawRetentionDays=0
+    insertAt(db, daysAgo(10), '12.6');
+    runMaintenance(db, { rawRetentionDays: 0, rollupAfterDays: 0 }, now);
+    const rawCount = (db.raw().prepare('SELECT COUNT(*) AS n FROM quote_raw').get() as any).n;
+    expect(Number(rawCount)).toBe(2); // both rows kept: purge skipped
+    db.close();
+  });
+
   it('rollupAfterDays=0 skips rpc_call_log purge (0 = off)', () => {
     const db = openDb(':memory:');
     // Insert a rpc_call_log row dated far in the past

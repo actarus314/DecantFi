@@ -1,10 +1,10 @@
 // Ordonnancement : délai jitté (pur, testable) + boucle séquentielle (un tick attendu avant le suivant =
 // pas de recouvrement). Le délai réel est délégué à `sleep` (injectable pour les tests).
 
-/** Délai en ms = cadence ± jitter aléatoire. random() ∈ [0,1). */
+/** Délai en ms = cadence ± jitter aléatoire. random() ∈ [0,1). Never negative (guard: min 0). */
 export function jitteredDelayMs(cadenceSec: number, jitterSec: number, random: () => number = Math.random): number {
   const offset = (random() * 2 - 1) * jitterSec; // [-jitter, +jitter]
-  return Math.round((cadenceSec + offset) * 1000);
+  return Math.max(0, Math.round((cadenceSec + offset) * 1000));
 }
 
 export interface LoopDeps {

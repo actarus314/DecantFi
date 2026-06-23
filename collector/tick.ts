@@ -115,7 +115,7 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
 
   // Parallélisation : toutes les sondes partent en même temps (Promise.all).
   // Chaque tâche retourne ses rows + erreurs ; la fusion est faite après (ordre déterministe = ordre deps.probes).
-  type ProbeResult = { rows: QuoteInsert[]; errors: Array<[string, string]> };
+  type ProbeResult = { rows: QuoteInsert[]; errors: Array<[string, string]>; resimErrors: number };
 
   const probeResults = await Promise.all(deps.probes.map(async (probe): Promise<ProbeResult> => {
     const result = await deps.quote({ sell: BLND, buy: probe.buy, amountIn: probe.amountIn, cfg: sourceCfg });
@@ -128,21 +128,29 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     // pour que la DB stocke les vrais fills simulés (pas les cotes API sur-cotées).
     // Best-effort : un échec RPC (429, timeout) ne casse jamais le tick.
     const pairUi = probe.buy.symbol === EURC.symbol ? 'EURC' : 'USDC';
+    let resimErrors = 0;
     try {
       await resimAquariusXbull(result, pairUi, probe.amountIn, { rpcUrl }, deps.resimDeps);
-    } catch { /* repli silencieux : cote API conservée */ }
+    } catch (e) {
+      // Count RPC pressure errors from re-sim (429, rate-limit, timeout, connection reset).
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/429|rate.?limit|too many|timeout|ETIMEDOUT|ECONNRESET/i.test(msg)) resimErrors++;
+      /* silent fallback: API quote kept as-is */
+    }
 
-    return { rows: rowsForProbe(probe, result, prices), errors: localErrors };
+    return { rows: rowsForProbe(probe, result, prices), errors: localErrors, resimErrors };
   }));
 
   // Fusion dans l'ordre de deps.probes (déterministe).
   const quotes: QuoteInsert[] = [];
   const reasons = new Map<string, string>(); // id → cause (timeout/http/indisponible)
+  let totalResimErrors = 0;
   for (const pr of probeResults) {
     quotes.push(...pr.rows);
     for (const [id, reason] of pr.errors) {
       if (!reasons.has(id)) reasons.set(id, reason);
     }
+    totalResimErrors += pr.resimErrors;
   }
 
   const rpcCalls = readRpc();
@@ -157,9 +165,10 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     note: null,
   };
 
-  // Comptage sim_errors par URL RPC (429, rate-limit, timeout, ECONNRESET)
+  // Comptage sim_errors par URL RPC (429, rate-limit, timeout, ECONNRESET).
+  // Includes both source adapter errors AND re-sim RPC errors (resimAquariusXbull catch).
   const simErrorRe = /429|rate.?limit|too many|timeout|ETIMEDOUT|ECONNRESET/i;
-  const simErrorCount = [...reasons.values()].filter((r) => simErrorRe.test(r)).length;
+  const simErrorCount = [...reasons.values()].filter((r) => simErrorRe.test(r)).length + totalResimErrors;
   const rpcProbes: RpcProbeInsert[] = sel.probes.map((p) => ({
     url: p.url, ok: p.ok, latency_ms: p.latencyMs, ledger: p.ledger,
     chosen: p.url === rpcUrl,

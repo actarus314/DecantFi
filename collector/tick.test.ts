@@ -98,6 +98,45 @@ describe('runTick (EURC)', () => {
   });
 });
 
+describe('runTick (EURC resim leg exclusion)', () => {
+  it('leg1=Aquarius avec simulateAquariusNet→null : pas de composite via-usdc dans les quotes', async () => {
+    // When makeReSimLeg/compareEurc excludes the Aquarius leg (sim → null = non-executable route),
+    // the engine returns eurc.viaUsdc = undefined. rowsForProbe must not emit a via-usdc row.
+    // We simulate this by injecting a result where viaUsdc is absent (engine already ran reSimLeg).
+    const directBest = mk('xbull', toStroops('11.0'), { sellAsset: BLND, buyAsset: EURC });
+
+    const result: QuoteResult = {
+      request: { sell: 'BLND', buy: 'EURC', amountIn: toStroops('250'), slippageBps: 50 }, prices,
+      ranking: { ranked: [{ ...directBest, rank: 1, deltaVsBestPct: 0 }], best: { ...directBest, rank: 1, deltaVsBestPct: 0 } },
+      // viaUsdc absent: makeReSimLeg returned null for the Aquarius leg → compareEurc found no leg1
+      eurc: {
+        direct: directBest,
+        viaUsdc: undefined,
+        winner: 'direct',
+        bestNetEurc: toStroops('11.0'),
+        note: 'x',
+      },
+      errors: [],
+    };
+
+    const { quotes } = await runTick({
+      probes: [{ pair: 'BLND->EURC', buy: EURC, amountIn: toStroops('250') }],
+      cfg: cfg({ pairs: ['EURC'] }), now, fetchPrices: async () => prices, quote: async () => result,
+      selectRpc: fakeSelectRpc,
+    });
+
+    // The via-usdc composite must not appear in collected rows
+    const paths = quotes.map((q) => q.eurc_path);
+    expect(paths).not.toContain('via-usdc');
+    // Direct quotes should still be present
+    expect(paths).toContain('direct');
+    // The winner is the direct xbull quote
+    const winner = quotes.find((q) => q.is_winner)!;
+    expect(winner.eurc_path).toBe('direct');
+    expect(winner.source_id).toBe('xbull');
+  });
+});
+
 describe('runTick (resim Aquarius + xBull)', () => {
   it('stocke le net re-simulé d\'Aquarius quand la sim retourne une valeur différente', async () => {
     // Aquarius sur-cote 12.6 → sim retourne 12.4 → la row DB doit stocker 12.4

@@ -12,6 +12,10 @@ describe('jitteredDelayMs', () => {
   it('jitter 0 → cadence exacte', () => {
     expect(jitteredDelayMs(900, 0, () => 0.7)).toBe(900_000);
   });
+  it('jamais négatif même si jitter > cadence (guard Math.max)', () => {
+    // random()=0 → offset=-jitter → cadence+offset could be negative without the guard
+    expect(jitteredDelayMs(10, 100, () => 0)).toBeGreaterThanOrEqual(0);
+  });
 });
 
 describe('runLoop (anti-recouvrement + arrêt)', () => {

@@ -21,10 +21,13 @@ export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void 
   const raw = db.raw();
 
   // (1) Purge du raw au-delà de la fenêtre chaude.
-  raw.prepare(
-    `DELETE FROM quote_raw WHERE quote_id IN (
-       SELECT q.id FROM quote q JOIN tick t ON t.id = q.tick_id WHERE t.started_at < ?)`,
-  ).run(isoCutoff(now, cfg.rawRetentionDays));
+  // rawRetentionDays=0 means "off": skip purge (cutoff=now would delete everything).
+  if (cfg.rawRetentionDays > 0) {
+    raw.prepare(
+      `DELETE FROM quote_raw WHERE quote_id IN (
+         SELECT q.id FROM quote q JOIN tick t ON t.id = q.tick_id WHERE t.started_at < ?)`,
+    ).run(isoCutoff(now, cfg.rawRetentionDays));
+  }
 
   // (2) Rollup horaire au-delà de la fenêtre tiède, puis suppression des lignes par-tick.
   // rollupAfterDays=0 means "off": skip rollup AND rpc_call_log purge entirely.
@@ -69,6 +72,9 @@ export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void 
     // NB: en prod un bucket horaire ancien n'est upserté qu'UNE fois (ses ticks sont ensuite supprimés et
     // aucun nouveau tick ne retombe dans une heure passée). La fusion DO UPDATE de net_med est donc une
     // approximation (moyenne pondérée de médianes, tronquée en INTEGER), quasi jamais empruntée — acceptable.
+    const selectWinnerDist = raw.prepare(
+      'SELECT winner_dist FROM rollup_hourly WHERE hour_utc=? AND pair=? AND amount_in=?',
+    );
     const upsert = raw.prepare(
       `INSERT INTO rollup_hourly (hour_utc, pair, amount_in, n_ticks, net_min, net_med, net_max, impact_avg, impact_avg_local, winner_dist, blnd_usd_avg)
        VALUES ($hour, $pair, $amount, $n, $min, $med, $max, $impact, $impact_local, $dist, $blnd)
@@ -92,7 +98,7 @@ export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void 
         const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
         // Fusion de winner_dist avec l'existant (pour l'idempotence cumulative).
-        const existing = raw.prepare('SELECT winner_dist FROM rollup_hourly WHERE hour_utc=? AND pair=? AND amount_in=?')
+        const existing = selectWinnerDist
           .get(g.hour, g.pair, g.amount) as { winner_dist?: string } | undefined;
         const merged: Record<string, number> = existing?.winner_dist ? JSON.parse(existing.winner_dist) : {};
         for (const [k, v] of Object.entries(g.acc.dist)) merged[k] = (merged[k] ?? 0) + v;
