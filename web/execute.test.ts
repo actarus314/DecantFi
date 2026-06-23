@@ -901,4 +901,64 @@ describe('Ultra Stellar', () => {
     const sends = [toStroops(400), toStroops(600)];
     expect(reconcileLegSends(sends, toStroops(1000))).toEqual(sends);
   });
+
+  it('reconcileLegSends → over-send (sum > total) : résidu négatif réduit la plus grande jambe à ≤ 0 → throw no-route', () => {
+    // sends sum = 1100, total = 1000 → residual = -100 → largest leg (600) becomes 500, OK
+    // To trigger the throw: sends sum = total + largest, so largest becomes 0 after residual applied.
+    // sends = [1000, 1000], total = 1000 → residual = -1000 → largest (1000 at index 0) → out[0] = 0 → throw
+    expect(() => reconcileLegSends([toStroops(1000), toStroops(1000)], toStroops(1000))).toThrow(ExecError);
+    expect(() => reconcileLegSends([toStroops(1000), toStroops(1000)], toStroops(1000))).toThrow(
+      expect.objectContaining({ code: 'no-route' }),
+    );
+  });
+
+  it('assertAllowedOps (via submit) → tx sans opération → rejeté ExecError bad_request', async () => {
+    // Build a transaction with no operations by removing the only operation via low-level XDR manipulation.
+    // Easiest: build a valid tx and produce a "zero ops" XDR by constructing one directly.
+    // We use xdrPayment() as a base but need a tx with ops.length === 0.
+    // Build it via TransactionBuilder manually with no addOperation calls — not allowed by SDK directly,
+    // so we build a tx and strip operations via XDR.
+    const { xdr } = await import('@stellar/stellar-sdk');
+    const account = new Account(TEST_KP.publicKey(), '200');
+    const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: Networks.PUBLIC })
+      .addOperation(Operation.payment({ destination: TEST_KP.publicKey(), asset: SdkAsset.native(), amount: '1' }))
+      .setTimeout(30)
+      .build();
+    // Strip operations from the envelope XDR directly
+    const envelope = tx.toEnvelope();
+    const innerTx = envelope.v1().tx();
+    innerTx.operations([]);
+    tx.sign(TEST_KP);
+    const emptyOpsXdr = envelope.toXDR('base64');
+
+    await expect(
+      submit('xbull', { id: 'q-empty', signedXdr: emptyOpsXdr }, { rpcUrl: 'r' }, fakeDeps({})),
+    ).rejects.toMatchObject({ code: 'bad_request', message: expect.stringContaining('sans opération') });
+  });
+
+  it('assertAllowedOps (via submit) → invokeHostFunction (Soroban) → passe la validation', async () => {
+    // Build a real invokeHostFunction XDR using the Stellar SDK
+    const { xdr: sdkXdr, Address } = await import('@stellar/stellar-sdk');
+    const func = sdkXdr.HostFunction.hostFunctionTypeInvokeContract(
+      new sdkXdr.InvokeContractArgs({
+        contractAddress: new Address('CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM').toScAddress(),
+        functionName: 'swap',
+        args: [],
+      }),
+    );
+    const invokeXdr = buildSignedXdr(Operation.invokeHostFunction({ func, auth: [] }), 10);
+    const deps = fakeDeps({ xbullSubmit: { success: true, hash: 'invoke-ok' } });
+    const result = await submit('xbull', { id: 'q-invoke', signedXdr: invokeXdr }, { rpcUrl: 'r' }, deps);
+    expect(result.hash).toBe('invoke-ok');
+  });
+});
+
+// ─── minReceivedStroops — borne haute ────────────────────────────────────────
+
+describe('minReceivedStroops — borne haute', () => {
+  it('9999 bps : valeur limite haute valide (ne throw pas)', () => {
+    // slippageBps = 9999 is valid (< 10000); result = net * 1 / 10000
+    expect(() => minReceivedStroops(100_0000000n, 9999)).not.toThrow();
+    expect(minReceivedStroops(100_0000000n, 9999)).toBe(100000n); // 100 * 1/10000 = 0.01 USDC in stroops
+  });
 });
