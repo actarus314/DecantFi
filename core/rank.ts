@@ -34,6 +34,6 @@ export function rankQuotes(quotes: NormalizedQuote[]): Ranking {
   return {
     ranked,
     best: ranked[0],
-    floor: quotes.find((q) => q.source === 'horizon'),
+    floor: quotes.find((q) => q.source === 'horizon') ?? quotes.find((q) => q.source === 'ultrastellar'),
   };
 }

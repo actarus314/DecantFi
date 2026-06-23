@@ -119,6 +119,30 @@ describe('quote vers EURC', () => {
   });
 });
 
+describe('quote EURC sans BLND en vente (composite doit être ignoré)', () => {
+  it('ne déclenche pas compareEurc quand sell != BLND', async () => {
+    const dynamic: SourceAdapter = {
+      id: 'dyn',
+      available: () => true,
+      async quote(req) {
+        if (req.sellAsset.symbol === 'USDC' && req.buyAsset.symbol === 'EURC') {
+          return mk('dyn', toStroops('46.7'), {
+            sellAsset: req.sellAsset,
+            buyAsset: req.buyAsset,
+            amountIn: req.amountIn,
+            grossOut: toStroops('46.7'),
+          });
+        }
+        return null;
+      },
+    };
+    const r = await quote({ sell: USDC, buy: EURC, amountIn: toStroops('50'), cfg: cfg([dynamic]) });
+    // eurc doit être undefined : pas de vente BLND, composite non pertinent
+    expect(r.eurc).toBeUndefined();
+    expect(r.ranking.best?.source).toBe('dyn');
+  });
+});
+
 describe('errorReasons (③-bis)', () => {
   it('null → indisponible, throw TimeoutError → timeout', async () => {
     const empty: SourceAdapter = { id: 'empty', available: () => true, async quote() { return null; } };
