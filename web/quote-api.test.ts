@@ -181,6 +181,32 @@ describe('liveQuote — sourceId / executable', () => {
   });
 });
 
+describe('resimAquariusXbull — netConfidence promotion', () => {
+  it('promotes Aquarius netConfidence to exact after successful re-sim', async () => {
+    // Start with 'estimate' (the new default from parseAquarius)
+    const aquaQ = {
+      ...makeQuote('aquarius', 4_0200000n),
+      netConfidence: 'estimate' as const,
+      raw: { swap_chain_xdr: 'FAKE_XDR' },
+    };
+    vi.mocked(engineQuote).mockResolvedValue({
+      request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
+      ranking: { ranked: [aquaQ], best: aquaQ },
+      errors: [],
+    } as any);
+
+    // Sim returns a different (lower) net → triggers update including netConfidence promotion
+    const fakeSim = vi.fn(async () => 3_9000000n);
+    const result = await liveQuote('USDC', AMT, FAKE_CFG as any, { simulateAquariusNet: fakeSim });
+
+    const aquaRow = result.ladder.find((r) => r.sourceId === 'aquarius');
+    expect(aquaRow).toBeDefined();
+    // After successful re-sim, chip should reflect 'exact' confidence (chipFor('exact') = 'obs')
+    expect(aquaRow!.chip).toBe('obs');
+  });
+});
+
 describe('makeReSimLeg — Aquarius structural failure exclusion', () => {
   /** Builds a minimal NormalizedQuote compatible with makeReSimLeg (no engine mock needed). */
   function makeAqQuote(overrides: Record<string, unknown> = {}) {

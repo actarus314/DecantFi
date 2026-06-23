@@ -154,7 +154,9 @@ export function makeReSimLeg(
           // No .catch() — let transient RPC errors throw to outer catch (downgraded to 'estimate')
           const simNet = await simFnAq(String(rawXdr), amountIn, inputSac, { rpcUrl: cfg.rpcUrl });
           if (simNet !== null && simNet > 0n) {
-            return { ...q, netOut: simNet, grossOut: simNet };
+            // Successful on-chain re-sim → real fill observed, promote to 'exact'
+            // (consistent with the main-ladder re-sim path).
+            return { ...q, netOut: simNet, grossOut: simNet, netConfidence: 'exact' as const };
           }
           // simNet === null → structural failure: route non-executable as quoted → exclude
           return null;
@@ -214,7 +216,7 @@ export async function resimAquariusXbull(
   };
   const [aqT, xbT] = await Promise.all([
     (aqRanked && rawXdr)
-      ? timed(simFnAq(String(rawXdr), amountStroops, BLND.sac, { rpcUrl: cfg.rpcUrl }).catch(() => null))
+      ? timed(simFnAq(String(rawXdr), amountStroops, aqRanked.sellAsset?.sac ?? BLND.sac, { rpcUrl: cfg.rpcUrl }).catch(() => null))
       : Promise.resolve({ r: null as bigint | null, ms: 0 }),
     (xbRanked && route)
       ? timed(simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null))
@@ -247,6 +249,7 @@ export async function resimAquariusXbull(
       if (q.source === 'aquarius') {
         if (aquariusSimNet !== undefined)
           return { ...q, netOut: aquariusSimNet, grossOut: aquariusSimNet,
+            netConfidence: 'exact' as const,
             durationMs: (q.durationMs ?? 0) + aqSimMs };
         if (aquariusSimFailed)
           return { ...q, netConfidence: 'estimate' as const };
