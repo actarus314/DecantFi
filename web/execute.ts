@@ -576,7 +576,11 @@ export async function quoteSoroswap(
   slippageBps: number,
 ): Promise<{ venue: 'soroswap'; netOut: bigint; minOut: bigint; soroPath?: string[]; quote: unknown } | null> {
   try {
-    // ponytail: SOROSWAP uniquement — l'agrégateur multi-protocole produit des quotes gonflées non construisibles.
+    // SOROSWAP uniquement — vérifié empiriquement 2026-06-24 (cote vs vrai fill simulé, la méthode qui a
+    // démystifié xBull) : protocols multi (PHOENIX/AQUA/SDEX) renvoie des routes Aqua aux cotes absurdes
+    // (USDC→EURC +2261 %, BLND→EURC +124 %) qui ÉCHOUENT au build ('Invalid poolHashes', bug @soroswap/sdk
+    // 0.4.0). Bug du SDK off-chain, pas du contrat on-chain ; et la liquidité Aqua est déjà captée honnêtement
+    // par l'adaptateur Aquarius keyless (find-path, 100 % fill). Ne PAS réactiver multi sans re-vérifier.
     const q = await client.quote({
       assetIn: sellSac,
       assetOut: buySac,
