@@ -12,6 +12,7 @@ import { runCoherenceProbes } from './coherence.js';
 import { jitteredDelayMs, runLoop, interruptibleSleep } from './scheduler.js';
 import { ensureDirWritable } from './fsguard.js';
 import { openDb } from '../db/index.js';
+import { withTimeout } from '../core/timeout.js';
 
 /** Sonde au boot : dossier DB inscriptible ? Échec → log explicite + exit(1) (jamais silencieux, anti-dEURO). */
 function assertDataDirWritable(dbPath: string): void {
@@ -37,10 +38,17 @@ async function main(): Promise<void> {
   let stopping = false;
   const abort = new AbortController(); // réveille le sleep à l'arrêt → arrêt propre immédiat
 
+  // Hard per-tick cap: a hung RPC re-sim must never freeze the loop (no tick → no exit → no Docker
+  // restart). Stays well under the cadence so the next scheduled tick is never delayed.
+  const TICK_TIMEOUT_MS = Math.max(60_000, Math.min(cfg.cadenceSec * 1000 - 30_000, 180_000));
+
   const tickAndStore = async (): Promise<void> => {
     const startedAt = new Date();
     try {
-      const { tick, quotes, rpcProbes } = await runTick({ probes, cfg, now: () => new Date(), fetchPrices, quote });
+      const { tick, quotes, rpcProbes } = await withTimeout(
+        runTick({ probes, cfg, now: () => new Date(), fetchPrices, quote }),
+        TICK_TIMEOUT_MS, 'collector tick',
+      );
       if (tick.finished_at) {
         lastTickDurationMs = new Date(tick.finished_at).getTime() - new Date(tick.started_at).getTime();
       }
