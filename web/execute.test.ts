@@ -340,7 +340,12 @@ function fakeDeps(opts: {
     },
   }));
 
-  return { fetchJson, makeSoroswap, simulateComet: vi.fn(async () => opts.cometOut ?? null) };
+  return {
+    fetchJson,
+    makeSoroswap,
+    simulateComet: vi.fn(async () => opts.cometOut ?? null),
+    simulateXbullNet: vi.fn(async () => null),
+  };
 }
 
 const CFG = { soroswapApiKey: 'test-key', rpcUrl: 'https://rpc.test', timeoutMs: 5000 };

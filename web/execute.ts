@@ -206,6 +206,8 @@ export interface ExecDeps {
   makeSoroswap: (apiKey: string) => SoroswapClient;
   /** Cotation Comet : simulation read-only de swap_exact_amount_in (sortie indépendante du user). Injectable → tests hermétiques. */
   simulateComet: (a: { sellSac: string; buySac: string; amountIn: bigint; rpcUrl: string }) => Promise<bigint | null>;
+  /** xBull net simulation via accept-quote + simulateTransaction. Injectable → hermetic tests. */
+  simulateXbullNet: (a: { route: string; amountIn: bigint; rpcUrl: string }) => Promise<{ net: bigint; route: string[]; transfers: Transfer[] } | null>;
 }
 
 /** Dépendances réelles avec fetch réseau.
@@ -245,6 +247,7 @@ export function defaultDeps(timeoutMs?: number): ExecDeps {
       }) as unknown as SoroswapClient;
     },
     simulateComet: simulateCometReal,
+    simulateXbullNet: (a) => simulateXbullNet(a.route, a.amountIn, { rpcUrl: a.rpcUrl }),
   };
 }
 
@@ -1129,7 +1132,7 @@ export async function pickExecutableVenue(
       try {
         // Utilise le vrai fill simulé pour le plancher (skim xBull ~0,1 % non divulgué).
         // Si la sim échoue → fallback sur cand.netOut (plancher conservateur).
-        const xbSim = await simulateXbullNet(cand.route, amountStroops, { rpcUrl: cfg.rpcUrl });
+        const xbSim = await deps.simulateXbullNet({ route: cand.route, amountIn: amountStroops, rpcUrl: cfg.rpcUrl });
         const realNet = xbSim?.net ?? cand.netOut;
         const minToGet = minReceivedStroops(realNet, slippageBps);
         const built = await buildXbull(cand.route, sender, amountStroops, minToGet, deps);
