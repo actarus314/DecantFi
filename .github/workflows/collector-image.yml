@@ -113,6 +113,12 @@ jobs:
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Idempotent: if the release already exists (e.g. drafted in the GitHub UI), skip
+          # instead of failing — build-push has already published the image at this point.
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists — skipping creation."
+            exit 0
+          fi
           notes=$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
             -f tag_name="${GITHUB_REF_NAME}" --jq .body)
           gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes "## Image
