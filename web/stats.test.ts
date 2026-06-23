@@ -490,8 +490,6 @@ describe('helpers', () => {
     expect(chipFor('exact')).toBe('obs');
     expect(chipFor('floor')).toBe('est');
     expect(chipFor('estimate')).toBe('est');
-    // composite via-usdc : net_confidence posé à 'exact' → observé
-    expect(chipFor('exact')).toBe('obs');
   });
 
   it('noteFor: toujours vide (annotation multi-tx retirée)', () => {

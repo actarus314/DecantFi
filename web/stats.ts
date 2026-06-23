@@ -75,7 +75,7 @@ export interface Overview {
 
 // ─── Mappings display / note / chip ──────────────────────────────────────────
 
-const SHORT_NAME: Record<string, string> = {
+const DISPLAY_NAME: Record<string, string> = {
   xbull: 'xBull',
   soroswap: 'Soroswap',
   aquarius: 'Aquarius',
@@ -84,35 +84,15 @@ const SHORT_NAME: Record<string, string> = {
   stellarbroker: 'StellarBroker',
   horizon: 'Horizon',
 };
-
-const FULL_NAME: Record<string, string> = {
-  xbull: 'xBull',
-  soroswap: 'Soroswap',
-  aquarius: 'Aquarius',
-  comet: 'Comet',
-  ultrastellar: 'Ultra Stellar',
-  stellarbroker: 'StellarBroker',
-  horizon: 'Horizon',
-};
-
-export function shortName(sourceId: string): string {
-  if (sourceId.includes('+')) {
-    return sourceId
-      .split('+')
-      .map((s) => SHORT_NAME[s.trim()] ?? s.trim())
-      .join(' + ');
-  }
-  return SHORT_NAME[sourceId] ?? sourceId;
-}
 
 export function displayName(sourceId: string): string {
   if (sourceId.includes('+')) {
     return sourceId
       .split('+')
-      .map((s) => FULL_NAME[s.trim()] ?? s.trim())
+      .map((s) => DISPLAY_NAME[s.trim()] ?? s.trim())
       .join(' + ');
   }
-  return FULL_NAME[sourceId] ?? sourceId;
+  return DISPLAY_NAME[sourceId] ?? sourceId;
 }
 
 export function noteFor(_sourceId: string, _winner: boolean, _eurcPath: string | null): string {
@@ -372,7 +352,7 @@ function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string, am
     const routeSummary = r['route_summary'] != null ? String(r['route_summary']) : '';
     return {
       path: maskedRoute(prettyRoute(routeSummary), sourceId),
-      tools: shortName(sourceId),
+      tools: displayName(sourceId),
       wins,
       winPct: Math.round((wins / totalNum) * 1000) / 10,
       marginPct: marginFor(sourceId, routeSummary),
@@ -884,8 +864,8 @@ export function buildSourceHealth(
   windowStart: string,
   now: Date,
 ): SourceHealthResult {
-  // Sources connues : les clés de FULL_NAME (7 venues atomiques)
-  const knownIds = Object.keys(FULL_NAME);
+  // Sources connues : les clés de DISPLAY_NAME (7 venues atomiques)
+  const knownIds = Object.keys(DISPLAY_NAME);
 
   // ── Calcul de la tendance (fenêtre précédente) ──────────────────────────────
   // Durée D = now - windowStart. Fenêtre précédente = [windowStart - D, windowStart].
