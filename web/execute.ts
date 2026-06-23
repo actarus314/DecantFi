@@ -201,11 +201,25 @@ export interface SoroswapClient {
   send(xdr: string): Promise<{ txHash: string; success: boolean }>;
 }
 
+export type SendStatus = 'PENDING' | 'DUPLICATE' | 'TRY_AGAIN_LATER' | 'ERROR';
+
+/** Client RPC Soroban minimal pour le fire-and-poll. Injectable → tests hermétiques. */
+export interface SorobanRpcClient {
+  /** FIRE : envoie le XDR signé ; rend le statut d'admission mempool + le hash. */
+  send(signedXdr: string): Promise<{ status: SendStatus; hash: string; errorResult?: unknown }>;
+  /** POLL : statut on-chain d'une tx par hash. */
+  status(hash: string): Promise<{ status: 'SUCCESS' | 'NOT_FOUND' | 'FAILED' }>;
+}
+
 export interface ExecDeps {
   fetchJson: (url: string, init?: { method?: string; body?: unknown }) => Promise<FetchResult>;
   makeSoroswap: (apiKey: string) => SoroswapClient;
   /** Cotation Comet : simulation read-only de swap_exact_amount_in (sortie indépendante du user). Injectable → tests hermétiques. */
   simulateComet: (a: { sellSac: string; buySac: string; amountIn: bigint; rpcUrl: string }) => Promise<bigint | null>;
+  /** xBull net simulation via accept-quote + simulateTransaction. Injectable → hermetic tests. */
+  simulateXbullNet: (a: { route: string; amountIn: bigint; rpcUrl: string }) => Promise<{ net: bigint; route: string[]; transfers: Transfer[] } | null>;
+  /** Client RPC Soroban (fire-and-poll : sendTransaction + getTransaction). Injectable → tests hermétiques. */
+  makeRpc: (rpcUrl: string) => SorobanRpcClient;
 }
 
 /** Dépendances réelles avec fetch réseau.
@@ -245,6 +259,28 @@ export function defaultDeps(timeoutMs?: number): ExecDeps {
       }) as unknown as SoroswapClient;
     },
     simulateComet: simulateCometReal,
+    simulateXbullNet: (a) => simulateXbullNet(a.route, a.amountIn, { rpcUrl: a.rpcUrl }),
+    makeRpc: makeRpcReal,
+  };
+}
+
+/** Implémentation réelle du client RPC Soroban (fire-and-poll). Import SDK paresseux + timeout par appel. */
+function makeRpcReal(rpcUrl: string): SorobanRpcClient {
+  const base = rpcUrl.replace(/\/$/, '');
+  return {
+    async send(signedXdr) {
+      const { rpc, TransactionBuilder, Networks } = await import('@stellar/stellar-sdk');
+      const server = new rpc.Server(base);
+      const tx = TransactionBuilder.fromXDR(signedXdr, Networks.PUBLIC);
+      const sent = await withTimeout(server.sendTransaction(tx), SIM_TIMEOUT_MS, 'soroban send');
+      return { status: sent.status as SendStatus, hash: sent.hash, errorResult: (sent as { errorResult?: unknown }).errorResult };
+    },
+    async status(hash) {
+      const { rpc } = await import('@stellar/stellar-sdk');
+      const server = new rpc.Server(base);
+      const got = await withTimeout(server.getTransaction(hash), SIM_TIMEOUT_MS, 'soroban status');
+      return { status: got.status as 'SUCCESS' | 'NOT_FOUND' | 'FAILED' };
+    },
   };
 }
 
@@ -1129,7 +1165,7 @@ export async function pickExecutableVenue(
       try {
         // Utilise le vrai fill simulé pour le plancher (skim xBull ~0,1 % non divulgué).
         // Si la sim échoue → fallback sur cand.netOut (plancher conservateur).
-        const xbSim = await simulateXbullNet(cand.route, amountStroops, { rpcUrl: cfg.rpcUrl });
+        const xbSim = await deps.simulateXbullNet({ route: cand.route, amountIn: amountStroops, rpcUrl: cfg.rpcUrl });
         const realNet = xbSim?.net ?? cand.netOut;
         const minToGet = minReceivedStroops(realNet, slippageBps);
         const built = await buildXbull(cand.route, sender, amountStroops, minToGet, deps);
@@ -1321,7 +1357,7 @@ export async function submit(
   payload: { id?: string; signedXdr: string },
   cfg: { rpcUrl: string; horizonUrl?: string; soroswapApiKey?: string; timeoutMs?: number },
   depsOverride?: Partial<ExecDeps>,
-): Promise<{ hash: string }> {
+): Promise<{ hash: string; status?: 'pending' }> {
   const deps: ExecDeps = { ...defaultDeps(cfg.timeoutMs), ...depsOverride };
 
   // Garde defense-in-depth : vérifie le type d'opération AVANT tout appel réseau.
@@ -1360,28 +1396,24 @@ export async function submit(
       throw new ExecError(classifyHorizonSubmit(e), msg);
     }
   } else if (venue === 'aquarius' || venue === 'comet') {
-    // Contrats Soroban (Aquarius swap_chained / Comet swap_exact_amount_in) → soumission RPC + poll jusqu'à résolution.
-    const sdk = await import('@stellar/stellar-sdk');
-    const { rpc, TransactionBuilder, Networks } = sdk;
-    const server = new rpc.Server(cfg.rpcUrl.replace(/\/$/, ''));
+    // Fire-and-poll : on FIRE la tx (sendTransaction) et on rend le hash immédiatement.
+    // La CONFIRMATION (getTransaction) est polled par le client via /api/tx-status — une
+    // tx lente n'est donc plus un faux échec post-signature. Cf. txStatus + /api/tx-status.
+    const client = deps.makeRpc(cfg.rpcUrl);
+    let sent: { status: SendStatus; hash: string; errorResult?: unknown };
     try {
-      const tx = TransactionBuilder.fromXDR(payload.signedXdr, Networks.PUBLIC);
-      const sent = await server.sendTransaction(tx);
-      if (sent.status === 'ERROR') {
-        throw new ExecError('down', `Soroban a rejeté la tx : ${JSON.stringify(sent.errorResult ?? sent)}`);
-      }
-      let got = await server.getTransaction(sent.hash);
-      for (let i = 0; i < 15 && got.status === 'NOT_FOUND'; i++) {
-        await new Promise((r) => setTimeout(r, 1000));
-        got = await server.getTransaction(sent.hash);
-      }
-      if (got.status === 'SUCCESS') return { hash: sent.hash };
-      throw new ExecError('down', `tx Soroban non confirmée (${got.status}) : ${sent.hash}`);
+      sent = await client.send(payload.signedXdr);
     } catch (e) {
       if (e instanceof ExecError) throw e;
       const msg = e instanceof Error ? e.message : String(e);
       throw new ExecError(classifyExecError(msg), msg);
     }
+    // ERROR | TRY_AGAIN_LATER = PAS entrée mempool → vrai échec d'admission.
+    if (sent.status === 'ERROR' || sent.status === 'TRY_AGAIN_LATER') {
+      throw new ExecError('down', `Soroban a rejeté la tx (${sent.status}) : ${JSON.stringify(sent.errorResult ?? sent.status)}`);
+    }
+    // PENDING | DUPLICATE → fired ; la confirmation est déléguée au client.
+    return { hash: sent.hash, status: 'pending' };
   } else {
     const client = deps.makeSoroswap(cfg.soroswapApiKey!);
     try {
@@ -1394,5 +1426,24 @@ export async function submit(
       const msg = e instanceof Error ? e.message : String(e);
       throw new ExecError(classifyExecError(msg), msg);
     }
+  }
+}
+
+/** Confirmation on-chain d'une tx Soroban (fire-and-poll, polled par le client).
+ *  SUCCESS → confirmée · FAILED → échec on-chain · NOT_FOUND/RPC KO → encore en vol ('pending', pas une erreur). */
+export async function txStatus(
+  hash: string,
+  cfg: { rpcUrl: string; timeoutMs?: number },
+  depsOverride?: Partial<ExecDeps>,
+): Promise<{ status: 'success' | 'failed' | 'pending' }> {
+  const deps: ExecDeps = { ...defaultDeps(cfg.timeoutMs), ...depsOverride };
+  try {
+    const got = await deps.makeRpc(cfg.rpcUrl).status(hash);
+    if (got.status === 'SUCCESS') return { status: 'success' };
+    if (got.status === 'FAILED') return { status: 'failed' };
+    return { status: 'pending' }; // NOT_FOUND
+  } catch {
+    // RPC indispo ≠ tx échouée : le client re-pollera.
+    return { status: 'pending' };
   }
 }

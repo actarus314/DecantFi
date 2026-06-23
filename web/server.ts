@@ -11,7 +11,7 @@ import { overview, buildSourceHealth, latestChosenRpc } from './stats.js';
 import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
 import { appendRpcCallLog } from '../db/index.js';
 import { resetRpc, readRpc, rpcAls } from '../core/rpc-meter.js';
-import { pickExecutableVenue, submit, buildChangeTrust, ExecError, type Venue } from './execute.js';
+import { pickExecutableVenue, submit, txStatus, buildChangeTrust, ExecError, type Venue } from './execute.js';
 import { manualRefresh, refreshBusy } from './refresh.js';
 import { toStroops, toNumber } from '../core/amount.js';
 import { readBlndBalance, readAssetBalance } from '../core/balance.js';
@@ -71,12 +71,16 @@ const rev = (process.env.APP_REV || 'dev').replace(/[^\w.-]/g, '');
 const appVersion = (process.env.APP_VERSION || 'dev').replace(/[^\w.-]/g, '');
 const htmlPath = fileURLToPath(new URL('./public/index.html', import.meta.url));
 const htmlStr = readFileSync(htmlPath, 'utf-8')
-  .replace('<script src="/version.js" onerror="void 0"></script>', `<script>window.__REV=${JSON.stringify(rev)};window.__VERSION=${JSON.stringify(appVersion)};</script>`);
+  .replace('<!--version-meta-->', `<meta name="app-rev" content="${rev}"><meta name="app-version" content="${appVersion}">`);
 const htmlAsset = staticAsset(Buffer.from(htmlStr), 'text/html; charset=utf-8');
 
 // B8 : lire en Buffer (pas utf-8)
 const walletkitPath = fileURLToPath(new URL('./public/walletkit.js', import.meta.url));
 const walletkitAsset = staticAsset(readFileSync(walletkitPath), 'text/javascript; charset=utf-8');
+
+// App logic extracted from index.html (CSP: served as 'self', no inline script needed).
+const appJsPath = fileURLToPath(new URL('./public/app.js', import.meta.url));
+const appJsAsset = staticAsset(readFileSync(appJsPath), 'text/javascript; charset=utf-8');
 
 const faviconPath = fileURLToPath(new URL('./public/favicon.svg', import.meta.url));
 const faviconAsset = staticAsset(readFileSync(faviconPath), 'image/svg+xml; charset=utf-8');
@@ -121,7 +125,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://stellar.creit.tech; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://stellar.creit.tech; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
 };
 
 // C4 — Redaction de l'URL RPC (protocol+host uniquement, sans le path qui peut contenir une clé API)
@@ -210,6 +214,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/walletkit.js') {
       sendStatic(req, res, walletkitAsset, 'no-cache', { 'X-Content-Type-Options': 'nosniff' });
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/app.js') {
+      sendStatic(req, res, appJsAsset, 'no-cache', { 'X-Content-Type-Options': 'nosniff' });
       return;
     }
 
@@ -453,6 +462,23 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       if (b.venue === 'xbull' && typeof b.id !== 'string') { json(res, req, 400, { error: 'id requis pour xbull' }); return; }
       try {
         const result = await submit(b.venue, { id: b.id as string | undefined, signedXdr: b.signedXdr }, cfg);
+        json(res, req, 200, result);
+      } catch (e) {
+        if (e instanceof ExecError) { json(res, req, execStatus(e.code), { error: e.message, code: e.code }); return; }
+        throw e;
+      }
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/api/tx-status') {
+      const ip = req.socket.remoteAddress ?? 'unknown';
+      if (rateLimited(ip, 90, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      const venue = query['venue'];
+      if (venue !== 'aquarius' && venue !== 'comet') { json(res, req, 400, { error: 'venue invalide (tx-status réservé aux venues Soroban)' }); return; }
+      const hash = query['hash'];
+      if (typeof hash !== 'string' || !/^[0-9a-f]{64}$/i.test(hash)) { json(res, req, 400, { error: 'hash invalide' }); return; }
+      try {
+        const result = await txStatus(hash, cfg);
         json(res, req, 200, result);
       } catch (e) {
         if (e instanceof ExecError) { json(res, req, execStatus(e.code), { error: e.message, code: e.code }); return; }
