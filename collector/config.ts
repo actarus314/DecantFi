@@ -29,9 +29,13 @@ export function loadCollectorConfig(env: Env = process.env): CollectorConfig {
     .split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
   for (const p of pairs) if (p !== 'USDC' && p !== 'EURC') throw new Error(`paire inconnue : ${p}`);
 
+  const cadenceSec = int(env, 'COLLECTOR_CADENCE_SEC', 900);
+  const jitterSec = int(env, 'COLLECTOR_JITTER_SEC', 60);
+  if (jitterSec >= cadenceSec) throw new Error(`COLLECTOR_JITTER_SEC (${jitterSec}) must be < COLLECTOR_CADENCE_SEC (${cadenceSec})`);
+
   return {
-    cadenceSec: int(env, 'COLLECTOR_CADENCE_SEC', 900),
-    jitterSec: int(env, 'COLLECTOR_JITTER_SEC', 60),
+    cadenceSec,
+    jitterSec,
     sizesBlnd: sizes,
     pairs: pairs as ('USDC' | 'EURC')[],
     dbPath: env.COLLECTOR_DB_PATH ?? './data/quotes.db',
@@ -47,5 +51,6 @@ export function loadCollectorConfig(env: Env = process.env): CollectorConfig {
     horizonUrl: env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org',
     soroswapApiKey: env.SOROSWAP_API_KEY || undefined,
     stellarBrokerApiKey: env.STELLARBROKER_API_KEY || undefined,
+    walletAddress: env.WALLET_ADDRESS || undefined,
   };
 }

@@ -118,7 +118,7 @@ export async function quote(opts: QuoteOptions): Promise<QuoteResult> {
   const ranking = rankQuotes(main.quotes);
 
   let eurc: EurcComparison | undefined;
-  if (buy.symbol === 'EURC') {
+  if (buy.symbol === 'EURC' && sell.symbol === 'BLND') {
     eurc = await compareEurc(amountIn, {
       blndToEurc: (amt) => quoteAllFor(BLND, EURC, amt),
       blndToUsdc: (amt) => quoteAllFor(BLND, USDC, amt),

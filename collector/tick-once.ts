@@ -1,4 +1,5 @@
 // Ops : exécute UN tick réel (réseau live) et l'écrit dans la DB. Pour smoke-test manuel / cron externe.
+import { dirname } from 'node:path';
 import { fetchPrices } from '../core/prices.js';
 import { quote } from '../core/engine.js';
 import { loadCollectorConfig } from './config.js';
@@ -6,9 +7,11 @@ import { buildProbes } from './probes.js';
 import { runTick } from './tick.js';
 import { openDb } from '../db/index.js';
 import { fromStroops } from '../core/amount.js';
+import { ensureDirWritable } from './fsguard.js';
 
 async function main(): Promise<void> {
   const cfg = loadCollectorConfig();
+  ensureDirWritable(dirname(cfg.dbPath));
   const db = openDb(cfg.dbPath);
   const { tick, quotes, rpcProbes } = await runTick({
     probes: buildProbes(cfg), cfg, now: () => new Date(), fetchPrices, quote,

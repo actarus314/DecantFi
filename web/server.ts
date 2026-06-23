@@ -10,7 +10,7 @@ import { openReadOnly, readCoherenceProbesByVenue } from './read-db.js';
 import { overview, buildSourceHealth, latestChosenRpc } from './stats.js';
 import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
 import { appendRpcCallLog } from '../db/index.js';
-import { resetRpc, readRpc } from '../core/rpc-meter.js';
+import { resetRpc, readRpc, rpcAls } from '../core/rpc-meter.js';
 import { pickExecutableVenue, submit, buildChangeTrust, ExecError, type Venue } from './execute.js';
 import { manualRefresh, refreshBusy } from './refresh.js';
 import { toStroops, toNumber } from '../core/amount.js';
@@ -131,6 +131,15 @@ function redactRpcUrl(u: string): string {
 
 // C5 — Rate-limiting en mémoire (token-bucket par IP)
 const rlBuckets = new Map<string, { count: number; resetAt: number }>();
+
+// Purge expired buckets every 5 minutes to prevent unbounded growth under IP churn.
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, e] of rlBuckets) {
+    if (now > e.resetAt) rlBuckets.delete(ip);
+  }
+}, 5 * 60_000).unref();
+
 function rateLimited(ip: string, max: number, windowMs: number): boolean {
   const now = Date.now();
   const e = rlBuckets.get(ip);
@@ -184,11 +193,16 @@ function isVenue(v: unknown): v is Venue { return typeof v === 'string' && (VENU
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const rawUrl = req.url ?? '/';
   const path = rawUrl.split('?')[0] ?? '/';
-  const query = parseQuery(rawUrl);
 
   process.stderr.write(`${new Date().toISOString()} ${req.method} ${rawUrl}\n`);
 
+  // Wrap in ALS so inc()/read() are isolated per concurrent request (fix #3).
+  return rpcAls.run({ n: 0 }, async () => {
   try {
+    // parseQuery uses decodeURIComponent which throws URIError on malformed URLs
+    // (e.g. ?pair=%GG). Keeping it inside try ensures the catch block sends a 500
+    // instead of leaving the request unanswered and crashing under --unhandled-rejections=throw.
+    const query = parseQuery(rawUrl);
     if (req.method === 'GET' && path === '/') {
       sendStatic(req, res, htmlAsset, 'no-cache', SECURITY_HEADERS);
       return;
@@ -453,6 +467,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     process.stderr.write(`ERROR ${path}: ${msg}\n`);
     json(res, req, 500, { error: 'internal error' });
   }
+  }); // end rpcAls.run()
 }
 
 const server = createServer((req, res) => {

@@ -30,6 +30,20 @@ describe('rankQuotes', () => {
     expect(r.floor?.source).toBe('horizon');
   });
 
+  it('expose UltraStellar comme plancher si Horizon absent', () => {
+    const r = rankQuotes([quote('xbull', 509_000_000n), quote('ultrastellar', 459_000_000n)]);
+    expect(r.floor?.source).toBe('ultrastellar');
+  });
+
+  it('Horizon est prioritaire sur UltraStellar comme plancher quand les deux sont présents', () => {
+    const r = rankQuotes([
+      quote('xbull', 509_000_000n),
+      quote('ultrastellar', 459_000_000n),
+      quote('horizon', 455_000_000n),
+    ]);
+    expect(r.floor?.source).toBe('horizon');
+  });
+
   it('liste vide', () => {
     const r = rankQuotes([]);
     expect(r.ranked).toEqual([]);

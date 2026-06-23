@@ -1,7 +1,24 @@
-// ponytail: compteur global de process. Le collecteur exécute UN tick à la fois (scheduler
-// séquentiel) → reset au début / read à la fin = sûr. En process web, un refresh manuel
-// concurrent à un /api/quote peut gonfler le compte (rare, plafond accepté).
+// RPC call counter — global for CLI/collector (sequential by design), per-request via ALS in the
+// web server (two concurrent /api/quote calls would otherwise pollute each other's logged count).
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+// Per-request store: { n: number } when inside a als.run() scope.
+export const rpcAls = new AsyncLocalStorage<{ n: number }>();
+
+// Global counter (fallback for CLI / collector — sequential, safe without ALS).
 let n = 0;
-export function bumpRpc(): void { n++; }
-export function readRpc(): number { return n; }
-export function resetRpc(): void { n = 0; }
+
+export function bumpRpc(): void {
+  const store = rpcAls.getStore();
+  if (store) { store.n++; } else { n++; }
+}
+
+export function readRpc(): number {
+  const store = rpcAls.getStore();
+  return store ? store.n : n;
+}
+
+export function resetRpc(): void {
+  const store = rpcAls.getStore();
+  if (store) { store.n = 0; } else { n = 0; }
+}

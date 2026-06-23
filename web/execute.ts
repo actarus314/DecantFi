@@ -1335,7 +1335,10 @@ export async function submit(
         JSON.stringify(body);
       throw new ExecError('down', msg);
     }
-    return { hash: body['hash'] as string };
+    if (typeof body['hash'] !== 'string' || !body['hash']) {
+      throw new ExecError('down', 'xBull submit succeeded but returned no transaction hash');
+    }
+    return { hash: body['hash'] };
   } else if (venue === 'horizon' || venue === 'ultrastellar') {
     // tx classique → soumission Horizon (gère l'encodage form + extraction d'erreur).
     const sdk = await import('@stellar/stellar-sdk');

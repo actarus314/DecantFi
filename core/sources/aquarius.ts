@@ -35,7 +35,7 @@ export function parseAquarius(raw: unknown, req: QuoteRequest): NormalizedQuote 
     gasXlm: DEFAULT_GAS_XLM.soroban,
     gasInTarget: 0n,
     netOut: grossOut,
-    netConfidence: 'exact',
+    netConfidence: 'estimate',
     route,
     raw,
   };

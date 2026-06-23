@@ -44,6 +44,11 @@ describe('aquarius', () => {
     expect(q.netOut).toBe(505220384n);
     expect(q.route.map((h) => h.buy)).toContain('sUSD');
   });
+  it('raw find-path quote defaults to estimate confidence (over-quotes ~0.2% via-XLM routes)', () => {
+    const q = parseAquarius(loadFixture('aquarius.blnd-usdc.json'), req)!;
+    // find-path API over-quotes; confidence is promoted to 'exact' only after a successful on-chain re-sim
+    expect(q.netConfidence).toBe('estimate');
+  });
   it('null si success=false', () => {
     expect(parseAquarius({ success: false }, req)).toBeNull();
   });

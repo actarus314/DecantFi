@@ -38,4 +38,16 @@ describe('loadCollectorConfig', () => {
     const c = loadCollectorConfig({ ...base, STELLAR_RPC_URL_FALLBACK: 'rpc' });
     expect(c.rpcUrls).toEqual(['rpc']);
   });
+  it('rejette jitterSec >= cadenceSec (tight-loop guard)', () => {
+    expect(() => loadCollectorConfig({ ...base, COLLECTOR_CADENCE_SEC: '60', COLLECTOR_JITTER_SEC: '60' })).toThrow();
+    expect(() => loadCollectorConfig({ ...base, COLLECTOR_CADENCE_SEC: '60', COLLECTOR_JITTER_SEC: '90' })).toThrow();
+  });
+  it('lit WALLET_ADDRESS depuis l env', () => {
+    const c = loadCollectorConfig({ ...base, WALLET_ADDRESS: 'GTEST' });
+    expect(c.walletAddress).toBe('GTEST');
+  });
+  it('walletAddress = undefined si absent', () => {
+    const c = loadCollectorConfig({ ...base });
+    expect(c.walletAddress).toBeUndefined();
+  });
 });

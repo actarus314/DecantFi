@@ -3,9 +3,8 @@
 //   npm run quote -- 1000 USDC
 //   npm run quote -- 1000 EURC --split
 //   npm run quote -- 500 USDC --slippage 30 --json
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { bySymbol, type Asset } from '../core/assets.js';
+import { loadEnv } from './env.js';
 import { fromStroops, toStroops } from '../core/amount.js';
 import { quote, type EngineConfig, type QuoteResult } from '../core/engine.js';
 import type { NormalizedQuote } from '../core/sources/types.js';
@@ -40,6 +39,10 @@ function parseArgs(argv: string[]): Args {
     if (pos.length >= 2) {
       a.balanceAddr = pos[0] ?? '';     // premier positionnel = adresse G…
       a.target = pos[1] ?? '';
+    } else if (pos.length === 1 && (pos[0] ?? '').startsWith('G')) {
+      // Address provided but target asset forgotten — fail loudly instead of misinterpreting addr as target
+      a.balanceAddr = pos[0] ?? '';
+      a.target = '';                    // will trigger the missing-target error in main()
     } else {
       a.target = pos[0] ?? '';          // rétrocompat : adresse via WALLET_ADDRESS
     }
@@ -67,19 +70,6 @@ Exemples:
   npm run quote -- 1000 USDC
   npm run quote -- 1000 EURC --split
 `;
-
-/** Charge repo/.env si direnv ne l'a pas deja fait (fallback non fatal). */
-function loadEnv(): void {
-  try {
-    const txt = readFileSync(fileURLToPath(new URL('../.env', import.meta.url)), 'utf8');
-    for (const line of txt.split('\n')) {
-      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-      if (m && process.env[m[1]!] === undefined) process.env[m[1]!] = (m[2] ?? '').replace(/^["']|["']$/g, '');
-    }
-  } catch {
-    /* pas de .env : on garde les defauts publics */
-  }
-}
 
 function routeStr(q: NormalizedQuote): string {
   if (q.route.length === 0) return `${q.sellAsset.symbol}->${q.buyAsset.symbol}`;
@@ -111,17 +101,21 @@ function table(headers: string[], rows: string[][]): string {
   return [fmt(headers), ...rows.map(fmt)].join('\n');
 }
 
-function renderQuotes(quotes: NormalizedQuote[], target: string): string {
+function renderQuotes(quotes: NormalizedQuote[], target: string, sellSymbol: string): string {
+  // Δspot is computed against BLND spot price; suppress it for non-BLND sells to avoid misleading values.
+  const showDelta = sellSymbol === 'BLND';
   const rows = quotes.map((q, i) => [
     String(i + 1),
     q.source,
     routeStr(q),
     fromStroops(q.netOut),
-    deltaStr(q),
+    showDelta ? deltaStr(q) : '—',
     fromStroops(q.gasInTarget),
     q.netConfidence,
   ]);
-  return table(['#', 'source', 'route', `net ${target}`, 'Δspot', 'gas', 'conf'], rows);
+  const lines = [table(['#', 'source', 'route', `net ${target}`, 'Δspot', 'gas', 'conf'], rows)];
+  if (!showDelta) lines.push('  (Δspot calculated vs BLND spot — not meaningful for non-BLND sells)');
+  return lines.join('\n');
 }
 
 export function renderText(result: QuoteResult): string {
@@ -137,7 +131,7 @@ export function renderText(result: QuoteResult): string {
   } else {
     if (ranking.ranked.length > 0) {
       if (eurc) out.push(`Sources directes ${rq.sell}→${rq.buy} :`);
-      out.push(renderQuotes(ranking.ranked, rq.buy));
+      out.push(renderQuotes(ranking.ranked, rq.buy, rq.sell));
       out.push('');
     }
 
@@ -214,10 +208,15 @@ async function main(): Promise<void> {
     process.exit(args.help ? 0 : 1);
   }
 
+  if (!Number.isFinite(args.slippageBps)) fail('slippage invalide : --slippage attend un entier en points de base (ex. --slippage 30)');
+
   const sell = bySymbol(args.from);
   const buy = bySymbol(args.target);
   if (!sell) fail(`actif vendu inconnu : ${args.from}`);
-  if (!buy) fail(`cible inconnue : ${args.target} (attendu USDC ou EURC)`);
+  if (!buy) {
+    if (args.balance && args.balanceAddr && !args.target) fail(`cible manquante : spécifier USDC ou EURC après l'adresse (ex. --balance ${args.balanceAddr} USDC)`);
+    fail(`cible inconnue : ${args.target} (attendu USDC ou EURC)`);
+  }
 
   loadEnv();
 
