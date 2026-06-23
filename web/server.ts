@@ -71,7 +71,7 @@ const rev = (process.env.APP_REV || 'dev').replace(/[^\w.-]/g, '');
 const appVersion = (process.env.APP_VERSION || 'dev').replace(/[^\w.-]/g, '');
 const htmlPath = fileURLToPath(new URL('./public/index.html', import.meta.url));
 const htmlStr = readFileSync(htmlPath, 'utf-8')
-  .replace('<script src="/version.js" onerror="void 0"></script>', `<script>window.__REV=${JSON.stringify(rev)};window.__VERSION=${JSON.stringify(appVersion)};</script>`);
+  .replace('<script src="/version.js" onerror="void 0"></script>', `<meta name="app-rev" content="${rev}"><meta name="app-version" content="${appVersion}">`);
 const htmlAsset = staticAsset(Buffer.from(htmlStr), 'text/html; charset=utf-8');
 
 // B8 : lire en Buffer (pas utf-8)
@@ -125,7 +125,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://stellar.creit.tech; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://stellar.creit.tech; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
 };
 
 // C4 — Redaction de l'URL RPC (protocol+host uniquement, sans le path qui peut contenir une clé API)

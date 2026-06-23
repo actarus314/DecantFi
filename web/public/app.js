@@ -1158,11 +1158,11 @@ const fmt0 = n => n.toLocaleString(LOCALE[lang], { maximumFractionDigits: 0 });
 
 function freshLabel(lastTickAt) {
   const hint = t('countdown_refresh_hint');
-  if (!lastTickAt) return `<span class="fresh" onclick="doRefresh()" title="${hint}"><span class="dot" style="background:var(--amber)"></span>${t('fresh_none')}</span>`;
+  if (!lastTickAt) return `<span class="fresh" data-act="doRefresh" title="${hint}"><span class="dot" style="background:var(--amber)"></span>${t('fresh_none')}</span>`;
   const diff = (Date.now() - new Date(lastTickAt).getTime()) / 60000;
   const color = diff < 30 ? 'var(--green)' : diff < 120 ? 'var(--amber)' : 'var(--red)';
   // Countdown text — rendered in a placeholder updated by setInterval
-  return `<span class="fresh" onclick="doRefresh()" title="${hint}"><span class="dot" style="background:${color}"></span><span id="countdown">${computeCountdownText()}</span></span>`;
+  return `<span class="fresh" data-act="doRefresh" title="${hint}"><span class="dot" style="background:${color}"></span><span id="countdown">${computeCountdownText()}</span></span>`;
 }
 
 function computeNextTickAt(meta) {
@@ -1269,7 +1269,7 @@ function ladderHead(u) {
   const impactStyle = 'cursor:pointer;user-select:none;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;';
   // Le toggle local/EVM ne concerne que l'EURC (USDC : identique). Hors EURC : en-tête simple, non cliquable, sans tooltip.
   const impactTh = isEurc
-    ? `<th onclick="toggleImpactMode()" style="${impactStyle}">
+    ? `<th data-act="toggleImpactMode" style="${impactStyle}">
       <div class="tip-wrap" style="display:inline-flex;align-items:center;">
         ${impactLabel}<span style="font-size:10px;margin-left:2px;opacity:.7">▾</span><span class="tip-icon">ⓘ</span>
         <span class="tip-box up">${t('ladder_tip_impact')}</span>
@@ -1344,9 +1344,9 @@ function impactEvmModalHtml() {
       <div style="font-size:14px;font-weight:700;margin-bottom:.75rem">${t('impact_evm_notice_title')}</div>
       <p style="font-size:13px;color:var(--caption);line-height:1.55;margin:0 0 1rem">${t('impact_evm_notice_body')}</p>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
-        <button class="btn" onclick="cancelImpactEvm()">${t('review_cancel')}</button>
-        <button class="btn" onclick="confirmImpactEvm(true)" style="font-size:12px">${t('impact_evm_dismiss')}</button>
-        <button class="btn primary" onclick="confirmImpactEvm(false)">${t('impact_evm_confirm')}</button>
+        <button class="btn" data-act="cancelImpactEvm">${t('review_cancel')}</button>
+        <button class="btn" data-act="confirmImpactEvm" data-args='[true]' style="font-size:12px">${t('impact_evm_dismiss')}</button>
+        <button class="btn primary" data-act="confirmImpactEvm" data-args='[false]'>${t('impact_evm_confirm')}</button>
       </div>
     </div>
   </div>`;
@@ -1362,7 +1362,7 @@ function ladderRows(rows, u, down) {
     const isSel = r.sourceId && r.sourceId === selectedSource;
     const trClass = [r.winner ? 'win' : '', isSel ? 'sel' : ''].filter(Boolean).join(' ');
     const sid = r.sourceId ? r.sourceId.replace(/\\/g, '\\\\').replace(/'/g, "\\'") : '';
-    return `<tr class="${trClass}" style="cursor:pointer" onclick="selectSource('${sid}')">
+    return `<tr class="${trClass}" style="cursor:pointer" data-act="selectSource" data-args='${JSON.stringify([sid])}'>
       <td>${venueCard(r.sourceId, r.display)}${r.note ? ` <span class="muted">· ${escapeHtml(noteLabel(r.note))}</span>` : ''}</td>
       <td>${fmt3(r.net)}</td>
       <td class="${deltaClass}">${delta}</td>
@@ -1459,7 +1459,7 @@ function simCard() {
     if (legsData) {
       // Composite EURC affiché (best ou ligne sélectionnée) → exécution 2-tx guidée.
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-        <button class="btn primary" onclick="doExecuteComposite()">${t('exec_composite')}</button>
+        <button class="btn primary" data-act="doExecuteComposite">${t('exec_composite')}</button>
       </div>`;
     } else if (selRow && !selRow.executable) {
       // Venue non intégré : pas d'exécution, message seul (plus de deep-link)
@@ -1470,7 +1470,7 @@ function simCard() {
       const execLabel = selRow ? t('exec_via', selRow.display)
         : (winRow && winRow.executable && !winRow.sourceId.includes('+') ? t('exec_via', winRow.display) : t('exec_btn'));
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-        <button class="btn primary" onclick="doExecute()">${execLabel}</button>
+        <button class="btn primary" data-act="doExecute">${execLabel}</button>
       </div>`;
     }
   }
@@ -1480,21 +1480,21 @@ function simCard() {
 
   return `<div class="sim">
     <div class="controls">
-      <input id="simAmt" type="text" value="${simInput}" placeholder="${t('sim_placeholder')}" oninput="onAmt(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();doSim();}">
+      <input id="simAmt" type="text" value="${simInput}" placeholder="${t('sim_placeholder')}" data-act-input="onAmt" data-act-keydown="simEnter">
       <span class="suffix">BLND</span>
-      <button class="btn" onclick="useWallet()" ${!walletConfigured ? 'disabled' : ''}>${walletLabel}</button>
-      <button id="simBtn" class="btn primary" onclick="doSim()" ${simBtnDisabled ? 'disabled' : ''}>${simBtnLabel}</button>
-      <button class="btn" onclick="clearSim()">${t('sim_btn_clear')}</button>
+      <button class="btn" data-act="useWallet" ${!walletConfigured ? 'disabled' : ''}>${walletLabel}</button>
+      <button id="simBtn" class="btn primary" data-act="doSim" ${simBtnDisabled ? 'disabled' : ''}>${simBtnLabel}</button>
+      <button class="btn" data-act="clearSim">${t('sim_btn_clear')}</button>
       <span style="color:var(--card-border);margin:0 .4rem;user-select:none">—</span>
       <span style="font-size:12px;color:var(--caption);font-weight:600;text-transform:uppercase;letter-spacing:.05em">${t('slippage_label')}</span>
       <span style="display:inline-flex;align-items:stretch;border:1px solid var(--card-border);border-radius:.4rem;overflow:hidden;background:var(--section-bg)">
         <input id="execSlippage" type="text" inputmode="decimal" value="${fmtRoute(execSlippagePct)}"
           style="width:40px;font-size:13px;padding:.35rem .1rem .35rem .4rem;border:0;background:transparent;color:var(--val);text-align:right"
-          onchange="onExecSlippage(this.value)">
+          data-act-change="onExecSlippage">
         <span style="display:flex;align-items:center;padding:0 .35rem 0 .1rem;font-size:13px;color:var(--caption);user-select:none">%</span>
         <span style="display:flex;flex-direction:column;border-left:1px solid var(--card-border)">
-          <button type="button" onclick="nudgeSlippage(0.1)" tabindex="-1" style="flex:1;border:0;border-bottom:1px solid var(--card-border);background:transparent;color:var(--caption);cursor:pointer;font-size:8px;line-height:1;padding:0 .35rem">▲</button>
-          <button type="button" onclick="nudgeSlippage(-0.1)" tabindex="-1" style="flex:1;border:0;background:transparent;color:var(--caption);cursor:pointer;font-size:8px;line-height:1;padding:0 .35rem">▼</button>
+          <button type="button" data-act="nudgeSlippage" data-args='[0.1]' tabindex="-1" style="flex:1;border:0;border-bottom:1px solid var(--card-border);background:transparent;color:var(--caption);cursor:pointer;font-size:8px;line-height:1;padding:0 .35rem">▲</button>
+          <button type="button" data-act="nudgeSlippage" data-args='[-0.1]' tabindex="-1" style="flex:1;border:0;background:transparent;color:var(--caption);cursor:pointer;font-size:8px;line-height:1;padding:0 .35rem">▼</button>
         </span>
       </span>
     </div>
@@ -1558,7 +1558,7 @@ function hebdoHtml(m, today, sel) {
       ? `<span class="hc" style="background:var(--card-border)"></span>`
       : `<span class="hc" style="background:${col(v)}" title="${days[d]} ${hh2(h)} · ${v > 0 ? '+' : ''}${v.toFixed(2)} %"></span>`).join('');
     const meanTxt = m.dayEff[d] == null ? '—' : `${fmt(m.dayEff[d] * 100)} %<small>${m.dayVs[d] >= 0 ? '+' : ''}${m.dayVs[d].toFixed(2)} % ${t('per_week')}</small>`;
-    html += `<div class="hrow${d === sel ? ' sel' : ''}" onclick="selectDay(${d})">
+    html += `<div class="hrow${d === sel ? ' sel' : ''}" data-act="selectDay" data-args='[${d}]'>
       <div class="hlbl${d === m.bestDay ? ' best' : ''}">
         <span class="hday">${days[d]}${d === m.bestDay ? ' ★' : ''}</span>
         <span class="hmean">${meanTxt}</span>
@@ -1607,7 +1607,7 @@ function zoomHtml(m, series, sel, today, nowSlot, u) {
   </svg>`;
   const nowDot = showNow ? `<span class="zdot pulse" style="left:${nowX}%;top:${nowY}%"></span>` : '';
   const wkTag = wkY != null ? `<span style="position:absolute;right:3px;top:${(wkY / H * 100).toFixed(1)}%;transform:translateY(-50%);font-size:9px;font-weight:600;color:var(--caption);background:var(--card-bg);padding:0 3px;border-radius:3px">${t('vs_week_line')}</span>` : '';
-  return `<div class="zm">${kpi}<div><div class="zwrap" onmousemove="zoomMove(event,this)" onmouseleave="zoomLeave()">${svg}${nowDot}${wkTag}<div class="zcursor" id="zcur"></div><div class="ztip" id="ztip"></div></div>${axis}<p class="help" style="margin:.45rem 0 0;font-size:12px">${t('zoom_legend')}</p></div></div>`;
+  return `<div class="zm">${kpi}<div><div class="zwrap" data-zoom>${svg}${nowDot}${wkTag}<div class="zcursor" id="zcur"></div><div class="ztip" id="ztip"></div></div>${axis}<p class="help" style="margin:.45rem 0 0;font-size:12px">${t('zoom_legend')}</p></div></div>`;
 }
 
 function selectDay(d) { selDay = d; renderApp(); }
@@ -1691,7 +1691,7 @@ function buildHealthPage(topbarHtml) {
       // Rouge si > 25 % de suspectes, sinon ambre
       const ratio = coh.suspects / coh.tests;
       const col = ratio > 0.25 ? 'var(--red)' : 'var(--amber)';
-      cohCell = `<span style="color:${col};cursor:pointer" title="${t('health_coh_suspect', coh.suspects, coh.tests)}" onclick="openCoherence('${s.id}')">⚠ ${coh.suspects}/${coh.tests}</span>`;
+      cohCell = `<span style="color:${col};cursor:pointer" title="${t('health_coh_suspect', coh.suspects, coh.tests)}" data-act="openCoherence" data-args='${JSON.stringify([s.id])}'>⚠ ${coh.suspects}/${coh.tests}</span>`;
     }
 
     // Colonne Exécution (durée médiane)
@@ -1724,7 +1724,7 @@ function buildHealthPage(topbarHtml) {
   }).join('');
 
   return `${topbarHtml}
-  <button class="backlink" onclick="setView('dashboard')">${t('nav_back')}</button>
+  <button class="backlink" data-act="setView" data-args='["dashboard"]'>${t('nav_back')}</button>
   <div class="zone-group"><div class="zone">
     <div class="zone-h">${t('health_title')}</div>
     ${kpiHtml}
@@ -1837,7 +1837,7 @@ function buildPage() {
 
   const NOW_SLOT = nowLocalHour() * 4 + Math.floor(new Date().getMinutes() / 15);
   const sondeKey = String(ladderSonde);
-  const sondeSeg = sondes.map(n => `<button class="${ladderSonde===n?'active':''}" onclick="setSonde(${n})">${n} BLND</button>`).join('');
+  const sondeSeg = sondes.map(n => `<button class="${ladderSonde===n?'active':''}" data-act="setSonde" data-args='[${n}]'>${n} BLND</button>`).join('');
   const EMPTY24 = Array.from({length:7}, () => new Array(24).fill(null));
   const EMPTY96 = Array.from({length:7}, () => new Array(96).fill(null));
   const useStellar = (typeof impactMode !== 'undefined' && impactMode === 'local');
@@ -1883,23 +1883,23 @@ function buildPage() {
       <span class="brand">decant<span style="color:var(--teal)">.fi</span> <span class="dim">· ${t('brand_dim')}</span></span>
     </a>
     ${view === 'dashboard' ? `<span class="pagenav" style="margin-left:.3rem">
-      <button class="${target==='USDC'?'active':''}" onclick="setTarget('USDC')">${t('pair_usdc')}</button>
-      <button class="${target==='EURC'?'active':''}" onclick="setTarget('EURC')">${t('pair_eurc')}</button>
+      <button class="${target==='USDC'?'active':''}" data-act="setTarget" data-args='["USDC"]'>${t('pair_usdc')}</button>
+      <button class="${target==='EURC'?'active':''}" data-act="setTarget" data-args='["EURC"]'>${t('pair_eurc')}</button>
     </span>` : ''}
     ${freshHtml}
     <span class="topbar-right">
       ${walletAddress
         ? `<span style="display:inline-flex;align-items:center;gap:.35rem">
             <span class="ctrl-btn" style="cursor:default;font-variant-numeric:tabular-nums">${shortAddr(walletAddress)}</span>
-            <button class="ctrl-btn" onclick="disconnectWallet()">${t('wallet_disconnect')}</button>
+            <button class="ctrl-btn" data-act="disconnectWallet">${t('wallet_disconnect')}</button>
            </span>`
-        : `<button class="ctrl-btn" onclick="connectWallet()">${t('connect_wallet')}</button>`}
-      <button class="ctrl-btn" onclick="toggleTheme()" title="${isDark ? t('theme_light') : t('theme_dark')}">${themeGlyph}</button>
+        : `<button class="ctrl-btn" data-act="connectWallet">${t('connect_wallet')}</button>`}
+      <button class="ctrl-btn" data-act="toggleTheme" title="${isDark ? t('theme_light') : t('theme_dark')}">${themeGlyph}</button>
       <details class="lang-menu"><summary class="ctrl-btn" style="font-size:16px;line-height:1;padding:1px 7px">${FLAG[lang]} <span style="font-size:10px">▾</span></summary><div class="lang-pop">
-        <button onclick="setLang('fr')">🇫🇷 Français</button>
-        <button onclick="setLang('en')">🇬🇧 English</button>
-        <button onclick="setLang('es')">🇪🇸 Español</button>
-        <button onclick="setLang('pt')">🇧🇷 Português</button>
+        <button data-act="setLang" data-args='["fr"]'>🇫🇷 Français</button>
+        <button data-act="setLang" data-args='["en"]'>🇬🇧 English</button>
+        <button data-act="setLang" data-args='["es"]'>🇪🇸 Español</button>
+        <button data-act="setLang" data-args='["pt"]'>🇧🇷 Português</button>
       </div></details>
     </span>
   </div>`;
@@ -1913,7 +1913,7 @@ function buildPage() {
     const cadH = cadenceHuman(meta.cadenceSec);
     // GitHub icon + FAQ link are language-neutral: rendered once, outside i18n strings
     const ghIcon = `<svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true" style="vertical-align:-4px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path></svg>`;
-    return `<div class="page-footer">${t('footer_readings', meta.nTicks, meta.nTicksOk, cadH, perDay, coverH)} · <button onclick="setView('health')">${t('footer_health_link')}</button> · <a href="https://github.com/actarus314/DecantFi" target="_blank" rel="noopener noreferrer" title="GitHub" style="color:var(--sub);text-decoration:none;display:inline-flex;align-items:center;" onmouseover="this.style.color='var(--caption)'" onmouseout="this.style.color='var(--sub)'">${ghIcon}</a> · <a href="https://github.com/actarus314/DecantFi/blob/main/FAQ.md" target="_blank" rel="noopener noreferrer" style="color:var(--sub);text-underline-offset:2px;" onmouseover="this.style.color='var(--caption)'" onmouseout="this.style.color='var(--sub)'">FAQ</a><span style="color:var(--sub);font-size:11px;opacity:.7"> · ${(()=>{const v=window.__VERSION||'dev';const r=window.__REV||'dev';const vLabel=/^\d/.test(v)?'v'+v:v;const commit7=r!=='dev'?r.slice(0,7):null;return commit7?(vLabel+' · '+commit7):vLabel;})()}</span></div>`;
+    return `<div class="page-footer">${t('footer_readings', meta.nTicks, meta.nTicksOk, cadH, perDay, coverH)} · <button data-act="setView" data-args='["health"]'>${t('footer_health_link')}</button> · <a href="https://github.com/actarus314/DecantFi" target="_blank" rel="noopener noreferrer" title="GitHub" class="footer-link" style="text-decoration:none;display:inline-flex;align-items:center;">${ghIcon}</a> · <a href="https://github.com/actarus314/DecantFi/blob/main/FAQ.md" target="_blank" rel="noopener noreferrer" class="footer-link" style="text-underline-offset:2px;">FAQ</a><span style="color:var(--sub);font-size:11px;opacity:.7"> · ${(()=>{const mta=(n)=>{const e=document.querySelector('meta[name="'+n+'"]');return e?e.content:'dev';};const v=mta('app-version'),r=mta('app-rev');const vLabel=/^\d/.test(v)?'v'+v:v;const commit7=r!=='dev'?r.slice(0,7):null;return commit7?(vLabel+' · '+commit7):vLabel;})()}</span></div>`;
   })() : '';
 
   return `${topbarHtml}
@@ -2803,8 +2803,9 @@ function cancelExecute() {
   renderApp();
 }
 
-function onModalBackdrop(e) {
-  if (e.target === e.currentTarget && execState && (execState.phase === 'done' || execState.phase === 'error')) {
+function onModalBackdrop() {
+  // backdrop self-click is enforced by the delegated dispatcher (data-self-only)
+  if (execState && (execState.phase === 'done' || execState.phase === 'error')) {
     cancelExecute();
   }
 }
@@ -2964,11 +2965,11 @@ function coherenceModalHtml() {
     }
   }
 
-  return `<div class="modal-overlay" onclick="if(event.target===this)closeCoherence()"><div class="modal-card" style="max-width:780px;width:95vw">
+  return `<div class="modal-overlay" data-act="closeCoherence" data-self-only><div class="modal-card" style="max-width:780px;width:95vw">
     <div style="font-size:14px;font-weight:700;margin-bottom:.8rem">${t('health_coh_modal_title', dName)}</div>
     ${body}
     <div style="display:flex;justify-content:flex-end;margin-top:.9rem">
-      <button class="btn" onclick="closeCoherence()">${t('health_coh_close')}</button>
+      <button class="btn" data-act="closeCoherence">${t('health_coh_close')}</button>
     </div>
   </div></div>`;
 }
@@ -3005,8 +3006,8 @@ function execModal() {
       ${fidelityNote}
       ${restoreNote}
       <div style="display:flex;gap:.55rem;margin-top:.9rem;justify-content:flex-end">
-        <button class="btn" onclick="cancelExecute()">${t('review_cancel')}</button>
-        <button class="btn primary" onclick="confirmExecute()">${t('review_confirm')}</button>
+        <button class="btn" data-act="cancelExecute">${t('review_cancel')}</button>
+        <button class="btn primary" data-act="confirmExecute">${t('review_confirm')}</button>
       </div>`;
   } else if (phase === 'signing') {
     const rv = build && build.review;
@@ -3066,7 +3067,7 @@ function execModal() {
       ${compBlock}
       <div style="display:flex;gap:.55rem;margin-top:1rem;align-items:center;justify-content:flex-end;flex-wrap:wrap">
         <a class="btn openlink" href="https://stellar.expert/explorer/public/tx/${encodeURIComponent(safeHash)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:.3rem">${t('exec_view')}</a>
-        <button class="btn primary" onclick="cancelExecute()">${t('exec_close')}</button>
+        <button class="btn primary" data-act="cancelExecute">${t('exec_close')}</button>
       </div>`;
   } else if (phase === 'trustline_adding') {
     content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0">${t('trustline_adding')}</p>`;
@@ -3074,10 +3075,10 @@ function execModal() {
     // Reprise après ajout : leg2 → retryCompositeLeg2 (USDC en main) ; leg1 → doExecuteComposite
     // (relance la jambe 1, JAMAIS doExecute() qui pourrait exécuter une venue atomique) ; mono → doExecute.
     const resumeBtn = (comp && comp.leg === 2 && comp.usdcReceived != null)
-      ? `<button class="btn primary" onclick="retryCompositeLeg2()">${t('comp_retry_leg2')}</button>`
+      ? `<button class="btn primary" data-act="retryCompositeLeg2">${t('comp_retry_leg2')}</button>`
       : (comp && comp.leg === 1)
-        ? `<button class="btn primary" onclick="doExecuteComposite()">${t('exec_btn')}</button>`
-        : `<button class="btn primary" onclick="doExecute()">${t('exec_btn')}</button>`;
+        ? `<button class="btn primary" data-act="doExecuteComposite">${t('exec_btn')}</button>`
+        : `<button class="btn primary" data-act="doExecute">${t('exec_btn')}</button>`;
     content = `
       <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.5rem">
         <span style="font-size:20px;color:var(--green);line-height:1">✓</span>
@@ -3085,7 +3086,7 @@ function execModal() {
       </div>
       <p class="help" style="margin:0 0 .9rem">${t('trustline_added_hint')}</p>
       <div style="display:flex;gap:.55rem;justify-content:flex-end;flex-wrap:wrap">
-        <button class="btn" onclick="cancelExecute()">${t('exec_close')}</button>
+        <button class="btn" data-act="cancelExecute">${t('exec_close')}</button>
         ${resumeBtn}
       </div>`;
   } else if (phase === 'error') {
@@ -3103,20 +3104,20 @@ function execModal() {
       : isTrust ? t('trustline_need', missAsset)
       : escapeHtml(errorMsg);
     const safeMissAsset = missAsset.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    const trustBtn = isTrust ? `<button class="btn primary" onclick="addTrustline('${safeMissAsset}')">${t('trustline_add_btn', missAsset)}</button>` : '';
+    const trustBtn = isTrust ? `<button class="btn primary" data-act="addTrustline" data-args='${JSON.stringify([safeMissAsset])}'>${t('trustline_add_btn', missAsset)}</button>` : '';
     // Relance directe seulement si ce n'est PAS un manque de trustline (sinon il faut d'abord l'ajouter).
-    const retryLeg2Btn = (isLeg2Fail && !isTrust) ? `<button class="btn primary" onclick="retryCompositeLeg2()">${t('comp_retry_leg2')}</button>` : '';
+    const retryLeg2Btn = (isLeg2Fail && !isTrust) ? `<button class="btn primary" data-act="retryCompositeLeg2">${t('comp_retry_leg2')}</button>` : '';
     content = `
       <p style="font-size:14px;font-weight:700;color:${titleColor};margin:0 0 .5rem">${title}</p>
       <p class="help" style="margin:0 0 .9rem;overflow-wrap:anywhere">${msg}</p>
       <div style="display:flex;gap:.55rem;justify-content:flex-end;flex-wrap:wrap">
-        <button class="btn" onclick="cancelExecute()">${t('exec_close')}</button>
+        <button class="btn" data-act="cancelExecute">${t('exec_close')}</button>
         ${trustBtn}
         ${retryLeg2Btn}
       </div>`;
   }
 
-  return `<div class="modal-overlay" onclick="onModalBackdrop(event)"><div class="modal-card">${content}</div></div>`;
+  return `<div class="modal-overlay" data-act="onModalBackdrop" data-self-only><div class="modal-card">${content}</div></div>`;
 }
 
 function toggleTheme() {
@@ -3268,4 +3269,43 @@ function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() 
     hide();
   });
   window.addEventListener('scroll', hide, { capture: true, passive: true });
+})();
+
+// ── Delegated event handling (CSP hardening: no inline on*= handlers) ─────────
+// Templates carry data-act / data-act-input / data-act-change / data-act-keydown /
+// data-zoom / data-self-only instead of inline on*= attributes. The functions below
+// are the top-level handlers defined earlier in this file.
+(() => {
+  const CLICK = {
+    doRefresh, toggleImpactMode, cancelImpactEvm, confirmImpactEvm, selectSource,
+    doExecuteComposite, doExecute, useWallet, doSim, clearSim, nudgeSlippage,
+    selectDay, openCoherence, setView, setSonde, setTarget, disconnectWallet,
+    connectWallet, toggleTheme, setLang, closeCoherence, cancelExecute,
+    confirmExecute, retryCompositeLeg2, addTrustline, onModalBackdrop,
+  };
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-act]');
+    if (!el) return;
+    const fn = CLICK[el.dataset.act];
+    if (!fn) return;
+    if ('selfOnly' in el.dataset && e.target !== el) return; // backdrop: only the element itself
+    fn(...(el.dataset.args ? JSON.parse(el.dataset.args) : []));
+  });
+  document.addEventListener('input', (e) => {
+    if (e.target && e.target.dataset && e.target.dataset.actInput === 'onAmt') onAmt(e.target.value);
+  });
+  document.addEventListener('change', (e) => {
+    if (e.target && e.target.dataset && e.target.dataset.actChange === 'onExecSlippage') onExecSlippage(e.target.value);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.target && e.target.dataset && e.target.dataset.actKeydown === 'simEnter' && e.key === 'Enter') { e.preventDefault(); doSim(); }
+  });
+  document.addEventListener('mousemove', (e) => {
+    const w = e.target.closest ? e.target.closest('[data-zoom]') : null;
+    if (w) zoomMove(e, w);
+  });
+  document.addEventListener('mouseout', (e) => {
+    const w = e.target.closest ? e.target.closest('[data-zoom]') : null;
+    if (w && !(e.relatedTarget && w.contains(e.relatedTarget))) zoomLeave();
+  });
 })();
