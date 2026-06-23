@@ -363,6 +363,7 @@ const STRINGS = {
     fresh_none: 'aucun tick',
     countdown_label: (m, s) => `prochain relevé dans ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'imminent',
+    countdown_overdue: 'relevé en retard',
     countdown_refresh_hint: 'Cliquer pour forcer un relevé maintenant',
 
     // Refresh
@@ -557,6 +558,7 @@ const STRINGS = {
     reason_simulation: 'simulation',
     // Colonnes Cohérence / Exécution + modal trace
     health_col_coherence: 'Cohérence',
+    health_coh_col_tip: 'Sondes de cohérence : la cote affichée est comparée à un fill re-simulé on-chain. ✓ = toutes cohérentes ; ⚠ = cotes suspectes (écart anormal coté/simulé), cliquer pour le détail.',
     health_col_exec: 'Exécution',
     health_total: 'Total (tick)',
     health_total_tip: "Durée d'un tick complet (médiane 7 j) : sélection RPC, prix, cotations en parallèle, re-simulations, classement et écriture. Pas la somme des venues.",
@@ -613,6 +615,7 @@ const STRINGS = {
     fresh_none: 'no tick yet',
     countdown_label: (m, s) => `next update in ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'imminent',
+    countdown_overdue: 'update overdue',
     countdown_refresh_hint: 'Click to force a reading now',
 
     // Refresh
@@ -807,6 +810,7 @@ const STRINGS = {
     reason_simulation: 'simulation',
     // Coherence / Execution columns + trace modal
     health_col_coherence: 'Coherence',
+    health_coh_col_tip: 'Coherence probes: the displayed quote of a source is compared to an on-chain re-simulated fill. ✓ = all coherent; ⚠ = suspect quotes (abnormal quoted/simulated gap), click for details.',
     health_col_exec: 'Execution',
     health_total: 'Total (tick)',
     health_total_tip: 'Full tick time (7-day median): RPC selection, prices, parallel quotes, re-simulations, ranking and write. Not the sum of venues.',
@@ -863,6 +867,7 @@ const STRINGS = {
     fresh_none: 'sin datos aún',
     countdown_label: (m, s) => `próxima actualización en ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'inminente',
+    countdown_overdue: 'actualización atrasada',
     countdown_refresh_hint: 'Clic para forzar una lectura ahora',
 
     // Refresh
@@ -1057,6 +1062,7 @@ const STRINGS = {
     reason_simulation: 'simulación',
     // Coherence / Execution columns + trace modal
     health_col_coherence: 'Coherencia',
+    health_coh_col_tip: 'Sondas de coherencia: la cotización mostrada se compara con un fill re-simulado on-chain. ✓ = todas coherentes; ⚠ = cotizaciones sospechosas (desviación anómala cotizado/simulado), haga clic para ver el detalle.',
     health_col_exec: 'Ejecución',
     health_total: 'Total (ciclo)',
     health_total_tip: 'Tiempo total del ciclo (mediana 7 días): selección de RPC, precios, cotizaciones paralelas, re-simulaciones, clasificación y escritura. No es la suma de las fuentes.',
@@ -1110,6 +1116,7 @@ const STRINGS = {
     fresh_none: 'nenhum ciclo ainda',
     countdown_label: (m, s) => `próxima atualização em ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'iminente',
+    countdown_overdue: 'atualização atrasada',
     countdown_refresh_hint: 'Clique para forçar uma leitura agora',
     refresh_loading: 'Buscando…',
     refresh_429: 'Busca já em andamento, aguarde.',
@@ -1258,6 +1265,7 @@ const STRINGS = {
     reason_rpc: 'erro RPC',
     reason_simulation: 'simulação',
     health_col_coherence: 'Coerência',
+    health_coh_col_tip: 'Sondas de coerência: a cotação exibida é comparada a um fill re-simulado on-chain. ✓ = todas coerentes; ⚠ = cotações suspeitas (desvio anormal cotado/simulado), clique para detalhes.',
     health_col_exec: 'Execução',
     health_total: 'Total (ciclo)',
     health_total_tip: 'Tempo total do ciclo (mediana de 7 dias): seleção de RPC, preços, cotações paralelas, re-simulações, ranking e gravação. Não é a soma das venues.',
@@ -1518,6 +1526,13 @@ function computeNextTickAt(meta) {
 }
 
 function computeCountdownText() {
+  // Daemon stale: no successful tick within ~2 cadences → collector is behind/stopped, not
+  // "imminent". Show an honest "overdue" instead of a countdown frozen forever on imminent.
+  const mt = (typeof overview !== 'undefined' && overview) ? overview.meta : null;
+  if (mt && mt.lastTickAt && mt.cadenceSec) {
+    const sinceLastSec = (Date.now() - new Date(mt.lastTickAt).getTime()) / 1000;
+    if (sinceLastSec > mt.cadenceSec * 2) return t('countdown_overdue');
+  }
   if (nextTickAt === null) {
     // If we have meta, show elapsed ago instead (fallback pre-nextTickAt set)
     return t('countdown_imminent');
@@ -2051,7 +2066,7 @@ function buildHealthPage(topbarHtml) {
       <td style="white-space:nowrap"><span class="srcname">${escapeHtml(s.display)}</span>${pairNote}</td>
       <td>${cohCell}</td>
       <td style="color:var(--caption);font-variant-numeric:tabular-nums">${execCell}</td>
-      <td><span class="days">${dots}</span> <span style="margin-left:1rem;font-size:12px;color:var(--caption);font-variant-numeric:tabular-nums;white-space:nowrap">${s.uptimePct.toFixed(0)} % ${trendArrow}</span></td>
+      <td class="left"><span class="days">${dots}</span> <span style="margin-left:1rem;font-size:12px;color:var(--caption);font-variant-numeric:tabular-nums;white-space:nowrap">${s.uptimePct.toFixed(0)} % ${trendArrow}</span></td>
       <td>${s.failedTicks}</td>
       <td class="muted">${healthAgo(s.lastFailureAt)}${s.lastFailureAt && s.lastFailureReason ? ' · ' + reasonLabel(s.lastFailureReason) : ''}</td>
     </tr>`;
@@ -2065,9 +2080,9 @@ function buildHealthPage(topbarHtml) {
     <div style="overflow-x:auto"><table class="flt">
       <thead><tr>
         <th>${t('health_col_source')}</th>
-        <th>${t('health_col_coherence')}</th>
+        <th><span class="tip-wrap" style="display:inline-flex;align-items:center">${t('health_col_coherence')}<span class="tip-icon">ⓘ</span><span class="tip-box">${t('health_coh_col_tip')}</span></span></th>
         <th>${t('health_col_exec')}</th>
-        <th>${t('health_col_days')}</th>
+        <th class="left">${t('health_col_days')}</th>
         <th>${t('health_col_fails')}</th>
         <th>${t('health_col_last')}</th>
       </tr></thead>

@@ -159,8 +159,9 @@ describe('buildSourceHealth — totalTicks', () => {
 });
 
 describe('buildSourceHealth — sources', () => {
-  it('7 sources (clés de FULL_NAME uniquement)', () => {
-    expect(result.sources.length).toBe(7);
+  it('liste les venues ACTIVES uniquement (StellarBroker débranché de ADAPTERS → exclu)', () => {
+    expect(result.sources.length).toBe(6);
+    expect(result.sources.some(s => s.id === 'stellarbroker')).toBe(false);
   });
 
   it('IDs composites avec "+" ignorés', () => {

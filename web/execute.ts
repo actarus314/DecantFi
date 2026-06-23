@@ -3,6 +3,7 @@
 import { BLND, USDC, EURC, bySac, classicColon, type Asset } from '../core/assets.js';
 import { decodeTransfers, routeFromTransfers, type Transfer } from '../core/soroban-route.js';
 import { bumpRpc } from '../core/rpc-meter.js';
+import { withTimeout } from '../core/timeout.js';
 import { toNumber, fromStroops, toStroops } from '../core/amount.js';
 import { stroopsOrNull, bigintOrNull } from '../core/sources/util.js';
 import { COMET_POOL, COMET_WITNESSES, decodeCometOut } from '../core/sources/comet.js';
@@ -19,6 +20,9 @@ const HORIZON_BASE_DEFAULT = 'https://horizon.stellar.org';
 const AQUA_ROUTER = 'CBQDHNBFBZYE4MKPWBSJOPIYLW4SFSXAXUTSXJN76GNKYVYPCKWC6QUK';
 const AQUA_FINDPATH = 'https://amm-api.aqua.network/api/external/v1/find-path/';
 const I128_MAX = 170141183460469231731687303715884105727n;
+// Hard cap on a single Soroban simulateTransaction / xBull accept-quote call. Without it a stalled
+// RPC connection hangs the caller forever — and a hung re-sim freezes the whole collector tick loop.
+const SIM_TIMEOUT_MS = 15000;
 
 // ─── Erreur typée ────────────────────────────────────────────────────────────
 
@@ -314,7 +318,7 @@ export async function simulateAquariusNet(
       .setTimeout(180)
       .build();
     bumpRpc();
-    const sim = await server.simulateTransaction(tx);
+    const sim = await withTimeout(server.simulateTransaction(tx), SIM_TIMEOUT_MS, 'aquarius sim');
     if (rpc.Api.isSimulationError(sim) || !sim.result) continue;
     try { return BigInt(scValToNative(sim.result.retval)); } catch { return null; }
   }
@@ -340,6 +344,7 @@ export async function simulateXbullNet(
           'User-Agent': XBULL_UA,
         },
         body: JSON.stringify({ sender: witness, recipient: witness, fromAmount: amountIn.toString(), minToGet: '0', route }),
+        signal: AbortSignal.timeout(SIM_TIMEOUT_MS),
       });
       if (!res.ok) continue;
       const body = (await res.json()) as Record<string, unknown>;
@@ -354,7 +359,7 @@ export async function simulateXbullNet(
       const server = new rpc.Server((cfg.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
       const tx = TransactionBuilder.fromXDR(xdrStr, Networks.PUBLIC);
       bumpRpc();
-      const sim = await server.simulateTransaction(tx);
+      const sim = await withTimeout(server.simulateTransaction(tx), SIM_TIMEOUT_MS, 'xbull sim');
       if (rpc.Api.isSimulationError(sim) || !sim.result) continue;
       const rv = scValToNative(sim.result.retval);
       if (!Array.isArray(rv) || rv.length < 2) continue;

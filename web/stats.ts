@@ -7,6 +7,7 @@ import { type DatabaseSync } from 'node:sqlite';
 import { prepBig, readCoherenceProbes, readExecMsBySource, readTickWallClocks } from './read-db.js';
 import { toNumber } from '../core/amount.js';
 import { priceImpactPct } from '../core/prices.js';
+import { ACTIVE_SOURCE_IDS } from '../core/sources/index.js';
 import type { CollectorConfig } from '../collector/config.js';
 
 // ─── Types publics ───────────────────────────────────────────────────────────
@@ -864,8 +865,9 @@ export function buildSourceHealth(
   windowStart: string,
   now: Date,
 ): SourceHealthResult {
-  // Sources connues : les clés de DISPLAY_NAME (7 venues atomiques)
-  const knownIds = Object.keys(DISPLAY_NAME);
+  // Sources connues = adaptateurs ACTIFS (source de vérité unique). Une venue débranchée de ADAPTERS
+  // (ex. StellarBroker en attente de clé) disparaît automatiquement de la page Stabilité.
+  const knownIds = ACTIVE_SOURCE_IDS;
 
   // ── Calcul de la tendance (fenêtre précédente) ──────────────────────────────
   // Durée D = now - windowStart. Fenêtre précédente = [windowStart - D, windowStart].

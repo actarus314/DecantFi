@@ -3,6 +3,7 @@
 import { quote as engineQuote } from '../core/engine.js';
 import { rankQuotes } from '../core/rank.js';
 import { simulateAquariusNet, simulateXbullNet } from './execute.js';
+import { withTimeout } from '../core/timeout.js';
 import { readBlndBalance } from '../core/balance.js';
 import { BLND, USDC, EURC } from '../core/assets.js';
 import { toStroops, toNumber } from '../core/amount.js';
@@ -84,6 +85,9 @@ export interface LiveQuote {
   downSources: Array<{ display: string; sourceId: string; reason: string }>;
 }
 
+// Per-call cap for re-simulation calls at the call site (independent of any inner SDK timeout).
+const RESIM_TIMEOUT_MS = 15000;
+
 // ─── Construction du ruban depuis la route du gagnant ────────────────────────
 
 // Nom d'affichage du venue (cartouche outil = info la + importante du design). Fallback : capitalise.
@@ -139,10 +143,11 @@ function buildRoute(hops: RouteHop[], amountIn: bigint, netOut: bigint, pairUi: 
  */
 export function makeReSimLeg(
   cfg: { rpcUrl: string },
-  deps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet },
+  deps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet; simTimeoutMs?: number },
 ): (quotes: import('../core/sources/types.js').NormalizedQuote[], amountIn: bigint) => Promise<import('../core/sources/types.js').NormalizedQuote[]> {
   const simFnAq = deps?.simulateAquariusNet ?? simulateAquariusNet;
   const simFnXb = deps?.simulateXbullNet ?? simulateXbullNet;
+  const simTimeoutMs = deps?.simTimeoutMs ?? RESIM_TIMEOUT_MS;
 
   return async (quotes, amountIn) => {
     const results = await Promise.all(quotes.map(async (q): Promise<import('../core/sources/types.js').NormalizedQuote | null> => {
@@ -151,8 +156,8 @@ export function makeReSimLeg(
           const rawXdr = (q.raw as { swap_chain_xdr?: unknown } | undefined)?.swap_chain_xdr;
           if (!rawXdr) return q;
           const inputSac = q.sellAsset.sac;
-          // No .catch() — let transient RPC errors throw to outer catch (downgraded to 'estimate')
-          const simNet = await simFnAq(String(rawXdr), amountIn, inputSac, { rpcUrl: cfg.rpcUrl });
+          // No .catch() — let transient RPC errors / timeouts throw to outer catch (downgraded to 'estimate')
+          const simNet = await withTimeout(simFnAq(String(rawXdr), amountIn, inputSac, { rpcUrl: cfg.rpcUrl }), simTimeoutMs, 'aquarius leg re-sim');
           if (simNet !== null && simNet > 0n) {
             // Successful on-chain re-sim → real fill observed, promote to 'exact'
             // (consistent with the main-ladder re-sim path).
@@ -163,7 +168,7 @@ export function makeReSimLeg(
         } else if (q.source === 'xbull') {
           const route = (q.raw as { route?: unknown } | undefined)?.route;
           if (!route) return q;
-          const xbSim = await simFnXb(String(route), amountIn, { rpcUrl: cfg.rpcUrl }).catch(() => null);
+          const xbSim = await withTimeout(simFnXb(String(route), amountIn, { rpcUrl: cfg.rpcUrl }), simTimeoutMs, 'xbull leg re-sim').catch(() => null);
           if (xbSim && xbSim.net > 0n && xbSim.net !== q.netOut)
             return { ...q, netOut: xbSim.net, grossOut: xbSim.net };
           // xbSim === null → RPC/timeout failure → downgrade confidence
@@ -190,12 +195,14 @@ export async function resimAquariusXbull(
   pairUi: string,
   amountStroops: bigint,
   cfg: { rpcUrl: string },
-  deps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet },
+  deps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet; simTimeoutMs?: number },
 ): Promise<void> {
   const simFnAq = deps?.simulateAquariusNet ?? simulateAquariusNet;
   const simFnXb = deps?.simulateXbullNet ?? simulateXbullNet;
+  const simTimeoutMs = deps?.simTimeoutMs ?? RESIM_TIMEOUT_MS;
 
   let aquariusSimNet: bigint | undefined;
+  let aquariusSimOk = false; // sim succeeded (real fill observed) → 'exact' even if it equals the find-path quote
   let xbullSimNet: bigint | undefined;
   // Tracks whether a sim was attempted but failed (→ downgrade to 'estimate')
   let aquariusSimFailed = false;
@@ -216,10 +223,10 @@ export async function resimAquariusXbull(
   };
   const [aqT, xbT] = await Promise.all([
     (aqRanked && rawXdr)
-      ? timed(simFnAq(String(rawXdr), amountStroops, aqRanked.sellAsset?.sac ?? BLND.sac, { rpcUrl: cfg.rpcUrl }).catch(() => null))
+      ? timed(withTimeout(simFnAq(String(rawXdr), amountStroops, aqRanked.sellAsset?.sac ?? BLND.sac, { rpcUrl: cfg.rpcUrl }), simTimeoutMs, 'aquarius re-sim').catch(() => null))
       : Promise.resolve({ r: null as bigint | null, ms: 0 }),
     (xbRanked && route)
-      ? timed(simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }).catch(() => null))
+      ? timed(withTimeout(simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }), simTimeoutMs, 'xbull re-sim').catch(() => null))
       : Promise.resolve({ r: null as Awaited<ReturnType<typeof simFnXb>> | null, ms: 0 }),
   ]);
   const aqSimResult = aqT.r;
@@ -229,8 +236,10 @@ export async function resimAquariusXbull(
 
   if (aqRanked && rawXdr) {
     const simNet = aqSimResult;
-    if (simNet !== null && simNet > 0n && simNet !== aqRanked.netOut) aquariusSimNet = simNet;
-    else if (simNet === null) aquariusSimFailed = true; // RPC/timeout failure → downgrade
+    if (simNet !== null && simNet > 0n) {
+      aquariusSimOk = true; // observed the real on-chain fill → 'exact', even when it equals the find-path quote
+      if (simNet !== aqRanked.netOut) aquariusSimNet = simNet; // differs → also correct netOut + re-rank
+    } else if (simNet === null) aquariusSimFailed = true; // RPC/timeout/revert → downgrade to 'estimate'
   }
 
   if (xbRanked && route) {
@@ -243,12 +252,13 @@ export async function resimAquariusXbull(
     if (!xbSim) xbullSimFailed = true; // RPC/timeout failure → downgrade
   }
 
-  if (aquariusSimNet !== undefined || xbullSimNet !== undefined || xbullHops !== undefined
+  if (aquariusSimOk || aquariusSimNet !== undefined || xbullSimNet !== undefined || xbullHops !== undefined
     || aquariusSimFailed || xbullSimFailed) {
     const newQuotes = result.ranking.ranked.map((q) => {
       if (q.source === 'aquarius') {
-        if (aquariusSimNet !== undefined)
-          return { ...q, netOut: aquariusSimNet, grossOut: aquariusSimNet,
+        if (aquariusSimOk)
+          return { ...q,
+            ...(aquariusSimNet !== undefined ? { netOut: aquariusSimNet, grossOut: aquariusSimNet } : {}),
             netConfidence: 'exact' as const,
             durationMs: (q.durationMs ?? 0) + aqSimMs };
         if (aquariusSimFailed)
@@ -296,7 +306,7 @@ export async function liveQuote(
   pairUi: string,
   amountStroops: bigint,
   cfg: WebConfig,
-  deps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet },
+  deps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet; simTimeoutMs?: number },
 ): Promise<LiveQuote> {
   const buyAsset = pairUi === 'EURC' ? EURC : USDC;
 
