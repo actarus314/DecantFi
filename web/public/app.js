@@ -3183,9 +3183,15 @@ function execModal() {
 }
 
 function toggleTheme() {
-  document.documentElement.classList.toggle('dark');
-  localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-  renderApp();
+  // DEEP-2 : cibler au lieu de tout reconstruire. Les couleurs sont pilotées par CSS via la
+  // classe .dark → le navigateur re-style seul (état UI préservé : scroll, focus, montant tapé).
+  // Restent 2 bouts pilotés en JS à rafraîchir à la main : l'icône du bouton et le graphe Sankey.
+  const isDark = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  const btn = document.querySelector('[data-act="toggleTheme"]');
+  if (btn) { const glyph = isDark ? t('theme_light') : t('theme_dark'); btn.textContent = glyph; btn.title = glyph; }
+  if (view === 'dashboard' && document.getElementById('route-sankey'))
+    Sankey.draw(target, ladderSonde, isDark, lang);
 }
 
 function setLang(l) {
