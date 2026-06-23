@@ -361,9 +361,6 @@ const STRINGS = {
 
     // Fraîcheur / countdown
     fresh_none: 'aucun tick',
-    fresh_instant: 'à l\'instant',
-    fresh_min: (n) => `il y a ${n} min`,
-    fresh_h: (n) => `il y a ${n} h`,
     countdown_label: (m, s) => `prochain relevé dans ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'imminent',
     countdown_refresh_hint: 'Cliquer pour forcer un relevé maintenant',
@@ -381,7 +378,6 @@ const STRINGS = {
     section_sim: 'Simulateur',
     section_ladder: 'Échelle des sources',
     section_slots: (u) => `Meilleurs créneaux — net BLND → ${u}`,
-    section_slots_note: 'rollup horaire · 7 j',
     slots_help: 'L\'<b>efficience</b> = part du prix de référence (DefiLlama) réellement obtenue, frais et slippage déduits — 100 % = exécution parfaite. Mesurée sur le meilleur devis de la sonde choisie (≈ 4 relevés/heure). Chaque <b>case</b> compare cette efficience à la moyenne des 7 derniers jours : <b>vert = mieux que la semaine, rouge = moins bien</b>. C\'est <b>relatif</b> — une case verte peut rester médiocre dans l\'absolu si toute la semaine est mauvaise. La <b>note du jour</b> = efficience moyenne du jour, en %.',
     section_hourly: 'Zoom journalier',
     section_hourly_note: '▼ heure en cours',
@@ -428,9 +424,6 @@ const STRINGS = {
 
     // Heatmap / profil
     hmap_insufficient: 'Données insuffisantes',
-    hmap_legend_lo: 'net plus faible',
-    hmap_legend_hi: 'net plus élevé',
-    hmap_legend_note: 'heure locale · % écart au net moyen 7 j',
     days: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
     hour_now_suffix: ' · maintenant',
 
@@ -492,7 +485,6 @@ const STRINGS = {
     review_sim_was: 'sim',
 
     // États d'exécution
-    exec_signing: 'Signature dans le wallet…',
     exec_signing_wallet: 'Signature dans le wallet…',
     exec_submitting: 'Soumission…',
     exec_restore: 'Étape de restauration d\'état requise (coût de stockage ponctuel) — signe-la, puis on reconstruit le swap.',
@@ -526,10 +518,6 @@ const STRINGS = {
     comp_leg2_failed: (x) => `Leg 1 réussi : ${x} USDC reçus. Le leg 2 a échoué — tu détiens ces USDC.`,
     comp_retry_leg2: 'Relancer le leg 2',
 
-    // Navigation
-    nav_dashboard: 'Tableau de bord',
-    nav_health: 'Stabilité',
-
     tx_label: 'Tx',
     hops_label: (n) => `${n} saut${n > 1 ? 's' : ''}`,
 
@@ -560,7 +548,7 @@ const STRINGS = {
     health_ago_h: (n) => `il y a ${n} h`,
     health_ago_j: (n) => `il y a ${n} j`,
     // Causes d'échec ③-bis
-    chip_down: 'échec',
+    chip_health_fail: 'échec',
     reason_timeout: 'timeout',
     reason_http: 'erreur HTTP',
     reason_indisponible: 'indisponible',
@@ -623,9 +611,6 @@ const STRINGS = {
 
     // Fraîcheur / countdown
     fresh_none: 'no tick yet',
-    fresh_instant: 'just now',
-    fresh_min: (n) => `${n} min ago`,
-    fresh_h: (n) => `${n} h ago`,
     countdown_label: (m, s) => `next update in ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'imminent',
     countdown_refresh_hint: 'Click to force a reading now',
@@ -643,7 +628,6 @@ const STRINGS = {
     section_sim: 'Simulator',
     section_ladder: 'Source ladder',
     section_slots: (u) => `Best time slots — net BLND → ${u}`,
-    section_slots_note: 'hourly rollup · 7 d',
     slots_help: '<b>Efficiency</b> = the share of the reference price (DefiLlama) actually obtained, fees and slippage deducted — 100 % = perfect execution. Measured on the best quote for the selected probe (≈ 4 readings/hour). Each <b>cell</b> compares this efficiency to the 7-day average: <b>green = better than the week, red = worse</b>. It\'s <b>relative</b> — a green cell can still be poor in absolute terms if the whole week is bad. The <b>day\'s note</b> = the day\'s average efficiency, in %.',
     section_hourly: 'Daily zoom',
     section_hourly_note: '▼ current hour',
@@ -690,9 +674,6 @@ const STRINGS = {
 
     // Heatmap / profil
     hmap_insufficient: 'Insufficient data',
-    hmap_legend_lo: 'lower net',
-    hmap_legend_hi: 'higher net',
-    hmap_legend_note: 'local time · % deviation from 7-day avg net',
     days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
     hour_now_suffix: ' · now',
 
@@ -754,7 +735,6 @@ const STRINGS = {
     review_sim_was: 'sim',
 
     // Execution states
-    exec_signing: 'Signing in wallet…',
     exec_signing_wallet: 'Signing in your wallet…',
     exec_submitting: 'Submitting…',
     exec_restore: 'A state restore step is required (one-time storage cost) — sign it, then we rebuild the swap.',
@@ -788,10 +768,6 @@ const STRINGS = {
     comp_leg2_failed: (x) => `Leg 1 succeeded: ${x} USDC received. Leg 2 failed — you hold these USDC.`,
     comp_retry_leg2: 'Retry leg 2',
 
-    // Navigation
-    nav_dashboard: 'Dashboard',
-    nav_health: 'Stability',
-
     tx_label: 'Tx',
     hops_label: (n) => `${n} hop${n > 1 ? 's' : ''}`,
 
@@ -822,7 +798,7 @@ const STRINGS = {
     health_ago_h: (n) => `${n} h ago`,
     health_ago_j: (n) => `${n} d ago`,
     // Failure causes ③-bis
-    chip_down: 'failed',
+    chip_health_fail: 'failed',
     reason_timeout: 'timeout',
     reason_http: 'HTTP error',
     reason_indisponible: 'unavailable',
@@ -885,9 +861,6 @@ const STRINGS = {
 
     // Fraîcheur / countdown
     fresh_none: 'sin datos aún',
-    fresh_instant: 'ahora mismo',
-    fresh_min: (n) => `hace ${n} min`,
-    fresh_h: (n) => `hace ${n} h`,
     countdown_label: (m, s) => `próxima actualización en ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'inminente',
     countdown_refresh_hint: 'Clic para forzar una lectura ahora',
@@ -905,7 +878,6 @@ const STRINGS = {
     section_sim: 'Simulador',
     section_ladder: 'Clasificación de fuentes',
     section_slots: (u) => `Mejores franjas horarias — neto BLND → ${u}`,
-    section_slots_note: 'agregación horaria · 7 d',
     slots_help: '<b>Eficiencia</b> = porcentaje del precio de referencia (DefiLlama) realmente obtenido, con comisiones y slippage deducidos — 100 % = ejecución perfecta. Medida sobre la mejor cotización para la sonda seleccionada (≈ 4 lecturas/hora). Cada <b>celda</b> compara esta eficiencia con el promedio de 7 días: <b>verde = mejor que la semana, rojo = peor</b>. Es <b>relativa</b> — una celda verde puede ser mala en términos absolutos si toda la semana es mala. La <b>nota del día</b> = eficiencia media del día, en %.',
     section_hourly: 'Zoom diario',
     section_hourly_note: '▼ hora actual',
@@ -952,9 +924,6 @@ const STRINGS = {
 
     // Heatmap / profil
     hmap_insufficient: 'Datos insuficientes',
-    hmap_legend_lo: 'neto menor',
-    hmap_legend_hi: 'neto mayor',
-    hmap_legend_note: 'hora local · % desviación respecto al neto promedio de 7 días',
     days: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
     hour_now_suffix: ' · ahora',
 
@@ -1016,7 +985,6 @@ const STRINGS = {
     review_sim_was: 'sim',
 
     // Execution states
-    exec_signing: 'Firmando en el wallet…',
     exec_signing_wallet: 'Firmando en su wallet…',
     exec_submitting: 'Enviando…',
     exec_restore: 'Se requiere un paso de restauración de estado (coste único de almacenamiento) — fírmelo y luego reconstruimos el swap.',
@@ -1050,10 +1018,6 @@ const STRINGS = {
     comp_leg2_failed: (x) => `Tramo 1 exitoso: ${x} USDC recibidos. Tramo 2 fallido — conserva estos USDC.`,
     comp_retry_leg2: 'Reintentar tramo 2',
 
-    // Navigation
-    nav_dashboard: 'Panel',
-    nav_health: 'Estabilidad',
-
     tx_label: 'Tx',
     hops_label: (n) => `${n} salto${n > 1 ? 's' : ''}`,
 
@@ -1084,7 +1048,7 @@ const STRINGS = {
     health_ago_h: (n) => `hace ${n} h`,
     health_ago_j: (n) => `hace ${n} d`,
     // Failure causes ③-bis
-    chip_down: 'fallida',
+    chip_health_fail: 'fallida',
     reason_timeout: 'tiempo de espera agotado',
     reason_http: 'error HTTP',
     reason_indisponible: 'no disponible',
@@ -1144,9 +1108,6 @@ const STRINGS = {
     route_detail: 'Detalhe da rota',
     net_fee_label: 'Taxa de rede (real / máx.)',
     fresh_none: 'nenhum ciclo ainda',
-    fresh_instant: 'agora mesmo',
-    fresh_min: (n) => `há ${n} min`,
-    fresh_h: (n) => `há ${n} h`,
     countdown_label: (m, s) => `próxima atualização em ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'iminente',
     countdown_refresh_hint: 'Clique para forçar uma leitura agora',
@@ -1158,7 +1119,6 @@ const STRINGS = {
     section_sim: 'Simulador',
     section_ladder: 'Escala de fontes',
     section_slots: (u) => `Melhores horários — líquido BLND → ${u}`,
-    section_slots_note: 'consolidação horária · 7 d',
     slots_help: '<b>Eficiência</b> = a proporção do preço de referência (DefiLlama) efetivamente obtida, descontadas as taxas e o slippage — 100% = execução perfeita. Medida na melhor cotação para a sonda selecionada (≈ 4 leituras/hora). Cada <b>célula</b> compara essa eficiência à média dos 7 dias: <b>verde = melhor que a semana, vermelho = pior</b>. É <b>relativa</b> — uma célula verde pode ser fraca em termos absolutos se toda a semana for ruim. A <b>nota do dia</b> = eficiência média do dia, em %.',
     section_hourly: 'Zoom diário',
     section_hourly_note: '▼ hora atual',
@@ -1197,9 +1157,6 @@ const STRINGS = {
     chip_down: 'indisponível',
     hops_hidden: 'Caminho não divulgado pelo xBull',
     hmap_insufficient: 'Dados insuficientes',
-    hmap_legend_lo: 'líquido menor',
-    hmap_legend_hi: 'líquido maior',
-    hmap_legend_note: 'horário local · % desvio da média líquida de 7 dias',
     days: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'],
     hour_now_suffix: ' · agora',
     slot_best: 'Melhor horário',
@@ -1241,7 +1198,6 @@ const STRINGS = {
     review_confirm: 'Confirmar e assinar',
     review_cancel: 'Cancelar',
     review_sim_was: 'sim',
-    exec_signing: 'Assinando na carteira…',
     exec_signing_wallet: 'Assinando na sua carteira…',
     exec_submitting: 'Enviando…',
     exec_restore: 'Uma etapa de restauração de estado é necessária (custo único de armazenamento) — assine-a e depois reconstruímos o swap.',
@@ -1269,8 +1225,6 @@ const STRINGS = {
     comp_leg1_confirming: 'Leg 1 confirmada — preparando leg 2…',
     comp_leg2_failed: (x) => `Leg 1 concluída: ${x} USDC recebidos. Leg 2 falhou — você possui esses USDC.`,
     comp_retry_leg2: 'Tentar leg 2 novamente',
-    nav_dashboard: 'Painel',
-    nav_health: 'Estabilidade',
     tx_label: 'Tx',
     hops_label: (n) => `${n} hop${n > 1 ? 's' : ''}`,
     footer_readings: (n, nOk, cadenceHuman, perDay, coverH) =>
@@ -1296,7 +1250,7 @@ const STRINGS = {
     health_ago_min: (n) => `há ${n} min`,
     health_ago_h: (n) => `há ${n} h`,
     health_ago_j: (n) => `há ${n} d`,
-    chip_down: 'falhou',
+    chip_health_fail: 'falhou',
     reason_timeout: 'timeout',
     reason_http: 'erro HTTP',
     reason_indisponible: 'indisponível',
@@ -1492,10 +1446,15 @@ function chipLabel(chip) {
   return map[chip] || chip;
 }
 
-// Notes générées côté backend (FR) : traduit les fragments en EN. Vocabulaire fermé.
+// Notes generated backend-side (FR): translate fragments to display language. Closed vocabulary.
 function noteLabel(note) {
-  if (!note || lang !== 'en') return note;
-  const map = { 'gagnant': 'winner', 'plancher (fee opaque)': 'floor (opaque fee)', 'plancher DEX': 'DEX floor' };
+  if (!note || lang === 'fr') return note;
+  const maps = {
+    en: { 'gagnant': 'winner', 'plancher (fee opaque)': 'floor (opaque fee)', 'plancher DEX': 'DEX floor' },
+    es: { 'gagnant': 'ganador', 'plancher (fee opaque)': 'suelo (comisión opaca)', 'plancher DEX': 'suelo DEX' },
+    pt: { 'gagnant': 'vencedor', 'plancher (fee opaque)': 'piso (taxa opaca)', 'plancher DEX': 'piso DEX' },
+  };
+  const map = maps[lang] || maps.en;
   return note.split(' · ').map((f) => map[f] || f).join(' · ');
 }
 
@@ -1751,7 +1710,7 @@ function ladderRows(rows, u, down) {
       `<tr><td><span class="muted">${venueCard(d.sourceId, d.display)}</span></td>
       <td class="muted">—</td>
       <td class="muted">—</td>
-      <td><span class="chip down">${t('chip_down')} · ${reasonLabel(d.reason)}</span></td>
+      <td><span class="chip down">${t('chip_health_fail')} · ${reasonLabel(d.reason)}</span></td>
       <td class="muted">—</td>
       <td class="left muted">—</td></tr>`
     ).join('');
@@ -1888,7 +1847,7 @@ function distBars(winnerDist) {
 }
 
 // ─── Section temporelle : modèle + rendu (encart / hebdo / zoom) ────────────────
-const hh2 = x => String(x).padStart(2, '0') + (lang === 'fr' ? ' h' : ':00');
+const hh2 = x => String(x).padStart(2, '0') + (lang === 'fr' || lang === 'pt' ? ' h' : ':00');
 const pctTxt = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)} %`;
 
 function timeModel(heatEffLocal, weekAvg) {
@@ -2404,8 +2363,9 @@ const Sankey = (function () {
     return FB[code % FB.length];
   }
   const toolDisplay = name => name ? name.replace(/\bUltra\b(?!\s+Stellar)/g, "Ultra Stellar") : name;
+  const LOCALE_MAP = { fr: 'fr-FR', en: 'en-US', es: 'es-ES', pt: 'pt-BR' };
   const fmtMargin = (m, lang) => (m === null || m === undefined) ? "—"
-    : "+" + (lang === 'en' ? m.toFixed(2) : m.toFixed(2).replace(".", ",")) + " %";
+    : "+" + m.toLocaleString(LOCALE_MAP[lang] || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " %";
   const fmtPct = p => p.toFixed(0) + " %";
 
   // ── buildGraph : fusion (from|to|tool) + rang complexité-first (copie verbatim maquette) ──
@@ -2526,8 +2486,7 @@ const Sankey = (function () {
       l.points = [[src.x1, slotOut.get(l)], ...mids, [tgt.x0, slotIn.get(l)]];
       l.width = l.value * scale; l.y0 = l.points[0][1]; l.source = src; l.target = tgt;
     });
-    const _items = []; itemsByCol.forEach(items => items.forEach(it => _items.push(it)));
-    return { nodes: names.map(n => node.get(n)), links: rawLinks, _items };
+    return { nodes: names.map(n => node.get(n)), links: rawLinks };
   }
 
   // ribbonPath — courbe lisse à tangentes horizontales (≡ d3.line().curve(d3.curveBumpX), pinné numériquement)
@@ -3477,7 +3436,8 @@ function execModal() {
     const msg = isLeg2Fail ? t('comp_leg2_failed', fmt3(comp.usdcReceived))
       : isTrust ? t('trustline_need', missAsset)
       : escapeHtml(errorMsg);
-    const trustBtn = isTrust ? `<button class="btn primary" onclick="addTrustline('${missAsset}')">${t('trustline_add_btn', missAsset)}</button>` : '';
+    const safeMissAsset = missAsset.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const trustBtn = isTrust ? `<button class="btn primary" onclick="addTrustline('${safeMissAsset}')">${t('trustline_add_btn', missAsset)}</button>` : '';
     // Relance directe seulement si ce n'est PAS un manque de trustline (sinon il faut d'abord l'ajouter).
     const retryLeg2Btn = (isLeg2Fail && !isTrust) ? `<button class="btn primary" onclick="retryCompositeLeg2()">${t('comp_retry_leg2')}</button>` : '';
     content = `
