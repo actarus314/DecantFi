@@ -205,6 +205,40 @@ describe('resimAquariusXbull — netConfidence promotion', () => {
     // After successful re-sim, chip should reflect 'exact' confidence (chipFor('exact') = 'obs')
     expect(aquaRow!.chip).toBe('obs');
   });
+
+  it('a hung Aquarius re-sim does not block the quote — Aquarius degrades to estimate, others unaffected', async () => {
+    const aquaQ = {
+      ...makeQuote('aquarius', 4_0200000n),
+      netConfidence: 'estimate' as const,
+      raw: { swap_chain_xdr: 'FAKE_XDR' },
+    };
+    const soroQ = makeQuote('soroswap', 4_0000000n);
+
+    vi.mocked(engineQuote).mockResolvedValue({
+      request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
+      ranking: { ranked: [aquaQ, soroQ], best: aquaQ },
+      errors: [],
+    } as any);
+
+    // Never resolves — simulates a hung RPC call
+    const hung = () => new Promise<never>(() => {});
+
+    const result = await liveQuote('USDC', AMT, FAKE_CFG as any, {
+      simulateAquariusNet: hung as any,
+      simTimeoutMs: 30,
+    });
+
+    // Aquarius must be degraded to 'est' (timeout → null → aquariusSimFailed → 'estimate')
+    const aquaRow = result.ladder.find((r) => r.sourceId === 'aquarius');
+    expect(aquaRow).toBeDefined();
+    expect(aquaRow!.chip).toBe('est');
+
+    // Soroswap must still be present and unaffected ('obs' = chipFor('exact'))
+    const soroRow = result.ladder.find((r) => r.sourceId === 'soroswap');
+    expect(soroRow).toBeDefined();
+    expect(soroRow!.chip).toBe('obs');
+  });
 });
 
 describe('makeReSimLeg — Aquarius structural failure exclusion', () => {
