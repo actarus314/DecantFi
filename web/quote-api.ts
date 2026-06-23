@@ -196,6 +196,7 @@ export async function resimAquariusXbull(
   const simFnXb = deps?.simulateXbullNet ?? simulateXbullNet;
 
   let aquariusSimNet: bigint | undefined;
+  let aquariusSimOk = false; // sim succeeded (real fill observed) → 'exact' even if it equals the find-path quote
   let xbullSimNet: bigint | undefined;
   // Tracks whether a sim was attempted but failed (→ downgrade to 'estimate')
   let aquariusSimFailed = false;
@@ -229,8 +230,10 @@ export async function resimAquariusXbull(
 
   if (aqRanked && rawXdr) {
     const simNet = aqSimResult;
-    if (simNet !== null && simNet > 0n && simNet !== aqRanked.netOut) aquariusSimNet = simNet;
-    else if (simNet === null) aquariusSimFailed = true; // RPC/timeout failure → downgrade
+    if (simNet !== null && simNet > 0n) {
+      aquariusSimOk = true; // observed the real on-chain fill → 'exact', even when it equals the find-path quote
+      if (simNet !== aqRanked.netOut) aquariusSimNet = simNet; // differs → also correct netOut + re-rank
+    } else if (simNet === null) aquariusSimFailed = true; // RPC/timeout/revert → downgrade to 'estimate'
   }
 
   if (xbRanked && route) {
@@ -243,12 +246,13 @@ export async function resimAquariusXbull(
     if (!xbSim) xbullSimFailed = true; // RPC/timeout failure → downgrade
   }
 
-  if (aquariusSimNet !== undefined || xbullSimNet !== undefined || xbullHops !== undefined
+  if (aquariusSimOk || aquariusSimNet !== undefined || xbullSimNet !== undefined || xbullHops !== undefined
     || aquariusSimFailed || xbullSimFailed) {
     const newQuotes = result.ranking.ranked.map((q) => {
       if (q.source === 'aquarius') {
-        if (aquariusSimNet !== undefined)
-          return { ...q, netOut: aquariusSimNet, grossOut: aquariusSimNet,
+        if (aquariusSimOk)
+          return { ...q,
+            ...(aquariusSimNet !== undefined ? { netOut: aquariusSimNet, grossOut: aquariusSimNet } : {}),
             netConfidence: 'exact' as const,
             durationMs: (q.durationMs ?? 0) + aqSimMs };
         if (aquariusSimFailed)
