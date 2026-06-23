@@ -5,9 +5,6 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main]
-  # Manual run on any branch (e.g. develop) before a merge to main: runs test + security only.
-  # build-push stays gated on main/tags and build-check on PRs, so a dispatch publishes nothing.
-  workflow_dispatch:
 
 # C13 — deny-all par défaut ; permissions minimales déclarées par job
 permissions: {}
