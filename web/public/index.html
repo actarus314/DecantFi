@@ -363,6 +363,7 @@ const STRINGS = {
     fresh_none: 'aucun tick',
     countdown_label: (m, s) => `prochain relevé dans ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'imminent',
+    countdown_overdue: 'relevé en retard',
     countdown_refresh_hint: 'Cliquer pour forcer un relevé maintenant',
 
     // Refresh
@@ -614,6 +615,7 @@ const STRINGS = {
     fresh_none: 'no tick yet',
     countdown_label: (m, s) => `next update in ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'imminent',
+    countdown_overdue: 'update overdue',
     countdown_refresh_hint: 'Click to force a reading now',
 
     // Refresh
@@ -865,6 +867,7 @@ const STRINGS = {
     fresh_none: 'sin datos aún',
     countdown_label: (m, s) => `próxima actualización en ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'inminente',
+    countdown_overdue: 'actualización atrasada',
     countdown_refresh_hint: 'Clic para forzar una lectura ahora',
 
     // Refresh
@@ -1113,6 +1116,7 @@ const STRINGS = {
     fresh_none: 'nenhum ciclo ainda',
     countdown_label: (m, s) => `próxima atualização em ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'iminente',
+    countdown_overdue: 'atualização atrasada',
     countdown_refresh_hint: 'Clique para forçar uma leitura agora',
     refresh_loading: 'Buscando…',
     refresh_429: 'Busca já em andamento, aguarde.',
@@ -1522,6 +1526,13 @@ function computeNextTickAt(meta) {
 }
 
 function computeCountdownText() {
+  // Daemon stale: no successful tick within ~2 cadences → collector is behind/stopped, not
+  // "imminent". Show an honest "overdue" instead of a countdown frozen forever on imminent.
+  const mt = (typeof overview !== 'undefined' && overview) ? overview.meta : null;
+  if (mt && mt.lastTickAt && mt.cadenceSec) {
+    const sinceLastSec = (Date.now() - new Date(mt.lastTickAt).getTime()) / 1000;
+    if (sinceLastSec > mt.cadenceSec * 2) return t('countdown_overdue');
+  }
   if (nextTickAt === null) {
     // If we have meta, show elapsed ago instead (fallback pre-nextTickAt set)
     return t('countdown_imminent');
