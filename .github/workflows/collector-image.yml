@@ -89,6 +89,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            REV=${{ github.sha }}
+            APP_VERSION=${{ steps.meta.outputs.version }}
 
   release:
     needs: build-push
