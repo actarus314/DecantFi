@@ -20,5 +20,10 @@ export const ADAPTERS: SourceAdapter[] = [
   horizon,
 ];
 
+/** IDs of the currently active adapters — single source of truth for "which venues exist now".
+ *  The Stability page derives its venue list from this, so a disconnected venue (e.g. StellarBroker,
+ *  pending its API key) drops off automatically and reappears when re-added to ADAPTERS. */
+export const ACTIVE_SOURCE_IDS = ADAPTERS.map((a) => a.id);
+
 export { xbull, soroswap, aquarius, comet, ultrastellar, stellarbroker, horizon };
 export type { SourceAdapter };
