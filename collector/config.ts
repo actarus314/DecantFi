@@ -11,6 +11,7 @@ export interface CollectorConfig {
 
 type Env = Record<string, string | undefined>;
 
+// Accepts 0 (e.g. ROLLUP_AFTER_DAYS=0 means "off"); rejects only negative values.
 function int(env: Env, key: string, def: number): number {
   const v = env[key];
   if (v === undefined || v.trim() === '') return def;

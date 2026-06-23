@@ -124,6 +124,9 @@ Puis ouvrez **http://localhost:8080**.
 | `STELLAR_RPC_URL` / `STELLAR_HORIZON_URL` | Remplacent les endpoints publics par défaut (un RPC dédié est recommandé sous charge). |
 | `IMAGE_OWNER` | Propriétaire de l'image GHCR (défaut `actarus314` ; définissez votre compte si vous forkez et publiez). |
 | `COLLECTOR_CADENCE_SEC` · `COLLECTOR_SIZES_BLND` · `COLLECTOR_PAIRS` | Cadence du collecteur (défaut 900 s), tailles de sonde (`250,750`), paires (`USDC,EURC`). |
+| `IMAGE_TAG` | Version d'image à déployer ; épingler une version précise en prod, jamais `latest`. |
+| `STELLAR_RPC_URL_FALLBACK` | Endpoint RPC de repli pour le failover (basculé au prochain tick si le primaire échoue). |
+| `WEB_HOST_PORT` | Port hôte sur lequel publier l'UI web (le conteneur écoute toujours sur 8080). |
 
 **Opérations courantes :**
 

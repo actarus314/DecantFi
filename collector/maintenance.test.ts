@@ -55,6 +55,24 @@ describe('runMaintenance', () => {
     db.close();
   });
 
+  it('rollupAfterDays=0 skips rpc_call_log purge (0 = off)', () => {
+    const db = openDb(':memory:');
+    // Insert a rpc_call_log row dated far in the past
+    db.raw().prepare(
+      `INSERT INTO rpc_call_log (at, url, kind, calls, dur_ms) VALUES (?, ?, ?, ?, ?)`,
+    ).run(daysAgo(500), 'https://rpc.example.com', 'auto', 5, 100);
+    const before = (db.raw().prepare('SELECT COUNT(*) AS n FROM rpc_call_log').get() as any).n;
+    expect(Number(before)).toBe(1);
+    // rollupAfterDays=0 must NOT purge rpc_call_log
+    runMaintenance(db, { rawRetentionDays: 90, rollupAfterDays: 0 }, now);
+    const after = (db.raw().prepare('SELECT COUNT(*) AS n FROM rpc_call_log').get() as any).n;
+    expect(Number(after)).toBe(1); // row must still be there
+    // Rollup table must also be empty (rollup skipped)
+    const rollup = (db.raw().prepare('SELECT COUNT(*) AS n FROM rollup_hourly').get() as any).n;
+    expect(Number(rollup)).toBe(0);
+    db.close();
+  });
+
   it('idempotent : deux passages ne doublent pas le rollup', () => {
     const db = openDb(':memory:');
     insertAt(db, '2025-01-01T14:05:00.000Z', '12.0');

@@ -5,6 +5,7 @@ export interface WebConfig extends CollectorConfig {
   port: number;
 }
 
+// Rejects 0 (port must be a positive integer; 0 is not a valid TCP port in this context).
 function intEnv(env: Record<string, string | undefined>, key: string, def: number): number {
   const v = env[key];
   if (v === undefined || v.trim() === '') return def;

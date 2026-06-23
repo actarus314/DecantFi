@@ -26,11 +26,8 @@ export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void 
        SELECT q.id FROM quote q JOIN tick t ON t.id = q.tick_id WHERE t.started_at < ?)`,
   ).run(isoCutoff(now, cfg.rawRetentionDays));
 
-  // (1b) Purge de rpc_call_log au-delà de la même fenêtre de rétention que les ticks.
-  // On utilise rollupAfterDays comme seuil de rétention (même logique que la purge des ticks).
-  raw.prepare(`DELETE FROM rpc_call_log WHERE at < ?`).run(isoCutoff(now, cfg.rollupAfterDays));
-
   // (2) Rollup horaire au-delà de la fenêtre tiède, puis suppression des lignes par-tick.
+  // rollupAfterDays=0 means "off": skip rollup AND rpc_call_log purge entirely.
   if (cfg.rollupAfterDays > 0) {
     const cutoff = isoCutoff(now, cfg.rollupAfterDays);
     const sel = raw.prepare(
@@ -110,6 +107,8 @@ export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void 
           dist_merged: JSON.stringify(merged),
         });
       }
+      // Purge rpc_call_log beyond the same retention window (same cutoff as ticks).
+      raw.prepare('DELETE FROM rpc_call_log WHERE at < ?').run(cutoff);
       // Supprime les ticks agrégés (CASCADE purge quote + quote_raw).
       raw.prepare('DELETE FROM tick WHERE started_at < ?').run(cutoff);
       raw.exec('COMMIT');

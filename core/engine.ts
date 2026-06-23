@@ -103,7 +103,7 @@ export interface QuoteOptions {
 export async function quote(opts: QuoteOptions): Promise<QuoteResult> {
   const { sell, buy, amountIn, cfg } = opts;
   const slippageBps = cfg.slippageBps ?? 50;
-  const prices = cfg.prices ?? (await fetchPrices({ timeoutMs: cfg.timeoutMs }));
+  const prices = cfg.prices ?? (await fetchPrices({ timeoutMs: cfg.timeoutMs, horizonUrl: cfg.horizonUrl }));
 
   const req = (s: Asset, b: Asset, amt: Stroops): QuoteRequest => ({
     sellAsset: s,

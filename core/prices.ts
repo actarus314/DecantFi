@@ -17,14 +17,19 @@ export type Fetcher = typeof fetch;
 // DefiLlama agrege les prix CoinGecko en un appel keyless. eurcUsd = prix USD de l'EURC (euro-coin).
 const LLAMA = 'https://coins.llama.fi/prices/current/coingecko:blend,coingecko:stellar,coingecko:euro-coin';
 
-// Carnet EURC/USDC sur le SDEX Stellar (1 niveau de profondeur suffit pour le mid).
-const HORIZON_ORDER_BOOK =
-  'https://horizon.stellar.org/order_book' +
-  '?selling_asset_type=credit_alphanum4&selling_asset_code=EURC' +
-  '&selling_asset_issuer=GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2' +
-  '&buying_asset_type=credit_alphanum4&buying_asset_code=USDC' +
-  '&buying_asset_issuer=GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN' +
-  '&limit=1';
+// Default Horizon base URL. Overridable via horizonUrl parameter (respects STELLAR_HORIZON_URL).
+const DEFAULT_HORIZON = 'https://horizon.stellar.org';
+
+// Build the EURC/USDC order-book URL from a given Horizon base URL.
+function horizonOrderBookUrl(horizonBase: string): string {
+  const base = horizonBase.replace(/\/$/, '');
+  return base + '/order_book' +
+    '?selling_asset_type=credit_alphanum4&selling_asset_code=EURC' +
+    '&selling_asset_issuer=GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2' +
+    '&buying_asset_type=credit_alphanum4&buying_asset_code=USDC' +
+    '&buying_asset_issuer=GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN' +
+    '&limit=1';
+}
 
 interface LlamaCoin {
   price?: number;
@@ -42,9 +47,11 @@ interface OrderBookResponse {
 export async function fetchEurcStellarMid(
   fetcher: Fetcher,
   timeoutMs: number,
+  horizonUrl?: string,
 ): Promise<number | null> {
   try {
-    const res = await fetcher(HORIZON_ORDER_BOOK, { signal: AbortSignal.timeout(timeoutMs) });
+    const url = horizonOrderBookUrl(horizonUrl ?? DEFAULT_HORIZON);
+    const res = await fetcher(url, { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) return null;
     const ob = (await res.json()) as OrderBookResponse;
     const bidPrice = ob.bids?.[0]?.price;
@@ -63,7 +70,7 @@ export async function fetchEurcStellarMid(
 }
 
 /** Recupere blndUsd, xlmUsd et eurcUsd en un appel DefiLlama + mid carnet Stellar. Best-effort, chaque champ peut etre null. */
-export async function fetchPrices(opts: { fetcher?: Fetcher; timeoutMs?: number } = {}): Promise<Prices> {
+export async function fetchPrices(opts: { fetcher?: Fetcher; timeoutMs?: number; horizonUrl?: string } = {}): Promise<Prices> {
   const fetcher = opts.fetcher ?? fetch;
   const timeoutMs = opts.timeoutMs ?? 8000;
   const empty: Prices = { blndUsd: null, xlmUsd: null, eurcUsd: null, eurcStellarMid: null };
@@ -77,7 +84,7 @@ export async function fetchPrices(opts: { fetcher?: Fetcher; timeoutMs?: number 
       eurcUsd: num(c['coingecko:euro-coin']?.price),
     };
     // Fetch mid carnet Stellar en parallèle (best-effort, try/catch séparé)
-    const eurcStellarMid = await fetchEurcStellarMid(fetcher, timeoutMs).catch(() => null);
+    const eurcStellarMid = await fetchEurcStellarMid(fetcher, timeoutMs, opts.horizonUrl).catch(() => null);
     return { ...llamaPrices, eurcStellarMid };
   } catch {
     return empty;

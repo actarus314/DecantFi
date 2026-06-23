@@ -102,6 +102,58 @@ describe('fetchEurcStellarMid', () => {
   });
 });
 
+describe('fetchPrices — horizonUrl override', () => {
+  it('uses custom horizonUrl for order-book request', async () => {
+    const capturedUrls: string[] = [];
+    const capturingFetch: typeof fetch = (async (url: string) => {
+      capturedUrls.push(url);
+      const body = String(url).includes('order_book')
+        ? orderBook('1.14', '1.16')
+        : llama(0.05, 0.11, 1.08);
+      return { ok: true, json: async () => body } as Response;
+    }) as unknown as typeof fetch;
+
+    await fetchPrices({ fetcher: capturingFetch, horizonUrl: 'https://custom-horizon.example.com' });
+
+    const orderBookCall = capturedUrls.find((u) => u.includes('order_book'));
+    expect(orderBookCall).toBeDefined();
+    expect(orderBookCall).toContain('custom-horizon.example.com');
+    expect(orderBookCall).not.toContain('horizon.stellar.org');
+  });
+
+  it('uses default horizon.stellar.org when horizonUrl is omitted', async () => {
+    const capturedUrls: string[] = [];
+    const capturingFetch: typeof fetch = (async (url: string) => {
+      capturedUrls.push(url);
+      const body = String(url).includes('order_book')
+        ? orderBook('1.14', '1.16')
+        : llama(0.05, 0.11, 1.08);
+      return { ok: true, json: async () => body } as Response;
+    }) as unknown as typeof fetch;
+
+    await fetchPrices({ fetcher: capturingFetch });
+
+    const orderBookCall = capturedUrls.find((u) => u.includes('order_book'));
+    expect(orderBookCall).toBeDefined();
+    expect(orderBookCall).toContain('horizon.stellar.org');
+  });
+});
+
+describe('fetchEurcStellarMid — horizonUrl override', () => {
+  it('uses custom horizonUrl for order-book request', async () => {
+    let capturedUrl = '';
+    const capturingFetch: typeof fetch = (async (url: string) => {
+      capturedUrl = url;
+      return { ok: true, json: async () => orderBook('1.14', '1.16') } as Response;
+    }) as unknown as typeof fetch;
+
+    await fetchEurcStellarMid(capturingFetch, 5000, 'https://my-horizon.example.com');
+
+    expect(capturedUrl).toContain('my-horizon.example.com');
+    expect(capturedUrl).not.toContain('horizon.stellar.org');
+  });
+});
+
 describe('targetEvmPerUnit', () => {
   it('USDC = 1', () =>
     expect(targetEvmPerUnit('USDC', { blndUsd: null, xlmUsd: null, eurcUsd: 1.1, eurcStellarMid: 1.09 })).toBe(1));

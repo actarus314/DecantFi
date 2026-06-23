@@ -16,7 +16,7 @@ export interface TickDeps {
   probes: Probe[];
   cfg: CollectorConfig;
   now: () => Date;
-  fetchPrices: (opts: { timeoutMs?: number }) => Promise<Prices>;
+  fetchPrices: (opts: { timeoutMs?: number; horizonUrl?: string }) => Promise<Prices>;
   quote: (opts: QuoteOptions) => Promise<QuoteResult>;
   /** Injection de fakes pour les sims Aquarius/xBull (tests uniquement). */
   resimDeps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet };
@@ -99,7 +99,7 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
   } catch { /* repli silencieux : rpcUrl par défaut */ }
   const rpcUrl = sel.chosen || deps.cfg.rpcUrl;
 
-  const prices = await deps.fetchPrices({ timeoutMs: deps.cfg.timeoutMs });
+  const prices = await deps.fetchPrices({ timeoutMs: deps.cfg.timeoutMs, horizonUrl: deps.cfg.horizonUrl });
 
   const sourceCfg: EngineConfig = {
     rpcUrl, horizonUrl: deps.cfg.horizonUrl,
