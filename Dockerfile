@@ -23,6 +23,8 @@ RUN npm prune --omit=dev
 FROM node:26-alpine@sha256:a2dc166a387cc6ca1e62d0c8e265e49ca985d6e60abc9fe6e6c3d6ce8e63f606 AS runtime
 ARG REV
 ENV APP_REV=${REV:-dev}
+ARG APP_VERSION
+ENV APP_VERSION=${APP_VERSION:-dev}
 WORKDIR /app
 ENV NODE_ENV=production
 ENV SQLITE_TMPDIR=/tmp

@@ -66,11 +66,12 @@ function sendStatic(
 
 // --- Assets statiques pré-compilés au boot ---
 
-// B10 : inliner APP_REV dans le HTML (supprime le round-trip /version.js)
+// B10 : inline APP_REV and APP_VERSION into the HTML (removes the /version.js round-trip)
 const rev = (process.env.APP_REV || 'dev').replace(/[^\w.-]/g, '');
+const appVersion = (process.env.APP_VERSION || 'dev').replace(/[^\w.-]/g, '');
 const htmlPath = fileURLToPath(new URL('./public/index.html', import.meta.url));
 const htmlStr = readFileSync(htmlPath, 'utf-8')
-  .replace('<script src="/version.js" onerror="void 0"></script>', `<script>window.__REV=${JSON.stringify(rev)};</script>`);
+  .replace('<script src="/version.js" onerror="void 0"></script>', `<script>window.__REV=${JSON.stringify(rev)};window.__VERSION=${JSON.stringify(appVersion)};</script>`);
 const htmlAsset = staticAsset(Buffer.from(htmlStr), 'text/html; charset=utf-8');
 
 // B8 : lire en Buffer (pas utf-8)

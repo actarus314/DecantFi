@@ -1,7 +1,7 @@
 name: decantfi
 services:
   collector:
-    image: ghcr.io/${IMAGE_OWNER:-actarus314}/decantfi-collector:${IMAGE_TAG:-latest}
+    image: ghcr.io/actarus314/decantfi-collector:${IMAGE_TAG}
     build:
       context: .
       args:
@@ -16,7 +16,7 @@ services:
     pids_limit: 256
     mem_limit: 512m
     volumes:
-      - ${DECANTFI_DATA:-./data}:/app/data
+      - ${DECANTFI_DATA}:/app/data
     env_file: .env
     environment:
       - COLLECTOR_DB_PATH=/app/data/quotes.db
@@ -27,11 +27,11 @@ services:
       interval: 60s
       timeout: 5s
       retries: 3
-      start_period: 1000s   # > cadence par défaut (900s) : couvre le 1er intervalle ; + heartbeat de boot
-    # backend pur : AUCUN bloc ports (n'expose rien).
+      start_period: 1000s   # > default cadence (900s): covers the first interval + boot heartbeat
+    # pure backend: NO ports block (exposes nothing).
 
   web:
-    image: ghcr.io/${IMAGE_OWNER:-actarus314}/decantfi-collector:${IMAGE_TAG:-latest}
+    image: ghcr.io/actarus314/decantfi-collector:${IMAGE_TAG}
     build:
       context: .
       args:
@@ -47,9 +47,9 @@ services:
     pids_limit: 256
     mem_limit: 256m
     ports:
-      - "${WEB_HOST_PORT:-8080}:8080"   # NUC = 8080 ; surchargeable (port hôte occupé en dev)
+      - "${WEB_HOST_PORT}:8080"   # published host port; the container always listens on 8080
     volumes:
-      - ${DECANTFI_DATA:-./data}:/app/data
+      - ${DECANTFI_DATA}:/app/data
     env_file: .env
     environment:
       - COLLECTOR_DB_PATH=/app/data/quotes.db
