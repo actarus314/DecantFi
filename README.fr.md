@@ -122,7 +122,6 @@ Puis ouvrez **http://localhost:8080**.
 | `DECANTFI_DATA` | Répertoire hôte pour la base de données SQLite (défaut `./data` ; ex. `/docker/decantfi/backend/data` sur un serveur). |
 | `SOROSWAP_API_KEY` | Optionnel ; utilisé uniquement par le chemin d'**exécution** pour construire les transactions Soroswap. La cotation est keyless. |
 | `STELLAR_RPC_URL` / `STELLAR_HORIZON_URL` | Remplacent les endpoints publics par défaut (un RPC dédié est recommandé sous charge). |
-| `IMAGE_OWNER` | Propriétaire de l'image GHCR (défaut `actarus314` ; définissez votre compte si vous forkez et publiez). |
 | `COLLECTOR_CADENCE_SEC` · `COLLECTOR_SIZES_BLND` · `COLLECTOR_PAIRS` | Cadence du collecteur (défaut 900 s), tailles de sonde (`250,750`), paires (`USDC,EURC`). |
 | `IMAGE_TAG` | Version d'image à déployer ; épingler une version précise en prod, jamais `latest`. |
 | `STELLAR_RPC_URL_FALLBACK` | Endpoint RPC de repli pour le failover (basculé au prochain tick si le primaire échoue). |

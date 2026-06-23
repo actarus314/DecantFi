@@ -1,6 +1,11 @@
-# node:24-slim (linux/amd64 + linux/arm64), index multi-arch OCI, pinné 2026-06-22 — Dependabot met à jour
-FROM node:26-slim@sha256:191ef878ecb351d68b78219593de18bd8942afd59af59f29960dc4b24805a3f1 AS build
+# node:26-alpine (linux/amd64 + linux/arm64), multi-arch OCI index, pinned 2026-06-23 — Dependabot updates.
+# Alpine over -slim saves ~96 MB (~28%); the image floor is the node binary + stellar-sdk prod deps.
+FROM node:26-alpine@sha256:a2dc166a387cc6ca1e62d0c8e265e49ca985d6e60abc9fe6e6c3d6ce8e63f606 AS build
 WORKDIR /app
+# Build-only native toolchain: a transitive devDep (trezor -> usb, via @creit.tech/stellar-wallets-kit,
+# used only to pre-build the committed walletkit.js) needs libusb/eudev to compile under musl.
+# None of this is carried into the runtime stage.
+RUN apk add --no-cache python3 make g++ linux-headers eudev-dev libusb-dev
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.build.json ./
@@ -10,16 +15,22 @@ COPY db ./db
 COPY cli ./cli
 COPY web ./web
 RUN npm run build
+# Drop devDeps (incl. the native usb chain). Prod deps are effectively pure-JS under musl:
+# the optional sodium-native addon ships no musl prebuild, so stellar-base falls back to
+# tweetnacl — fine here, signing happens wallet-side, never server-side.
+RUN npm prune --omit=dev
 
-FROM node:26-slim@sha256:191ef878ecb351d68b78219593de18bd8942afd59af59f29960dc4b24805a3f1 AS runtime
+FROM node:26-alpine@sha256:a2dc166a387cc6ca1e62d0c8e265e49ca985d6e60abc9fe6e6c3d6ce8e63f606 AS runtime
 ARG REV
 ENV APP_REV=${REV:-dev}
 WORKDIR /app
 ENV NODE_ENV=production
 ENV SQLITE_TMPDIR=/tmp
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+# Copy the pruned prod node_modules from build (runtime has no toolchain; no native addon
+# loads under musl — stellar-base uses its tweetnacl fallback).
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY web/public ./dist/web/public
-# root:root (philosophie standard §14) ; durcissement via directives compose.
+COPY package.json ./
+# root:root (standard §14) ; hardening via compose directives (cap_drop, read_only, tmpfs).
 CMD ["node", "dist/collector/daemon.js"]
