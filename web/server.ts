@@ -71,7 +71,7 @@ const rev = (process.env.APP_REV || 'dev').replace(/[^\w.-]/g, '');
 const appVersion = (process.env.APP_VERSION || 'dev').replace(/[^\w.-]/g, '');
 const htmlPath = fileURLToPath(new URL('./public/index.html', import.meta.url));
 const htmlStr = readFileSync(htmlPath, 'utf-8')
-  .replace('<script src="/version.js" onerror="void 0"></script>', `<meta name="app-rev" content="${rev}"><meta name="app-version" content="${appVersion}">`);
+  .replace('<!--version-meta-->', `<meta name="app-rev" content="${rev}"><meta name="app-version" content="${appVersion}">`);
 const htmlAsset = staticAsset(Buffer.from(htmlStr), 'text/html; charset=utf-8');
 
 // B8 : lire en Buffer (pas utf-8)
