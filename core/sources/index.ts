@@ -15,9 +15,9 @@ export const ADAPTERS: SourceAdapter[] = [
   aquarius,
   comet,
   ultrastellar,
-  // stellarbroker — DISCONNECTED 2026-06-22: keyless endpoint is Cloudflare-rate-limited / IP-blocked
-  // under collector polling (sustained 4xx). Re-enable via the key-based path once STELLARBROKER_API_KEY
-  // is wired — see TODO in stellarbroker.ts.
+  // stellarbroker — WS-authenticated (cfg.stellarBrokerApiKey required; available() gates activation).
+  // Classified on the estimate; floor (directTrade.buying) exposed in UI. Non-executable (quote-only).
+  stellarbroker,
   horizon,
   // phoenix — NOT ACTIVE: Phoenix has no BLND pool on mainnet, so it's inert for DecantFi's
   // current BLND→USDC/EURC pairs (supports() returns false → never quoted, no Stability-page noise).

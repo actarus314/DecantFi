@@ -110,7 +110,7 @@ function buildTestDb(): void {
             const src = sources[i]!;
             const netOut = netOutFor(sonde, i, quality, blndUsd);
             const isWinner = i === 0;
-            const netConf = src === 'stellarbroker' ? 'floor' : src === 'horizon' ? 'estimate' : 'exact';
+            const netConf = src === 'stellarbroker' ? 'estimate' : src === 'horizon' ? 'estimate' : 'exact';
             const eurcPath = (pairUi === 'EURC' && src === 'xbull') ? 'via-usdc' : null;
 
             quotes.push({

@@ -51,6 +51,8 @@ const STRINGS = {
     sim_btn_clear: 'Vider',
     sim_loading: 'Cotation en cours…',
     sim_min: (u) => `Reçu min (${u})`,
+    sb_floor_label: (u) => `Reçu réel - route directe (${u})`,
+    sb_floor_note: 'L\'estimate est atteignable uniquement via l\'exécution StellarBroker. En routant vous-même : ≈ ce plancher.',
 
     // Tableau ladder
     ladder_col_tool: 'Outil de swap',
@@ -309,6 +311,8 @@ const STRINGS = {
     sim_btn_clear: 'Clear',
     sim_loading: 'Fetching quote…',
     sim_min: (u) => `Min received (${u})`,
+    sb_floor_label: (u) => `Actual received - direct route (${u})`,
+    sb_floor_note: 'Estimate reachable only via StellarBroker\'s own execution. Routing yourself: ≈ this floor.',
 
     // Tableau ladder
     ladder_col_tool: 'Swap tool',
@@ -567,6 +571,8 @@ const STRINGS = {
     sim_btn_clear: 'Limpiar',
     sim_loading: 'Obteniendo cotización…',
     sim_min: (u) => `Mínimo recibido (${u})`,
+    sb_floor_label: (u) => `Recibido real - ruta directa (${u})`,
+    sb_floor_note: 'La estimación es alcanzable solo mediante la ejecución de StellarBroker. Enrutando tú mismo: ≈ este mínimo.',
 
     // Tableau ladder
     ladder_col_tool: 'Herramienta de swap',
@@ -814,6 +820,8 @@ const STRINGS = {
     sim_btn_clear: 'Limpar',
     sim_loading: 'Buscando cotação…',
     sim_min: (u) => `Mínimo recebido (${u})`,
+    sb_floor_label: (u) => `Recebido real - rota direta (${u})`,
+    sb_floor_note: 'A estimativa é alcançável apenas via execução do StellarBroker. Roteando você mesmo: ≈ este piso.',
     ladder_col_tool: 'Ferramenta de swap',
     ladder_col_net: (u) => `${u}`,
     ladder_col_delta: 'Δ vencedor',
@@ -1484,7 +1492,13 @@ function simCard() {
       { const v = getImpactVal(b); impactMeta = v != null ? ` · impact ${fmt(v)} %` : ''; }
       minReceived = b.net * (1 - execSlippagePct / 100);
     }
-    const minStr = `<span style="color:var(--caption)">${t('sim_min', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(minReceived)} ${target}</span>`;
+    // For StellarBroker: show the floor (directTrade.buying = guaranteed minimum from own route)
+    // instead of the slippage-derived min (which would be doubly optimistic on top of an estimate).
+    const activeRow = displayRow || winRow;
+    const sbFloor = activeRow && activeRow.sourceId === 'stellarbroker' && activeRow.floor != null ? activeRow.floor : null;
+    const minStr = sbFloor != null
+      ? `<span style="color:var(--caption)">${t('sb_floor_label', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(sbFloor)} ${target}</span><br><span style="color:var(--caption);font-size:.78em">${t('sb_floor_note')}</span>`
+      : `<span style="color:var(--caption)">${t('sim_min', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(minReceived)} ${target}</span>`;
     // Nom de l'outil retiré ici : il est désormais porté par le bouton « Exécuter via [outil] ».
     const legsData = (displayRow || b).legs;
     const routeDiv = legsData

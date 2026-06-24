@@ -48,6 +48,8 @@ export interface LiveLadderRow {
   executable: boolean;
   /** Legs du composite EURC via-USDC (2 transactions). Absent pour les routes atomiques. */
   legs?: CompositeLeg[];
+  /** Floor (direct route guaranteed minimum) in target asset units. StellarBroker only; from netRange.low. */
+  floor?: number;
 }
 
 /** Normalise les symboles d'actifs : 'native' → 'XLM', tout le reste inchangé. */
@@ -407,7 +409,7 @@ export async function liveQuote(
   // Échelle complète : ranking direct + (EURC) ligne composite via-USDC, triée par net.
   // Le composite est TOUJOURS listé quand il existe (comme le stockage collecteur) → le tableau
   // colle au simulateur (le gagnant peut être le composite, pas le meilleur direct).
-  const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; hops: RouteHop[] | null; eurcPath: string | null; impactPct: number | null; impactLocalPct: number | null; legs?: CompositeLeg[] }> =
+  const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; hops: RouteHop[] | null; eurcPath: string | null; impactPct: number | null; impactLocalPct: number | null; legs?: CompositeLeg[]; floor?: number }> =
     result.ranking.ranked.map((rq) => ({
       source: rq.source,
       netOut: rq.netOut,
@@ -417,6 +419,7 @@ export async function liveQuote(
       eurcPath: null,
       impactPct: rq.priceImpactPct ?? null,
       impactLocalPct: rq.priceImpactLocalPct ?? null,
+      floor: rq.netRange?.low !== undefined ? toNumber(rq.netRange.low) : undefined,
     }));
 
   // Legs du composite EURC via-USDC (calculés une seule fois, réutilisés pour best et ladder)
@@ -473,6 +476,7 @@ export async function liveQuote(
     // (sinon un clic exécuterait un swap direct 1-leg ≠ les 2 tx revues). Seules les venues simples le sont.
     executable: !r.source.includes('+') && ['xbull', 'soroswap', 'horizon', 'aquarius', 'comet', 'ultrastellar'].includes(r.source.trim()),
     legs: r.legs,
+    floor: r.floor,
   }));
 
   return {
