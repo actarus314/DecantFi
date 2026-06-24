@@ -2,6 +2,7 @@
 // Routes : GET / · GET /api/overview · GET /api/quote · GET /api/balance
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { clientIp, apiAllowed } from './request-ip.js';
+import { accessLine } from './access-log.js';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
@@ -246,7 +247,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   const rawUrl = req.url ?? '/';
   const path = rawUrl.split('?')[0] ?? '/';
 
-  process.stderr.write(`${new Date().toISOString()} ${req.method} ${path}\n`);
+  // Emit one nginx COMBINED line to stdout on response finish (GoAccess-parseable).
+  // Registered before rpcAls.run so it fires for every status (200/304/400/403/404/429/500).
+  res.on('finish', () => {
+    process.stdout.write(accessLine(req, res, path));
+  });
 
   // Wrap in ALS so inc()/read() are isolated per concurrent request (fix #3).
   return rpcAls.run({ n: 0 }, async () => {
