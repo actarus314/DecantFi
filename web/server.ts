@@ -2,7 +2,7 @@
 // Routes : GET / · GET /api/overview · GET /api/quote · GET /api/balance
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { clientIp, apiAllowed } from './request-ip.js';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
@@ -101,6 +101,20 @@ const robotsTxtAsset = staticAsset(
   'text/plain; charset=utf-8',
 );
 
+// Wallet icons: precompile all .png files from web/public/wallet-icons/ at boot.
+// Generic: any icon produced by build:walletkit is served automatically.
+const walletIconsMap = new Map<string, ReturnType<typeof staticAsset>>();
+const walletIconsDir = new URL('./public/wallet-icons/', import.meta.url);
+try {
+  for (const name of readdirSync(fileURLToPath(walletIconsDir))) {
+    if (!name.endsWith('.png')) continue;
+    const buf = readFileSync(fileURLToPath(new URL(name, walletIconsDir)));
+    walletIconsMap.set(name, staticAsset(buf, 'image/png'));
+  }
+} catch {
+  // Directory missing (fresh checkout before build:walletkit) — serve 404 for icon requests.
+}
+
 // --- Cache mémoire TTL pour /api/overview (B3) ---
 
 // ponytail: Map keyed by `${pair}|${offsetH}`; bounded by validated inputs
@@ -141,7 +155,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://stellar.creit.tech; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
 };
 
 // C4 — Redaction de l'URL RPC (protocol+host uniquement, sans le path qui peut contenir une clé API)
@@ -272,6 +286,19 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (req.method === 'GET' && path === '/robots.txt') {
       sendStatic(req, res, robotsTxtAsset, 'public, max-age=86400');
       return;
+    }
+
+    if (req.method === 'GET' && path.startsWith('/wallet-icons/')) {
+      const name = path.slice('/wallet-icons/'.length);
+      // Validate: only safe filename characters, must end with .png (map lookup is path-traversal-safe)
+      if (/^[A-Za-z0-9._-]+\.png$/.test(name)) {
+        const icon = walletIconsMap.get(name);
+        if (icon) {
+          sendStatic(req, res, icon, 'public, max-age=86400', { 'X-Content-Type-Options': 'nosniff' });
+          return;
+        }
+      }
+      // Fall through to 404
     }
 
     if (req.method === 'GET' && path === '/api/health') {
