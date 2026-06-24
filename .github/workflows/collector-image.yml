@@ -10,6 +10,7 @@ permissions: {}
 
 jobs:
   test:
+    if: github.event_name == 'pull_request'   # gates the merge; tags trust it (no re-run on publish)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -23,6 +24,7 @@ jobs:
       - run: npm run typecheck
 
   security:
+    if: github.event_name == 'pull_request'   # gates the merge; tags trust it (no re-run on publish)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -61,11 +63,10 @@ jobs:
           cache-to: type=gha,mode=max
 
   build-push:
-    needs: [test, security]
     # tag v* only → publishes :X.Y.Z + :latest (frozen release). PRs validate the build via build-check
-    # (no publish; GHCR login is impossible from a fork). No :edge image: nothing consumes it, and dropping
-    # the main-push run removes a redundant test/security pass per release (PR gates the merge, the tag gates
-    # the publish). Prod discipline unchanged: pin a version, never :latest.
+    # (no publish; GHCR login is impossible from a fork). test+security run on the PR (the merge gate) and
+    # are NOT re-run here: the tag trusts that gate (no duplicate pass per release). Discipline — only ever
+    # tag a merged, PR-validated commit; a tag on unvalidated code would publish untested. Pin a version, never :latest.
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
