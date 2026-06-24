@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-06-24
+
+### Added
+- StellarBroker re-enabled as a quote source via its **authenticated WebSocket**
+  (`wss://api.stellar.broker/ws?partner=<key>`). The API key is WS-only — the keyless REST
+  endpoint remains Cloudflare-rate-limited. Quotes are classed on the estimate
+  (`estimatedBuyingAmount`) with the realizable SDEX floor shown in the quote detail, since
+  StellarBroker's best price is only reachable through its own execution layer.
+- **"Execute floor (SDEX)"** action on the StellarBroker row: runs the full execution flow
+  at the realizable floor (a Horizon-equivalent strict-send), because routing it yourself
+  yields approximately the floor, not the estimate.
+
+### Fixed
+- Collector now forwards the StellarBroker API key per tick, so StellarBroker is collected
+  automatically — not only in manual/live quotes.
+- StellarBroker's identity card now shows its fee (opaque, per-partner) and simulation
+  status (off-chain RFQ, not on-chain simulated); its note no longer says "classed on the
+  floor."
+
+### Changed
+- Release CI builds and publishes images only on version tags (`:X.Y.Z` + `:latest`); the
+  unused `:edge` image and the redundant main-push test run were removed.
+
 ## [0.2.4] - 2026-06-24
 
 ### Added
@@ -106,7 +129,8 @@ Initial public release.
 - Custom zero-dependency Sankey route visualization and a 4-language UI (English, French,
   Spanish, Brazilian Portuguese).
 
-[Unreleased]: https://github.com/actarus314/DecantFi/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/actarus314/DecantFi/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/actarus314/DecantFi/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/actarus314/DecantFi/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/actarus314/DecantFi/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/actarus314/DecantFi/compare/v0.2.1...v0.2.2

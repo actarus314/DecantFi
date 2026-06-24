@@ -95,7 +95,7 @@ Gérer les swaps de tierces personnes est une position de confiance, et le proje
 
 Interrogées en parallèle, tolérantes aux pannes : **xBull**, **Aquarius**, **Soroswap** (keyless, via le `soroswap-router-sdk` local), **Ultra Stellar** (StellarTerm), **Horizon** strict-send (un plancher fiable), et une sonde directe de la pool **Comet** (BLND/USDC).
 
-> **StellarBroker** est actuellement **déconnecté** : son endpoint keyless est soumis à un rate-limiting sous interrogation automatique répétée. Il reviendra via une intégration authentifiée par clé — voir la [FAQ](FAQ.fr.md).
+> **StellarBroker** est désormais intégré via son **WebSocket authentifié par clé**. Les cotes sont classées sur l'estimation, avec le plancher SDEX réalisable affiché dans le détail — le meilleur prix de StellarBroker n'est atteignable qu'à travers sa propre couche d'exécution. Voir la [FAQ](FAQ.fr.md).
 
 ## Installation — auto-hébergement avec Docker
 

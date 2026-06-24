@@ -95,7 +95,7 @@ Production `npm audit --omit=dev` is **clean**. See the [FAQ](FAQ.md) for the th
 
 Queried in parallel, fault-tolerant: **xBull**, **Aquarius**, **Soroswap** (keyless, via the local `soroswap-router-sdk`), **Ultra Stellar** (StellarTerm), **Horizon** strict-send (a reliable floor), and a direct **Comet** pool probe (BLND/USDC).
 
-> **StellarBroker** is currently **disconnected**: its keyless endpoint is rate-limited under automated polling. It will return through an authenticated, key-based integration — see the [FAQ](FAQ.md).
+> **StellarBroker** is now integrated via its **authenticated key-based WebSocket**. Quotes are classed on the estimate, with the realizable SDEX floor shown in the detail — StellarBroker's best price is only achievable through its own execution layer. See the [FAQ](FAQ.md).
 
 ## Install — self-host with Docker
 
