@@ -1,6 +1,7 @@
 // Serveur HTTP web — node:http (stdlib, pas d'Express).
 // Routes : GET / · GET /api/overview · GET /api/quote · GET /api/balance
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { clientIp } from './request-ip.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
@@ -107,6 +108,7 @@ function json(res: ServerResponse, req: IncomingMessage, status: number, data: u
     'Content-Type': 'application/json',
     'Cache-Control': 'no-store',
     'Vary': 'Accept-Encoding',
+    'X-Content-Type-Options': 'nosniff',
   };
   let out = body;
   let enc: string | undefined;
@@ -168,9 +170,14 @@ function parseQuery(url: string): Record<string, string> {
   for (const part of qs.split('&')) {
     const eq = part.indexOf('=');
     if (eq === -1) continue;
-    const k = decodeURIComponent(part.slice(0, eq));
-    const v = decodeURIComponent(part.slice(eq + 1));
-    params[k] = v;
+    try {
+      const k = decodeURIComponent(part.slice(0, eq));
+      const v = decodeURIComponent(part.slice(eq + 1));
+      params[k] = v;
+    } catch {
+      // Malformed percent-encoding (%GG etc.) — skip param, return a 400 later if required.
+      continue;
+    }
   }
   return params;
 }
@@ -198,14 +205,13 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   const rawUrl = req.url ?? '/';
   const path = rawUrl.split('?')[0] ?? '/';
 
-  process.stderr.write(`${new Date().toISOString()} ${req.method} ${rawUrl}\n`);
+  process.stderr.write(`${new Date().toISOString()} ${req.method} ${path}\n`);
 
   // Wrap in ALS so inc()/read() are isolated per concurrent request (fix #3).
   return rpcAls.run({ n: 0 }, async () => {
   try {
-    // parseQuery uses decodeURIComponent which throws URIError on malformed URLs
-    // (e.g. ?pair=%GG). Keeping it inside try ensures the catch block sends a 500
-    // instead of leaving the request unanswered and crashing under --unhandled-rejections=throw.
+    // parseQuery skips malformed percent-encoded params (e.g. ?pair=%GG) via try/catch;
+    // the handler then returns 400 if a required param is absent or invalid.
     const query = parseQuery(rawUrl);
     if (req.method === 'GET' && path === '/') {
       sendStatic(req, res, htmlAsset, 'no-cache', SECURITY_HEADERS);
@@ -298,7 +304,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     if (req.method === 'GET' && path === '/api/quote') {
-      const ip = req.socket.remoteAddress ?? 'unknown';
+      const ip = clientIp(req);
       if (rateLimited(ip, 120, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const pairRaw = query['pair'] ?? 'USDC';
       const pair = parsePair(pairRaw);
@@ -352,6 +358,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     if (req.method === 'GET' && path === '/api/balance') {
+      const ip = clientIp(req);
+      if (rateLimited(ip, 60, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const address = query['address'];
       if (address !== undefined) {
         if (!isStellarPubkey(address)) { json(res, req, 400, { error: 'adresse invalide' }); return; }
@@ -365,6 +373,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     if (req.method === 'GET' && path === '/api/asset-balance') {
+      const ip = clientIp(req);
+      if (rateLimited(ip, 60, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const address = query['address'];
       if (!isStellarPubkey(address)) { json(res, req, 400, { error: 'adresse invalide' }); return; }
       const assetKey = query['asset'];
@@ -400,7 +410,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     if (req.method === 'POST' && path === '/api/build') {
-      const ip = req.socket.remoteAddress ?? 'unknown';
+      const ip = clientIp(req);
       if (rateLimited(ip, 30, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
@@ -439,6 +449,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     if (req.method === 'POST' && path === '/api/build-trustline') {
+      const ip = clientIp(req);
+      if (rateLimited(ip, 10, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       const pair = parsePair(typeof b.pair === 'string' ? b.pair : null);
@@ -455,6 +467,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     if (req.method === 'POST' && path === '/api/submit') {
+      const ip = clientIp(req);
+      if (rateLimited(ip, 10, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       if (!isVenue(b.venue)) { json(res, req, 400, { error: 'venue invalide' }); return; }
@@ -471,7 +485,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     if (req.method === 'GET' && path === '/api/tx-status') {
-      const ip = req.socket.remoteAddress ?? 'unknown';
+      const ip = clientIp(req);
       if (rateLimited(ip, 90, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const venue = query['venue'];
       if (venue !== 'aquarius' && venue !== 'comet') { json(res, req, 400, { error: 'venue invalide (tx-status réservé aux venues Soroban)' }); return; }
@@ -500,9 +514,10 @@ const server = createServer((req, res) => {
   void handle(req, res);
 });
 
-// B7 — keep-alive
+// B7 — keep-alive + slowloris guard
 server.keepAliveTimeout = 30_000;
 server.headersTimeout = 35_000;
+server.requestTimeout = 30_000; // abort slow body uploads (anti-slowloris)
 
 server.listen(cfg.port, '0.0.0.0', () => {
   process.stderr.write(`DecantFi web · http://0.0.0.0:${cfg.port} · DB=${cfg.dbPath}\n`);
