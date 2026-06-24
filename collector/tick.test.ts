@@ -51,6 +51,16 @@ describe('runTick (USDC)', () => {
     expect(tick.blnd_usd).toBeNull();
     expect(tick.ok).toBe(true);
   });
+
+  it('forwards stellarBrokerApiKey to the engine cfg (collector/web parity)', async () => {
+    let seenCfg: any = null;
+    const captureQuote = async (o: any) => { seenCfg = o.cfg; return usdcResult(o.amountIn); };
+    await runTick({
+      probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
+      cfg: cfg({ stellarBrokerApiKey: 'sb-test-key' }), now, fetchPrices: async () => prices, quote: captureQuote, selectRpc: fakeSelectRpc,
+    });
+    expect(seenCfg?.stellarBrokerApiKey).toBe('sb-test-key');
+  });
 });
 
 describe('runTick (EURC)', () => {
