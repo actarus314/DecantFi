@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-06-25
+
+### Security
+- **Anti-scraping guard on `/api/*`**: every request must come from a same-origin browser
+  context (`Sec-Fetch-Site`) or a loopback caller (the Docker healthcheck); direct programmatic
+  access (curl, scripts, scrapers, AI crawlers) is rejected with 403. The public dashboard is
+  unaffected. Added `robots.txt` (`Disallow: /api/`).
+- **Wallet-connect icons are now self-hosted** instead of fetched from a third-party origin at
+  runtime; CSP `img-src` tightened to `'self' data:`. The bundle build vendors and rewrites the
+  icon URLs automatically on every rebuild (adapts to new wallets).
+- Added `Cross-Origin-Opener-Policy: same-origin-allow-popups`, `Cross-Origin-Resource-Policy:
+  same-origin`, and a restrictive `Permissions-Policy`.
+- A blocked request emits a `BLOCK` log line (status, reason, path, IP, user-agent) for
+  monitoring. The 403 body and `robots.txt` carry an open-source notice inviting scrapers to run
+  their own instance and reach out via a GitHub issue.
+
+### Fixed
+- `/api/overview` is now cached per `pair|tzoff` (the previous single-slot cache was busted by
+  rotating the `tzoff` parameter, forcing a DB recompute on every request).
+
+### Changed
+- Documented `STELLARBROKER_API_KEY` and `TRUST_PROXY` in `.env.example`, the README config
+  table, and the FAQ; aligned README/FAQ with the current hardening and StellarBroker (active
+  WebSocket quote source).
+- CI: `test` and `security` run on pull requests only (they gate the merge); release tags trust
+  that gate and no longer re-run the suite.
+
 ## [0.2.6] - 2026-06-24
 
 ### Security
@@ -144,7 +171,8 @@ Initial public release.
 - Custom zero-dependency Sankey route visualization and a 4-language UI (English, French,
   Spanish, Brazilian Portuguese).
 
-[Unreleased]: https://github.com/actarus314/DecantFi/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/actarus314/DecantFi/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/actarus314/DecantFi/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/actarus314/DecantFi/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/actarus314/DecantFi/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/actarus314/DecantFi/compare/v0.2.3...v0.2.4
