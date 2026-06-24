@@ -81,11 +81,11 @@ Handling other people's swaps is a position of trust, so the project treats it l
 
 ![Connect wallet — non-custodial signing](docs/img/decantfi-wallet-connect-en.png)
 
-**Hardening done before opening the source** (a focused audit pass, all on `main`):
+**Security hardening:**
 
-- **Web headers** — Content-Security-Policy, `X-Frame-Options`, `X-Content-Type-Options`, referrer policy; output-escaped on every API-fed sink.
-- **Abuse resistance** — per-IP rate-limiting on quote/build/submit endpoints, refresh cooldown, hard caps on input sizes, allow-listed assets and venues.
-- **Secret hygiene** — RPC API keys redacted from logs and the database; generic `500`s to clients with detail kept server-side; **zero secrets** in the repo (full git-history scan + `gitleaks` in CI).
+- **Web headers** — Content-Security-Policy, `X-Frame-Options`, referrer policy, and `X-Content-Type-Options: nosniff` on every response (including JSON and errors); output-escaped on every API-fed sink.
+- **Abuse resistance** — per-IP rate-limiting on every Horizon/RPC-touching endpoint (quote, build, submit, balance, asset-balance, build-trustline, tx-status), proxy-aware via the `TRUST_PROXY` knob; request-body timeout (anti-slowloris); refresh cooldown; hard caps on input sizes; allow-listed assets and venues.
+- **Secret hygiene** — RPC API keys redacted from logs and the database; generic `500`s to clients with detail kept server-side; upstream/SDK execution-error text is kept out of client responses (logged server-side only); **zero secrets** in the repo (full git-history scan + `gitleaks` in CI).
 - **Supply chain** — base image pinned by digest, GitHub Actions pinned by SHA, the one vendored browser bundle ships with a checksum and a reproducible build script, `npm audit` + `gitleaks` gate every push, Dependabot keeps dependencies current (verified, never blind-merged).
 - **Container** — multi-stage build, `--omit=dev`, `read_only` root filesystem, dropped capabilities, `no-new-privileges`.
 
@@ -121,11 +121,13 @@ Then open **http://localhost:8080**.
 |-----|---------|
 | `DECANTFI_DATA` | Host directory for the SQLite database (default `./data`; e.g. `/docker/decantfi/backend/data` on a server). |
 | `SOROSWAP_API_KEY` | Optional; only used by the **execution** path to build Soroswap transactions. Quoting is keyless. |
+| `STELLARBROKER_API_KEY` | Optional; enables **StellarBroker** as a quote source via its authenticated WebSocket. Without it StellarBroker is silently skipped. Quote-only — the source is not executable. |
 | `STELLAR_RPC_URL` / `STELLAR_HORIZON_URL` | Override the default public endpoints (a dedicated RPC is recommended under load). |
 | `COLLECTOR_CADENCE_SEC` · `COLLECTOR_SIZES_BLND` · `COLLECTOR_PAIRS` | Collector cadence (default 900 s), probe sizes (`250,750`), pairs (`USDC,EURC`). |
 | `IMAGE_TAG` | Image version to deploy; pin to a specific release in production, never use `latest`. |
 | `STELLAR_RPC_URL_FALLBACK` | Fallback RPC endpoint for failover (switched in on the next tick if the primary fails). |
 | `WEB_HOST_PORT` | Host port to publish the web UI on (the container always listens on 8080). |
+| `TRUST_PROXY` | Trust the reverse proxy's `X-Real-IP` / `X-Forwarded-For` headers for the real client IP used as the rate-limit key. **Off by default** — enable only when a trusted proxy is the sole ingress (otherwise a client could spoof the header). |
 
 **Common operations:**
 
@@ -137,7 +139,7 @@ docker compose pull && docker compose up -d   # update (if using a published ima
 git pull && docker compose build && docker compose up -d --force-recreate
 ```
 
-> **Exposing it publicly?** Put it behind a reverse proxy with TLS (Caddy / nginx) — the app speaks plain HTTP by design and ships per-IP rate-limiting; the proxy adds TLS and is the right place for any access control.
+> **Exposing it publicly?** Put it behind a reverse proxy with TLS (Caddy / nginx) — the app speaks plain HTTP by design and ships per-IP rate-limiting; the proxy adds TLS and is the right place for any access control. Behind a proxy, set `TRUST_PROXY=true` and have the proxy forward `X-Real-IP` / `X-Forwarded-For`, so the per-IP rate limits key on the real client IP instead of the proxy's — otherwise they apply globally.
 
 ## CLI (development / scripting)
 

@@ -81,11 +81,11 @@ Gérer les swaps de tierces personnes est une position de confiance, et le proje
 
 ![Connexion wallet — signature non-custodiale](docs/img/decantfi-wallet-connect-en.png)
 
-**Durcissement effectué avant l'ouverture du code source** (un audit ciblé, tout sur `main`) :
+**Durcissement sécurité :**
 
-- **En-têtes web** — Content-Security-Policy, `X-Frame-Options`, `X-Content-Type-Options`, politique de référent ; échappement en sortie sur chaque sink alimenté par l'API.
-- **Résistance aux abus** — rate-limiting par IP sur les endpoints quote/build/submit, cooldown de rafraîchissement, plafonds stricts sur les tailles d'entrée, assets et sources sur liste d'autorisation.
-- **Hygiène des secrets** — les clés API RPC sont expurgées des logs et de la base de données ; `500` génériques aux clients, détail conservé côté serveur ; **zéro secret** dans le dépôt (scan complet de l'historique git + `gitleaks` en CI).
+- **En-têtes web** — Content-Security-Policy, `X-Frame-Options`, politique de référent, et `X-Content-Type-Options: nosniff` sur chaque réponse (y compris JSON et erreurs) ; échappement en sortie sur chaque sink alimenté par l'API.
+- **Résistance aux abus** — rate-limiting par IP sur chaque endpoint touchant Horizon/RPC (quote, build, submit, balance, asset-balance, build-trustline, tx-status), compatible proxy via le knob `TRUST_PROXY` ; timeout sur le corps de requête (anti-slowloris) ; cooldown de rafraîchissement ; plafonds stricts sur les tailles d'entrée ; assets et sources sur liste d'autorisation.
+- **Hygiène des secrets** — les clés API RPC sont expurgées des logs et de la base de données ; `500` génériques aux clients, détail conservé côté serveur ; le texte d'erreur d'exécution SDK/upstream est tenu hors des réponses client (journalisé côté serveur uniquement) ; **zéro secret** dans le dépôt (scan complet de l'historique git + `gitleaks` en CI).
 - **Supply chain** — image de base épinglée par digest, GitHub Actions épinglées par SHA, le seul bundle de navigateur vendoré est livré avec une somme de contrôle et un script de build reproductible, `npm audit` + `gitleaks` bloquent chaque push, et Dependabot maintient les dépendances à jour (vérifiées, jamais fusionnées à l'aveugle).
 - **Conteneur** — build multi-étapes, `--omit=dev`, système de fichiers racine `read_only`, capabilities supprimées, `no-new-privileges`.
 
@@ -121,11 +121,13 @@ Puis ouvrez **http://localhost:8080**.
 |-----|------|
 | `DECANTFI_DATA` | Répertoire hôte pour la base de données SQLite (défaut `./data` ; ex. `/docker/decantfi/backend/data` sur un serveur). |
 | `SOROSWAP_API_KEY` | Optionnel ; utilisé uniquement par le chemin d'**exécution** pour construire les transactions Soroswap. La cotation est keyless. |
+| `STELLARBROKER_API_KEY` | Optionnel ; active **StellarBroker** comme source de cotation via son WebSocket authentifié. Sans elle, StellarBroker est silencieusement ignoré. Cotation seule — la source n'est pas exécutable. |
 | `STELLAR_RPC_URL` / `STELLAR_HORIZON_URL` | Remplacent les endpoints publics par défaut (un RPC dédié est recommandé sous charge). |
 | `COLLECTOR_CADENCE_SEC` · `COLLECTOR_SIZES_BLND` · `COLLECTOR_PAIRS` | Cadence du collecteur (défaut 900 s), tailles de sonde (`250,750`), paires (`USDC,EURC`). |
 | `IMAGE_TAG` | Version d'image à déployer ; épingler une version précise en prod, jamais `latest`. |
 | `STELLAR_RPC_URL_FALLBACK` | Endpoint RPC de repli pour le failover (basculé au prochain tick si le primaire échoue). |
 | `WEB_HOST_PORT` | Port hôte sur lequel publier l'UI web (le conteneur écoute toujours sur 8080). |
+| `TRUST_PROXY` | Fait confiance aux en-têtes `X-Real-IP` / `X-Forwarded-For` du reverse proxy pour l'IP client réelle servant de clé au rate-limiting. **Désactivé par défaut** — à n'activer que si un proxy de confiance est le seul point d'entrée (sinon un client pourrait usurper l'en-tête). |
 
 **Opérations courantes :**
 
@@ -137,7 +139,7 @@ docker compose pull && docker compose up -d   # mettre à jour (si image publié
 git pull && docker compose build && docker compose up -d --force-recreate
 ```
 
-> **Vous l'exposez publiquement ?** Mettez-le derrière un reverse proxy avec TLS (Caddy / nginx) — l'application parle HTTP simple par conception et embarque un rate-limiting par IP ; le proxy ajoute le TLS et est le bon endroit pour tout contrôle d'accès.
+> **Vous l'exposez publiquement ?** Mettez-le derrière un reverse proxy avec TLS (Caddy / nginx) — l'application parle HTTP simple par conception et embarque un rate-limiting par IP ; le proxy ajoute le TLS et est le bon endroit pour tout contrôle d'accès. Derrière un proxy, mettez `TRUST_PROXY=true` et faites transmettre `X-Real-IP` / `X-Forwarded-For` par le proxy, pour que le rate-limiting par IP se base sur l'IP client réelle et non celle du proxy — sinon il s'applique globalement.
 
 ## CLI (développement / scripts)
 

@@ -22,7 +22,7 @@ DecantFi est un outil de cotation auto-hébergé en lecture seule. Il **ne custo
 
 ### De quoi ai-je réellement besoin pour le déployer ?
 
-Pour la **cotation**, rien d'obligatoire — chaque source a un chemin keyless ou un endpoint public par défaut. Pour **exécuter** des swaps depuis l'application web, c'est votre wallet qui signe ; la seule clé optionnelle est `SOROSWAP_API_KEY` (utilisée par le chemin d'exécution pour construire les transactions Soroswap). Toutes les clés `.env` sont optionnelles et documentées dans [`.env.example`](.env.example).
+Pour la **cotation**, rien d'obligatoire — chaque source a un chemin keyless ou un endpoint public par défaut. Pour **exécuter** des swaps depuis l'application web, c'est votre wallet qui signe ; les clés optionnelles sont `SOROSWAP_API_KEY` (utilisée par le chemin d'exécution pour construire les transactions Soroswap) et `STELLARBROKER_API_KEY` (active StellarBroker comme source de cotation via son WebSocket authentifié ; sans elle, cette source est ignorée). Toutes les clés `.env` sont optionnelles et documentées dans [`.env.example`](.env.example).
 
 ### Où sont stockées mes données ?
 
@@ -34,7 +34,7 @@ Il utilise un Stellar RPC configurable (`STELLAR_RPC_URL`) avec un fallback publ
 
 ### Comment l'exposer à d'autres personnes en toute sécurité ?
 
-Mettez-le derrière un reverse proxy (Caddy ou nginx) terminant le **TLS**, et gardez l'application liée à localhost derrière lui. L'application parle HTTP simple par conception et embarque un rate-limiting par IP ; le reverse proxy ajoute le TLS et est le bon endroit pour tout contrôle d'accès supplémentaire.
+Mettez-le derrière un reverse proxy (Caddy ou nginx) terminant le **TLS**, et gardez l'application liée à localhost derrière lui. L'application parle HTTP simple par conception et embarque un rate-limiting par IP ; le reverse proxy ajoute le TLS et est le bon endroit pour tout contrôle d'accès supplémentaire. Derrière un proxy, mettez `TRUST_PROXY=true` et faites transmettre `X-Real-IP` / `X-Forwarded-For` par le proxy, pour que le rate-limiting par IP se base sur l'IP client réelle et non celle du proxy — sinon il s'applique globalement.
 
 ### Comment les dépendances sont-elles maintenues à jour ?
 

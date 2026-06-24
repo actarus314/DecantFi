@@ -22,7 +22,7 @@ DecantFi is a self-hosted, read-only quoting tool. It does **not** custody funds
 
 ### What do I actually need to deploy it?
 
-For **quoting**, nothing mandatory — every source has a keyless path or a public-endpoint default. For **executing** swaps from the web app, your wallet does the signing; the only optional key is `SOROSWAP_API_KEY` (used by the execution path to build Soroswap transactions). All `.env` keys are optional and documented in [`.env.example`](.env.example).
+For **quoting**, nothing mandatory — every source has a keyless path or a public-endpoint default. For **executing** swaps from the web app, your wallet does the signing; the optional keys are `SOROSWAP_API_KEY` (used by the execution path to build Soroswap transactions) and `STELLARBROKER_API_KEY` (enables StellarBroker as a quote source via its authenticated WebSocket; without it that source is skipped). All `.env` keys are optional and documented in [`.env.example`](.env.example).
 
 ### Where is my data stored?
 
@@ -34,7 +34,7 @@ It uses a configurable Stellar RPC (`STELLAR_RPC_URL`) with a public fallback, a
 
 ### How do I expose it to other people safely?
 
-Put it behind a reverse proxy (Caddy or nginx) terminating **TLS**, and keep the app bound to localhost behind it. The app speaks plain HTTP by design and ships per-IP rate-limiting; the reverse proxy adds TLS and is the right place for any additional access control.
+Put it behind a reverse proxy (Caddy or nginx) terminating **TLS**, and keep the app bound to localhost behind it. The app speaks plain HTTP by design and ships per-IP rate-limiting; the reverse proxy adds TLS and is the right place for any additional access control. Behind a proxy, set `TRUST_PROXY=true` and have the proxy forward `X-Real-IP` / `X-Forwarded-For`, so the per-IP rate limits key on the real client IP instead of the proxy's — otherwise they apply globally.
 
 ### How are dependencies kept up to date?
 
