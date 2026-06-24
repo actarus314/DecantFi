@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-06-24
+
+### Security
+- Hardened the public web server (generalist, safe defaults, no infra assumptions):
+  - Rate-limit previously unguarded endpoints that hit Horizon/RPC: `/api/balance` and
+    `/api/asset-balance` (60/min), `/api/build-trustline` and `/api/submit` (10/min).
+  - Opt-in `TRUST_PROXY` (default off) with spoof-safe client-IP extraction (`X-Real-IP`,
+    then the rightmost `X-Forwarded-For` element); every rate limit is keyed on the real client IP.
+  - Sanitized client-facing execution error messages — raw SDK/upstream text now goes to
+    stderr only; clients receive a static per-code message (public Horizon `result_codes` kept).
+  - `X-Content-Type-Options: nosniff` on all JSON responses.
+  - `server.requestTimeout` (anti-slowloris on the request body).
+  - Request logging drops the query string (no wallet addresses in logs).
+  - Malformed percent-encoded query parameters now return 400 instead of 500.
+
 ## [0.2.5] - 2026-06-24
 
 ### Added
@@ -129,7 +144,8 @@ Initial public release.
 - Custom zero-dependency Sankey route visualization and a 4-language UI (English, French,
   Spanish, Brazilian Portuguese).
 
-[Unreleased]: https://github.com/actarus314/DecantFi/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/actarus314/DecantFi/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/actarus314/DecantFi/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/actarus314/DecantFi/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/actarus314/DecantFi/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/actarus314/DecantFi/compare/v0.2.2...v0.2.3

@@ -90,6 +90,19 @@ export function classifyExecError(message: string): 'trustline' | 'funds' | 'sli
   return 'down';
 }
 
+/** Static client-facing message per ExecError code — never leaks upstream SDK text. */
+function safeExecMessage(code: ExecError['code']): string {
+  switch (code) {
+    case 'down':        return 'service indisponible';
+    case 'slippage':    return 'slippage dépassé';
+    case 'no-route':    return 'aucune route exécutable';
+    case 'bad_request': return 'requête invalide';
+    case 'funds':       return 'compte introuvable ou non financé';
+    case 'trustline':   return 'trustline requise';
+    default:            return "erreur d'exécution";
+  }
+}
+
 /** Label de route lisible pour l'UI.
  *  Soroswap : chaque SAC → symbole via bySac (fallback C1234…7890).
  *  xBull : route décodée depuis la sim (simulateXbullNet) — plus de masque ☁. */
@@ -553,15 +566,18 @@ export async function buildXbull(
   });
   if (!res.ok) {
     const body = res.body as Record<string, unknown> | null;
-    const msg =
+    const raw =
       (body?.['message'] as string | undefined) ??
       (body?.['error'] as string | undefined) ??
       JSON.stringify(body);
-    throw new ExecError(classifyExecError(msg), msg);
+    process.stderr.write(`ExecError raw: ${raw}\n`);
+    const code = classifyExecError(raw);
+    throw new ExecError(code, safeExecMessage(code));
   }
   const parsed = parseXbullAcceptQuote(res.body);
   if (!parsed) {
-    throw new ExecError('down', `réponse accept-quote non parseable : ${JSON.stringify(res.body)}`);
+    process.stderr.write(`ExecError raw: réponse accept-quote non parseable : ${JSON.stringify(res.body)}\n`);
+    throw new ExecError('down', safeExecMessage('down'));
   }
   return parsed;
 }
@@ -621,8 +637,10 @@ export async function buildSoroswap(
   try {
     return await client.build({ quote, from: sender });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new ExecError(classifyExecError(msg), msg);
+    const raw = e instanceof Error ? e.message : String(e);
+    process.stderr.write(`ExecError raw: ${raw}\n`);
+    const code = classifyExecError(raw);
+    throw new ExecError(code, safeExecMessage(code));
   }
 }
 
@@ -826,11 +844,13 @@ export async function buildAquarius(
     const prepared = await server.prepareTransaction(tx);
     return { xdr: prepared.toXDR() };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const raw = e instanceof Error ? e.message : String(e);
+    process.stderr.write(`ExecError raw: ${raw}\n`);
     // #2006 = revert du routeur Aquarius quand la sortie simulée < out_min : la route find-path a
     // sur-coté, elle ne tient pas au slippage demandé (≠ panne, ≠ fonds). Classer en slippage → message actionnable.
-    if (msg.includes('#2006')) throw new ExecError('slippage', msg);
-    throw new ExecError(classifyExecError(msg), msg);
+    if (raw.includes('#2006')) throw new ExecError('slippage', safeExecMessage('slippage'));
+    const code = classifyExecError(raw);
+    throw new ExecError(code, safeExecMessage(code));
   }
 }
 
@@ -895,8 +915,10 @@ export async function buildComet(
     const prepared = await server.prepareTransaction(tx);
     return { xdr: prepared.toXDR() };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new ExecError(classifyExecError(msg), msg);
+    const raw = e instanceof Error ? e.message : String(e);
+    process.stderr.write(`ExecError raw: ${raw}\n`);
+    const code = classifyExecError(raw);
+    throw new ExecError(code, safeExecMessage(code));
   }
 }
 
@@ -1374,11 +1396,12 @@ export async function submit(
     });
     const body = res.body as Record<string, unknown> | null;
     if (!res.ok || body?.['success'] !== true) {
-      const msg =
+      const raw =
         (body?.['message'] as string | undefined) ??
         (body?.['error'] as string | undefined) ??
         JSON.stringify(body);
-      throw new ExecError('down', msg);
+      process.stderr.write(`ExecError raw: ${raw}\n`);
+      throw new ExecError('down', safeExecMessage('down'));
     }
     if (typeof body['hash'] !== 'string' || !body['hash']) {
       throw new ExecError('down', 'xBull submit succeeded but returned no transaction hash');
@@ -1396,8 +1419,13 @@ export async function submit(
     } catch (e) {
       if (e instanceof ExecError) throw e;
       const codes = horizonResultCodes(e);
-      const msg = codes.length ? `Horizon a rejeté la tx : ${codes.join(', ')}` : (e instanceof Error ? e.message : String(e));
-      throw new ExecError(classifyHorizonSubmit(e), msg);
+      if (codes.length) {
+        // Protocol result_codes are public — safe to include verbatim.
+        throw new ExecError(classifyHorizonSubmit(e), `Horizon a rejeté la tx : ${codes.join(', ')}`);
+      }
+      const raw = e instanceof Error ? e.message : String(e);
+      process.stderr.write(`ExecError raw: ${raw}\n`);
+      throw new ExecError(classifyHorizonSubmit(e), safeExecMessage(classifyHorizonSubmit(e)));
     }
   } else if (venue === 'aquarius' || venue === 'comet') {
     // Fire-and-poll : on FIRE la tx (sendTransaction) et on rend le hash immédiatement.
@@ -1409,12 +1437,15 @@ export async function submit(
       sent = await client.send(payload.signedXdr);
     } catch (e) {
       if (e instanceof ExecError) throw e;
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new ExecError(classifyExecError(msg), msg);
+      const raw = e instanceof Error ? e.message : String(e);
+      process.stderr.write(`ExecError raw: ${raw}\n`);
+      const code = classifyExecError(raw);
+      throw new ExecError(code, safeExecMessage(code));
     }
     // ERROR | TRY_AGAIN_LATER = PAS entrée mempool → vrai échec d'admission.
     if (sent.status === 'ERROR' || sent.status === 'TRY_AGAIN_LATER') {
-      throw new ExecError('down', `Soroban a rejeté la tx (${sent.status}) : ${JSON.stringify(sent.errorResult ?? sent.status)}`);
+      process.stderr.write(`ExecError raw: Soroban a rejeté la tx (${sent.status}) : ${JSON.stringify(sent.errorResult ?? sent.status)}\n`);
+      throw new ExecError('down', safeExecMessage('down'));
     }
     // PENDING | DUPLICATE → fired ; la confirmation est déléguée au client.
     return { hash: sent.hash, status: 'pending' };
@@ -1427,8 +1458,10 @@ export async function submit(
     } catch (e) {
       // Symétrie avec buildSoroswap : toute erreur SDK ressort en ExecError classée (jamais un 500 opaque post-signature).
       if (e instanceof ExecError) throw e;
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new ExecError(classifyExecError(msg), msg);
+      const raw = e instanceof Error ? e.message : String(e);
+      process.stderr.write(`ExecError raw: ${raw}\n`);
+      const code = classifyExecError(raw);
+      throw new ExecError(code, safeExecMessage(code));
     }
   }
 }

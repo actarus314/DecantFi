@@ -34,5 +34,6 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY web/public ./dist/web/public
 COPY package.json ./
-# root:root (standard §14) ; hardening via compose directives (cap_drop, read_only, tmpfs).
+# root:root (deliberate) — custom container users explored and rejected (too much volume-ownership
+# friction). Hardening lives in the compose directives: cap_drop ALL, read_only, no-new-privileges, tmpfs.
 CMD ["node", "dist/collector/daemon.js"]
