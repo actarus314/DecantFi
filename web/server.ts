@@ -90,7 +90,14 @@ const logoPath = fileURLToPath(new URL('./public/logo.svg', import.meta.url));
 const logoAsset = staticAsset(readFileSync(logoPath), 'image/svg+xml; charset=utf-8');
 
 const robotsTxtAsset = staticAsset(
-  Buffer.from('User-agent: *\nDisallow: /api/\n'),
+  Buffer.from(
+    '# DecantFi is open-source. Want the data? Run your own instance:\n' +
+    '#   https://github.com/actarus314/DecantFi\n' +
+    '# The /api/* endpoints serve the dashboard only — please don\'t scrape them.\n' +
+    '# Questions or a use case? Open a GitHub issue and reach out.\n' +
+    'User-agent: *\n' +
+    'Disallow: /api/\n',
+  ),
   'text/plain; charset=utf-8',
 );
 
@@ -205,6 +212,12 @@ function isStellarPubkey(s: unknown): s is string { return typeof s === 'string'
 
 function execStatus(code: ExecError['code']): number { return code === 'down' ? 502 : 400; } // bad_request → 400 (client error)
 
+// Operator-visible signal when a protection fires: `docker logs <web> | grep BLOCK`.
+function logBlock(req: IncomingMessage, status: number, reason: string, path: string): void {
+  const ua = (req.headers['user-agent'] ?? '').toString().replace(/[\r\n]/g, ' ').slice(0, 100);
+  process.stderr.write(`BLOCK ${status} ${reason} ${path} ip=${clientIp(req)} ua="${ua}"\n`);
+}
+
 const VENUES: readonly Venue[] = ['xbull', 'soroswap', 'horizon', 'aquarius', 'comet', 'ultrastellar'];
 function isVenue(v: unknown): v is Venue { return typeof v === 'string' && (VENUES as readonly string[]).includes(v); }
 
@@ -222,7 +235,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const query = parseQuery(rawUrl);
 
     if (path.startsWith('/api/') && !apiAllowed(req)) {
-      json(res, req, 403, { error: 'accès direct à l\'API non autorisé' });
+      logBlock(req, 403, 'sec-fetch', path);
+      json(res, req, 403, {
+        error: "accès direct à l'API non autorisé",
+        message: "DecantFi is open-source. Want this data? Run your own instance — it's a few commands: https://github.com/actarus314/DecantFi . The /api/* endpoints power the dashboard only; please don't scrape them. Questions or a use case? Open a GitHub issue and let's talk.",
+      });
       return;
     }
 
@@ -326,7 +343,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/api/quote') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 120, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 120, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const pairRaw = query['pair'] ?? 'USDC';
       const pair = parsePair(pairRaw);
       if (!pair) {
@@ -380,7 +397,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/api/balance') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 60, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 60, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const address = query['address'];
       if (address !== undefined) {
         if (!isStellarPubkey(address)) { json(res, req, 400, { error: 'adresse invalide' }); return; }
@@ -395,7 +412,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/api/asset-balance') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 60, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 60, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const address = query['address'];
       if (!isStellarPubkey(address)) { json(res, req, 400, { error: 'adresse invalide' }); return; }
       const assetKey = query['asset'];
@@ -432,7 +449,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'POST' && path === '/api/build') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 30, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 30, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       const pair = parsePair(typeof b.pair === 'string' ? b.pair : null);
@@ -471,7 +488,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'POST' && path === '/api/build-trustline') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 10, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 10, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       const pair = parsePair(typeof b.pair === 'string' ? b.pair : null);
@@ -489,7 +506,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'POST' && path === '/api/submit') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 10, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 10, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       if (!isVenue(b.venue)) { json(res, req, 400, { error: 'venue invalide' }); return; }
@@ -507,7 +524,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/api/tx-status') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 90, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 90, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const venue = query['venue'];
       if (venue !== 'aquarius' && venue !== 'comet') { json(res, req, 400, { error: 'venue invalide (tx-status réservé aux venues Soroban)' }); return; }
       const hash = query['hash'];
