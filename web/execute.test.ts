@@ -554,6 +554,37 @@ describe('pickExecutableVenue', () => {
     ).rejects.toMatchObject({ code: 'no-route' });
   });
 
+  // ─── StellarBroker floor execution path ──────────────────────────────────────
+  // When the user clicks "Execute floor (SDEX)" on a StellarBroker row, the UI
+  // calls /api/build with venue:'horizon'. This mirrors doExecuteSbFloor() in app.js.
+  // Test (i2a): proves the routing filter — forceVenue:'horizon' eliminates all non-horizon
+  // candidates even when xbull would otherwise win. buildHorizon calls Horizon.Server directly
+  // (not injected via deps), so the full-build path is validated live; here we verify the filter
+  // by checking that when only a horizon candidate exists and the build fails (no live Horizon in
+  // CI), the error is 'no-route' from horizon's build — not xbull (which was filtered out).
+  it('(i2a) SB floor: forceVenue:horizon → seuls les candidats horizon retenus (xbull filtré)', async () => {
+    // xbull has a much higher net quote, but must be filtered out by forceVenue:'horizon'.
+    // quoteHorizon returns null (Horizon URL not reachable in CI) → no candidates after filter → no-route.
+    await expect(
+      pickExecutableVenue(
+        'USDC',
+        1000_0000000n,
+        SENDER,
+        50,
+        CFG,
+        undefined,
+        fakeDeps({
+          xbullQuote: { toAmount: '500000000', route: 'uuid-xbull' }, // high net, but filtered by forceVenue
+          xbullAccept: { id: 'id1', xdr: 'xdr-xbull', type: 'full' },
+          soroQuote: null,
+        }),
+        'horizon', // forceVenue: SDEX strict-send (SB floor path)
+      ),
+    ).rejects.toMatchObject({ code: 'no-route' });
+    // If xbull were not filtered, it would succeed (xbullAccept is valid). The no-route proves
+    // that forceVenue:'horizon' correctly excludes xbull and relies on horizon-only candidates.
+  });
+
   it('(j) soroswap multi-hop EURC (path 3 nœuds) → review.route = BLND → USDC → EURC', async () => {
     const net = 4_1000000n;
     const result = await pickExecutableVenue(

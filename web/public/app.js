@@ -7,9 +7,9 @@ const STRINGS = {
     theme_dark: '🌙',
     theme_light: '☀️',
     venue_cols: ['Type', 'Couche', 'Liquidité', 'Frais', 'Simulation', 'Note'],
-    fee_kind: { agg: 'skim agrégateur', pool: 'pool', sdex: 'SDEX', variable: 'variable (selon le chemin)' },
-    sim_status: { simulated: 'Simulé', resimulated: 'Re-simulé', none: 'Non simulé' },
-    sim_why: { simulated: 'sortie lue des réserves du pool on-chain (exacte)', resimulated: 'cote API re-simulée sur le vrai fill on-chain (corrige la sur-cote)', none: "carnet SDEX classique : la cote = l'exécution" },
+    fee_kind: { agg: 'skim agrégateur', pool: 'pool', sdex: 'SDEX', variable: 'variable (selon le chemin)', opaque: 'opaque (déduit on-chain, par partenaire)' },
+    sim_status: { simulated: 'Simulé', resimulated: 'Re-simulé', none: 'Non simulé', rfq: 'Non simulé' },
+    sim_why: { simulated: 'sortie lue des réserves du pool on-chain (exacte)', resimulated: 'cote API re-simulée sur le vrai fill on-chain (corrige la sur-cote)', none: "carnet SDEX classique : la cote = l'exécution", rfq: 'devis RFQ hors-chaîne via WebSocket ; estimate non simulé on-chain' },
     route_detail: 'Détail des routes',
     net_fee_label: 'Frais réseau (réel / max)',
 
@@ -258,6 +258,8 @@ const STRINGS = {
     exec_via: (tool) => 'Exécuter via ' + tool,
     exec_composite: 'Exécuter (2 transactions)',
     exec_integrated_soon: 'Exécution intégrée à venir pour cet outil.',
+    exec_sb_floor: 'Exécuter le plancher (SDEX)',
+    exec_sb_floor_note: 'L\'estimate StellarBroker nécessite leur propre couche d\'exécution. On exécute ici le plancher SDEX strict-send réalisable.',
     ladder_pick_hint: 'Cliquez une ligne pour exécuter via cet outil (re-clic = retour au choix auto).',
   },
   en: {
@@ -267,9 +269,9 @@ const STRINGS = {
     theme_dark: '🌙',
     theme_light: '☀️',
     venue_cols: ['Type', 'Layer', 'Liquidity', 'Fee', 'Simulation', 'Note'],
-    fee_kind: { agg: 'aggregator skim', pool: 'pool', sdex: 'SDEX', variable: 'variable (route-dependent)' },
-    sim_status: { simulated: 'Simulated', resimulated: 'Re-simulated', none: 'Not simulated' },
-    sim_why: { simulated: 'output read from on-chain pool reserves (exact)', resimulated: 'API quote re-simulated against the real on-chain fill (corrects the over-quote)', none: 'classic SDEX order book: the quote = the execution' },
+    fee_kind: { agg: 'aggregator skim', pool: 'pool', sdex: 'SDEX', variable: 'variable (route-dependent)', opaque: 'opaque (deducted on-chain, per-partner)' },
+    sim_status: { simulated: 'Simulated', resimulated: 'Re-simulated', none: 'Not simulated', rfq: 'Not simulated' },
+    sim_why: { simulated: 'output read from on-chain pool reserves (exact)', resimulated: 'API quote re-simulated against the real on-chain fill (corrects the over-quote)', none: 'classic SDEX order book: the quote = the execution', rfq: 'off-chain RFQ quote via WebSocket; estimate not simulated on-chain' },
     route_detail: 'Route detail',
     net_fee_label: 'Network fee (real / max)',
 
@@ -518,6 +520,8 @@ const STRINGS = {
     exec_via: (tool) => 'Execute via ' + tool,
     exec_composite: 'Execute (2 transactions)',
     exec_integrated_soon: 'Integrated execution coming soon for this tool.',
+    exec_sb_floor: 'Execute floor (SDEX)',
+    exec_sb_floor_note: 'StellarBroker\'s estimate requires their own execution layer. Executing the realizable SDEX strict-send floor instead.',
     ladder_pick_hint: 'Click a row to execute via that tool (click again to revert to auto).',
   },
   es: {
@@ -527,9 +531,9 @@ const STRINGS = {
     theme_dark: '🌙',
     theme_light: '☀️',
     venue_cols: ['Tipo', 'Capa', 'Liquidez', 'Comisión', 'Simulación', 'Nota'],
-    fee_kind: { agg: 'skim del agregador', pool: 'pool', sdex: 'SDEX', variable: 'variable (según la ruta)' },
-    sim_status: { simulated: 'Simulado', resimulated: 'Re-simulado', none: 'No simulado' },
-    sim_why: { simulated: 'salida leída de las reservas del pool on-chain (exacta)', resimulated: 'cotización API re-simulada sobre el fill real on-chain (corrige la sobrecotización)', none: 'libro de órdenes SDEX clásico: la cotización = la ejecución' },
+    fee_kind: { agg: 'skim del agregador', pool: 'pool', sdex: 'SDEX', variable: 'variable (según la ruta)', opaque: 'opaca (deducida on-chain, por socio)' },
+    sim_status: { simulated: 'Simulado', resimulated: 'Re-simulado', none: 'No simulado', rfq: 'No simulado' },
+    sim_why: { simulated: 'salida leída de las reservas del pool on-chain (exacta)', resimulated: 'cotización API re-simulada sobre el fill real on-chain (corrige la sobrecotización)', none: 'libro de órdenes SDEX clásico: la cotización = la ejecución', rfq: 'cotización RFQ off-chain vía WebSocket; estimación no simulada on-chain' },
     route_detail: 'Detalle de ruta',
     net_fee_label: 'Comisión de red (real / máx)',
 
@@ -778,6 +782,8 @@ const STRINGS = {
     exec_via: (tool) => 'Ejecutar vía ' + tool,
     exec_composite: 'Ejecutar (2 transacciones)',
     exec_integrated_soon: 'Ejecución integrada próximamente para esta herramienta.',
+    exec_sb_floor: 'Ejecutar el mínimo (SDEX)',
+    exec_sb_floor_note: 'La estimación de StellarBroker requiere su propia capa de ejecución. Se ejecuta en su lugar el mínimo SDEX strict-send realizable.',
     ladder_pick_hint: 'Haga clic en una fila para ejecutar vía esa herramienta (haga clic de nuevo para volver a automático).',
   },
   pt: {
@@ -786,9 +792,9 @@ const STRINGS = {
     theme_dark: '🌙',
     theme_light: '☀️',
     venue_cols: ['Tipo', 'Camada', 'Liquidez', 'Taxa', 'Simulação', 'Nota'],
-    fee_kind: { agg: 'skim do agregador', pool: 'pool', sdex: 'SDEX', variable: 'variável (conforme a rota)' },
-    sim_status: { simulated: 'Simulado', resimulated: 'Re-simulado', none: 'Não simulado' },
-    sim_why: { simulated: 'saída lida das reservas do pool on-chain (exata)', resimulated: 'cotação API re-simulada no fill real on-chain (corrige a supercotização)', none: 'livro de ordens SDEX clássico: a cotação = a execução' },
+    fee_kind: { agg: 'skim do agregador', pool: 'pool', sdex: 'SDEX', variable: 'variável (conforme a rota)', opaque: 'opaca (deduzida on-chain, por parceiro)' },
+    sim_status: { simulated: 'Simulado', resimulated: 'Re-simulado', none: 'Não simulado', rfq: 'Não simulado' },
+    sim_why: { simulated: 'saída lida das reservas do pool on-chain (exata)', resimulated: 'cotação API re-simulada no fill real on-chain (corrige a supercotização)', none: 'livro de ordens SDEX clássico: a cotação = a execução', rfq: 'cotação RFQ off-chain via WebSocket; estimativa não simulada on-chain' },
     route_detail: 'Detalhe da rota',
     net_fee_label: 'Taxa de rede (real / máx.)',
     fresh_none: 'nenhum ciclo ainda',
@@ -987,6 +993,8 @@ const STRINGS = {
     exec_via: (tool) => 'Executar via ' + tool,
     exec_composite: 'Executar (2 transações)',
     exec_integrated_soon: 'Execução integrada em breve para esta ferramenta.',
+    exec_sb_floor: 'Executar o piso (SDEX)',
+    exec_sb_floor_note: 'A estimativa do StellarBroker requer a própria camada de execução deles. Executando em vez disso o piso SDEX strict-send realizável.',
     ladder_pick_hint: 'Clique em uma linha para executar via essa ferramenta (clique novamente para voltar ao automático).',
   },
 };
@@ -1096,10 +1104,11 @@ const VENUE_META = {
     pt: { type: 'Agregador', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + livro SDEX (find-path)', note: '' },
   },
   stellarbroker: {
-    fr: { type: 'Agrégateur (RFQ)', couche: 'hors-chaîne', liquidite: 'agrège des market makers', note: 'frais opaques → classé en plancher (borne basse)' },
-    en: { type: 'Aggregator (RFQ)', couche: 'off-chain', liquidite: 'aggregates market makers', note: 'opaque fees → treated as a floor (lower bound)' },
-    es: { type: 'Agregador (RFQ)', couche: 'fuera de cadena', liquidite: 'agrega creadores de mercado', note: 'comisiones opacas → tratado como suelo (límite inferior)' },
-    pt: { type: 'Agregador (RFQ)', couche: 'off-chain', liquidite: 'agrega formadores de mercado', note: 'taxas opacas → tratado como piso (limite inferior)' },
+    feePct: null, feeKind: 'opaque', sim: 'rfq',
+    fr: { type: 'Agrégateur (RFQ)', couche: 'hors-chaîne', liquidite: 'agrège des market makers', note: 'classé sur l\'estimate (RFQ) ; plancher réalisable dans le détail ; frais opaques déduits à l\'exécution ; estimate atteignable uniquement via StellarBroker.' },
+    en: { type: 'Aggregator (RFQ)', couche: 'off-chain', liquidite: 'aggregates market makers', note: 'classed on the estimate (RFQ); realizable floor shown in detail; opaque fees deducted at execution; estimate reachable only via StellarBroker.' },
+    es: { type: 'Agregador (RFQ)', couche: 'fuera de cadena', liquidite: 'agrega creadores de mercado', note: 'clasificado sobre la estimación (RFQ); mínimo realizable en el detalle; comisiones opacas deducidas en ejecución; estimación alcanzable solo vía StellarBroker.' },
+    pt: { type: 'Agregador (RFQ)', couche: 'off-chain', liquidite: 'agrega formadores de mercado', note: 'classificado pela estimativa (RFQ); piso realizável no detalhe; taxas opacas deduzidas na execução; estimativa alcançável apenas via StellarBroker.' },
   },
   ultrastellar: {
     feePct: 0, feeKind: 'sdex', sim: 'none',
@@ -1135,7 +1144,7 @@ function venueCard(id, name) {
     `<span>${L[2]}</span><span>${m.liquidite}</span>`;
   if (meta.feeKind) {
     const kind = t('fee_kind')[meta.feeKind] || meta.feeKind;
-    const feeStr = meta.feeKind === 'variable'
+    const feeStr = meta.feePct == null
       ? kind
       : `${meta.feePct.toLocaleString(LOCALE[lang], { maximumFractionDigits: 1 })} % · ${kind}`;
     grid += `<span>${L[3]}</span><span>${feeStr}</span>`;
@@ -1518,10 +1527,17 @@ function simCard() {
         <button class="btn primary" data-act="doExecuteComposite">${t('exec_composite')}</button>
       </div>`;
     } else if (selRow && !selRow.executable) {
-      // Venue non intégré : pas d'exécution, message seul (plus de deep-link)
-      resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-        <span style="font-size:12px;color:var(--caption)">${t('exec_integrated_soon')}</span>
-      </div>`;
+      if (selRow.sourceId === 'stellarbroker') {
+        // StellarBroker: offer to execute the realizable SDEX floor (not the estimate)
+        resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+          <button class="btn primary" data-act="doExecuteSbFloor">${t('exec_sb_floor')}</button>
+        </div>`;
+      } else {
+        // Other non-integrated venues: coming-soon message
+        resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+          <span style="font-size:12px;color:var(--caption)">${t('exec_integrated_soon')}</span>
+        </div>`;
+      }
     } else {
       const execLabel = selRow ? t('exec_via', selRow.display)
         : (winRow && winRow.executable && !winRow.sourceId.includes('+') ? t('exec_via', winRow.display) : t('exec_btn'));
@@ -2674,6 +2690,33 @@ async function doExecute() {
   renderApp();
 }
 
+// Execute the realizable SDEX floor for StellarBroker by forcing Horizon strict-send.
+// The estimate shown by SB requires their own execution layer; the floor (directTrade.buying)
+// is equivalent to a Horizon strict-send, which we reuse here. The review will show the
+// fresh Horizon net (the realizable floor), never the SB estimate.
+async function doExecuteSbFloor() {
+  if (!simResult || !simActive || simAmt <= 0) return;
+  if (!walletAddress) {
+    execState = { phase: 'error', errorMsg: t('exec_connect_first') };
+    renderApp();
+    return;
+  }
+  const body = {
+    pair: target,
+    amount: simAmt,
+    sender: walletAddress,
+    slippageBps: Math.round(execSlippagePct * 100),
+    venue: 'horizon', // force SDEX strict-send (== SB floor execution path)
+  };
+  try {
+    const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code }; }
+    else { execState = { phase: 'review', build: j, sbFloor: true }; } // sbFloor flag → honest note in review
+  } catch (e) { execState = { phase: 'error', errorMsg: t('err_down') }; }
+  renderApp();
+}
+
 // Lance le flux composite 2-tx pour la ligne composite affichée (best OU sélectionnée).
 // Indépendant du flag `winner` du ladder : le headline peut être le composite alors que
 // raw[0] (winner) est une venue atomique → on cible la ligne dont le sourceId contient '+'.
@@ -3090,12 +3133,17 @@ function execModal() {
     const restoreNote = build.type === 'restore'
       ? `<p class="help" style="margin:.6rem 0 0;color:var(--amber)">${t('exec_restore')}</p>`
       : '';
+    // Honest note when executing the StellarBroker floor via Horizon strict-send.
+    const sbFloorNote = execState.sbFloor
+      ? `<p class="help" style="margin:.6rem 0 0;color:var(--caption);font-size:12px">${t('exec_sb_floor_note')}</p>`
+      : '';
     content = `
       ${stepBadge}
       <div style="font-size:14px;font-weight:700;margin-bottom:.9rem">${t('review_title')}</div>
       ${reviewTableHtml(rv, legTarget, true, sendAsset)}
       ${fidelityNote}
       ${restoreNote}
+      ${sbFloorNote}
       <div style="display:flex;gap:.55rem;margin-top:.9rem;justify-content:flex-end">
         <button class="btn" data-act="cancelExecute">${t('review_cancel')}</button>
         <button class="btn primary" data-act="confirmExecute">${t('review_confirm')}</button>
@@ -3390,7 +3438,7 @@ function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() 
 (() => {
   const CLICK = {
     doRefresh, toggleImpactMode, cancelImpactEvm, confirmImpactEvm, selectSource,
-    doExecuteComposite, doExecute, useWallet, doSim, clearSim, nudgeSlippage,
+    doExecuteComposite, doExecute, doExecuteSbFloor, useWallet, doSim, clearSim, nudgeSlippage,
     selectDay, openCoherence, setView, setSonde, setTarget, disconnectWallet,
     connectWallet, toggleTheme, setLang, closeCoherence, cancelExecute,
     confirmExecute, retryCompositeLeg2, addTrustline, onModalBackdrop,
