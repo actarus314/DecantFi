@@ -67,15 +67,22 @@ describe('horizon', () => {
 });
 
 describe('stellarbroker', () => {
-  it('classe sur le plancher, expose la fourchette', () => {
+  it('classifies on estimate, floor in netRange.low', () => {
     const q = parseStellarbroker(loadFixture('stellarbroker.blnd-usdc.json'), req)!;
-    expect(q.netConfidence).toBe('floor');
-    expect(q.netOut).toBe(toStroops('45.653111'));
-    expect(q.netRange?.high).toBe(toStroops('47.9822629'));
+    expect(q.netConfidence).toBe('estimate');
+    expect(q.netOut).toBe(toStroops('42.0911116'));
+    expect(q.netRange?.low).toBe(toStroops('40.7380394'));
+    expect(q.netRange?.high).toBe(toStroops('42.0911116'));
     expect(q.netRange!.high).toBeGreaterThan(q.netRange!.low);
   });
   it('null si status != success', () => {
     expect(parseStellarbroker({ status: 'error' }, req)).toBeNull();
+  });
+  it('unwraps msg.quote (WS envelope)', () => {
+    const wsEnvelope = loadFixture('stellarbroker.ws.blnd-usdc.json') as { quote: unknown };
+    const q = parseStellarbroker(wsEnvelope.quote, req)!;
+    expect(q.netConfidence).toBe('estimate');
+    expect(q.netOut).toBe(toStroops('42.0911116'));
   });
 });
 

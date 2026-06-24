@@ -25,6 +25,8 @@ export interface LadderRow {
   impactPct: number | null;
   impactLocalPct: number | null;
   winner: boolean;
+  /** Floor (direct route guaranteed minimum) in target asset units. StellarBroker only; absent for DB rows. */
+  floor?: number;
 }
 
 export interface Meta {

@@ -103,7 +103,8 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
 
   const sourceCfg: EngineConfig = {
     rpcUrl, horizonUrl: deps.cfg.horizonUrl,
-    soroswapApiKey: deps.cfg.soroswapApiKey, walletAddress: deps.cfg.walletAddress,
+    soroswapApiKey: deps.cfg.soroswapApiKey, stellarBrokerApiKey: deps.cfg.stellarBrokerApiKey,
+    walletAddress: deps.cfg.walletAddress,
     timeoutMs: deps.cfg.timeoutMs, prices, // <- prix injecté : 1 seul fetch, comparabilité préservée
     // Cache RPC partagé par les 4 sondes du tick : coalesce les lectures de pools identiques
     // (sondes EURC × 3 sous-cotations re-lisent les mêmes pools) → ~180 → ~30 appels RPC/tick,

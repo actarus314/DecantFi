@@ -58,9 +58,9 @@ Both the winning route and the price impact depend on trade size — a venue tha
 
 For EURC only, price impact is shown two ways (toggle from the column header). **Local** compares against the EURC price on Stellar's SDEX order book — the right reference if you intend to stay on Stellar. **EVM** compares against the global EURC price on Base/Ethereum — the right reference if you intend to bridge out, because then Stellar's premium or discount over the global price becomes a real gain or loss. USDC is identical in both modes. Positive = you receive less, negative = you receive more.
 
-### Why is StellarBroker disconnected, and why do some sources fail sometimes?
+### How is StellarBroker integrated, and why do some sources fail sometimes?
 
-StellarBroker's keyless endpoint sits behind Cloudflare and gets rate-limited / IP-blocked under repeated automated polling (the dashboard's stability page shows the resulting failures). Rather than risk a harder block, it is **disconnected pending an authenticated, key-based integration** — which will also make its fee transparent. Other sources can fail transiently (timeouts, endpoint hiccups); that is expected, and the aggregator is built to rank fine without any single one.
+StellarBroker is integrated via its **authenticated WebSocket** (`wss://api.stellar.broker/ws?partner=<key>`). The API key is WS-only — the keyless REST endpoint remains Cloudflare-rate-limited and ignores the key. Quotes are classed on the **estimate** (`estimatedBuyingAmount`), with the realizable SDEX floor shown in the quote detail, because StellarBroker's best price is only achievable through its own execution layer (a multi-route split); routing it yourself yields approximately the floor. StellarBroker's fee is **opaque** (deducted on-chain at execution, per-partner; not disclosed in the quote), and its quote is **not on-chain simulated** — it is an off-chain RFQ over WebSocket. Other sources can fail transiently (timeouts, endpoint hiccups); that is expected, and the aggregator is built to rank fine without any single one.
 
 ### Why keep a GPL dependency / keyless routing?
 
