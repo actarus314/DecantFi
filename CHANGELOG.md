@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-06-24
+
 ### Added
+- Source identity cards now show, per tool, the fee it takes (aggregator skim vs pool fee
+  vs SDEX) and whether its quote is fully simulated, re-simulated, or not — with the
+  reason. Comet's pool fee confirmed on-chain at 0.30%.
 - Phoenix AMM quote adapter (Soroban `simulate_swap`), validated on-chain but kept
-  inactive: Phoenix has no BLND pool, so it is inert for BLND routes. Wired for future
-  multi-asset support and cross-checking aggregator routes.
+  inactive: Phoenix has no BLND pool, so it is inert for DecantFi's routes.
+- This CHANGELOG, reconstructed from v0.1.0.
 
 ## [0.2.3] - 2026-06-23
 
@@ -101,7 +106,8 @@ Initial public release.
 - Custom zero-dependency Sankey route visualization and a 4-language UI (English, French,
   Spanish, Brazilian Portuguese).
 
-[Unreleased]: https://github.com/actarus314/DecantFi/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/actarus314/DecantFi/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/actarus314/DecantFi/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/actarus314/DecantFi/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/actarus314/DecantFi/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/actarus314/DecantFi/compare/v0.2.0...v0.2.1
