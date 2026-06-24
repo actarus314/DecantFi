@@ -6,7 +6,10 @@ const STRINGS = {
     tz_note: (z) => `UTC stocké · affiché en heure locale (${z})`,
     theme_dark: '🌙',
     theme_light: '☀️',
-    venue_cols: ['Type', 'Couche', 'Liquidité', 'Note'],
+    venue_cols: ['Type', 'Couche', 'Liquidité', 'Frais', 'Simulation', 'Note'],
+    fee_kind: { agg: 'skim agrégateur', pool: 'pool', sdex: 'SDEX', variable: 'variable (selon le chemin)' },
+    sim_status: { simulated: 'Simulé', resimulated: 'Re-simulé', none: 'Non simulé' },
+    sim_why: { simulated: 'sortie lue des réserves du pool on-chain (exacte)', resimulated: 'cote API re-simulée sur le vrai fill on-chain (corrige la sur-cote)', none: "carnet SDEX classique : la cote = l'exécution" },
     route_detail: 'Détail des routes',
     net_fee_label: 'Frais réseau (réel / max)',
 
@@ -261,7 +264,10 @@ const STRINGS = {
     tz_note: (z) => `UTC stored · displayed in local time (${z})`,
     theme_dark: '🌙',
     theme_light: '☀️',
-    venue_cols: ['Type', 'Layer', 'Liquidity', 'Note'],
+    venue_cols: ['Type', 'Layer', 'Liquidity', 'Fee', 'Simulation', 'Note'],
+    fee_kind: { agg: 'aggregator skim', pool: 'pool', sdex: 'SDEX', variable: 'variable (route-dependent)' },
+    sim_status: { simulated: 'Simulated', resimulated: 'Re-simulated', none: 'Not simulated' },
+    sim_why: { simulated: 'output read from on-chain pool reserves (exact)', resimulated: 'API quote re-simulated against the real on-chain fill (corrects the over-quote)', none: 'classic SDEX order book: the quote = the execution' },
     route_detail: 'Route detail',
     net_fee_label: 'Network fee (real / max)',
 
@@ -516,7 +522,10 @@ const STRINGS = {
     tz_note: (z) => `UTC almacenado · mostrado en hora local (${z})`,
     theme_dark: '🌙',
     theme_light: '☀️',
-    venue_cols: ['Tipo', 'Capa', 'Liquidez', 'Nota'],
+    venue_cols: ['Tipo', 'Capa', 'Liquidez', 'Comisión', 'Simulación', 'Nota'],
+    fee_kind: { agg: 'skim del agregador', pool: 'pool', sdex: 'SDEX', variable: 'variable (según la ruta)' },
+    sim_status: { simulated: 'Simulado', resimulated: 'Re-simulado', none: 'No simulado' },
+    sim_why: { simulated: 'salida leída de las reservas del pool on-chain (exacta)', resimulated: 'cotización API re-simulada sobre el fill real on-chain (corrige la sobrecotización)', none: 'libro de órdenes SDEX clásico: la cotización = la ejecución' },
     route_detail: 'Detalle de ruta',
     net_fee_label: 'Comisión de red (real / máx)',
 
@@ -770,7 +779,10 @@ const STRINGS = {
     tz_note: (z) => `UTC armazenado · exibido no horário local (${z})`,
     theme_dark: '🌙',
     theme_light: '☀️',
-    venue_cols: ['Tipo', 'Camada', 'Liquidez', 'Nota'],
+    venue_cols: ['Tipo', 'Camada', 'Liquidez', 'Taxa', 'Simulação', 'Nota'],
+    fee_kind: { agg: 'skim do agregador', pool: 'pool', sdex: 'SDEX', variable: 'variável (conforme a rota)' },
+    sim_status: { simulated: 'Simulado', resimulated: 'Re-simulado', none: 'Não simulado' },
+    sim_why: { simulated: 'saída lida das reservas do pool on-chain (exata)', resimulated: 'cotação API re-simulada no fill real on-chain (corrige a supercotização)', none: 'livro de ordens SDEX clássico: a cotação = a execução' },
     route_detail: 'Detalhe da rota',
     net_fee_label: 'Taxa de rede (real / máx.)',
     fresh_none: 'nenhum ciclo ainda',
@@ -1055,22 +1067,25 @@ function t(key, ...args) {
 // ─── Cartes d'identité de venue ───────────────────────────────────────────────
 const VENUE_META = {
   xbull: {
-    fr: { type: 'Agrégateur', couche: 'SDEX + AMM Soroban', liquidite: 'meilleur chemin multi-venues (swap-kit, sans clé)', note: 'prélève 0,1 % — classé sur le fill réellement simulé' },
-    en: { type: 'Aggregator', couche: 'SDEX + Soroban AMMs', liquidite: 'best multi-venue path (swap-kit, keyless)', note: 'skims 0.1% — ranked on the actually simulated fill' },
-    es: { type: 'Agregador', couche: 'SDEX + AMMs Soroban', liquidite: 'mejor ruta multi-fuente (swap-kit, sin clave)', note: 'descuenta 0,1% — clasificado sobre el fill realmente simulado' },
-    pt: { type: 'Agregador', couche: 'SDEX + AMMs Soroban', liquidite: 'melhor rota multi-venue (swap-kit, sem chave)', note: 'desconta 0,1% — classificado sobre o fill realmente simulado' },
+    feePct: 0.1, feeKind: 'agg', sim: 'resimulated',
+    fr: { type: 'Agrégateur', couche: 'SDEX + AMM Soroban', liquidite: 'meilleur chemin multi-venues (swap-kit, sans clé)', note: '' },
+    en: { type: 'Aggregator', couche: 'SDEX + Soroban AMMs', liquidite: 'best multi-venue path (swap-kit, keyless)', note: '' },
+    es: { type: 'Agregador', couche: 'SDEX + AMMs Soroban', liquidite: 'mejor ruta multi-fuente (swap-kit, sin clave)', note: '' },
+    pt: { type: 'Agregador', couche: 'SDEX + AMMs Soroban', liquidite: 'melhor rota multi-venue (swap-kit, sem chave)', note: '' },
   },
   soroswap: {
-    fr: { type: 'Agrégateur', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: 'frais protocole inclus dans le fill simulé' },
-    en: { type: 'Aggregator', couche: 'Soroban', liquidite: 'Soroswap AMM (router)', note: 'protocol fees included in the simulated fill' },
-    es: { type: 'Agregador', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: 'comisiones del protocolo incluidas en el fill simulado' },
-    pt: { type: 'Agregador', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: 'taxas do protocolo incluídas no fill simulado' },
+    feePct: 0.3, feeKind: 'pool', sim: 'simulated',
+    fr: { type: 'Agrégateur', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: '' },
+    en: { type: 'Aggregator', couche: 'Soroban', liquidite: 'Soroswap AMM (router)', note: '' },
+    es: { type: 'Agregador', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: '' },
+    pt: { type: 'Agregador', couche: 'Soroban', liquidite: 'AMM Soroswap (router)', note: '' },
   },
   aquarius: {
-    fr: { type: 'Agrégateur', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + carnet SDEX (find-path)', note: 'find-path sur-cote parfois (3-hop via XLM) → re-simulé' },
-    en: { type: 'Aggregator', couche: 'AMM + SDEX', liquidite: 'Aquarius pools + SDEX book (find-path)', note: 'find-path sometimes over-quotes (3-hop via XLM) → re-simulated' },
-    es: { type: 'Agregador', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + libro SDEX (find-path)', note: 'find-path a veces sobrecotiza (3 saltos vía XLM) → re-simulado' },
-    pt: { type: 'Agregador', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + livro SDEX (find-path)', note: 'find-path às vezes supercotiza (3 hops via XLM) → re-simulado' },
+    feePct: null, feeKind: 'variable', sim: 'resimulated',
+    fr: { type: 'Agrégateur', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + carnet SDEX (find-path)', note: '' },
+    en: { type: 'Aggregator', couche: 'AMM + SDEX', liquidite: 'Aquarius pools + SDEX book (find-path)', note: '' },
+    es: { type: 'Agregador', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + libro SDEX (find-path)', note: '' },
+    pt: { type: 'Agregador', couche: 'AMM + SDEX', liquidite: 'pools Aquarius + livro SDEX (find-path)', note: '' },
   },
   stellarbroker: {
     fr: { type: 'Agrégateur (RFQ)', couche: 'hors-chaîne', liquidite: 'agrège des market makers', note: 'frais opaques → classé en plancher (borne basse)' },
@@ -1079,18 +1094,21 @@ const VENUE_META = {
     pt: { type: 'Agregador (RFQ)', couche: 'off-chain', liquidite: 'agrega formadores de mercado', note: 'taxas opacas → tratado como piso (limite inferior)' },
   },
   ultrastellar: {
-    fr: { type: 'Carnet SDEX', couche: 'SDEX classique', liquidite: "carnet d'ordres natif Stellar", note: 'path payment, frais 0' },
-    en: { type: 'SDEX order book', couche: 'classic SDEX', liquidite: 'native Stellar order book', note: 'path payment, 0 fee' },
-    es: { type: 'Libro de órdenes SDEX', couche: 'SDEX clásico', liquidite: 'libro de órdenes nativo de Stellar', note: 'path payment, 0 comisión' },
-    pt: { type: 'Livro de ordens SDEX', couche: 'SDEX clássico', liquidite: 'livro de ordens nativo da Stellar', note: 'path payment, taxa 0' },
+    feePct: 0, feeKind: 'sdex', sim: 'none',
+    fr: { type: 'Carnet SDEX', couche: 'SDEX classique', liquidite: "carnet d'ordres natif Stellar", note: '' },
+    en: { type: 'SDEX order book', couche: 'classic SDEX', liquidite: 'native Stellar order book', note: '' },
+    es: { type: 'Libro de órdenes SDEX', couche: 'SDEX clásico', liquidite: 'libro de órdenes nativo de Stellar', note: '' },
+    pt: { type: 'Livro de ordens SDEX', couche: 'SDEX clássico', liquidite: 'livro de ordens nativo da Stellar', note: '' },
   },
   horizon: {
-    fr: { type: 'Carnet SDEX', couche: 'SDEX classique', liquidite: "carnet d'ordres natif (strict-send)", note: 'plancher garanti (path payment direct)' },
-    en: { type: 'SDEX order book', couche: 'classic SDEX', liquidite: 'native order book (strict-send)', note: 'guaranteed floor (direct path payment)' },
-    es: { type: 'Libro de órdenes SDEX', couche: 'SDEX clásico', liquidite: 'libro de órdenes nativo (strict-send)', note: 'suelo garantizado (path payment directo)' },
-    pt: { type: 'Livro de ordens SDEX', couche: 'SDEX clássico', liquidite: 'livro de ordens nativo (strict-send)', note: 'piso garantido (path payment direto)' },
+    feePct: 0, feeKind: 'sdex', sim: 'none',
+    fr: { type: 'Carnet SDEX', couche: 'SDEX classique', liquidite: "carnet d'ordres natif (strict-send)", note: '' },
+    en: { type: 'SDEX order book', couche: 'classic SDEX', liquidite: 'native order book (strict-send)', note: '' },
+    es: { type: 'Libro de órdenes SDEX', couche: 'SDEX clásico', liquidite: 'libro de órdenes nativo (strict-send)', note: '' },
+    pt: { type: 'Livro de ordens SDEX', couche: 'SDEX clássico', liquidite: 'livro de ordens nativo (strict-send)', note: '' },
   },
   comet: {
+    feePct: 0.3, feeKind: 'pool', sim: 'simulated',
     fr: { type: 'Pool (source unique)', couche: 'Soroban', liquidite: 'pool backstop Blend 80/20 (BLND/USDC)', note: 'cote indépendante du solde ; BLND→USDC seulement' },
     en: { type: 'Pool (single source)', couche: 'Soroban', liquidite: 'Blend 80/20 backstop pool (BLND/USDC)', note: 'balance-independent quote; BLND→USDC only' },
     es: { type: 'Pool (fuente única)', couche: 'Soroban', liquidite: 'pool de respaldo Blend 80/20 (BLND/USDC)', note: 'cotización independiente del saldo; solo BLND→USDC' },
@@ -1102,14 +1120,26 @@ function venueCard(id, name) {
   const meta = VENUE_META[id];
   if (!meta) return escapeHtml(name); // composite / inconnu → pas de carte
   const m = meta[lang] || meta.en;
-  const L = t('venue_cols');
+  const L = t('venue_cols'); // [Type, Layer, Liquidity, Fee, Simulation, Note]
   const eName = escapeHtml(name);
-  return `<span class="tip-wrap vname"><span class="srcname">${eName}</span>` +
-    `<span class="tip-box vcard"><b>${eName}</b>` +
-    `<span class="vgrid"><span>${L[0]}</span><span>${m.type}</span>` +
+  let grid = `<span>${L[0]}</span><span>${m.type}</span>` +
     `<span>${L[1]}</span><span>${m.couche}</span>` +
-    `<span>${L[2]}</span><span>${m.liquidite}</span>` +
-    `<span>${L[3]}</span><span>${m.note}</span></span></span></span>`;
+    `<span>${L[2]}</span><span>${m.liquidite}</span>`;
+  if (meta.feeKind) {
+    const kind = t('fee_kind')[meta.feeKind] || meta.feeKind;
+    const feeStr = meta.feeKind === 'variable'
+      ? kind
+      : `${meta.feePct.toLocaleString(LOCALE[lang], { maximumFractionDigits: 1 })} % · ${kind}`;
+    grid += `<span>${L[3]}</span><span>${feeStr}</span>`;
+  }
+  if (meta.sim) {
+    const st = t('sim_status')[meta.sim] || meta.sim;
+    const why = t('sim_why')[meta.sim] || '';
+    grid += `<span>${L[4]}</span><span>${st} — ${why}</span>`;
+  }
+  if (m.note) grid += `<span>${L[5]}</span><span>${m.note}</span>`;
+  return `<span class="tip-wrap vname"><span class="srcname">${eName}</span>` +
+    `<span class="tip-box vcard"><b>${eName}</b><span class="vgrid">${grid}</span></span></span>`;
 }
 
 function chipLabel(chip) {
