@@ -40,3 +40,15 @@ function firstHeader(h: string | string[] | undefined): string | null {
   const t = raw.trim();
   return t || null;
 }
+
+/** Gate for /api/* — allows the browser dashboard (same-origin fetch) and internal/loopback
+ *  callers (Docker healthcheck), blocks direct programmatic access (curl, scrapers, crawlers).
+ *  `Sec-Fetch-Site` is set by the browser and cannot be forged from page JS; non-browser clients
+ *  omit it. Lives here (not in server.ts) so it is unit-testable without booting the server. */
+export function apiAllowed(req: IncomingMessage): boolean {
+  // Internal/loopback callers (Docker healthcheck, same-host tooling) are always allowed.
+  const peer = req.socket.remoteAddress;
+  if (peer === '127.0.0.1' || peer === '::1' || peer === '::ffff:127.0.0.1') return true;
+  const sfs = firstHeader(req.headers['sec-fetch-site']);
+  return sfs === 'same-origin' || sfs === 'same-site';
+}

@@ -1,7 +1,7 @@
 // Serveur HTTP web — node:http (stdlib, pas d'Express).
 // Routes : GET / · GET /api/overview · GET /api/quote · GET /api/balance
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { clientIp } from './request-ip.js';
+import { clientIp, apiAllowed } from './request-ip.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
@@ -89,9 +89,16 @@ const faviconAsset = staticAsset(readFileSync(faviconPath), 'image/svg+xml; char
 const logoPath = fileURLToPath(new URL('./public/logo.svg', import.meta.url));
 const logoAsset = staticAsset(readFileSync(logoPath), 'image/svg+xml; charset=utf-8');
 
+const robotsTxtAsset = staticAsset(
+  Buffer.from('User-agent: *\nDisallow: /api/\n'),
+  'text/plain; charset=utf-8',
+);
+
 // --- Cache mémoire TTL pour /api/overview (B3) ---
 
-let overviewCache: { key: string; at: number; data: unknown } | null = null;
+// ponytail: Map keyed by `${pair}|${offsetH}`; bounded by validated inputs
+// (2 pairs × tzoff[-14..14] ≈ 58 keys) — the clear() is a paranoia cap.
+const overviewCache = new Map<string, { at: number; data: unknown }>();
 const OVERVIEW_TTL_MS = 60_000;
 
 // --- Cache mémoire TTL pour /api/health (D3) ---
@@ -213,6 +220,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     // parseQuery skips malformed percent-encoded params (e.g. ?pair=%GG) via try/catch;
     // the handler then returns 400 if a required param is absent or invalid.
     const query = parseQuery(rawUrl);
+
+    if (path.startsWith('/api/') && !apiAllowed(req)) {
+      json(res, req, 403, { error: 'accès direct à l\'API non autorisé' });
+      return;
+    }
+
     if (req.method === 'GET' && path === '/') {
       sendStatic(req, res, htmlAsset, 'no-cache', SECURITY_HEADERS);
       return;
@@ -236,6 +249,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
     if (req.method === 'GET' && path === '/logo.svg') {
       sendStatic(req, res, logoAsset, 'public, max-age=86400', { 'X-Content-Type-Options': 'nosniff' });
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/robots.txt') {
+      sendStatic(req, res, robotsTxtAsset, 'public, max-age=86400');
       return;
     }
 
@@ -293,12 +311,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const offsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
       const now = Date.now();
       const cacheKey = `${pair}|${offsetH}`;
-      if (overviewCache && overviewCache.key === cacheKey && now - overviewCache.at < OVERVIEW_TTL_MS) {
-        json(res, req, 200, overviewCache.data);
+      const hit = overviewCache.get(cacheKey);
+      if (hit && now - hit.at < OVERVIEW_TTL_MS) {
+        json(res, req, 200, hit.data);
         return;
       }
       const result = overview(db, pair, cfg, undefined, offsetH);
-      overviewCache = { key: cacheKey, at: now, data: result };
+      // ponytail: bounded by validated inputs (2 pairs × tzoff[-14..14] ≈ 58 keys); clear() is a paranoia cap.
+      if (overviewCache.size > 200) overviewCache.clear();
+      overviewCache.set(cacheKey, { at: now, data: result });
       json(res, req, 200, result);
       return;
     }
@@ -403,7 +424,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const offsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
       const refresh = await manualRefresh(cfg);
       // B3/D3 : invalide les caches après un refresh (les données changent)
-      overviewCache = null;
+      overviewCache.clear();
       healthCache = null;
       json(res, req, 200, { refresh, overview: overview(db, pair, cfg, undefined, offsetH) });
       return;
