@@ -137,6 +137,7 @@ function json(res: ServerResponse, req: IncomingMessage, status: number, data: u
     'Cache-Control': 'no-store',
     'Vary': 'Accept-Encoding',
     'X-Content-Type-Options': 'nosniff',
+    'Cross-Origin-Resource-Policy': 'same-origin',
   };
   let out = body;
   let enc: string | undefined;
@@ -156,7 +157,13 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
   'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'Permissions-Policy': 'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()',
 };
+
+// C1b — En-têtes communs pour les assets statiques (JS, SVG, PNG, texte)
+const RESOURCE_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'Cross-Origin-Resource-Policy': 'same-origin' } as const;
 
 // C4 — Redaction de l'URL RPC (protocol+host uniquement, sans le path qui peut contenir une clé API)
 function redactRpcUrl(u: string): string {
@@ -263,23 +270,23 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     if (req.method === 'GET' && path === '/walletkit.js') {
-      sendStatic(req, res, walletkitAsset, 'no-cache', { 'X-Content-Type-Options': 'nosniff' });
+      sendStatic(req, res, walletkitAsset, 'no-cache', RESOURCE_HEADERS);
       return;
     }
 
     if (req.method === 'GET' && path === '/app.js') {
-      sendStatic(req, res, appJsAsset, 'no-cache', { 'X-Content-Type-Options': 'nosniff' });
+      sendStatic(req, res, appJsAsset, 'no-cache', RESOURCE_HEADERS);
       return;
     }
 
     // B10 : /version.js supprimé (APP_REV inliné dans le HTML au boot)
 
     if (req.method === 'GET' && path === '/favicon.svg') {
-      sendStatic(req, res, faviconAsset, 'public, max-age=86400', { 'X-Content-Type-Options': 'nosniff' });
+      sendStatic(req, res, faviconAsset, 'public, max-age=86400', RESOURCE_HEADERS);
       return;
     }
     if (req.method === 'GET' && path === '/logo.svg') {
-      sendStatic(req, res, logoAsset, 'public, max-age=86400', { 'X-Content-Type-Options': 'nosniff' });
+      sendStatic(req, res, logoAsset, 'public, max-age=86400', RESOURCE_HEADERS);
       return;
     }
 
@@ -294,7 +301,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       if (/^[A-Za-z0-9._-]+\.png$/.test(name)) {
         const icon = walletIconsMap.get(name);
         if (icon) {
-          sendStatic(req, res, icon, 'public, max-age=86400', { 'X-Content-Type-Options': 'nosniff' });
+          sendStatic(req, res, icon, 'public, max-age=86400', RESOURCE_HEADERS);
           return;
         }
       }
