@@ -1,8 +1,8 @@
 // Serveur HTTP web — node:http (stdlib, pas d'Express).
 // Routes : GET / · GET /api/overview · GET /api/quote · GET /api/balance
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { clientIp } from './request-ip.js';
-import { readFileSync } from 'node:fs';
+import { clientIp, apiAllowed } from './request-ip.js';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
@@ -89,9 +89,37 @@ const faviconAsset = staticAsset(readFileSync(faviconPath), 'image/svg+xml; char
 const logoPath = fileURLToPath(new URL('./public/logo.svg', import.meta.url));
 const logoAsset = staticAsset(readFileSync(logoPath), 'image/svg+xml; charset=utf-8');
 
+const robotsTxtAsset = staticAsset(
+  Buffer.from(
+    '# DecantFi is open-source. Want the data? Run your own instance:\n' +
+    '#   https://github.com/actarus314/DecantFi\n' +
+    '# The /api/* endpoints serve the dashboard only — please don\'t scrape them.\n' +
+    '# Questions or a use case? Open a GitHub issue and reach out.\n' +
+    'User-agent: *\n' +
+    'Disallow: /api/\n',
+  ),
+  'text/plain; charset=utf-8',
+);
+
+// Wallet icons: precompile all .png files from web/public/wallet-icons/ at boot.
+// Generic: any icon produced by build:walletkit is served automatically.
+const walletIconsMap = new Map<string, ReturnType<typeof staticAsset>>();
+const walletIconsDir = new URL('./public/wallet-icons/', import.meta.url);
+try {
+  for (const name of readdirSync(fileURLToPath(walletIconsDir))) {
+    if (!name.endsWith('.png')) continue;
+    const buf = readFileSync(fileURLToPath(new URL(name, walletIconsDir)));
+    walletIconsMap.set(name, staticAsset(buf, 'image/png'));
+  }
+} catch {
+  // Directory missing (fresh checkout before build:walletkit) — serve 404 for icon requests.
+}
+
 // --- Cache mémoire TTL pour /api/overview (B3) ---
 
-let overviewCache: { key: string; at: number; data: unknown } | null = null;
+// ponytail: Map keyed by `${pair}|${offsetH}`; bounded by validated inputs
+// (2 pairs × tzoff[-14..14] ≈ 58 keys) — the clear() is a paranoia cap.
+const overviewCache = new Map<string, { at: number; data: unknown }>();
 const OVERVIEW_TTL_MS = 60_000;
 
 // --- Cache mémoire TTL pour /api/health (D3) ---
@@ -109,6 +137,7 @@ function json(res: ServerResponse, req: IncomingMessage, status: number, data: u
     'Cache-Control': 'no-store',
     'Vary': 'Accept-Encoding',
     'X-Content-Type-Options': 'nosniff',
+    'Cross-Origin-Resource-Policy': 'same-origin',
   };
   let out = body;
   let enc: string | undefined;
@@ -127,8 +156,14 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://stellar.creit.tech; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'Permissions-Policy': 'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()',
 };
+
+// C1b — En-têtes communs pour les assets statiques (JS, SVG, PNG, texte)
+const RESOURCE_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'Cross-Origin-Resource-Policy': 'same-origin' } as const;
 
 // C4 — Redaction de l'URL RPC (protocol+host uniquement, sans le path qui peut contenir une clé API)
 function redactRpcUrl(u: string): string {
@@ -198,6 +233,12 @@ function isStellarPubkey(s: unknown): s is string { return typeof s === 'string'
 
 function execStatus(code: ExecError['code']): number { return code === 'down' ? 502 : 400; } // bad_request → 400 (client error)
 
+// Operator-visible signal when a protection fires: `docker logs <web> | grep BLOCK`.
+function logBlock(req: IncomingMessage, status: number, reason: string, path: string): void {
+  const ua = (req.headers['user-agent'] ?? '').toString().replace(/[\r\n]/g, ' ').slice(0, 100);
+  process.stderr.write(`BLOCK ${status} ${reason} ${path} ip=${clientIp(req)} ua="${ua}"\n`);
+}
+
 const VENUES: readonly Venue[] = ['xbull', 'soroswap', 'horizon', 'aquarius', 'comet', 'ultrastellar'];
 function isVenue(v: unknown): v is Venue { return typeof v === 'string' && (VENUES as readonly string[]).includes(v); }
 
@@ -213,30 +254,58 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     // parseQuery skips malformed percent-encoded params (e.g. ?pair=%GG) via try/catch;
     // the handler then returns 400 if a required param is absent or invalid.
     const query = parseQuery(rawUrl);
+
+    if (path.startsWith('/api/') && !apiAllowed(req)) {
+      logBlock(req, 403, 'sec-fetch', path);
+      json(res, req, 403, {
+        error: "accès direct à l'API non autorisé",
+        message: "DecantFi is open-source. Want this data? Run your own instance — it's a few commands: https://github.com/actarus314/DecantFi . The /api/* endpoints power the dashboard only; please don't scrape them. Questions or a use case? Open a GitHub issue and let's talk.",
+      });
+      return;
+    }
+
     if (req.method === 'GET' && path === '/') {
       sendStatic(req, res, htmlAsset, 'no-cache', SECURITY_HEADERS);
       return;
     }
 
     if (req.method === 'GET' && path === '/walletkit.js') {
-      sendStatic(req, res, walletkitAsset, 'no-cache', { 'X-Content-Type-Options': 'nosniff' });
+      sendStatic(req, res, walletkitAsset, 'no-cache', RESOURCE_HEADERS);
       return;
     }
 
     if (req.method === 'GET' && path === '/app.js') {
-      sendStatic(req, res, appJsAsset, 'no-cache', { 'X-Content-Type-Options': 'nosniff' });
+      sendStatic(req, res, appJsAsset, 'no-cache', RESOURCE_HEADERS);
       return;
     }
 
     // B10 : /version.js supprimé (APP_REV inliné dans le HTML au boot)
 
     if (req.method === 'GET' && path === '/favicon.svg') {
-      sendStatic(req, res, faviconAsset, 'public, max-age=86400', { 'X-Content-Type-Options': 'nosniff' });
+      sendStatic(req, res, faviconAsset, 'public, max-age=86400', RESOURCE_HEADERS);
       return;
     }
     if (req.method === 'GET' && path === '/logo.svg') {
-      sendStatic(req, res, logoAsset, 'public, max-age=86400', { 'X-Content-Type-Options': 'nosniff' });
+      sendStatic(req, res, logoAsset, 'public, max-age=86400', RESOURCE_HEADERS);
       return;
+    }
+
+    if (req.method === 'GET' && path === '/robots.txt') {
+      sendStatic(req, res, robotsTxtAsset, 'public, max-age=86400');
+      return;
+    }
+
+    if (req.method === 'GET' && path.startsWith('/wallet-icons/')) {
+      const name = path.slice('/wallet-icons/'.length);
+      // Validate: only safe filename characters, must end with .png (map lookup is path-traversal-safe)
+      if (/^[A-Za-z0-9._-]+\.png$/.test(name)) {
+        const icon = walletIconsMap.get(name);
+        if (icon) {
+          sendStatic(req, res, icon, 'public, max-age=86400', RESOURCE_HEADERS);
+          return;
+        }
+      }
+      // Fall through to 404
     }
 
     if (req.method === 'GET' && path === '/api/health') {
@@ -293,19 +362,22 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const offsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
       const now = Date.now();
       const cacheKey = `${pair}|${offsetH}`;
-      if (overviewCache && overviewCache.key === cacheKey && now - overviewCache.at < OVERVIEW_TTL_MS) {
-        json(res, req, 200, overviewCache.data);
+      const hit = overviewCache.get(cacheKey);
+      if (hit && now - hit.at < OVERVIEW_TTL_MS) {
+        json(res, req, 200, hit.data);
         return;
       }
       const result = overview(db, pair, cfg, undefined, offsetH);
-      overviewCache = { key: cacheKey, at: now, data: result };
+      // ponytail: bounded by validated inputs (2 pairs × tzoff[-14..14] ≈ 58 keys); clear() is a paranoia cap.
+      if (overviewCache.size > 200) overviewCache.clear();
+      overviewCache.set(cacheKey, { at: now, data: result });
       json(res, req, 200, result);
       return;
     }
 
     if (req.method === 'GET' && path === '/api/quote') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 120, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 120, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const pairRaw = query['pair'] ?? 'USDC';
       const pair = parsePair(pairRaw);
       if (!pair) {
@@ -359,7 +431,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/api/balance') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 60, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 60, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const address = query['address'];
       if (address !== undefined) {
         if (!isStellarPubkey(address)) { json(res, req, 400, { error: 'adresse invalide' }); return; }
@@ -374,7 +446,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/api/asset-balance') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 60, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 60, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const address = query['address'];
       if (!isStellarPubkey(address)) { json(res, req, 400, { error: 'adresse invalide' }); return; }
       const assetKey = query['asset'];
@@ -403,7 +475,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const offsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
       const refresh = await manualRefresh(cfg);
       // B3/D3 : invalide les caches après un refresh (les données changent)
-      overviewCache = null;
+      overviewCache.clear();
       healthCache = null;
       json(res, req, 200, { refresh, overview: overview(db, pair, cfg, undefined, offsetH) });
       return;
@@ -411,7 +483,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'POST' && path === '/api/build') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 30, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 30, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       const pair = parsePair(typeof b.pair === 'string' ? b.pair : null);
@@ -450,7 +522,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'POST' && path === '/api/build-trustline') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 10, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 10, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       const pair = parsePair(typeof b.pair === 'string' ? b.pair : null);
@@ -468,7 +540,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'POST' && path === '/api/submit') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 10, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 10, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const raw = await readJsonBody(req);
       const b = (raw ?? {}) as Record<string, unknown>;
       if (!isVenue(b.venue)) { json(res, req, 400, { error: 'venue invalide' }); return; }
@@ -486,7 +558,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/api/tx-status') {
       const ip = clientIp(req);
-      if (rateLimited(ip, 90, 60_000)) { json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      if (rateLimited(ip, 90, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
       const venue = query['venue'];
       if (venue !== 'aquarius' && venue !== 'comet') { json(res, req, 400, { error: 'venue invalide (tx-status réservé aux venues Soroban)' }); return; }
       const hash = query['hash'];

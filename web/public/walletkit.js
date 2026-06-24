@@ -10204,7 +10204,7 @@ var xBullModule = class {
       enumerable: true,
       configurable: true,
       writable: true,
-      value: "https://stellar.creit.tech/wallet-icons/xbull.png"
+      value: "/wallet-icons/xbull.png"
     });
   }
   isAvailable() {
@@ -10424,7 +10424,7 @@ var FreighterModule = class {
       enumerable: true,
       configurable: true,
       writable: true,
-      value: "https://stellar.creit.tech/wallet-icons/freighter.png"
+      value: "/wallet-icons/freighter.png"
     });
   }
   async runChecks() {
@@ -10571,7 +10571,7 @@ var LobstrModule = class {
       enumerable: true,
       configurable: true,
       writable: true,
-      value: "https://stellar.creit.tech/wallet-icons/lobstr.png"
+      value: "/wallet-icons/lobstr.png"
     });
   }
   async runChecks() {
@@ -11751,7 +11751,7 @@ var AlbedoModule = class {
       enumerable: true,
       configurable: true,
       writable: true,
-      value: "https://stellar.creit.tech/wallet-icons/albedo.png"
+      value: "/wallet-icons/albedo.png"
     });
   }
   async isAvailable() {
@@ -11840,7 +11840,7 @@ var RabetModule = class {
       enumerable: true,
       configurable: true,
       writable: true,
-      value: "https://stellar.creit.tech/wallet-icons/rabet.png"
+      value: "/wallet-icons/rabet.png"
     });
   }
   async runChecks() {
@@ -11936,7 +11936,7 @@ var HanaModule = class {
       enumerable: true,
       configurable: true,
       writable: true,
-      value: "https://stellar.creit.tech/wallet-icons/hana.png"
+      value: "/wallet-icons/hana.png"
     });
   }
   async runChecks() {
