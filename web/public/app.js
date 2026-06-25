@@ -1456,13 +1456,8 @@ function ladderRows(rows, u, down) {
     const isSel = r.sourceId && r.sourceId === selectedSource;
     const trClass = [r.winner ? 'win' : '', isSel ? 'sel' : ''].filter(Boolean).join(' ');
     const sid = r.sourceId ? r.sourceId.replace(/\\/g, '\\\\').replace(/'/g, "\\'") : '';
-    // High-gas warning badge for xBull/Aquarius when real on-chain gas exceeds threshold.
-    const rowGasHigh = r.gasRealXlm != null && r.gasRealXlm > HIGH_GAS_XLM;
-    const gasWarnHtml = rowGasHigh
-      ? ` <span class="tip-wrap"><span style="color:var(--amber);font-weight:700;cursor:help">⚠</span><span class="tip-box" style="min-width:260px;white-space:normal"><b>${t('gas_high_label')}</b><br>${t('gas_high_tip', (r.gasRealXlm).toFixed(2))}</span></span>`
-      : '';
     return `<tr class="${trClass}" style="cursor:pointer" data-act="selectSource" data-args='${JSON.stringify([sid])}'>
-      <td>${venueCard(r.sourceId, r.display)}${r.note ? ` <span class="muted">· ${escapeHtml(noteLabel(r.note))}</span>` : ''}${gasWarnHtml}</td>
+      <td>${venueCard(r.sourceId, r.display)}${r.note ? ` <span class="muted">· ${escapeHtml(noteLabel(r.note))}</span>` : ''}</td>
       <td>${fmt3(r.net)}</td>
       <td class="${deltaClass}">${delta}</td>
       <td><span class="chip ${r.chip}">${chipLabel(r.chip)}</span></td>

@@ -90,11 +90,6 @@ export interface NormalizedQuote {
   /** Durée totale de cotation pour cette source (ms) : fetch API + re-simulation incluse le cas échéant.
    *  Alimenté par engine (fetch) + quote-api/tick (re-sim). Optionnel : absent = non mesuré. */
   durationMs?: number;
-  /** Real Soroban resource fee in XLM, extracted from a real on-chain XDR simulation.
-   *  Only set for xBull (from accept-quote XDR) and Aquarius (from swap_chain_xdr re-sim).
-   *  Never set from the flat DEFAULT_GAS_XLM default — only populated when a real XDR is available.
-   *  Used for the high-gas warning (rent/TTL extension); never affects net or ranking. */
-  gasRealXlm?: number;
 }
 
 export interface SourceAdapter {
