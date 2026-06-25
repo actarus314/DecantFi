@@ -68,7 +68,8 @@ services:
 
   # ─── Monitoring profile (optional) ────────────────────────────────────────
   # Start with: docker compose --profile monitoring up -d
-  # Requires ACCESS_LOG=/app/logs/access.log in .env (web must write the file).
+  # The web service always writes the access log (ACCESS_LOG is set in its env above);
+  # this profile just adds GoAccess to read + serve it. No extra .env var required.
   # The dashboard is published on host port ${GOACCESS_PORT} — put it behind your
   # reverse proxy with authentication; never expose it publicly without auth.
 
@@ -101,10 +102,12 @@ services:
         while true; do
           LOGS="/logs/access.log"
           [ -f /logs/access.log.1 ] && LOGS="$$LOGS /logs/access.log.1"
-          goaccess $$LOGS --log-format=COMBINED -o /report/index.html.tmp 2>/dev/null || true
-          if [ -f /report/index.html.tmp ]; then
-            sed -i "s|</head>|<meta http-equiv=\"refresh\" content=\"$$REFRESH\"></head>|" /report/index.html.tmp
-            mv /report/index.html.tmp /report/index.html
+          # goaccess picks the output format from the file extension, so the temp file
+          # must end in .html (a .tmp suffix is rejected). On success, swap it in atomically.
+          # stderr is kept (not /dev/null) so failures + a per-cycle heartbeat show in `docker logs`.
+          if goaccess $$LOGS --log-format=COMBINED -o /report/index.tmp.html 2>&1; then
+            sed -i "s|</head>|<meta http-equiv=\"refresh\" content=\"$$REFRESH\"></head>|" /report/index.tmp.html
+            mv /report/index.tmp.html /report/index.html
           fi
           sleep $$REFRESH
         done
