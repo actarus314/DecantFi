@@ -88,6 +88,9 @@ const walletkitAsset = staticAsset(readFileSync(walletkitPath), 'text/javascript
 const appJsPath = fileURLToPath(new URL('./public/app.js', import.meta.url));
 const appJsAsset = staticAsset(readFileSync(appJsPath), 'text/javascript; charset=utf-8');
 
+const chooseExecPath = fileURLToPath(new URL('./public/choose-exec.js', import.meta.url));
+const chooseExecAsset = staticAsset(readFileSync(chooseExecPath), 'text/javascript; charset=utf-8');
+
 const faviconPath = fileURLToPath(new URL('./public/favicon.svg', import.meta.url));
 const faviconAsset = staticAsset(readFileSync(faviconPath), 'image/svg+xml; charset=utf-8');
 
@@ -288,6 +291,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/app.js') {
       sendStatic(req, res, appJsAsset, 'no-cache', RESOURCE_HEADERS);
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/choose-exec.js') {
+      sendStatic(req, res, chooseExecAsset, 'no-cache', RESOURCE_HEADERS);
       return;
     }
 

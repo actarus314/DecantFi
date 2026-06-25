@@ -1509,7 +1509,11 @@ function simCard() {
       ? `<span style="color:var(--caption)">${t('sb_floor_label', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(sbFloor)} ${target}</span><br><span style="color:var(--caption);font-size:.78em">${t('sb_floor_note')}</span>`
       : `<span style="color:var(--caption)">${t('sim_min', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(minReceived)} ${target}</span>`;
     // Nom de l'outil retiré ici : il est désormais porté par le bouton « Exécuter via [outil] ».
-    const legsData = (displayRow || b).legs;
+    // Same decision as doExecute (choose-exec.js): the button shown and the route
+    // preview are driven by the row that will actually execute, so "Execute via X"
+    // can never open a different flow than X.
+    const exec = chooseExec(selectedSource, simResult);
+    const legsData = exec.row ? exec.row.legs : undefined;
     const routeDiv = legsData
       ? '<div class="complegs">' + legsData.map((leg, i) =>
           `<div class="legblock"><span class="txbadge">${t('tx_label')} ${i + 1}</span>${routeFromParts(leg.routeParts, false)}</div>`
@@ -2658,15 +2662,15 @@ async function doExecute() {
     renderApp();
     return;
   }
-  // Si une source exécutable est sélectionnée, forcer ce venue côté serveur
-  const selRow = selectedSource
-    ? (simResult.ladder || []).find(r => r.sourceId === selectedSource)
-    : null;
-  const winRow = (simResult.ladder || []).find(r => r.winner);
-  const isComposite = !!(winRow && winRow.sourceId && winRow.sourceId.includes('+'));
-  // Composite EURC → flux guidé 2 jambes
+  // Single source of truth shared with the render (choose-exec.js): the row we
+  // execute MUST be the row the UI showed as the target. Selecting an atomic venue
+  // while the composite is the displayed winner must run THAT venue — never the
+  // 2-tx flow. Gating on winRow here was the bug: for EURC the winner IS the
+  // composite, so every selection short-circuited into startCompositeLeg1.
+  const { row: chosenRow, selRow, winRow, isComposite } = chooseExec(selectedSource, simResult);
+  // Composite EURC → flux guidé 2 jambes, sur la ligne composite choisie.
   if (isComposite) {
-    await startCompositeLeg1(winRow);
+    await startCompositeLeg1(chosenRow);
     return;
   }
   // Venue à forcer : la ligne sélectionnée si exécutable, sinon le GAGNANT affiché s'il est exécutable.
@@ -2717,9 +2721,10 @@ async function doExecuteSbFloor() {
   renderApp();
 }
 
-// Lance le flux composite 2-tx pour la ligne composite affichée (best OU sélectionnée).
-// Indépendant du flag `winner` du ladder : le headline peut être le composite alors que
-// raw[0] (winner) est une venue atomique → on cible la ligne dont le sourceId contient '+'.
+// Lance le flux composite 2-tx. Cible explicitement la ligne dont le sourceId contient
+// '+' (la composite EURC via-USDC), sans dépendre du flag `winner` : pour EURC c'est
+// justement la composite qui est en tête (raw[0], donc winner), mais ce bouton n'est
+// rendu que quand la composite est la cible d'exécution effective (cf. chooseExec).
 async function doExecuteComposite() {
   if (!simResult || !simActive || simAmt <= 0) return;
   if (!walletAddress) { execState = { phase: 'error', errorMsg: t('exec_connect_first') }; renderApp(); return; }
@@ -2728,9 +2733,9 @@ async function doExecuteComposite() {
   await startCompositeLeg1(compRow);
 }
 
-async function startCompositeLeg1(winRow) {
-  const leg1Source = (winRow.legs && winRow.legs[0] && winRow.legs[0].sourceId)
-    || winRow.sourceId.split('+')[0].trim();
+async function startCompositeLeg1(compRow) {
+  const leg1Source = (compRow.legs && compRow.legs[0] && compRow.legs[0].sourceId)
+    || compRow.sourceId.split('+')[0].trim();
   // Lire le solde USDC avant (non bloquant)
   let usdcBefore = null;
   if (walletAddress) {
