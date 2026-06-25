@@ -66,7 +66,7 @@ services:
   # ─── Monitoring profile (optional) ────────────────────────────────────────
   # Start with: docker compose --profile monitoring up -d
   # Requires ACCESS_LOG=/app/logs/access.log in .env (web must write the file).
-  # The dashboard is served at 0.0.0.0:${GOACCESS_PORT} — put it behind your
+  # The dashboard is published on host port ${GOACCESS_PORT} — put it behind your
   # reverse proxy with authentication; never expose it publicly without auth.
 
   goaccess:
@@ -120,7 +120,7 @@ services:
     pids_limit: 32
     mem_limit: 32m
     ports:
-      - "0.0.0.0:${GOACCESS_PORT}:80"
+      - "${GOACCESS_PORT}:80"   # published host port; put it behind your reverse proxy + auth
     volumes:
       - goaccess-report:/report:ro
     command: ["httpd", "-f", "-p", "80", "-h", "/report"]
