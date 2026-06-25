@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { clfTime, accessLine } from './access-log.js';
+import { clfTime, accessLine, shouldRotate } from './access-log.js';
 
 // ─── clfTime ────────────────────────────────────────────────────────────────
 
@@ -118,5 +118,33 @@ describe('accessLine', () => {
     const req = makeReq({ headers: { 'if-none-match': 'W/"abc"' } });
     const res = makeRes(304);
     expect(accessLine(req, res, '/app.js')).toMatch(COMBINED);
+  });
+});
+
+// ─── shouldRotate (rotation decision) ───────────────────────────────────────
+
+describe('shouldRotate', () => {
+  const MAX = 50 * 1024 * 1024; // 50 MB in bytes
+
+  it('returns false when file size is exactly at the cap', () => {
+    expect(shouldRotate(MAX, MAX)).toBe(false);
+  });
+
+  it('returns false when file size is well below the cap', () => {
+    expect(shouldRotate(1024, MAX)).toBe(false);
+  });
+
+  it('returns true when file size exceeds the cap by 1 byte', () => {
+    expect(shouldRotate(MAX + 1, MAX)).toBe(true);
+  });
+
+  it('returns true when file size is well above the cap', () => {
+    expect(shouldRotate(100 * 1024 * 1024, MAX)).toBe(true);
+  });
+
+  it('respects a custom cap (e.g. 10 MB)', () => {
+    const tenMb = 10 * 1024 * 1024;
+    expect(shouldRotate(tenMb, tenMb)).toBe(false);
+    expect(shouldRotate(tenMb + 1, tenMb)).toBe(true);
   });
 });

@@ -2,7 +2,7 @@
 // Routes : GET / · GET /api/overview · GET /api/quote · GET /api/balance
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { clientIp, apiAllowed } from './request-ip.js';
-import { accessLine } from './access-log.js';
+import { accessLine, initAccessFile, accessFileActive, writeToAccessFile } from './access-log.js';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
@@ -21,6 +21,10 @@ import { TARGETS, BLND, USDC } from '../core/assets.js';
 
 const cfg = loadWebConfig();
 const db = openReadOnly(cfg.dbPath);
+
+// Initialise the optional COMBINED access-log file tee (opt-in via ACCESS_LOG env var).
+// No-op when ACCESS_LOG is empty/unset.
+initAccessFile();
 
 // --- Helpers compression + ETag ---
 
@@ -248,9 +252,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   const path = rawUrl.split('?')[0] ?? '/';
 
   // Emit one nginx COMBINED line to stdout on response finish (GoAccess-parseable).
+  // Also tee to the access log file when ACCESS_LOG is set (optional file sink).
   // Registered before rpcAls.run so it fires for every status (200/304/400/403/404/429/500).
   res.on('finish', () => {
-    process.stdout.write(accessLine(req, res, path));
+    const line = accessLine(req, res, path);
+    process.stdout.write(line);
+    if (accessFileActive()) writeToAccessFile(line);
   });
 
   // Wrap in ALS so inc()/read() are isolated per concurrent request (fix #3).
