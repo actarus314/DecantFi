@@ -168,10 +168,16 @@ const STRINGS = {
     // Trustline in-app
     trustline_title: 'Trustline requise',
     trustline_need: (tgt) => `Ton compte n'a pas de trustline ${tgt} — obligatoire pour recevoir l'${tgt}. Ajoute-la en un clic ci-dessous (~0,5 XLM de réserve immobilisée, récupérable si tu la retires plus tard).`,
+    gas_high_label: 'Gas réseau élevé',
+    gas_high_tip: (x) => `Cette route doit prolonger le TTL d'entrées Soroban partagées (rent ~${x} XLM). Coût ponctuel/périodique, pas par-swap : il retombe une fois les entrées réétendues, et le surplus réservé est remboursé. Garde assez de XLM.`,
     trustline_add_btn: (tgt) => `Ajouter la trustline ${tgt}`,
     trustline_adding: 'Ajout de la trustline…',
     trustline_added: (tgt) => `Trustline ${tgt} ajoutée`,
     trustline_added_hint: 'Tu peux maintenant lancer le swap.',
+
+    // Fee guard
+    fee_insufficient_title: 'XLM insuffisant pour les frais réseau',
+    fee_insufficient: (fee, avail) => `Cette route réserve ${fee} XLM de frais réseau ; le réseau exige que ton compte les couvre (le surplus est remboursé). Or tu n'as que ${avail} XLM disponibles (hors réserve). Ajoute du XLM, ou choisis une autre venue.`,
 
     // Composite 2-tx
     comp_step: (n) => `Étape ${n} / 2`,
@@ -431,10 +437,16 @@ const STRINGS = {
     // In-app trustline
     trustline_title: 'Trustline required',
     trustline_need: (tgt) => `Your account has no ${tgt} trustline — required to receive ${tgt}. Add it in one click below (~0.5 XLM reserve locked, refundable if you remove it later).`,
+    gas_high_label: 'High network gas',
+    gas_high_tip: (x) => `This route must extend the TTL of shared Soroban state (rent ~${x} XLM). One-off/periodic cost, not per-swap: it drops once the entries are re-extended and the reserved surplus is refunded. Keep enough XLM.`,
     trustline_add_btn: (tgt) => `Add ${tgt} trustline`,
     trustline_adding: 'Adding trustline…',
     trustline_added: (tgt) => `${tgt} trustline added`,
     trustline_added_hint: 'You can now run the swap.',
+
+    // Fee guard
+    fee_insufficient_title: 'Not enough XLM for network fees',
+    fee_insufficient: (fee, avail) => `This route reserves ${fee} XLM of network fees; the network requires your account to cover them (the surplus is refunded). You only have ${avail} XLM available (excluding reserve). Add XLM, or pick another venue.`,
 
     // Composite 2-tx
     comp_step: (n) => `Step ${n} / 2`,
@@ -694,10 +706,16 @@ const STRINGS = {
     // In-app trustline
     trustline_title: 'Trustline requerida',
     trustline_need: (tgt) => `Su cuenta no tiene trustline de ${tgt} — necesaria para recibir ${tgt}. Añádala con un clic a continuación (~0,5 XLM de reserva bloqueada, reembolsable si la elimina más adelante).`,
+    gas_high_label: 'Gas de red elevado',
+    gas_high_tip: (x) => `Esta ruta debe extender el TTL de entradas Soroban compartidas (alquiler ~${x} XLM). Costo puntual/periódico, no por-swap: baja una vez que las entradas se reextienden y el excedente reservado se reembolsa. Mantén suficiente XLM.`,
     trustline_add_btn: (tgt) => `Añadir trustline de ${tgt}`,
     trustline_adding: 'Añadiendo trustline…',
     trustline_added: (tgt) => `Trustline de ${tgt} añadida`,
     trustline_added_hint: 'Ya puede ejecutar el swap.',
+
+    // Fee guard
+    fee_insufficient_title: 'XLM insuficiente para las tarifas de red',
+    fee_insufficient: (fee, avail) => `Esta ruta reserva ${fee} XLM en tarifas de red; la red exige que su cuenta las cubra (el excedente se reembolsa). Solo dispone de ${avail} XLM disponibles (excluyendo la reserva). Añada XLM o elija otra venue.`,
 
     // Composite 2-tx
     comp_step: (n) => `Paso ${n} / 2`,
@@ -917,10 +935,17 @@ const STRINGS = {
     err_noroute: 'Nenhuma rota executável para este valor.',
     trustline_title: 'Trustline necessária',
     trustline_need: (tgt) => `Sua conta não tem trustline ${tgt} — necessária para receber ${tgt}. Adicione com um clique abaixo (~0,5 XLM de reserva bloqueada, reembolsável se removida depois).`,
+    gas_high_label: 'Gas de rede elevado',
+    gas_high_tip: (x) => `Esta rota deve estender o TTL de entradas Soroban compartilhadas (aluguel ~${x} XLM). Custo pontual/periódico, não por-swap: diminui quando as entradas são reestendidas e o excedente reservado é reembolsado. Mantenha XLM suficiente.`,
     trustline_add_btn: (tgt) => `Adicionar trustline ${tgt}`,
     trustline_adding: 'Adicionando trustline…',
     trustline_added: (tgt) => `Trustline ${tgt} adicionada`,
     trustline_added_hint: 'Agora você pode executar o swap.',
+
+    // Fee guard
+    fee_insufficient_title: 'XLM insuficiente para as taxas de rede',
+    fee_insufficient: (fee, avail) => `Esta rota reserva ${fee} XLM em taxas de rede; a rede exige que sua conta as cubra (o excedente é reembolsado). Você tem apenas ${avail} XLM disponíveis (excluindo a reserva). Adicione XLM ou escolha outra venue.`,
+
     comp_step: (n) => `Etapa ${n} / 2`,
     comp_leg1_confirming: 'Leg 1 confirmada — preparando leg 2…',
     comp_leg2_failed: (x) => `Leg 1 concluída: ${x} USDC recebidos. Leg 2 falhou — você possui esses USDC.`,
@@ -1026,6 +1051,11 @@ let health = null;      // données de /api/health
 let target = 'USDC';
 // Langue par défaut = navigateur (FR si la préférence commence par "fr", sinon EN) ; un choix explicite reste persisté
 const LOCALE = { fr: 'fr-FR', en: 'en-US', es: 'es-ES', pt: 'pt-BR' };
+
+// Threshold for the high-gas warning (XLM). Only applies to real on-chain XDR gas (xBull/Aquarius).
+// Must match the server-side constant. Classic routes (Horizon/Ultra/StellarBroker) never trigger this.
+// DEFAULT_GAS_XLM.soroban = 0.045 XLM — far below this threshold, so it can never false-trigger.
+const HIGH_GAS_XLM = 0.5;
 let lang = (() => {
   const saved = localStorage.getItem('lang');
   if (['fr', 'en', 'es', 'pt'].includes(saved)) return saved;
@@ -3026,17 +3056,27 @@ function reviewTableHtml(rv, tgt, showSimDelta, sendAsset = 'BLND') {
   const feeStr = feeXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
   const realXlm = rv.gasRealXlm;
   const realStr = realXlm != null ? realXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
+  const gasHigh = realXlm != null && realXlm > HIGH_GAS_XLM;
+  const gasColor = gasHigh ? 'var(--amber)' : null;
   const feeLabel = t('net_fee_label');
   const feeDisplay = realStr != null
-    ? `${realStr} XLM <span style="font-size:12px;color:var(--caption)">(max&nbsp;${feeStr})</span>`
+    ? `${realStr} XLM <span style="font-size:12px;color:${gasHigh ? 'var(--amber)' : 'var(--caption)'}">(max&nbsp;${feeStr})</span>`
     : `${feeStr} XLM`;
+  const feeCell = gasHigh
+    ? `<span style="color:var(--amber);font-weight:700">${feeDisplay}</span>`
+    : feeDisplay;
+  // High-gas warning near venue name: tooltip using existing tip-wrap/tip-box pattern (CSP-safe, no onclick).
+  const gasHighTipHtml = gasHigh
+    ? ` <span class="tip-wrap"><span style="color:var(--amber);font-weight:700;cursor:help">⚠</span><span class="tip-box" style="min-width:260px;white-space:normal">${t('gas_high_tip', (realXlm).toFixed(2))}</span></span>`
+    : '';
+  const venueCell = `${vl}${gasHighTipHtml}`;
   return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.4rem">
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} ${sendAsset}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${tgt}${simDeltaHtml}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt3(rv.minReceived)} ${tgt}</td></tr>
-    <tr><td style="padding:4px 0;color:var(--caption)">${feeLabel}</td><td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">${feeDisplay}</td></tr>
-    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${vl}</td></tr>
+    <tr><td style="padding:4px 0;color:${gasColor ?? 'var(--caption)'}${gasHigh ? ';font-weight:700' : ''}">${feeLabel}</td><td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">${feeCell}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${venueCell}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
   </table>
   <hr style="border:0;border-top:1px solid var(--card-border);margin:.2rem 0 .6rem">
@@ -3154,6 +3194,10 @@ function execModal() {
     const sbFloorNote = execState.sbFloor
       ? `<p class="help" style="margin:.6rem 0 0;color:var(--caption);font-size:12px">${t('exec_sb_floor_note')}</p>`
       : '';
+    const fw = build.feeWarning;
+    const feeGuardNote = fw
+      ? `<p class="help" style="margin:.6rem 0 0;font-size:12px;font-weight:700;color:var(--red)">${t('fee_insufficient_title')} — ${t('fee_insufficient', Number(fw.maxFeeXlm).toFixed(2), Number(fw.spendableXlm).toFixed(2))}</p>`
+      : '';
     content = `
       ${stepBadge}
       <div style="font-size:14px;font-weight:700;margin-bottom:.9rem">${t('review_title')}</div>
@@ -3161,9 +3205,10 @@ function execModal() {
       ${fidelityNote}
       ${restoreNote}
       ${sbFloorNote}
+      ${feeGuardNote}
       <div style="display:flex;gap:.55rem;margin-top:.9rem;justify-content:flex-end">
         <button class="btn" data-act="cancelExecute">${t('review_cancel')}</button>
-        <button class="btn primary" data-act="confirmExecute">${t('review_confirm')}</button>
+        <button class="btn primary" data-act="confirmExecute"${fw ? ' disabled' : ''}>${t('review_confirm')}</button>
       </div>`;
   } else if (phase === 'signing') {
     const rv = build && build.review;

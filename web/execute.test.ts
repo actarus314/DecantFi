@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   minReceivedStroops,
   pickBest,
+  feeExceedsSpendable,
   parseXbullAcceptQuote,
   classifyExecError,
   reviewData,
@@ -1059,5 +1060,46 @@ describe('txStatus', () => {
   it('RPC error → pending (re-poll, pas un échec)', async () => {
     const deps: Partial<ExecDeps> = { makeRpc: () => ({ send: async () => ({ status: 'PENDING' as const, hash: '' }), status: async () => { throw new Error('rpc down'); } }) };
     expect(await txStatus('h', { rpcUrl: 'r' }, deps)).toEqual({ status: 'pending' });
+  });
+});
+
+// ─── feeExceedsSpendable ─────────────────────────────────────────────────────
+// Account: 5.1224040 XLM (51224040 stroops), 3 subentries
+// Reserve  = (2+3) × 5_000_000 = 25_000_000 stroops (2.5 XLM)
+// Spendable = 51224040 − 25000000 = 26224040 stroops (≈ 2.62 XLM)
+
+describe('feeExceedsSpendable', () => {
+  const NATIVE = 51_224_040; // 5.1224040 XLM
+  const SUBS   = 3;
+
+  it('max_fee 3.76 XLM (37600000 stroops) exceeds spendable → exceeds: true', () => {
+    const { exceeds, spendableStroops } = feeExceedsSpendable(37_600_000, NATIVE, SUBS);
+    expect(exceeds).toBe(true);
+    expect(spendableStroops).toBe(26_224_040);
+  });
+
+  it('max_fee 0.11 XLM (1100000 stroops) fits → exceeds: false', () => {
+    const { exceeds, spendableStroops } = feeExceedsSpendable(1_100_000, NATIVE, SUBS);
+    expect(exceeds).toBe(false);
+    expect(spendableStroops).toBe(26_224_040);
+  });
+
+  it('account below reserve → spendableStroops clamped to 0, any fee exceeds', () => {
+    // 1.0 XLM native, 3 subentries → reserve 2.5 XLM → raw spendable negative → clamped to 0
+    // Any fee > 0 therefore exceeds the clamped spendable
+    const { exceeds, spendableStroops } = feeExceedsSpendable(100, 10_000_000, SUBS);
+    expect(spendableStroops).toBe(0);
+    expect(exceeds).toBe(true);
+  });
+
+  it('exact match (max_fee == spendable) → exceeds: false', () => {
+    // 26224040 stroops fee == 26224040 spendable → not strictly greater
+    const { exceeds } = feeExceedsSpendable(26_224_040, NATIVE, SUBS);
+    expect(exceeds).toBe(false);
+  });
+
+  it('max_fee one stroop over spendable → exceeds: true', () => {
+    const { exceeds } = feeExceedsSpendable(26_224_041, NATIVE, SUBS);
+    expect(exceeds).toBe(true);
   });
 });

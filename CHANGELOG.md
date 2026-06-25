@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-06-25
+
+### Added
+- **Pre-signature guard against insufficient XLM for network fees.** A route's *declared*
+  `max_fee` is locked by the network at submission — and for Soroban routes (xBull especially) it
+  can be large because of a worst-case fee reservation. When it exceeds the wallet's spendable XLM
+  (balance minus reserve), the review popup now shows a clear, blocking red message and disables
+  the sign button, instead of letting the user hit an opaque "execution source unavailable" at
+  signature.
+- **High network-fee warning in the review popup.** When a Soroban route's real network fee is
+  unusually high — because the route must extend the TTL of shared on-chain state ("rent") — the
+  fee value turns amber with an explanatory tooltip. Non-blocking: the cost is periodic, not
+  per-swap, and the reserved surplus is refunded. Classic routes (Horizon/Ultra/StellarBroker)
+  never trigger it.
+
 ## [0.2.9] - 2026-06-25
 
 ### Fixed

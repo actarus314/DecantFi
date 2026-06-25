@@ -13,7 +13,7 @@ import { overview, buildSourceHealth, latestChosenRpc } from './stats.js';
 import { liveQuote, walletBalance, parseAmountStroops } from './quote-api.js';
 import { appendRpcCallLog } from '../db/index.js';
 import { resetRpc, readRpc, rpcAls } from '../core/rpc-meter.js';
-import { pickExecutableVenue, submit, txStatus, buildChangeTrust, ExecError, type Venue } from './execute.js';
+import { pickExecutableVenue, submit, txStatus, buildChangeTrust, ExecError, feeExceedsSpendable, type Venue } from './execute.js';
 import { manualRefresh, refreshBusy } from './refresh.js';
 import { toStroops, toNumber } from '../core/amount.js';
 import { readBlndBalance, readAssetBalance } from '../core/balance.js';
@@ -532,6 +532,29 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const sellAsset = b.from === 'USDC' ? USDC : BLND;
       try {
         const result = await pickExecutableVenue(pair, amount, b.sender as string, slippageBps, cfg, displayed, undefined, forceVenue, sellAsset);
+        // Pre-signature fee guard: if the declared max_fee exceeds the sender's spendable XLM,
+        // the network will reject the tx at submission. Attach a feeWarning so the UI can block signing.
+        // ponytail: second loadAccount call — acceptable here (build already made multiple network calls).
+        try {
+          if (result.xdr) {
+            const { TransactionBuilder, Networks, Horizon } = await import('@stellar/stellar-sdk');
+            const maxFeeStroops = Number(TransactionBuilder.fromXDR(result.xdr, Networks.PUBLIC).fee);
+            const horizonServer = new Horizon.Server((cfg.horizonUrl || 'https://horizon.stellar.org').replace(/\/$/, ''));
+            const account = await horizonServer.loadAccount(b.sender as string);
+            const nativeBal = account.balances.find((x: { asset_type: string }) => x.asset_type === 'native');
+            if (nativeBal && 'balance' in nativeBal) {
+              const nativeStroops = Math.round(parseFloat((nativeBal as { balance: string }).balance) * 1e7);
+              const subentryCount = account.subentry_count;
+              const { exceeds, spendableStroops } = feeExceedsSpendable(maxFeeStroops, nativeStroops, subentryCount);
+              if (exceeds) {
+                (result as typeof result & { feeWarning?: unknown }).feeWarning = {
+                  maxFeeXlm: maxFeeStroops / 1e7,
+                  spendableXlm: spendableStroops / 1e7,
+                };
+              }
+            }
+          }
+        } catch { /* fee guard is best-effort — never fail the build */ }
         json(res, req, 200, result);
       } catch (e) {
         if (e instanceof ExecError) { json(res, req, execStatus(e.code), { error: e.message, code: e.code, asset: e.asset }); return; }
