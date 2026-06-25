@@ -88,7 +88,8 @@ jobs:
           # metadata-action ajoute le label org.opencontainers.image.source → rattache le package au repo (onglet Packages).
           tags: |
             type=semver,pattern={{version}}
-            type=raw,value=latest
+            # :latest only for real releases — a pre-release tag (v*-beta.N) must NOT become latest
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
       - uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .

@@ -40,6 +40,18 @@ Put it behind a reverse proxy (Caddy or nginx) terminating **TLS**, and keep the
 
 Dependabot opens PRs (npm, Docker, GitHub Actions); they are merged only after `typecheck` + tests pass — **current, but verified, never blind-merged**. `npm audit --omit=dev` is clean and gates CI.
 
+### How do I prevent container logs from growing without bound? How do I monitor traffic?
+
+**Container log rotation** — DecantFi does not ship `logging:` limits in `docker-compose.yaml` to avoid overriding your daemon configuration. The recommended approach is to switch the Docker daemon to the modern `local` driver once (in `/etc/docker/daemon.json`: `{"log-driver":"local"}`); it rotates and compresses the stdout of **every** container by default. Alternatively, add a `logging:` block to your own compose override, per service.
+
+**Traffic monitoring (optional GoAccess dashboard)** — the `web` container emits one nginx COMBINED-format access-log line to stdout per request and also writes it to a self-capped file (`ACCESS_LOG_MAX_MB`, default 50 MB, in a named volume). Enabling the dashboard is a single switch — start the optional GoAccess stack:
+
+```sh
+docker compose --profile monitoring up -d
+```
+
+This starts two extra containers (a GoAccess report generator and a minimal static file server) and publishes the dashboard at `http://host:${GOACCESS_PORT}` (default `7890`). **Put this behind your reverse proxy with authentication** — never expose it publicly without access control. The refresh interval is controlled by `GOACCESS_REFRESH_SEC` (default 60 s).
+
 ## Design choices
 
 ### Why is "net" the gross amount, with gas shown separately?

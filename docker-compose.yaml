@@ -50,9 +50,13 @@ services:
       - "${WEB_HOST_PORT}:8080"   # published host port; the container always listens on 8080
     volumes:
       - ${DECANTFI_DATA}:/app/data
+      - weblogs:/app/logs           # COMBINED access log written here, read by goaccess
     env_file: .env
     environment:
       - COLLECTOR_DB_PATH=/app/data/quotes.db
+      # Always write the COMBINED access log (capped by ACCESS_LOG_MAX_MB). Enabling the
+      # `monitoring` profile is then the SINGLE switch that starts GoAccess to read + serve it.
+      - ACCESS_LOG=/app/logs/access.log
     networks:
       - decantfi
     healthcheck:
@@ -61,6 +65,79 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  # ─── Monitoring profile (optional) ────────────────────────────────────────
+  # Start with: docker compose --profile monitoring up -d
+  # The web service always writes the access log (ACCESS_LOG is set in its env above);
+  # this profile just adds GoAccess to read + serve it. No extra .env var required.
+  # The dashboard is published on host port ${GOACCESS_PORT} — put it behind your
+  # reverse proxy with authentication; never expose it publicly without auth.
+
+  goaccess:
+    image: allinurl/goaccess:1.9.3
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev,size=32m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 128m
+    volumes:
+      - weblogs:/logs:ro
+      - goaccess-report:/report
+    # Generation loop: regenerate every $GOACCESS_REFRESH_SEC seconds.
+    # Reads both the active log and the rotated .1 (ignored if absent).
+    # Injects a <meta http-equiv="refresh"> so the browser auto-reloads at the
+    # same interval (GoAccess --html-refresh is capped at 60 s; this works for any value).
+    # The image's ENTRYPOINT is /bin/goaccess, so a plain command: would be passed
+    # as goaccess args (and goaccess would choke on the script). Override it to run
+    # the loop in a shell instead.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        REFRESH=$${GOACCESS_REFRESH_SEC}
+        while true; do
+          LOGS="/logs/access.log"
+          [ -f /logs/access.log.1 ] && LOGS="$$LOGS /logs/access.log.1"
+          # goaccess picks the output format from the file extension, so the temp file
+          # must end in .html (a .tmp suffix is rejected). On success, swap it in atomically.
+          # stderr is kept (not /dev/null) so failures + a per-cycle heartbeat show in `docker logs`.
+          if goaccess $$LOGS --log-format=COMBINED -o /report/index.tmp.html 2>&1; then
+            sed -i "s|</head>|<meta http-equiv=\"refresh\" content=\"$$REFRESH\"></head>|" /report/index.tmp.html
+            mv /report/index.tmp.html /report/index.html
+          fi
+          sleep $$REFRESH
+        done
+    env_file: .env
+    networks:
+      - decantfi
+
+  goaccess-web:
+    image: busybox:1.37
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev,size=8m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 32
+    mem_limit: 32m
+    ports:
+      - "${GOACCESS_PORT}:80"   # published host port; put it behind your reverse proxy + auth
+    volumes:
+      - goaccess-report:/report:ro
+    command: ["httpd", "-f", "-p", "80", "-h", "/report"]
+    networks:
+      - decantfi
+
+volumes:
+  weblogs:       # access log files shared between web and goaccess
+  goaccess-report:  # generated HTML report shared between goaccess and goaccess-web
 
 networks:
   decantfi:

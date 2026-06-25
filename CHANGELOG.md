@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-06-25
+
+### Added
+- **Optional GoAccess traffic dashboard** (`monitoring` Compose profile). The web service always
+  writes an nginx COMBINED access log (to stdout, and to a size-capped, self-rotating file);
+  enabling the profile starts GoAccess to regenerate an auto-refreshing HTML dashboard and serve
+  it on a dedicated host port. One switch: `docker compose --profile monitoring up` (or set
+  `COMPOSE_PROFILES=monitoring`). Publish it behind your reverse proxy with authentication —
+  never expose it publicly without auth. Tunables in `.env`: `ACCESS_LOG_MAX_MB`,
+  `GOACCESS_REFRESH_SEC`, `GOACCESS_PORT`.
+
+### Changed
+- CI: pre-release tags (`vX.Y.Z-beta.N`) are no longer published as `:latest`; only final
+  releases get `:latest`. Documented `COMPOSE_PROFILES`.
+
 ## [0.2.7] - 2026-06-25
 
 ### Security
