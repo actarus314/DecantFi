@@ -135,6 +135,7 @@ const STRINGS = {
     review_fidelity: (winner, net) => `Le meilleur affiché était ${winner} (net ${net}) — non exécutable en 1 clic ; on exécute la meilleure route exécutable.`,
     review_network_fee: 'Frais réseau (max)',
     review_network_fee_note: 'Frais max affichés par le wallet ; la part de loyer (rent) non consommée est remboursée.',
+    review_freighter_classic_note: (v) => `⚠ <b>Freighter</b> affiche pour ${v} le <b>minimum garanti</b>, pas le reçu estimé ci-dessus — c'est un défaut d'affichage de Freighter sur les routes classiques (paiement par chemin). Le swap est correct : tu recevras ≈ le montant attendu.`,
     review_confirm: 'Confirmer & signer',
     review_cancel: 'Annuler',
 
@@ -397,6 +398,7 @@ const STRINGS = {
     review_fidelity: (winner, net) => `The best displayed was ${winner} (net ${net}) — not executable in 1 click; we execute the best executable route.`,
     review_network_fee: 'Network fee (max)',
     review_network_fee_note: 'Max fees shown by the wallet; unused rent is refunded.',
+    review_freighter_classic_note: (v) => `⚠ <b>Freighter</b> shows the <b>guaranteed minimum</b> for ${v}, not the expected amount above — a Freighter display quirk on classic (path-payment) routes. The swap is fine: you'll receive ≈ the expected amount.`,
     review_confirm: 'Confirm & sign',
     review_cancel: 'Cancel',
 
@@ -659,6 +661,7 @@ const STRINGS = {
     review_fidelity: (winner, net) => `El mejor mostrado fue ${winner} (neto ${net}) — no ejecutable en 1 clic; ejecutamos la mejor ruta ejecutable.`,
     review_network_fee: 'Comisión de red (máx)',
     review_network_fee_note: 'Comisiones máximas mostradas por el wallet; el alquiler no utilizado se reembolsa.',
+    review_freighter_classic_note: (v) => `⚠ <b>Freighter</b> muestra el <b>mínimo garantizado</b> para ${v}, no el monto esperado de arriba — un defecto de visualización de Freighter en rutas clásicas (pago por ruta). El swap es correcto: recibirás ≈ el monto esperado.`,
     review_confirm: 'Confirmar y firmar',
     review_cancel: 'Cancelar',
 
@@ -888,6 +891,7 @@ const STRINGS = {
     review_fidelity: (winner, net) => `O melhor exibido foi ${winner} (líquido ${net}) — não executável em 1 clique; executamos a melhor rota executável.`,
     review_network_fee: 'Taxa de rede (máx.)',
     review_network_fee_note: 'Taxas máximas mostradas pela carteira; o saldo não utilizado é reembolsado.',
+    review_freighter_classic_note: (v) => `⚠ A <b>Freighter</b> mostra o <b>mínimo garantido</b> para ${v}, não o valor esperado acima — uma falha de exibição da Freighter em rotas clássicas (pagamento por caminho). O swap está correto: você receberá ≈ o valor esperado.`,
     review_confirm: 'Confirmar e assinar',
     review_cancel: 'Cancelar',
     review_sim_was: 'sim',
@@ -1046,6 +1050,7 @@ let refreshMsg = '';
 
 // Wallet
 let walletAddress = localStorage.getItem('walletAddress') || null;
+let walletId = localStorage.getItem('walletId') || null; // wallet-kit productId, e.g. 'freighter' (gates Freighter-only notices)
 // Exécution swap
 let execState = null; // null | { phase:'review'|'signing'|'submitting'|'done'|'error', build?, hash?, venue?, errorMsg? }
 let execSlippagePct = (() => { const s = parseFloat(localStorage.getItem('slippagePct')); return (!isNaN(s) && s >= 0 && s <= 50) ? s : 0.5; })(); // UI %, → bps = Math.round(execSlippagePct*100)
@@ -2640,6 +2645,8 @@ async function connectWallet() {
     const { address } = await SWK.authModal();
     walletAddress = address;
     localStorage.setItem('walletAddress', address);
+    try { walletId = SWK.selectedModule.productId; localStorage.setItem('walletId', walletId); }
+    catch { walletId = null; localStorage.removeItem('walletId'); }
     await loadBalance();
     renderApp();
   } catch (e) { /* user closed modal: ignore */ }
@@ -2649,6 +2656,8 @@ async function disconnectWallet() {
   try { await ensureKit(); await SWK.disconnect(); } catch (e) { /* ignore */ }
   walletAddress = null;
   localStorage.removeItem('walletAddress');
+  walletId = null;
+  localStorage.removeItem('walletId');
   walletBlnd = 0;
   walletConfigured = false;
   renderApp();
@@ -3030,7 +3039,10 @@ function reviewTableHtml(rv, tgt, showSimDelta, sendAsset = 'BLND') {
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${vl}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
   </table>
-  <p class="help" style="margin:0 0 .8rem;font-size:12px;color:var(--caption)">${t('review_network_fee_note')}</p>`;
+  <hr style="border:0;border-top:1px solid var(--card-border);margin:.2rem 0 .6rem">
+  <div style="margin-bottom:.8rem">
+    <p class="help" style="margin:0;font-size:12px;color:var(--caption)">${t('review_network_fee_note')}</p>${(walletId === 'freighter' && (rv.venue === 'horizon' || rv.venue === 'ultrastellar')) ? `<p class="help" style="margin:.5rem 0 0;font-size:12px;font-weight:700;color:var(--amber)">${t('review_freighter_classic_note', vl)}</p>` : ''}
+  </div>`;
 }
 
 // ─── Modal cohérence (sondes suspectes) ──────────────────────────────────────
