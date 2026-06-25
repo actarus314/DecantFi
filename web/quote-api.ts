@@ -260,7 +260,13 @@ export async function resimAquariusXbull(
       if (q.source === 'aquarius') {
         if (aquariusSimOk)
           return { ...q,
-            ...(aquariusSimNet !== undefined ? { netOut: aquariusSimNet, grossOut: aquariusSimNet } : {}),
+            ...(aquariusSimNet !== undefined ? {
+              netOut: aquariusSimNet,
+              grossOut: aquariusSimNet,
+              // Recalculate impact on the corrected net (was stale, computed on the over-quoted value)
+              priceImpactPct: priceImpactPct(q.amountIn, aquariusSimNet, result.prices.blndUsd, targetEvmPerUnit(pairUi, result.prices)) ?? q.priceImpactPct,
+              priceImpactLocalPct: priceImpactPct(q.amountIn, aquariusSimNet, result.prices.blndUsd, targetLocalPerUnit(pairUi, result.prices)) ?? q.priceImpactLocalPct,
+            } : {}),
             netConfidence: 'exact' as const,
             durationMs: (q.durationMs ?? 0) + aqSimMs };
         if (aquariusSimFailed)
@@ -269,7 +275,13 @@ export async function resimAquariusXbull(
       if (q.source === 'xbull') {
         if (xbullSimNet !== undefined || xbullHops)
           return { ...q,
-            ...(xbullSimNet !== undefined ? { netOut: xbullSimNet, grossOut: xbullSimNet } : {}),
+            ...(xbullSimNet !== undefined ? {
+              netOut: xbullSimNet,
+              grossOut: xbullSimNet,
+              // Recalculate impact on the corrected net (was stale, computed on the over-quoted value)
+              priceImpactPct: priceImpactPct(q.amountIn, xbullSimNet, result.prices.blndUsd, targetEvmPerUnit(pairUi, result.prices)) ?? q.priceImpactPct,
+              priceImpactLocalPct: priceImpactPct(q.amountIn, xbullSimNet, result.prices.blndUsd, targetLocalPerUnit(pairUi, result.prices)) ?? q.priceImpactLocalPct,
+            } : {}),
             ...(xbullHops ? { route: xbullHops } : {}),
             durationMs: (q.durationMs ?? 0) + xbSimMs };
         if (xbullSimFailed)

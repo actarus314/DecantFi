@@ -21,6 +21,7 @@ vi.mock('../core/prices.js', () => ({
 }));
 
 import { quote as engineQuote } from '../core/engine.js';
+import { priceImpactPct } from '../core/prices.js';
 import { liveQuote, makeReSimLeg } from './quote-api.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -238,6 +239,110 @@ describe('resimAquariusXbull — netConfidence promotion', () => {
     const soroRow = result.ladder.find((r) => r.sourceId === 'soroswap');
     expect(soroRow).toBeDefined();
     expect(soroRow!.chip).toBe('obs');
+  });
+});
+
+describe('resimAquariusXbull — priceImpact recalculation on corrected net', () => {
+  beforeEach(() => {
+    vi.mocked(engineQuote).mockReset();
+    vi.mocked(priceImpactPct).mockReset();
+  });
+
+  it('recalculates priceImpactPct for xBull when re-sim corrects the net', async () => {
+    // xBull over-quotes 4.10 → real fill is 4.00 → impact must be recalculated on 4.00, not 4.10
+    const xbullQ = {
+      ...makeQuote('xbull', 4_1000000n),
+      amountIn: AMT,
+      priceImpactPct: -5,    // stale value computed on the over-quoted 4.10
+      priceImpactLocalPct: -5,
+      raw: { route: 'fake-route' },
+    };
+
+    vi.mocked(engineQuote).mockResolvedValue({
+      request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
+      ranking: { ranked: [xbullQ], best: xbullQ },
+      errors: [],
+    } as any);
+
+    // Make priceImpactPct return a fresh value (simulating a lower impact on the real net)
+    vi.mocked(priceImpactPct).mockReturnValue(2.5);
+
+    const fakeSimXb = vi.fn(async () => ({ net: 4_0000000n, route: [], transfers: [] }));
+    const result = await liveQuote('USDC', AMT, FAKE_CFG as any, { simulateXbullNet: fakeSimXb });
+
+    const xbullRow = result.ladder.find((r) => r.sourceId === 'xbull');
+    expect(xbullRow).toBeDefined();
+    // net must be the corrected value
+    expect(xbullRow!.net).toBeCloseTo(4.0, 5);
+    // impact must be the recalculated value (2.5), not the stale -5
+    expect(xbullRow!.impactPct).toBe(2.5);
+  });
+
+  it('recalculates priceImpactPct for Aquarius when re-sim corrects the net', async () => {
+    // Aquarius over-quotes 4.10 → real fill is 3.90 → impact must be recalculated on 3.90
+    const aquaQ = {
+      ...makeQuote('aquarius', 4_1000000n),
+      amountIn: AMT,
+      priceImpactPct: -5,    // stale value computed on the over-quoted 4.10
+      priceImpactLocalPct: -5,
+      netConfidence: 'estimate' as const,
+      raw: { swap_chain_xdr: 'FAKE_XDR' },
+    };
+
+    vi.mocked(engineQuote).mockResolvedValue({
+      request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
+      ranking: { ranked: [aquaQ], best: aquaQ },
+      errors: [],
+    } as any);
+
+    // Make priceImpactPct return a fresh value (higher impact = more slippage on the lower real net)
+    vi.mocked(priceImpactPct).mockReturnValue(4.88);
+
+    const fakeSim = vi.fn(async () => 3_9000000n); // corrected net < over-quoted
+    const result = await liveQuote('USDC', AMT, FAKE_CFG as any, { simulateAquariusNet: fakeSim });
+
+    const aquaRow = result.ladder.find((r) => r.sourceId === 'aquarius');
+    expect(aquaRow).toBeDefined();
+    // net must be the corrected value
+    expect(aquaRow!.net).toBeCloseTo(3.9, 5);
+    // impact must be the recalculated value (4.88), not the stale -5
+    expect(aquaRow!.impactPct).toBe(4.88);
+  });
+
+  it('keeps original priceImpactPct for xBull when only route (hops) changes, not the net', async () => {
+    // Re-sim decodes route but net is unchanged → impact must NOT be recalculated
+    const xbullQ = {
+      ...makeQuote('xbull', 4_0000000n),
+      amountIn: AMT,
+      priceImpactPct: 3.0,    // original impact (on the correct net — no over-quote here)
+      priceImpactLocalPct: 3.0,
+      raw: { route: 'fake-route' },
+    };
+
+    vi.mocked(engineQuote).mockResolvedValue({
+      request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
+      ranking: { ranked: [xbullQ], best: xbullQ },
+      errors: [],
+    } as any);
+
+    // Re-sim returns same net but decoded route
+    const fakeSimXb = vi.fn(async () => ({
+      net: 4_0000000n, // same net → xbullSimNet stays undefined (line: net !== q.netOut)
+      route: ['BLND', 'USDC'],
+      transfers: [],
+    }));
+    const result = await liveQuote('USDC', AMT, FAKE_CFG as any, { simulateXbullNet: fakeSimXb });
+
+    // priceImpactPct should NOT have been called (net unchanged → no impact recalc)
+    expect(vi.mocked(priceImpactPct)).not.toHaveBeenCalled();
+
+    const xbullRow = result.ladder.find((r) => r.sourceId === 'xbull');
+    expect(xbullRow).toBeDefined();
+    // impact unchanged
+    expect(xbullRow!.impactPct).toBe(3.0);
   });
 });
 
