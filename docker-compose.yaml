@@ -50,10 +50,13 @@ services:
       - "${WEB_HOST_PORT}:8080"   # published host port; the container always listens on 8080
     volumes:
       - ${DECANTFI_DATA}:/app/data
-      - weblogs:/app/logs           # shared with goaccess; inert when ACCESS_LOG is unset
+      - weblogs:/app/logs           # COMBINED access log written here, read by goaccess
     env_file: .env
     environment:
       - COLLECTOR_DB_PATH=/app/data/quotes.db
+      # Always write the COMBINED access log (capped by ACCESS_LOG_MAX_MB). Enabling the
+      # `monitoring` profile is then the SINGLE switch that starts GoAccess to read + serve it.
+      - ACCESS_LOG=/app/logs/access.log
     networks:
       - decantfi
     healthcheck:

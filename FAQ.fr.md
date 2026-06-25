@@ -44,7 +44,7 @@ Dependabot ouvre des PRs (npm, Docker, GitHub Actions) ; elles sont fusionnées 
 
 **Rotation des logs conteneurs** — DecantFi ne livre pas de directives `logging:` dans `docker-compose.yaml` pour ne pas écraser votre configuration du daemon. L'approche recommandée est de basculer le daemon Docker sur le driver moderne `local` une seule fois (dans `/etc/docker/daemon.json` : `{"log-driver":"local"}`) ; il rotate et compresse le stdout de **tous** les conteneurs par défaut. Vous pouvez aussi ajouter un bloc `logging:` à votre propre surcharge compose, par service.
 
-**Monitoring du trafic (dashboard GoAccess optionnel)** — le conteneur `web` émet une ligne au format nginx COMBINED sur stdout par requête. Vous pouvez aussi lui faire écrire un fichier en réglant `ACCESS_LOG=/app/logs/access.log` dans `.env` ; l'application plafonne et rotate le fichier elle-même (`ACCESS_LOG_MAX_MB=50`). Une fois ce fichier en place, démarrez le stack GoAccess optionnel :
+**Monitoring du trafic (dashboard GoAccess optionnel)** — le conteneur `web` émet une ligne au format nginx COMBINED sur stdout par requête, et l'écrit aussi dans un fichier auto-plafonné (`ACCESS_LOG_MAX_MB`, défaut 50 Mo, dans un volume named). Activer le dashboard est un **seul interrupteur** — démarrez le stack GoAccess optionnel :
 
 ```sh
 docker compose --profile monitoring up -d
