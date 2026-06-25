@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-06-25
+
+### Fixed
+- **Swap review popup now honors the selected tool.** For BLND→EURC, picking any venue opened
+  that venue's verification/execution flow as displayed, but the action always started the
+  composite 2-tx (via-USDC) flow. Render and action now share one decision (`chooseExec`), so the
+  displayed target always equals the executed one.
+
+### Added
+- **Freighter simulation notice** in the pre-signature review popup. Only when connected via
+  Freighter *and* routing through Horizon or Ultra Stellar, a note explains that Freighter's
+  screen shows the guaranteed minimum (`destMin`) for these classic path-payment routes — not the
+  expected amount above. Soroban swaps (xBull/Soroswap/Comet/Aquarius) simulate correctly, so the
+  notice is scoped to the affected case.
+
 ## [0.2.8] - 2026-06-25
 
 ### Added
