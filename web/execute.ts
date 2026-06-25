@@ -395,7 +395,7 @@ export async function simulateXbullNet(
   route: string,
   amountIn: bigint,
   cfg: { rpcUrl: string },
-): Promise<{ net: bigint; route: string[]; transfers: Transfer[] } | null> {
+): Promise<{ net: bigint; route: string[]; transfers: Transfer[]; gasRealXlm?: number } | null> {
   for (const witness of AQUARIUS_WITNESSES) {
     let xdrStr: string;
     try {
@@ -428,8 +428,11 @@ export async function simulateXbullNet(
       const net = BigInt(rv[1]);
       // Extraction de la route réelle depuis la chaîne de transferts SAC
       const transfers = await decodeTransfers((sim as any).events ?? []);
-      const route = routeFromTransfers(transfers);
-      return { net, route: route.length >= 2 ? route : [], transfers };
+      const decodedRoute = routeFromTransfers(transfers);
+      // Extract real Soroban resource fee from the accept-quote XDR (rent/TTL cost, not the default flat).
+      const gasBreakdown = await xdrGasBreakdown(xdrStr).catch(() => null);
+      const gasRealXlm = gasBreakdown ? gasBreakdown.real : undefined;
+      return { net, route: decodedRoute.length >= 2 ? decodedRoute : [], transfers, gasRealXlm };
     } catch {
       continue;
     }

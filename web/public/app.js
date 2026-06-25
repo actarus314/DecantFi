@@ -168,6 +168,8 @@ const STRINGS = {
     // Trustline in-app
     trustline_title: 'Trustline requise',
     trustline_need: (tgt) => `Ton compte n'a pas de trustline ${tgt} — obligatoire pour recevoir l'${tgt}. Ajoute-la en un clic ci-dessous (~0,5 XLM de réserve immobilisée, récupérable si tu la retires plus tard).`,
+    gas_high_label: 'Gas réseau élevé',
+    gas_high_tip: (x) => `Cette route doit prolonger le TTL d'entrées Soroban partagées (rent ~${x} XLM). Coût ponctuel/périodique, pas par-swap : il retombe une fois les entrées réétendues, et le surplus réservé est remboursé. Garde assez de XLM.`,
     trustline_add_btn: (tgt) => `Ajouter la trustline ${tgt}`,
     trustline_adding: 'Ajout de la trustline…',
     trustline_added: (tgt) => `Trustline ${tgt} ajoutée`,
@@ -435,6 +437,8 @@ const STRINGS = {
     // In-app trustline
     trustline_title: 'Trustline required',
     trustline_need: (tgt) => `Your account has no ${tgt} trustline — required to receive ${tgt}. Add it in one click below (~0.5 XLM reserve locked, refundable if you remove it later).`,
+    gas_high_label: 'High network gas',
+    gas_high_tip: (x) => `This route must extend the TTL of shared Soroban state (rent ~${x} XLM). One-off/periodic cost, not per-swap: it drops once the entries are re-extended and the reserved surplus is refunded. Keep enough XLM.`,
     trustline_add_btn: (tgt) => `Add ${tgt} trustline`,
     trustline_adding: 'Adding trustline…',
     trustline_added: (tgt) => `${tgt} trustline added`,
@@ -702,6 +706,8 @@ const STRINGS = {
     // In-app trustline
     trustline_title: 'Trustline requerida',
     trustline_need: (tgt) => `Su cuenta no tiene trustline de ${tgt} — necesaria para recibir ${tgt}. Añádala con un clic a continuación (~0,5 XLM de reserva bloqueada, reembolsable si la elimina más adelante).`,
+    gas_high_label: 'Gas de red elevado',
+    gas_high_tip: (x) => `Esta ruta debe extender el TTL de entradas Soroban compartidas (alquiler ~${x} XLM). Costo puntual/periódico, no por-swap: baja una vez que las entradas se reextienden y el excedente reservado se reembolsa. Mantén suficiente XLM.`,
     trustline_add_btn: (tgt) => `Añadir trustline de ${tgt}`,
     trustline_adding: 'Añadiendo trustline…',
     trustline_added: (tgt) => `Trustline de ${tgt} añadida`,
@@ -929,6 +935,8 @@ const STRINGS = {
     err_noroute: 'Nenhuma rota executável para este valor.',
     trustline_title: 'Trustline necessária',
     trustline_need: (tgt) => `Sua conta não tem trustline ${tgt} — necessária para receber ${tgt}. Adicione com um clique abaixo (~0,5 XLM de reserva bloqueada, reembolsável se removida depois).`,
+    gas_high_label: 'Gas de rede elevado',
+    gas_high_tip: (x) => `Esta rota deve estender o TTL de entradas Soroban compartilhadas (aluguel ~${x} XLM). Custo pontual/periódico, não por-swap: diminui quando as entradas são reestendidas e o excedente reservado é reembolsado. Mantenha XLM suficiente.`,
     trustline_add_btn: (tgt) => `Adicionar trustline ${tgt}`,
     trustline_adding: 'Adicionando trustline…',
     trustline_added: (tgt) => `Trustline ${tgt} adicionada`,
@@ -1043,6 +1051,11 @@ let health = null;      // données de /api/health
 let target = 'USDC';
 // Langue par défaut = navigateur (FR si la préférence commence par "fr", sinon EN) ; un choix explicite reste persisté
 const LOCALE = { fr: 'fr-FR', en: 'en-US', es: 'es-ES', pt: 'pt-BR' };
+
+// Threshold for the high-gas warning (XLM). Only applies to real on-chain XDR gas (xBull/Aquarius).
+// Must match the server-side constant. Classic routes (Horizon/Ultra/StellarBroker) never trigger this.
+// DEFAULT_GAS_XLM.soroban = 0.045 XLM — far below this threshold, so it can never false-trigger.
+const HIGH_GAS_XLM = 0.5;
 let lang = (() => {
   const saved = localStorage.getItem('lang');
   if (['fr', 'en', 'es', 'pt'].includes(saved)) return saved;
@@ -1443,8 +1456,13 @@ function ladderRows(rows, u, down) {
     const isSel = r.sourceId && r.sourceId === selectedSource;
     const trClass = [r.winner ? 'win' : '', isSel ? 'sel' : ''].filter(Boolean).join(' ');
     const sid = r.sourceId ? r.sourceId.replace(/\\/g, '\\\\').replace(/'/g, "\\'") : '';
+    // High-gas warning badge for xBull/Aquarius when real on-chain gas exceeds threshold.
+    const rowGasHigh = r.gasRealXlm != null && r.gasRealXlm > HIGH_GAS_XLM;
+    const gasWarnHtml = rowGasHigh
+      ? ` <span class="tip-wrap"><span style="color:var(--amber);font-weight:700;cursor:help">⚠</span><span class="tip-box" style="min-width:260px;white-space:normal"><b>${t('gas_high_label')}</b><br>${t('gas_high_tip', (r.gasRealXlm).toFixed(2))}</span></span>`
+      : '';
     return `<tr class="${trClass}" style="cursor:pointer" data-act="selectSource" data-args='${JSON.stringify([sid])}'>
-      <td>${venueCard(r.sourceId, r.display)}${r.note ? ` <span class="muted">· ${escapeHtml(noteLabel(r.note))}</span>` : ''}</td>
+      <td>${venueCard(r.sourceId, r.display)}${r.note ? ` <span class="muted">· ${escapeHtml(noteLabel(r.note))}</span>` : ''}${gasWarnHtml}</td>
       <td>${fmt3(r.net)}</td>
       <td class="${deltaClass}">${delta}</td>
       <td><span class="chip ${r.chip}">${chipLabel(r.chip)}</span></td>
@@ -3043,17 +3061,27 @@ function reviewTableHtml(rv, tgt, showSimDelta, sendAsset = 'BLND') {
   const feeStr = feeXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 });
   const realXlm = rv.gasRealXlm;
   const realStr = realXlm != null ? realXlm.toLocaleString(LOCALE[lang], { minimumSignificantDigits: 1, maximumSignificantDigits: 5 }) : null;
+  const gasHigh = realXlm != null && realXlm > HIGH_GAS_XLM;
+  const gasColor = gasHigh ? 'var(--amber)' : null;
   const feeLabel = t('net_fee_label');
   const feeDisplay = realStr != null
-    ? `${realStr} XLM <span style="font-size:12px;color:var(--caption)">(max&nbsp;${feeStr})</span>`
+    ? `${realStr} XLM <span style="font-size:12px;color:${gasHigh ? 'var(--amber)' : 'var(--caption)'}">(max&nbsp;${feeStr})</span>`
     : `${feeStr} XLM`;
+  const feeCell = gasHigh
+    ? `<span style="color:var(--amber);font-weight:700">${feeDisplay}</span>`
+    : feeDisplay;
+  // High-gas warning near venue name: tooltip using existing tip-wrap/tip-box pattern (CSP-safe, no onclick).
+  const gasHighTipHtml = gasHigh
+    ? ` <span class="tip-wrap"><span style="color:var(--amber);font-weight:700;cursor:help">⚠</span><span class="tip-box" style="min-width:260px;white-space:normal">${t('gas_high_tip', (realXlm).toFixed(2))}</span></span>`
+    : '';
+  const venueCell = `${vl}${gasHighTipHtml}`;
   return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:.4rem">
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_route')}</td><td style="padding:4px 0;text-align:right">${renderRoute(rv.route)}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_send')}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmt3(rv.sendAmount)} ${sendAsset}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_expected')}</td><td style="padding:4px 0;text-align:right">${fmt3(rv.netOut)} ${tgt}${simDeltaHtml}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption);font-weight:600">${t('review_receive_min')}</td><td style="padding:4px 0;text-align:right;font-weight:700;color:var(--green)">${fmt3(rv.minReceived)} ${tgt}</td></tr>
-    <tr><td style="padding:4px 0;color:var(--caption)">${feeLabel}</td><td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">${feeDisplay}</td></tr>
-    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${vl}</td></tr>
+    <tr><td style="padding:4px 0;color:${gasColor ?? 'var(--caption)'}${gasHigh ? ';font-weight:700' : ''}">${feeLabel}</td><td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">${feeCell}</td></tr>
+    <tr><td style="padding:4px 0;color:var(--caption)">${t('review_venue')}</td><td style="padding:4px 0;text-align:right">${venueCell}</td></tr>
     <tr><td style="padding:4px 0;color:var(--caption)">${t('review_slippage')}</td><td style="padding:4px 0;text-align:right">${rv.slippageBps / 100} %</td></tr>
   </table>
   <hr style="border:0;border-top:1px solid var(--card-border);margin:.2rem 0 .6rem">

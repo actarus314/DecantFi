@@ -2,7 +2,7 @@
 // ponytail: Number = affichage, jamais règlement.
 import { quote as engineQuote } from '../core/engine.js';
 import { rankQuotes } from '../core/rank.js';
-import { simulateAquariusNet, simulateXbullNet } from './execute.js';
+import { simulateAquariusNet, simulateXbullNet, xdrGasBreakdown } from './execute.js';
 import { withTimeout } from '../core/timeout.js';
 import { readBlndBalance } from '../core/balance.js';
 import { BLND, USDC, EURC } from '../core/assets.js';
@@ -50,6 +50,10 @@ export interface LiveLadderRow {
   legs?: CompositeLeg[];
   /** Floor (direct route guaranteed minimum) in target asset units. StellarBroker only; from netRange.low. */
   floor?: number;
+  /** Real Soroban resource fee in XLM from an actual on-chain XDR (xBull accept-quote or Aquarius swap_chain_xdr).
+   *  Absent for classic routes (Horizon/Ultra/StellarBroker) and venues without re-simulation (Comet/Soroswap).
+   *  High values indicate rent/TTL extension of shared Soroban state. */
+  gasRealXlm?: number;
 }
 
 /** Normalise les symboles d'actifs : 'native' → 'XLM', tout le reste inchangé. */
@@ -161,9 +165,12 @@ export function makeReSimLeg(
           // No .catch() — let transient RPC errors / timeouts throw to outer catch (downgraded to 'estimate')
           const simNet = await withTimeout(simFnAq(String(rawXdr), amountIn, inputSac, { rpcUrl: cfg.rpcUrl }), simTimeoutMs, 'aquarius leg re-sim');
           if (simNet !== null && simNet > 0n) {
+            // Extract real gas from the Aquarius XDR (best-effort, never blocks the quote).
+            const aqGas = await xdrGasBreakdown(String(rawXdr)).catch(() => null);
             // Successful on-chain re-sim → real fill observed, promote to 'exact'
             // (consistent with the main-ladder re-sim path).
-            return { ...q, netOut: simNet, grossOut: simNet, netConfidence: 'exact' as const };
+            return { ...q, netOut: simNet, grossOut: simNet, netConfidence: 'exact' as const,
+              ...(aqGas ? { gasRealXlm: aqGas.real } : {}) };
           }
           // simNet === null → structural failure: route non-executable as quoted → exclude
           return null;
@@ -172,7 +179,8 @@ export function makeReSimLeg(
           if (!route) return q;
           const xbSim = await withTimeout(simFnXb(String(route), amountIn, { rpcUrl: cfg.rpcUrl }), simTimeoutMs, 'xbull leg re-sim').catch(() => null);
           if (xbSim && xbSim.net > 0n && xbSim.net !== q.netOut)
-            return { ...q, netOut: xbSim.net, grossOut: xbSim.net };
+            return { ...q, netOut: xbSim.net, grossOut: xbSim.net,
+              ...(xbSim.gasRealXlm != null ? { gasRealXlm: xbSim.gasRealXlm } : {}) };
           // xbSim === null → RPC/timeout failure → downgrade confidence
           if (!xbSim) return { ...q, netConfidence: 'estimate' as const };
         }
@@ -205,7 +213,9 @@ export async function resimAquariusXbull(
 
   let aquariusSimNet: bigint | undefined;
   let aquariusSimOk = false; // sim succeeded (real fill observed) → 'exact' even if it equals the find-path quote
+  let aquariusGasReal: number | undefined;
   let xbullSimNet: bigint | undefined;
+  let xbullGasReal: number | undefined;
   // Tracks whether a sim was attempted but failed (→ downgrade to 'estimate')
   let aquariusSimFailed = false;
   let xbullSimFailed = false;
@@ -241,6 +251,11 @@ export async function resimAquariusXbull(
     if (simNet !== null && simNet > 0n) {
       aquariusSimOk = true; // observed the real on-chain fill → 'exact', even when it equals the find-path quote
       if (simNet !== aqRanked.netOut) aquariusSimNet = simNet; // differs → also correct netOut + re-rank
+      // Extract real gas from the Aquarius XDR (best-effort — failure never blocks the quote).
+      try {
+        const aqGas = await xdrGasBreakdown(String(rawXdr));
+        if (aqGas.real > 0) aquariusGasReal = aqGas.real;
+      } catch { /* best-effort */ }
     } else if (simNet === null) aquariusSimFailed = true; // RPC/timeout/revert → downgrade to 'estimate'
   }
 
@@ -251,27 +266,31 @@ export async function resimAquariusXbull(
       const r = xbSim.route;
       xbullHops = r.slice(0, -1).map((sell, i) => ({ venue: 'xbull', sell, buy: r[i + 1]! }));
     }
+    // Propagate real gas from the accept-quote XDR (already extracted by simulateXbullNet).
+    if (xbSim?.gasRealXlm != null) xbullGasReal = xbSim.gasRealXlm;
     if (!xbSim) xbullSimFailed = true; // RPC/timeout failure → downgrade
   }
 
   if (aquariusSimOk || aquariusSimNet !== undefined || xbullSimNet !== undefined || xbullHops !== undefined
-    || aquariusSimFailed || xbullSimFailed) {
+    || aquariusSimFailed || xbullSimFailed || aquariusGasReal !== undefined || xbullGasReal !== undefined) {
     const newQuotes = result.ranking.ranked.map((q) => {
       if (q.source === 'aquarius') {
         if (aquariusSimOk)
           return { ...q,
             ...(aquariusSimNet !== undefined ? { netOut: aquariusSimNet, grossOut: aquariusSimNet } : {}),
             netConfidence: 'exact' as const,
-            durationMs: (q.durationMs ?? 0) + aqSimMs };
+            durationMs: (q.durationMs ?? 0) + aqSimMs,
+            ...(aquariusGasReal !== undefined ? { gasRealXlm: aquariusGasReal } : {}) };
         if (aquariusSimFailed)
           return { ...q, netConfidence: 'estimate' as const };
       }
       if (q.source === 'xbull') {
-        if (xbullSimNet !== undefined || xbullHops)
+        if (xbullSimNet !== undefined || xbullHops || xbullGasReal !== undefined)
           return { ...q,
             ...(xbullSimNet !== undefined ? { netOut: xbullSimNet, grossOut: xbullSimNet } : {}),
             ...(xbullHops ? { route: xbullHops } : {}),
-            durationMs: (q.durationMs ?? 0) + xbSimMs };
+            durationMs: (q.durationMs ?? 0) + xbSimMs,
+            ...(xbullGasReal !== undefined ? { gasRealXlm: xbullGasReal } : {}) };
         if (xbullSimFailed)
           return { ...q, netConfidence: 'estimate' as const };
       }
@@ -409,7 +428,7 @@ export async function liveQuote(
   // Échelle complète : ranking direct + (EURC) ligne composite via-USDC, triée par net.
   // Le composite est TOUJOURS listé quand il existe (comme le stockage collecteur) → le tableau
   // colle au simulateur (le gagnant peut être le composite, pas le meilleur direct).
-  const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; hops: RouteHop[] | null; eurcPath: string | null; impactPct: number | null; impactLocalPct: number | null; legs?: CompositeLeg[]; floor?: number }> =
+  const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; hops: RouteHop[] | null; eurcPath: string | null; impactPct: number | null; impactLocalPct: number | null; legs?: CompositeLeg[]; floor?: number; gasRealXlm?: number }> =
     result.ranking.ranked.map((rq) => ({
       source: rq.source,
       netOut: rq.netOut,
@@ -420,6 +439,7 @@ export async function liveQuote(
       impactPct: rq.priceImpactPct ?? null,
       impactLocalPct: rq.priceImpactLocalPct ?? null,
       floor: rq.netRange?.low !== undefined ? toNumber(rq.netRange.low) : undefined,
+      gasRealXlm: rq.gasRealXlm,
     }));
 
   // Legs du composite EURC via-USDC (calculés une seule fois, réutilisés pour best et ladder)
@@ -477,6 +497,7 @@ export async function liveQuote(
     executable: !r.source.includes('+') && ['xbull', 'soroswap', 'horizon', 'aquarius', 'comet', 'ultrastellar'].includes(r.source.trim()),
     legs: r.legs,
     floor: r.floor,
+    gasRealXlm: r.gasRealXlm,
   }));
 
   return {
