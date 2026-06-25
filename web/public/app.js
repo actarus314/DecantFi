@@ -3196,7 +3196,7 @@ function execModal() {
       : '';
     const fw = build.feeWarning;
     const feeGuardNote = fw
-      ? `<p class="help" style="margin:.6rem 0 0;font-size:12px;font-weight:700;color:var(--amber)">${t('fee_insufficient_title')} — ${t('fee_insufficient', Number(fw.maxFeeXlm).toFixed(2), Number(fw.spendableXlm).toFixed(2))}</p>`
+      ? `<p class="help" style="margin:.6rem 0 0;font-size:12px;font-weight:700;color:var(--red)">${t('fee_insufficient_title')} — ${t('fee_insufficient', Number(fw.maxFeeXlm).toFixed(2), Number(fw.spendableXlm).toFixed(2))}</p>`
       : '';
     content = `
       ${stepBadge}
