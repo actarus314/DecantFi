@@ -81,6 +81,19 @@ export function parseXbullAcceptQuote(raw: unknown): { id: string; xdr: string; 
   return { id: obj['id'], xdr: obj['xdr'], type: obj['type'] };
 }
 
+/** Spendable XLM = native balance − minimum reserve ((2 + subentries) × 0.5 XLM).
+ *  Returns whether the declared max_fee exceeds it (the network locks max_fee at submission). */
+export function feeExceedsSpendable(
+  maxFeeStroops: number,
+  nativeBalanceStroops: number,
+  subentryCount: number,
+): { exceeds: boolean; spendableStroops: number } {
+  const BASE_RESERVE = 5_000_000; // 0.5 XLM in stroops
+  const reserve = (2 + subentryCount) * BASE_RESERVE;
+  const spendable = nativeBalanceStroops - reserve;
+  return { exceeds: maxFeeStroops > spendable, spendableStroops: Math.max(0, spendable) };
+}
+
 /** Classification des erreurs d'exécution. Insensible à la casse. */
 export function classifyExecError(message: string): 'trustline' | 'funds' | 'slippage' | 'down' {
   const m = message.toLowerCase();

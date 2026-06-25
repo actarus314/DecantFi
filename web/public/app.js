@@ -173,6 +173,10 @@ const STRINGS = {
     trustline_added: (tgt) => `Trustline ${tgt} ajoutée`,
     trustline_added_hint: 'Tu peux maintenant lancer le swap.',
 
+    // Fee guard
+    fee_insufficient_title: 'XLM insuffisant pour les frais réseau',
+    fee_insufficient: (fee, avail) => `Cette route réserve ${fee} XLM de frais réseau ; le réseau exige que ton compte les couvre (le surplus est remboursé). Or tu n'as que ${avail} XLM disponibles (hors réserve). Ajoute du XLM, ou choisis une autre venue.`,
+
     // Composite 2-tx
     comp_step: (n) => `Étape ${n} / 2`,
     comp_leg1_confirming: 'Leg 1 confirmé — préparation du leg 2…',
@@ -435,6 +439,10 @@ const STRINGS = {
     trustline_adding: 'Adding trustline…',
     trustline_added: (tgt) => `${tgt} trustline added`,
     trustline_added_hint: 'You can now run the swap.',
+
+    // Fee guard
+    fee_insufficient_title: 'Not enough XLM for network fees',
+    fee_insufficient: (fee, avail) => `This route reserves ${fee} XLM of network fees; the network requires your account to cover them (the surplus is refunded). You only have ${avail} XLM available (excluding reserve). Add XLM, or pick another venue.`,
 
     // Composite 2-tx
     comp_step: (n) => `Step ${n} / 2`,
@@ -699,6 +707,10 @@ const STRINGS = {
     trustline_added: (tgt) => `Trustline de ${tgt} añadida`,
     trustline_added_hint: 'Ya puede ejecutar el swap.',
 
+    // Fee guard
+    fee_insufficient_title: 'XLM insuficiente para las tarifas de red',
+    fee_insufficient: (fee, avail) => `Esta ruta reserva ${fee} XLM en tarifas de red; la red exige que su cuenta las cubra (el excedente se reembolsa). Solo dispone de ${avail} XLM disponibles (excluyendo la reserva). Añada XLM o elija otra venue.`,
+
     // Composite 2-tx
     comp_step: (n) => `Paso ${n} / 2`,
     comp_leg1_confirming: 'Tramo 1 confirmado — preparando tramo 2…',
@@ -921,6 +933,11 @@ const STRINGS = {
     trustline_adding: 'Adicionando trustline…',
     trustline_added: (tgt) => `Trustline ${tgt} adicionada`,
     trustline_added_hint: 'Agora você pode executar o swap.',
+
+    // Fee guard
+    fee_insufficient_title: 'XLM insuficiente para as taxas de rede',
+    fee_insufficient: (fee, avail) => `Esta rota reserva ${fee} XLM em taxas de rede; a rede exige que sua conta as cubra (o excedente é reembolsado). Você tem apenas ${avail} XLM disponíveis (excluindo a reserva). Adicione XLM ou escolha outra venue.`,
+
     comp_step: (n) => `Etapa ${n} / 2`,
     comp_leg1_confirming: 'Leg 1 confirmada — preparando leg 2…',
     comp_leg2_failed: (x) => `Leg 1 concluída: ${x} USDC recebidos. Leg 2 falhou — você possui esses USDC.`,
@@ -3154,6 +3171,10 @@ function execModal() {
     const sbFloorNote = execState.sbFloor
       ? `<p class="help" style="margin:.6rem 0 0;color:var(--caption);font-size:12px">${t('exec_sb_floor_note')}</p>`
       : '';
+    const fw = build.feeWarning;
+    const feeGuardNote = fw
+      ? `<p class="help" style="margin:.6rem 0 0;font-size:12px;font-weight:700;color:var(--amber)">${t('fee_insufficient_title')} — ${t('fee_insufficient', Number(fw.maxFeeXlm).toFixed(2), Number(fw.spendableXlm).toFixed(2))}</p>`
+      : '';
     content = `
       ${stepBadge}
       <div style="font-size:14px;font-weight:700;margin-bottom:.9rem">${t('review_title')}</div>
@@ -3161,9 +3182,10 @@ function execModal() {
       ${fidelityNote}
       ${restoreNote}
       ${sbFloorNote}
+      ${feeGuardNote}
       <div style="display:flex;gap:.55rem;margin-top:.9rem;justify-content:flex-end">
         <button class="btn" data-act="cancelExecute">${t('review_cancel')}</button>
-        <button class="btn primary" data-act="confirmExecute">${t('review_confirm')}</button>
+        <button class="btn primary" data-act="confirmExecute"${fw ? ' disabled' : ''}>${t('review_confirm')}</button>
       </div>`;
   } else if (phase === 'signing') {
     const rv = build && build.review;
