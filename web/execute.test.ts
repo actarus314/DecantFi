@@ -20,7 +20,6 @@ import {
   parseUltraQuote,
   quoteUltra,
   reconcileLegSends,
-  sorobanNonRefundableXlm,
   type ExecDeps,
   type FetchResult,
   type SoroswapClient,
@@ -131,26 +130,6 @@ describe('minReceivedStroops', () => {
 });
 
 // ─── pickBest ────────────────────────────────────────────────────────────────
-
-describe('sorobanNonRefundableXlm', () => {
-  it('returns the non-refundable floor, nowhere near the declared rent-padded fee', () => {
-    // xBull-style EURC build: ~20M instr, 38 entries (17 written), tiny disk read, ~3.9KB tx.
-    // The XDR declares ~2.76 XLM resourceFee (worst-case refundable rent); actually charged ≈ this.
-    const xlm = sorobanNonRefundableXlm({
-      instructions: 20_000_000, entriesAccessed: 38, entriesWritten: 17, diskReadBytes: 232, txSizeBytes: 3896,
-    });
-    expect(xlm).toBeGreaterThan(0.005);
-    expect(xlm).toBeLessThan(0.05); // ~0.0135 — orders of magnitude below the ~2.76 declared
-  });
-
-  it('scales down for a small single-pool swap (Comet-like)', () => {
-    const xlm = sorobanNonRefundableXlm({
-      instructions: 3_500_000, entriesAccessed: 10, entriesWritten: 4, diskReadBytes: 100, txSizeBytes: 1200,
-    });
-    expect(xlm).toBeGreaterThan(0);
-    expect(xlm).toBeLessThan(0.02);
-  });
-});
 
 describe('pickBest', () => {
   it('sélectionne le netOut le plus élevé', () => {
