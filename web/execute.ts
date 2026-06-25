@@ -135,13 +135,47 @@ export interface ReviewData {
   route: string;
   /** Frais réseau max (fee du XDR en XLM). Plafond autorisé par le wallet. */
   gasFeeXlm: number;
-  /** Frais réseau réels estimés (resource fee Soroban de la simulation ; == gasFeeXlm pour une tx classique). */
+  /** Frais réseau réellement débité estimé = floor non-remboursable Soroban (le rent déclaré est
+   * remboursé) ; == gasFeeXlm pour une tx classique. Cf. sorobanNonRefundableXlm. */
   gasRealXlm?: number;
   /** Présent seulement si le net affiché au meta-agrégateur était supérieur à ce qu'on exécute. */
   fidelity?: { displayedWinner: string; displayedWinnerNet: number };
 }
 
-/** {max: fee totale autorisée, real: resource fee Soroban (coût réel estimé depuis la sim)}. Pour tx classique real==max. */
+/**
+ * Non-refundable Soroban resource fee, in XLM — the part that is actually CHARGED.
+ * The `resourceFee` declared in the XDR is dominated by a worst-case rent/TTL estimate that is
+ * REFUNDABLE: it is returned at apply time when the touched entries are already live (the normal
+ * case), so the declared value over-states the real cost by ~10–200× for router builds like xBull
+ * (e.g. declared ~2.76 XLM, actually charged ~0.01). This computes only the non-refundable floor
+ * (CPU + ledger entry/byte access + tx size + historical), which matches on-chain `fee_charged`
+ * for real swaps (verified: 400 tx ≤0.29 XLM, median 0.0033).
+ * ponytail: the mainnet fee rates below are a 2026-06 snapshot (stroops); they move only on a
+ * protocol upgrade — if one shifts them, re-read the ConfigSetting ledger entries
+ * (compute / ledgerCost / bandwidth / historical) and update here.
+ */
+export function sorobanNonRefundableXlm(r: {
+  instructions: number;
+  entriesAccessed: number; // readOnly + readWrite footprint entry count
+  entriesWritten: number;  // readWrite footprint entry count
+  diskReadBytes: number;
+  txSizeBytes: number;
+}): number {
+  const FEE = { instr: 7, readEntry: 1563, writeEntry: 2500, diskRead1Kb: 447, txSize1Kb: 406, hist1Kb: 4059 };
+  const ceilDiv = (a: number, b: number) => Math.ceil(a / b);
+  const stroops =
+    ceilDiv(r.instructions * FEE.instr, 10000) +
+    r.entriesAccessed * FEE.readEntry +
+    r.entriesWritten * FEE.writeEntry +
+    ceilDiv(r.diskReadBytes * FEE.diskRead1Kb, 1024) +
+    ceilDiv((r.txSizeBytes + 300) * FEE.hist1Kb, 1024) + // +300 ≈ tx result size (historical fee)
+    ceilDiv(r.txSizeBytes * FEE.txSize1Kb, 1024);
+  return stroops / 1e7;
+}
+
+/** {max: fee totale réservée (plafond affiché par le wallet), real: gas réellement débité estimé}.
+ * Pour une tx classique real==max ; pour Soroban real = floor non-remboursable (le rent déclaré
+ * dans le XDR est majoritairement remboursé, cf. sorobanNonRefundableXlm). */
 export async function xdrGasBreakdown(xdr: string): Promise<{ real: number; max: number }> {
   try {
     const { TransactionBuilder, Networks } = await import('@stellar/stellar-sdk');
@@ -152,8 +186,19 @@ export async function xdrGasBreakdown(xdr: string): Promise<{ real: number; max:
       const env = (tx as any).toEnvelope?.();
       const extVal = env?.v1?.()?.tx?.()?.ext?.();
       if (extVal?.switch?.() === 1) {
-        const resourceFee = extVal?.sorobanData?.()?.resourceFee?.();
-        if (resourceFee != null) return { real: Number(resourceFee) / 1e7, max };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const res: any = extVal.sorobanData().resources();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const num = (v: any) => Number(typeof v === 'object' && v?.toString ? v.toString() : v);
+        const fp = res.footprint();
+        const real = sorobanNonRefundableXlm({
+          instructions: num(res.instructions()),
+          entriesAccessed: fp.readOnly().length + fp.readWrite().length,
+          entriesWritten: fp.readWrite().length,
+          diskReadBytes: num(res.diskReadBytes ? res.diskReadBytes() : res.readBytes()),
+          txSizeBytes: env.toXDR().length,
+        });
+        return { real, max };
       }
     } catch { /* tx classique sans sorobanData */ }
     return { real: max, max };
