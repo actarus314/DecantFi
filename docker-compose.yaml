@@ -91,9 +91,11 @@ services:
     # Reads both the active log and the rotated .1 (ignored if absent).
     # Injects a <meta http-equiv="refresh"> so the browser auto-reloads at the
     # same interval (GoAccess --html-refresh is capped at 60 s; this works for any value).
+    # The image's ENTRYPOINT is /bin/goaccess, so a plain command: would be passed
+    # as goaccess args (and goaccess would choke on the script). Override it to run
+    # the loop in a shell instead.
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - /bin/sh
-      - -c
       - |
         REFRESH=$${GOACCESS_REFRESH_SEC}
         while true; do
