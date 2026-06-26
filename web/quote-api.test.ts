@@ -22,7 +22,7 @@ vi.mock('../core/prices.js', () => ({
 
 import { quote as engineQuote } from '../core/engine.js';
 import { priceImpactPct } from '../core/prices.js';
-import { liveQuote, makeReSimLeg } from './quote-api.js';
+import { liveQuote, makeReSimLeg, resimAquariusXbull } from './quote-api.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -346,6 +346,84 @@ describe('resimAquariusXbull — priceImpact recalculation on corrected net', ()
   });
 });
 
+describe('makeReSimLeg — StellarBroker re-sim', () => {
+  function makeSbQuote(overrides: Record<string, unknown> = {}) {
+    return {
+      source: 'stellarbroker' as const,
+      sellAsset: BLND,
+      buyAsset: USDC,
+      amountIn: AMT,
+      grossOut: 5_0000000n,
+      feeBreakdown: [{ kind: 'aggregator' as const, note: 'opaque' }],
+      gasXlm: 0n,
+      gasInTarget: 0n,
+      netOut: 5_0000000n,
+      netConfidence: 'estimate' as const,
+      netRange: { low: 4_8000000n, high: 5_0000000n },
+      route: [],
+      priceImpactPct: undefined,
+      raw: {},
+      ...overrides,
+    };
+  }
+
+  it('promotes StellarBroker quote to exact with collapsed netRange when sim succeeds (all-Soroban, exact)', async () => {
+    const sbQ = makeSbQuote();
+    const fakeSimSb = vi.fn(async () => ({ net: 4_9500000n, route: ['BLND', 'USDC'], exact: true }));
+    const reSimLeg = makeReSimLeg(
+      { rpcUrl: 'https://rpc.test', stellarBrokerApiKey: 'key' },
+      { simulateStellarBrokerNet: fakeSimSb as any },
+    );
+    const result = await reSimLeg([sbQ as any], AMT);
+    expect(result).toHaveLength(1);
+    const updated = result[0]!;
+    expect(updated.netConfidence).toBe('exact');
+    expect(updated.netOut).toBe(4_9500000n);
+    expect(updated.netRange).toEqual({ low: 4_9500000n, high: 4_9500000n });
+    expect((updated.feeBreakdown as Array<{ note?: string }>)[0]?.note).toMatch(/empty-auth/);
+  });
+
+  it('does NOT promote a mixed (exact=false) StellarBroker net — leaves the estimate untouched', async () => {
+    const sbQ = makeSbQuote();
+    // Mixed burst: net is a conservative lower bound (a classic destMin floor contributed)
+    const fakeSimSb = vi.fn(async () => ({ net: 4_9500000n, route: ['BLND', 'USDC'], exact: false }));
+    const reSimLeg = makeReSimLeg(
+      { rpcUrl: 'https://rpc.test', stellarBrokerApiKey: 'key' },
+      { simulateStellarBrokerNet: fakeSimSb as any },
+    );
+    const result = await reSimLeg([sbQ as any], AMT);
+    expect(result).toHaveLength(1);
+    const updated = result[0]!;
+    expect(updated.netConfidence).toBe('estimate');             // NOT promoted
+    expect(updated.netOut).toBe(5_0000000n);                    // original net, unchanged
+    expect(updated.netRange).toEqual({ low: 4_8000000n, high: 5_0000000n }); // original range kept
+  });
+
+  it('keeps original StellarBroker quote (no downgrade) when sim returns null', async () => {
+    const sbQ = makeSbQuote();
+    const fakeSimSb = vi.fn(async () => null);
+    const reSimLeg = makeReSimLeg(
+      { rpcUrl: 'https://rpc.test', stellarBrokerApiKey: 'key' },
+      { simulateStellarBrokerNet: fakeSimSb as any },
+    );
+    const result = await reSimLeg([sbQ as any], AMT);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.netConfidence).toBe('estimate'); // original, not downgraded
+    expect(result[0]!.netOut).toBe(5_0000000n);        // original net
+  });
+
+  it('skips StellarBroker re-sim when no stellarBrokerApiKey', async () => {
+    const sbQ = makeSbQuote();
+    const fakeSimSb = vi.fn(async () => ({ net: 4_9000000n, route: [] }));
+    const reSimLeg = makeReSimLeg(
+      { rpcUrl: 'https://rpc.test' }, // no key
+      { simulateStellarBrokerNet: fakeSimSb as any },
+    );
+    await reSimLeg([sbQ as any], AMT);
+    expect(fakeSimSb).not.toHaveBeenCalled();
+  });
+});
+
 describe('makeReSimLeg — Aquarius structural failure exclusion', () => {
   /** Builds a minimal NormalizedQuote compatible with makeReSimLeg (no engine mock needed). */
   function makeAqQuote(overrides: Record<string, unknown> = {}) {
@@ -393,5 +471,141 @@ describe('makeReSimLeg — Aquarius structural failure exclusion', () => {
     expect(kept).toBeDefined();
     expect(kept!.netOut).toBe(5_0000000n); // raw net, unchanged
     expect(kept!.netConfidence).toBe('estimate'); // downgraded: sim failed
+  });
+});
+
+describe('resimAquariusXbull — StellarBroker branch', () => {
+  beforeEach(() => {
+    vi.mocked(engineQuote).mockReset();
+    vi.mocked(priceImpactPct).mockReset();
+  });
+
+  it('promotes StellarBroker to exact, collapses netRange, recalculates priceImpact', async () => {
+    vi.mocked(priceImpactPct).mockReturnValue(1.5);
+
+    const sbQ = {
+      source: 'stellarbroker' as const,
+      sellAsset: BLND,
+      buyAsset: USDC,
+      amountIn: AMT,
+      grossOut: 5_0000000n,
+      feeBreakdown: [{ kind: 'aggregator' as const, note: 'opaque' }],
+      gasXlm: 0n,
+      gasInTarget: 0n,
+      netOut: 5_0000000n,
+      netConfidence: 'estimate' as const,
+      netRange: { low: 4_8000000n, high: 5_0000000n },
+      route: [],
+      priceImpactPct: -1,
+      priceImpactLocalPct: -1,
+      raw: {},
+    };
+
+    const fakeResult = {
+      request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
+      ranking: { ranked: [sbQ as any], best: sbQ as any },
+      errors: [],
+    } as any;
+
+    const fakeSimSb = vi.fn(async () => ({ net: 4_9200000n, route: ['BLND', 'USDC'], exact: true }));
+    await resimAquariusXbull(
+      fakeResult, 'USDC', AMT,
+      { rpcUrl: 'https://rpc.test', stellarBrokerApiKey: 'key' },
+      { simulateStellarBrokerNet: fakeSimSb as any },
+    );
+
+    const sbRow = fakeResult.ranking.ranked.find((q: any) => q.source === 'stellarbroker');
+    expect(sbRow).toBeDefined();
+    expect(sbRow!.netConfidence).toBe('exact');
+    expect(sbRow!.netOut).toBe(4_9200000n);
+    expect(sbRow!.netRange).toEqual({ low: 4_9200000n, high: 4_9200000n });
+    expect(vi.mocked(priceImpactPct)).toHaveBeenCalled();
+    expect(sbRow!.priceImpactPct).toBe(1.5);
+    expect((sbRow!.feeBreakdown as Array<{ note?: string }>)[0]?.note).toMatch(/empty-auth/);
+  });
+
+  it('does NOT promote a mixed (exact=false) StellarBroker net — leaves the estimate untouched', async () => {
+    const sbQ = {
+      source: 'stellarbroker' as const,
+      sellAsset: BLND, buyAsset: USDC, amountIn: AMT,
+      grossOut: 5_0000000n, feeBreakdown: [{ kind: 'aggregator' as const, note: 'opaque' }],
+      gasXlm: 0n, gasInTarget: 0n, netOut: 5_0000000n,
+      netConfidence: 'estimate' as const, netRange: { low: 4_8000000n, high: 5_0000000n },
+      route: [], priceImpactPct: -1, priceImpactLocalPct: -1, raw: {},
+    };
+    const fakeResult = {
+      request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
+      ranking: { ranked: [sbQ as any], best: sbQ as any },
+      errors: [],
+    } as any;
+    // Mixed burst: net is a conservative lower bound, not fully observed
+    const fakeSimSb = vi.fn(async () => ({ net: 4_9200000n, route: ['BLND', 'USDC'], exact: false }));
+    await resimAquariusXbull(
+      fakeResult, 'USDC', AMT,
+      { rpcUrl: 'https://rpc.test', stellarBrokerApiKey: 'key' },
+      { simulateStellarBrokerNet: fakeSimSb as any },
+    );
+    const sbRow = fakeResult.ranking.ranked.find((q: any) => q.source === 'stellarbroker');
+    expect(sbRow).toBeDefined();
+    expect(sbRow!.netConfidence).toBe('estimate'); // NOT promoted
+    expect(sbRow!.netOut).toBe(5_0000000n);        // original net, unchanged
+    expect(sbRow!.netRange).toEqual({ low: 4_8000000n, high: 5_0000000n }); // original range kept
+  });
+
+  it('does not re-rank when SB sim fails (no stellarBrokerApiKey)', async () => {
+    const sbQ = {
+      source: 'stellarbroker' as const,
+      sellAsset: BLND, buyAsset: USDC, amountIn: AMT,
+      grossOut: 5_0000000n, gasXlm: 0n, gasInTarget: 0n, netOut: 5_0000000n,
+      netConfidence: 'estimate' as const, netRange: undefined,
+      feeBreakdown: [], route: [], raw: {},
+    };
+    const fakeResult = {
+      request: {}, prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
+      ranking: { ranked: [sbQ as any], best: sbQ as any }, errors: [],
+    } as any;
+    const fakeSimSb = vi.fn(async () => ({ net: 4_9000000n, route: [] }));
+    await resimAquariusXbull(
+      fakeResult, 'USDC', AMT,
+      { rpcUrl: 'https://rpc.test' }, // no key → SB branch skipped
+      { simulateStellarBrokerNet: fakeSimSb as any },
+    );
+    expect(fakeSimSb).not.toHaveBeenCalled();
+    // netConfidence unchanged
+    expect(fakeResult.ranking.ranked[0].netConfidence).toBe('estimate');
+  });
+});
+
+describe('liveQuote — StellarBroker chip after re-sim', () => {
+  beforeEach(() => {
+    vi.mocked(engineQuote).mockReset();
+    vi.mocked(priceImpactPct).mockReset();
+  });
+
+  it('shows "obs" chip for StellarBroker after successful re-sim', async () => {
+    const sbQ = {
+      ...makeQuote('stellarbroker', 5_0000000n),
+      netConfidence: 'estimate' as const,
+    };
+    vi.mocked(engineQuote).mockResolvedValue({
+      request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
+      ranking: { ranked: [sbQ], best: sbQ },
+      errors: [],
+    } as any);
+
+    const fakeSimSb = vi.fn(async () => ({ net: 4_9500000n, route: ['BLND', 'USDC'], exact: true }));
+    const result = await liveQuote(
+      'USDC', AMT,
+      { ...FAKE_CFG, stellarBrokerApiKey: 'test-key' } as any,
+      { simulateStellarBrokerNet: fakeSimSb as any },
+    );
+
+    const sbRow = result.ladder.find(r => r.sourceId === 'stellarbroker');
+    expect(sbRow).toBeDefined();
+    expect(sbRow!.chip).toBe('obs');
+    expect(sbRow!.net).toBeCloseTo(4.95, 5);
   });
 });

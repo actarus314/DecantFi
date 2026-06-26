@@ -3,7 +3,7 @@
 import { quote as engineQuote } from '../core/engine.js';
 import { isExecutableSource } from '../core/executable.js';
 import { rankQuotes } from '../core/rank.js';
-import { simulateAquariusNet, simulateXbullNet } from './execute.js';
+import { simulateAquariusNet, simulateXbullNet, simulateStellarBrokerNet } from './execute.js';
 import { withTimeout } from '../core/timeout.js';
 import { readBlndBalance } from '../core/balance.js';
 import { BLND, USDC, EURC } from '../core/assets.js';
@@ -142,14 +142,22 @@ function buildRoute(hops: RouteHop[], amountIn: bigint, netOut: bigint, pairUi: 
  * Crée un callback `reSimLeg` pour `compareEurc` : re-simule on-chain chaque cote xBull/Aquarius
  * de la liste et remplace netOut+grossOut par le vrai fill. Best-effort : un échec RPC ou l'absence
  * de données brutes → cote brute conservée, jamais d'exception.
- * Comet/Soroswap/Horizon/Ultra/StellarBroker sont déjà fidèles → inchangés.
+ * Comet/Soroswap/Horizon/Ultra sont déjà fidèles → inchangés.
+ * StellarBroker est re-simulé ici (capture WS + sim empty-auth), promu 'exact' seulement
+ * si toutes les jambes sont des sims Soroban observées (sinon la cote estimée reste intacte).
  */
 export function makeReSimLeg(
-  cfg: { rpcUrl: string },
-  deps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet; simTimeoutMs?: number },
+  cfg: { rpcUrl: string; stellarBrokerApiKey?: string },
+  deps?: {
+    simulateAquariusNet?: typeof simulateAquariusNet;
+    simulateXbullNet?: typeof simulateXbullNet;
+    simulateStellarBrokerNet?: typeof simulateStellarBrokerNet;
+    simTimeoutMs?: number;
+  },
 ): (quotes: import('../core/sources/types.js').NormalizedQuote[], amountIn: bigint) => Promise<import('../core/sources/types.js').NormalizedQuote[]> {
   const simFnAq = deps?.simulateAquariusNet ?? simulateAquariusNet;
   const simFnXb = deps?.simulateXbullNet ?? simulateXbullNet;
+  const simFnSb = deps?.simulateStellarBrokerNet ?? simulateStellarBrokerNet;
   const simTimeoutMs = deps?.simTimeoutMs ?? RESIM_TIMEOUT_MS;
 
   return async (quotes, amountIn) => {
@@ -176,6 +184,34 @@ export function makeReSimLeg(
             return { ...q, netOut: xbSim.net, grossOut: xbSim.net };
           // xbSim === null → RPC/timeout failure → downgrade confidence
           if (!xbSim) return { ...q, netConfidence: 'estimate' as const };
+        } else if (q.source === 'stellarbroker' && cfg.stellarBrokerApiKey) {
+          const sbResult = await withTimeout(
+            simFnSb({
+              sellAsset: q.sellAsset,
+              buyAsset: q.buyAsset,
+              amountIn,
+              slippageBps: 50, // default; slippage irrelevant for fill observation
+              apiKey: cfg.stellarBrokerApiKey,
+              rpcUrl: cfg.rpcUrl,
+            }),
+            simTimeoutMs,
+            'sb leg re-sim',
+          ).catch(() => null);
+          // Promote to 'exact'/observed ONLY when EVERY leg was a Soroban sim (sbResult.exact).
+          // A mixed burst (Soroban + classic destMin floor) is a conservative lower bound we did
+          // not fully observe → keep the honest estimate row untouched, never relabel it observed.
+          if (sbResult && sbResult.net > 0n && sbResult.exact) {
+            return {
+              ...q,
+              netOut: sbResult.net,
+              grossOut: sbResult.net,
+              netConfidence: 'exact' as const,
+              netRange: { low: sbResult.net, high: sbResult.net },
+              feeBreakdown: [{ kind: 'aggregator' as const, note: 'fill observed via empty-auth Soroban simulation' }],
+            };
+          }
+          // capture/sim failure OR mixed (non-exact) net → keep original (no downgrade, no relabel)
+          return q;
         }
       } catch {
         // Transient RPC error (throw from Aquarius sim) → downgrade confidence, keep raw quote
@@ -197,16 +233,24 @@ export async function resimAquariusXbull(
   result: QuoteResult,
   pairUi: string,
   amountStroops: bigint,
-  cfg: { rpcUrl: string },
-  deps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet; simTimeoutMs?: number },
+  cfg: { rpcUrl: string; stellarBrokerApiKey?: string },
+  deps?: {
+    simulateAquariusNet?: typeof simulateAquariusNet;
+    simulateXbullNet?: typeof simulateXbullNet;
+    simulateStellarBrokerNet?: typeof simulateStellarBrokerNet;
+    simTimeoutMs?: number;
+  },
 ): Promise<void> {
   const simFnAq = deps?.simulateAquariusNet ?? simulateAquariusNet;
   const simFnXb = deps?.simulateXbullNet ?? simulateXbullNet;
+  const simFnSb = deps?.simulateStellarBrokerNet ?? simulateStellarBrokerNet;
   const simTimeoutMs = deps?.simTimeoutMs ?? RESIM_TIMEOUT_MS;
 
   let aquariusSimNet: bigint | undefined;
   let aquariusSimOk = false; // sim succeeded (real fill observed) → 'exact' even if it equals the find-path quote
   let xbullSimNet: bigint | undefined;
+  let sbSimNet: bigint | undefined;
+  let sbSimMs = 0;
   // Tracks whether a sim was attempted but failed (→ downgrade to 'estimate')
   let aquariusSimFailed = false;
   let xbullSimFailed = false;
@@ -218,24 +262,39 @@ export async function resimAquariusXbull(
   const route = (xbRanked?.raw as { route?: unknown } | undefined)?.route;
   let xbullHops: RouteHop[] | undefined;
 
-  // B4 — lancer Aquarius + xBull en parallèle (pools disjoints, indépendants)
+  const sbRanked = cfg.stellarBrokerApiKey
+    ? result.ranking.ranked.find((q) => q.source === 'stellarbroker')
+    : undefined;
+
+  // B4 — lancer Aquarius + xBull + StellarBroker en parallèle (pools disjoints, indépendants)
   // Wrapper de chronométrage par promesse (mesure la durée individuelle même en parallèle)
   const timed = <T>(p: Promise<T>): Promise<{ r: T; ms: number }> => {
     const t = Date.now();
     return p.then((r) => ({ r, ms: Date.now() - t }));
   };
-  const [aqT, xbT] = await Promise.all([
+  const [aqT, xbT, sbT] = await Promise.all([
     (aqRanked && rawXdr)
       ? timed(withTimeout(simFnAq(String(rawXdr), amountStroops, aqRanked.sellAsset?.sac ?? BLND.sac, { rpcUrl: cfg.rpcUrl }), simTimeoutMs, 'aquarius re-sim').catch(() => null))
       : Promise.resolve({ r: null as bigint | null, ms: 0 }),
     (xbRanked && route)
       ? timed(withTimeout(simFnXb(String(route), amountStroops, { rpcUrl: cfg.rpcUrl }), simTimeoutMs, 'xbull re-sim').catch(() => null))
       : Promise.resolve({ r: null as Awaited<ReturnType<typeof simFnXb>> | null, ms: 0 }),
+    (sbRanked && cfg.stellarBrokerApiKey)
+      ? timed(withTimeout(simFnSb({
+          sellAsset: sbRanked.sellAsset,
+          buyAsset: sbRanked.buyAsset,
+          amountIn: amountStroops,
+          slippageBps: 50,
+          apiKey: cfg.stellarBrokerApiKey,
+          rpcUrl: cfg.rpcUrl,
+        }), simTimeoutMs, 'sb re-sim').catch(() => null))
+      : Promise.resolve({ r: null as Awaited<ReturnType<typeof simFnSb>> | null, ms: 0 }),
   ]);
   const aqSimResult = aqT.r;
   const aqSimMs = aqT.ms;
   const xbSimResult = xbT.r;
   const xbSimMs = xbT.ms;
+  sbSimMs = sbT.ms;
 
   if (aqRanked && rawXdr) {
     const simNet = aqSimResult;
@@ -255,8 +314,13 @@ export async function resimAquariusXbull(
     if (!xbSim) xbullSimFailed = true; // RPC/timeout failure → downgrade
   }
 
+  // Promote SB only when the whole net was observed via Soroban sims (exact). A mixed
+  // (Soroban + classic destMin floor) net is a conservative lower bound → leave the SB
+  // estimate quote untouched rather than relabel a partly-unobserved number as "observed".
+  if (sbRanked && sbT.r && sbT.r.net > 0n && sbT.r.exact) sbSimNet = sbT.r.net;
+
   if (aquariusSimOk || aquariusSimNet !== undefined || xbullSimNet !== undefined || xbullHops !== undefined
-    || aquariusSimFailed || xbullSimFailed) {
+    || aquariusSimFailed || xbullSimFailed || sbSimNet !== undefined) {
     const newQuotes = result.ranking.ranked.map((q) => {
       if (q.source === 'aquarius') {
         if (aquariusSimOk)
@@ -288,15 +352,31 @@ export async function resimAquariusXbull(
         if (xbullSimFailed)
           return { ...q, netConfidence: 'estimate' as const };
       }
+      if (q.source === 'stellarbroker' && sbSimNet !== undefined) {
+        return {
+          ...q,
+          netOut: sbSimNet,
+          grossOut: sbSimNet,
+          netConfidence: 'exact' as const,
+          netRange: { low: sbSimNet, high: sbSimNet },
+          feeBreakdown: [{ kind: 'aggregator' as const, note: 'fill observed via empty-auth Soroban simulation' }],
+          priceImpactPct: priceImpactPct(q.amountIn, sbSimNet, result.prices.blndUsd, targetEvmPerUnit(pairUi, result.prices)) ?? q.priceImpactPct,
+          priceImpactLocalPct: priceImpactPct(q.amountIn, sbSimNet, result.prices.blndUsd, targetLocalPerUnit(pairUi, result.prices)) ?? q.priceImpactLocalPct,
+          durationMs: (q.durationMs ?? 0) + sbSimMs,
+        };
+      }
       return q;
     });
     result.ranking = rankQuotes(newQuotes);
   }
 
-  // EURC direct via Aquarius ou xBull : mettre à jour netOut et recalculer winner/bestNetEurc
+  // EURC direct via Aquarius, xBull, or StellarBroker: update netOut, recompute winner/bestNetEurc
   if (pairUi === 'EURC' && result.eurc?.direct) {
     const directSrc = result.eurc.direct.source;
-    const simNet = directSrc === 'aquarius' ? aquariusSimNet : directSrc === 'xbull' ? xbullSimNet : undefined;
+    const simNet = directSrc === 'aquarius' ? aquariusSimNet
+                 : directSrc === 'xbull' ? xbullSimNet
+                 : directSrc === 'stellarbroker' ? sbSimNet
+                 : undefined;
     if (simNet !== undefined) {
       const eurc = result.eurc;
       eurc.direct = { ...eurc.direct!, netOut: simNet, grossOut: simNet };
@@ -321,7 +401,12 @@ export async function liveQuote(
   pairUi: string,
   amountStroops: bigint,
   cfg: WebConfig,
-  deps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet; simTimeoutMs?: number },
+  deps?: {
+    simulateAquariusNet?: typeof simulateAquariusNet;
+    simulateXbullNet?: typeof simulateXbullNet;
+    simulateStellarBrokerNet?: typeof simulateStellarBrokerNet;
+    simTimeoutMs?: number;
+  },
 ): Promise<LiveQuote> {
   const buyAsset = pairUi === 'EURC' ? EURC : USDC;
 
@@ -341,14 +426,14 @@ export async function liveQuote(
       rpcCache: new Map(),
       // Re-simulation honnête des jambes EURC via-USDC (xBull/Aquarius seulement).
       // Best-effort : un échec RPC laisse la cote brute, ne casse pas la cotation.
-      reSimLeg: pairUi === 'EURC' ? makeReSimLeg({ rpcUrl: cfg.rpcUrl }, deps) : undefined,
+      reSimLeg: pairUi === 'EURC' ? makeReSimLeg({ rpcUrl: cfg.rpcUrl, stellarBrokerApiKey: cfg.stellarBrokerApiKey }, deps) : undefined,
     },
   });
 
   // ─── Re-simulation Aquarius + xBull : remplace les nets sur-cotés par les vrais fills simulés ───
   // Aquarius find-path sur-cote ~0,2 % sur les routes via-XLM.
   // xBull /swaps/quote sur-cote ~0,1 % (skim routeur non divulgué).
-  await resimAquariusXbull(result, pairUi, amountStroops, { rpcUrl: cfg.rpcUrl }, deps);
+  await resimAquariusXbull(result, pairUi, amountStroops, { rpcUrl: cfg.rpcUrl, stellarBrokerApiKey: cfg.stellarBrokerApiKey }, deps);
 
   // Pour EURC : si le gagnant est via-usdc, utiliser result.eurc
   let bestQuote: import('../core/sources/types.js').NormalizedQuote | undefined = result.ranking.best;

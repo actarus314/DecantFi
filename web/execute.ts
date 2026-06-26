@@ -7,6 +7,7 @@ import { withTimeout } from '../core/timeout.js';
 import { toNumber, fromStroops, toStroops } from '../core/amount.js';
 import { stroopsOrNull, bigintOrNull } from '../core/sources/util.js';
 import { COMET_POOL, COMET_WITNESSES, decodeCometOut } from '../core/sources/comet.js';
+import { SB_FEE_ACCOUNT } from '../core/sources/stellarbroker.js';
 import { parseBlndBalance } from '../core/balance.js';
 import { SoroswapSDK, SupportedNetworks, SupportedProtocols, TradeType } from '@soroswap/sdk';
 
@@ -435,6 +436,140 @@ export async function simulateXbullNet(
     }
   }
   return null;
+}
+
+// ─── Simulation StellarBroker (empty-auth recording-mode) ────────────────────
+
+// SB_FEE_ACCOUNT is defined canonically in core/sources/stellarbroker.ts; re-export for callers/tests.
+export { SB_FEE_ACCOUNT };
+
+/**
+ * Re-simulate a StellarBroker swap using the empty-auth recording-mode technique
+ * proven in spike/sb-mediator/scripts/t5b-emptyauth-sim.mjs.
+ *
+ * Opens a WS trade session against a witness (no signing), captures the unsigned
+ * tx burst, then for each XDR:
+ *   - invokeHostFunction: rebuild with witness as source, auth:[], no sorobanData;
+ *     simulateTransaction in recording mode; contribution = scValToNative(retval)[1].
+ *   - pathPaymentStrictSend to trader (≠ SB_FEE_ACCOUNT): contribution = destMin.
+ *   - pathPaymentStrictSend to SB_FEE_ACCOUNT: excluded (fee leg).
+ *
+ * Net = Σ contributions. Returns null on capture failure or zero net.
+ *
+ * `exact` is true ONLY when every contributing leg was a Soroban recording-mode
+ * sim (a real observed fill). If any classic trader leg contributed its destMin
+ * (a slippage FLOOR, not an observed fill), `exact` is false: the net is then a
+ * conservative lower bound and callers MUST NOT relabel it "observed".
+ */
+export async function simulateStellarBrokerNet(opts: {
+  sellAsset: Asset;
+  buyAsset: Asset;
+  amountIn: bigint;
+  slippageBps: number;
+  apiKey: string;
+  rpcUrl: string;
+  wsConstructor?: typeof WebSocket;
+  /** For testing: skip real WS capture, use these XDRs directly. */
+  _capturedXdrs?: string[];
+  /** For testing: override the RPC server. */
+  _rpcServer?: { simulateTransaction(tx: unknown): Promise<unknown> };
+}): Promise<{ net: bigint; route: string[]; exact: boolean } | null> {
+  // All AQUARIUS_WITNESSES hold BLND, USDC, EURC — pick the first as witness/trader
+  const witness = AQUARIUS_WITNESSES[0]!;
+
+  let capturedXdrs: string[];
+
+  if (opts._capturedXdrs) {
+    capturedXdrs = opts._capturedXdrs;
+  } else {
+    const { captureStellarBrokerTx } = await import('../core/sources/stellarbroker.js');
+    const capture = await withTimeout(
+      captureStellarBrokerTx(
+        { sellAsset: opts.sellAsset, buyAsset: opts.buyAsset, amountIn: opts.amountIn, slippageBps: opts.slippageBps },
+        opts.apiKey,
+        witness,
+        { WebSocketConstructor: opts.wsConstructor },
+      ),
+      SIM_TIMEOUT_MS,
+      'sb capture',
+    ).catch(() => null);
+    if (!capture || capture.xdrs.length === 0) return null;
+    capturedXdrs = capture.xdrs;
+  }
+
+  const sdk = await import('@stellar/stellar-sdk');
+  const { rpc, TransactionBuilder, Networks, Account, Operation, scValToNative, FeeBumpTransaction } = sdk;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const server: { simulateTransaction(tx: unknown): Promise<unknown> } =
+    opts._rpcServer ?? new rpc.Server((opts.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
+
+  let totalNet = 0n;
+  // True as soon as a classic trader-leg destMin (a floor, not an observed fill) is summed
+  // into the net → the result can no longer be honestly labelled "observed/exact".
+  let classicContributed = false;
+  const routeSyms: string[] = [opts.sellAsset.symbol];
+
+  for (const xdrStr of capturedXdrs) {
+    try {
+      const parsed = TransactionBuilder.fromXDR(xdrStr, Networks.PUBLIC);
+      // Unwrap FeeBump if present
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tx = (parsed instanceof FeeBumpTransaction) ? (parsed as any).innerTransaction : parsed;
+
+      // Check for invokeHostFunction ops (Soroban swap legs)
+      const invokeOps = (tx.operations as Array<{ type: string }>).filter((o) => o.type === 'invokeHostFunction');
+      for (const invokeOp of invokeOps) {
+        // Rebuild with witness as source, empty auth, no sorobanData → recording mode
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const func = (invokeOp as any).func;
+        const rebuilt = new TransactionBuilder(new Account(witness, '0'), {
+          fee: '1000000',
+          networkPassphrase: Networks.PUBLIC,
+        })
+          .addOperation(Operation.invokeHostFunction({ func, auth: [] }))
+          .setTimeout(120)
+          .build();
+        bumpRpc();
+        const sim = await withTimeout(
+          server.simulateTransaction(rebuilt),
+          SIM_TIMEOUT_MS,
+          'sb soroban sim',
+        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (rpc.Api.isSimulationError(sim as any) || !(sim as any)?.result?.retval) continue;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const native = scValToNative((sim as any).result.retval);
+        if (!Array.isArray(native) || native.length < 2) continue;
+        const leg = BigInt(native[1]);
+        if (leg > 0n) totalNet += leg;
+        if (!routeSyms.includes(opts.buyAsset.symbol)) routeSyms.push(opts.buyAsset.symbol);
+      }
+
+      if (invokeOps.length > 0) continue; // tx was Soroban — classic branch below not applicable
+
+      // Classic pathPaymentStrictSend legs
+      for (const op of (tx.operations as Array<{ type: string; destination?: string; destMin?: string }>)) {
+        if (op.type !== 'pathPaymentStrictSend') continue;
+        if (op.destination === SB_FEE_ACCOUNT) continue; // fee leg → skip
+        // Trader leg: destMin is a guaranteed FLOOR, never an observed fill. Summing it
+        // makes the net a conservative lower bound → mark non-exact so callers keep the
+        // honest estimate label instead of promoting to "observed".
+        if (op.destMin) {
+          try {
+            const destMinStroops = toStroops(op.destMin);
+            if (destMinStroops > 0n) { totalNet += destMinStroops; classicContributed = true; }
+          } catch { /* malformed destMin — skip */ }
+        }
+        if (!routeSyms.includes(opts.buyAsset.symbol)) routeSyms.push(opts.buyAsset.symbol);
+      }
+    } catch {
+      // Malformed XDR — skip
+    }
+  }
+
+  if (totalNet <= 0n) return null;
+  return { net: totalNet, route: routeSyms, exact: !classicContributed };
 }
 
 /** Simule swap_chained Aquarius et retourne les Transfer[] bruts (pour la sonde de cohérence).

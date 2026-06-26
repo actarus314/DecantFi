@@ -21,6 +21,8 @@ import {
   parseUltraQuote,
   quoteUltra,
   reconcileLegSends,
+  simulateStellarBrokerNet,
+  SB_FEE_ACCOUNT,
   type ExecDeps,
   type FetchResult,
   type SoroswapClient,
@@ -35,6 +37,8 @@ import {
   Asset as SdkAsset,
   Keypair,
   Account,
+  Contract,
+  nativeToScVal,
 } from '@stellar/stellar-sdk';
 
 // ─── Helpers pour construire de vraies transactions de test ──────────────────
@@ -1101,5 +1105,170 @@ describe('feeExceedsSpendable', () => {
   it('max_fee one stroop over spendable → exceeds: true', () => {
     const { exceeds } = feeExceedsSpendable(26_224_041, NATIVE, SUBS);
     expect(exceeds).toBe(true);
+  });
+});
+
+// ─── simulateStellarBrokerNet ─────────────────────────────────────────────────
+
+describe('simulateStellarBrokerNet', () => {
+  const SB_ROUTER = 'CBWP275BNGLHWFTQVB6QHA67MLX7WTX6YZ5LNSUVOK7W2TMKWX7OPYOJ';
+  const WITNESS = 'GCA34HBKNLWN3AOXWBRW5Y3HSGHCWF3UDBRJ5YHGU6HWGJZEPO2NSXI3';
+  const USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
+  const EURC_ISSUER = 'GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2';
+
+  /** Minimal Soroban XDR: one invokeHostFunction op on the SB router. */
+  function makeSorobanXdr(): string {
+    const account = new Account(WITNESS, '100');
+    const tx = new TransactionBuilder(account, { fee: '1000000', networkPassphrase: Networks.PUBLIC })
+      .addOperation(new Contract(SB_ROUTER).call('swap'))
+      .setTimeout(120)
+      .build();
+    return tx.toXDR();
+  }
+
+  /** Classic pathPaymentStrictSend XDR (fee or trader leg). */
+  function makeClassicXdr(destination: string, destMin: string): string {
+    const account = new Account(WITNESS, '100');
+    const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: Networks.PUBLIC })
+      .addOperation(Operation.pathPaymentStrictSend({
+        sendAsset: new SdkAsset('USDC', USDC_ISSUER),
+        sendAmount: '1000',
+        destination,
+        destAsset: new SdkAsset('EURC', EURC_ISSUER),
+        destMin,
+        path: [],
+      }))
+      .setTimeout(180)
+      .build();
+    return tx.toXDR();
+  }
+
+  /** Fake RPC that returns a known retval: [amountIn, amountOut, 0n] as i128 vec. */
+  function makeFakeRpc(amountOut: bigint) {
+    return {
+      async simulateTransaction(_tx: unknown) {
+        return { result: { retval: nativeToScVal([10_000_0000000n, amountOut, 0n]) } };
+      },
+    };
+  }
+
+  // REAL captured StellarBroker swap tx (public on-chain data, not a secret), copied verbatim
+  // from spike/sb-mediator/fixtures/blnd-usdc-5000-0.xdr. Exercises the genuine decode path:
+  // fromXDR → invokeHostFunction func extraction → empty-auth rebuild → simulateTransaction.
+  const REAL_SB_SOROBAN_XDR =
+    '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';
+
+  it('returns retval[1] from a Soroban invokeHostFunction XDR', async () => {
+    const result = await simulateStellarBrokerNet({
+      sellAsset: BLND, buyAsset: USDC,
+      amountIn: 5000_0000000n, slippageBps: 50,
+      apiKey: 'test', rpcUrl: 'https://rpc.test',
+      _capturedXdrs: [makeSorobanXdr()],
+      _rpcServer: makeFakeRpc(100_0000000n),
+    });
+    expect(result).not.toBeNull();
+    expect(result!.net).toBe(100_0000000n);
+    expect(result!.exact).toBe(true); // all-Soroban burst → observed
+    expect(result!.route).toContain('BLND');
+    expect(result!.route).toContain('USDC');
+  });
+
+  it('sums two Soroban legs across two separate XDRs', async () => {
+    let callCount = 0;
+    const fakeRpc = {
+      async simulateTransaction(_tx: unknown) {
+        callCount++;
+        const out = callCount === 1 ? 60_0000000n : 40_0000000n;
+        return { result: { retval: nativeToScVal([5000_0000000n, out, 0n]) } };
+      },
+    };
+    const result = await simulateStellarBrokerNet({
+      sellAsset: BLND, buyAsset: USDC,
+      amountIn: 5000_0000000n, slippageBps: 50,
+      apiKey: 'test', rpcUrl: 'https://rpc.test',
+      _capturedXdrs: [makeSorobanXdr(), makeSorobanXdr()],
+      _rpcServer: fakeRpc,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.net).toBe(100_0000000n); // 60 + 40
+    expect(result!.exact).toBe(true); // both legs Soroban → observed
+  });
+
+  it('excludes fee-account classic XDR, adds destMin from trader classic XDR, and is NOT exact', async () => {
+    const neverCalled = { async simulateTransaction(): Promise<never> { throw new Error('should not be called'); } };
+    const result = await simulateStellarBrokerNet({
+      sellAsset: USDC, buyAsset: EURC,
+      amountIn: 1000_0000000n, slippageBps: 50,
+      apiKey: 'test', rpcUrl: 'https://rpc.test',
+      _capturedXdrs: [
+        makeClassicXdr(SB_FEE_ACCOUNT, '0.0001'), // fee leg → excluded
+        makeClassicXdr(WITNESS, '879.1223392'),    // trader leg → add destMin (a floor)
+      ],
+      _rpcServer: neverCalled,
+    });
+    expect(result).not.toBeNull();
+    // 879.1223392 × 10^7 = 8_791_223_392 stroops
+    expect(result!.net).toBe(8_791_223_392n);
+    // destMin is a slippage floor, never an observed fill → must NOT be labelled exact
+    expect(result!.exact).toBe(false);
+  });
+
+  it('returns null when all Soroban sims error (isSimulationError)', async () => {
+    const failRpc = { async simulateTransaction(_tx: unknown) { return { error: 'failed' }; } };
+    const result = await simulateStellarBrokerNet({
+      sellAsset: BLND, buyAsset: USDC,
+      amountIn: 5000_0000000n, slippageBps: 50,
+      apiKey: 'test', rpcUrl: 'https://rpc.test',
+      _capturedXdrs: [makeSorobanXdr()],
+      _rpcServer: failRpc,
+    });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when _capturedXdrs is empty', async () => {
+    const result = await simulateStellarBrokerNet({
+      sellAsset: BLND, buyAsset: USDC,
+      amountIn: 5000_0000000n, slippageBps: 50,
+      apiKey: 'test', rpcUrl: 'https://rpc.test',
+      _capturedXdrs: [],
+      _rpcServer: { async simulateTransaction() { return {}; } },
+    });
+    expect(result).toBeNull();
+  });
+
+  it('decodes a REAL captured SB Soroban XDR and returns retval[1], exact=true', async () => {
+    // Real fixture → genuine fromXDR + invokeHostFunction func extraction + empty-auth rebuild.
+    // RPC injected so the assertion targets the decode path, not network behaviour.
+    const result = await simulateStellarBrokerNet({
+      sellAsset: BLND, buyAsset: USDC,
+      amountIn: 5000_0000000n, slippageBps: 50,
+      apiKey: 'test', rpcUrl: 'https://rpc.test',
+      _capturedXdrs: [REAL_SB_SOROBAN_XDR],
+      _rpcServer: makeFakeRpc(201_9641968n), // retval[1] = simulated fill
+    });
+    expect(result).not.toBeNull();
+    expect(result!.net).toBe(201_9641968n);
+    expect(result!.exact).toBe(true);
+    expect(result!.route).toEqual(['BLND', 'USDC']);
+  });
+
+  it('mixes a REAL Soroban leg with classic legs: sums trader destMin, excludes fee leg, exact=false', async () => {
+    // Real Soroban leg (sim → 100) + classic trader leg (destMin 50, a floor) + classic fee leg (excluded).
+    const result = await simulateStellarBrokerNet({
+      sellAsset: USDC, buyAsset: EURC,
+      amountIn: 1000_0000000n, slippageBps: 50,
+      apiKey: 'test', rpcUrl: 'https://rpc.test',
+      _capturedXdrs: [
+        REAL_SB_SOROBAN_XDR,                  // Soroban leg → sim retval[1] = 100
+        makeClassicXdr(SB_FEE_ACCOUNT, '0.0001'), // fee leg → excluded
+        makeClassicXdr(WITNESS, '50.0'),          // trader leg → destMin 50 added
+      ],
+      _rpcServer: makeFakeRpc(100_0000000n),
+    });
+    expect(result).not.toBeNull();
+    // 100 (Soroban sim) + 50 (trader destMin); fee leg excluded
+    expect(result!.net).toBe(150_0000000n);
+    // a classic destMin floor contributed → cannot be labelled observed
+    expect(result!.exact).toBe(false);
   });
 });

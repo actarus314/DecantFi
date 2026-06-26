@@ -70,6 +70,151 @@ export function parseStellarbroker(raw: unknown, req: QuoteRequest): NormalizedQ
   };
 }
 
+// ─── Capture (read-only trade session) ───────────────────────────────────────
+
+/** StellarBroker fee account: pathPaymentStrictSend ops destined here are the fee leg — skip. */
+export const SB_FEE_ACCOUNT = 'GD53CUDUMAIX5BCS4LU5ZZ46RON7B3HCH3JYHR6LLC3OWH3KLRFUQD5I';
+
+export interface SBCaptureResult {
+  /** Unsigned tx XDRs in burst order */
+  xdrs: string[];
+  /** Estimate from SB quote (buy-asset units, decimal string) */
+  estimatedBuyingAmount: string;
+  /** Floor from directTrade.buying (decimal string) */
+  directBuying: string;
+}
+
+/**
+ * Opens a StellarBroker WS trade session against `witnessAccount`, captures the full
+ * unsigned tx burst WITHOUT signing, then sends {type:'stop'} and closes.
+ *
+ * Protocol (raw WS, no @stellar-broker/client SDK):
+ *   connected → {type:'quote'} → server {type:'quote'} → {type:'trade', account}
+ *   → collect server {type:'tx'} for burstWindowMs after first tx → {type:'stop'} → close
+ *
+ * Returns null on timeout (no tx received) or SB error response. NEVER signs or submits.
+ */
+export async function captureStellarBrokerTx(
+  req: QuoteRequest,
+  apiKey: string,
+  witnessAccount: string,
+  deps?: {
+    WebSocketConstructor?: typeof WebSocket;
+    /** Override burst collection window (default 2500 ms). Shorten in tests. */
+    _burstWindowMs?: number;
+    /** Override global timeout (default 10 000 ms). Shorten in tests. */
+    _totalTimeoutMs?: number;
+  },
+): Promise<SBCaptureResult | null> {
+  const WS = deps?.WebSocketConstructor ?? (globalThis as unknown as { WebSocket: typeof WebSocket }).WebSocket;
+  if (!WS) return null;
+
+  const url = `wss://api.stellar.broker/ws?partner=${encodeURIComponent(apiKey)}`;
+  const burstWindowMs = deps?._burstWindowMs ?? 2500;
+  const totalTimeoutMs = deps?._totalTimeoutMs ?? 10_000;
+
+  return new Promise<SBCaptureResult | null>((resolve) => {
+    let done = false;
+    let quoteSent = false;
+    let tradeSent = false;
+    const xdrs: string[] = [];
+    let estimatedBuyingAmount = '';
+    let directBuying = '';
+    let burstTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const finish = (result: SBCaptureResult | null) => {
+      if (done) return;
+      done = true;
+      if (burstTimer) { clearTimeout(burstTimer); burstTimer = null; }
+      clearTimeout(globalTimer);
+      try { ws.send(JSON.stringify({ type: 'stop' })); } catch { /* ignore */ }
+      try { ws.close(); } catch { /* ignore */ }
+      resolve(result);
+    };
+
+    const sendQuote = () => {
+      if (quoteSent || done) return;
+      quoteSent = true;
+      try {
+        ws.send(JSON.stringify({
+          type: 'quote',
+          sellingAsset: dash(req.sellAsset),
+          buyingAsset: dash(req.buyAsset),
+          sellingAmount: fromStroops(req.amountIn),
+          slippageTolerance: req.slippageBps / 10000,
+        }));
+      } catch { /* ignore */ }
+    };
+
+    const globalTimer = setTimeout(
+      () => finish(xdrs.length > 0 ? { xdrs, estimatedBuyingAmount, directBuying } : null),
+      totalTimeoutMs,
+    );
+
+    let ws: WebSocket;
+    try {
+      ws = new WS(url);
+    } catch {
+      clearTimeout(globalTimer);
+      resolve(null);
+      return;
+    }
+
+    ws.onopen = () => {
+      // Fallback: send quote if 'connected' arrived before onopen (mirrors existing adapter)
+      setTimeout(() => {
+        if (!done && !quoteSent && ws.readyState === 1) sendQuote();
+      }, 1500);
+    };
+
+    ws.onmessage = (event: MessageEvent) => {
+      if (done) return;
+      let msg: Record<string, unknown>;
+      try {
+        msg = JSON.parse(String(event.data)) as Record<string, unknown>;
+      } catch { return; }
+
+      const type = msg['type'];
+
+      if (type === 'connected') {
+        sendQuote();
+      } else if (type === 'ping') {
+        try { ws.send(JSON.stringify({ type: 'pong', uid: msg['uid'] })); } catch { /* ignore */ }
+      } else if (type === 'quote') {
+        const q = msg['quote'] as StellarBrokerRaw | null;
+        if (!q || q.status !== 'success') { finish(null); return; }
+        estimatedBuyingAmount = q.estimatedBuyingAmount ?? '';
+        directBuying = q.directTrade?.buying ?? '';
+        if (!tradeSent) {
+          tradeSent = true;
+          try { ws.send(JSON.stringify({ type: 'trade', account: witnessAccount })); } catch { /* ignore */ }
+        }
+      } else if (type === 'tx') {
+        const xdr = msg['xdr'];
+        if (typeof xdr === 'string' && xdr.length > 0) {
+          xdrs.push(xdr);
+          if (xdrs.length === 1) {
+            // Start burst collection window on first tx
+            burstTimer = setTimeout(() => {
+              finish({ xdrs, estimatedBuyingAmount, directBuying });
+            }, burstWindowMs);
+          }
+        }
+      } else if (type === 'stop') {
+        // Server signals end of trade session
+        finish(xdrs.length > 0 ? { xdrs, estimatedBuyingAmount, directBuying } : null);
+      }
+    };
+
+    ws.onerror = () => {
+      if (!done) finish(xdrs.length > 0 ? { xdrs, estimatedBuyingAmount, directBuying } : null);
+    };
+    ws.onclose = () => {
+      if (!done) finish(xdrs.length > 0 ? { xdrs, estimatedBuyingAmount, directBuying } : null);
+    };
+  });
+}
+
 // ─── WebSocket transport ──────────────────────────────────────────────────────
 
 /** Injection seam: override the WebSocket constructor in tests to avoid real network calls.

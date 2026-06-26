@@ -9,7 +9,7 @@ import { loadFixture } from '../../test/loadFixture.js';
 import { parseXbull } from './xbull.js';
 import { parseAquarius } from './aquarius.js';
 import { parseHorizon } from './horizon.js';
-import { parseStellarbroker } from './stellarbroker.js';
+import { parseStellarbroker, captureStellarBrokerTx } from './stellarbroker.js';
 import { parseUltrastellar } from './ultrastellar.js';
 import { parseSoroswapRoute } from './soroswap.js';
 import { decodeCometOut } from './comet.js';
@@ -141,5 +141,113 @@ describe('comet', () => {
   it('decode direct depuis un tableau', () => {
     expect(decodeCometOut([509156322n, 196540873n])).toBe(509156322n);
     expect(decodeCometOut([])).toBeNull();
+  });
+});
+
+// ─── captureStellarBrokerTx ───────────────────────────────────────────────────
+
+describe('captureStellarBrokerTx', () => {
+  /** Minimal fake WebSocket that lets the test drive server→client messages. */
+  type FakeWS = {
+    sentMessages: string[];
+    onmessage: ((e: { data: string }) => void) | null;
+    onerror: ((e: unknown) => void) | null;
+    onclose: (() => void) | null;
+    onopen: (() => void) | null;
+    readyState: number;
+    send(data: string): void;
+    close(): void;
+    receive(data: string): void;
+  };
+
+  let wsInstance: FakeWS | null = null;
+  const FakeWSClass = class {
+    sentMessages: string[] = [];
+    onmessage: ((e: { data: string }) => void) | null = null;
+    onerror: ((e: unknown) => void) | null = null;
+    onclose: (() => void) | null = null;
+    onopen: (() => void) | null = null;
+    readyState = 1;
+    constructor(_url: string) { wsInstance = this as unknown as FakeWS; }
+    send(data: string) { this.sentMessages.push(data); }
+    close() { this.readyState = 3; }
+    receive(data: string) { this.onmessage?.({ data }); }
+  } as unknown as typeof WebSocket;
+
+  const REQ: QuoteRequest = { sellAsset: BLND, buyAsset: USDC, amountIn: 5000_0000000n, slippageBps: 50 };
+  const WITNESS = 'GCA34HBKNLWN3AOXWBRW5Y3HSGHCWF3UDBRJ5YHGU6HWGJZEPO2NSXI3';
+
+  it('sends quote on connected, sends trade on quote success, collects XDRs, sends stop on burst end', async () => {
+    wsInstance = null;
+    const capturePromise = captureStellarBrokerTx(REQ, 'test-key', WITNESS, {
+      WebSocketConstructor: FakeWSClass,
+      _burstWindowMs: 10,
+      _totalTimeoutMs: 500,
+    });
+
+    // Promise executor runs synchronously → wsInstance and handlers are set before we continue
+    expect(wsInstance).not.toBeNull();
+
+    // Server: connected
+    wsInstance!.receive(JSON.stringify({ type: 'connected' }));
+    expect(wsInstance!.sentMessages.some(m => JSON.parse(m).type === 'quote')).toBe(true);
+
+    // Server: quote success
+    wsInstance!.receive(JSON.stringify({
+      type: 'quote',
+      quote: { status: 'success', estimatedBuyingAmount: '201.5', directTrade: { buying: '193.1' } },
+    }));
+    expect(wsInstance!.sentMessages.some(m => JSON.parse(m).type === 'trade')).toBe(true);
+
+    // Server: tx burst
+    wsInstance!.receive(JSON.stringify({ type: 'tx', xdr: 'XDR_0' }));
+    wsInstance!.receive(JSON.stringify({ type: 'tx', xdr: 'XDR_1' }));
+
+    // Wait for burst window (10 ms) + margin
+    await new Promise(r => setTimeout(r, 30));
+
+    const result = await capturePromise;
+    expect(result).not.toBeNull();
+    expect(result!.xdrs).toEqual(['XDR_0', 'XDR_1']);
+    expect(result!.estimatedBuyingAmount).toBe('201.5');
+    expect(result!.directBuying).toBe('193.1');
+    expect(wsInstance!.sentMessages.some(m => JSON.parse(m).type === 'stop')).toBe(true);
+  });
+
+  it('returns null when server quote status is not success', async () => {
+    wsInstance = null;
+    const capturePromise = captureStellarBrokerTx(REQ, 'test-key', WITNESS, {
+      WebSocketConstructor: FakeWSClass, _burstWindowMs: 10, _totalTimeoutMs: 200,
+    });
+    wsInstance!.receive(JSON.stringify({ type: 'connected' }));
+    wsInstance!.receive(JSON.stringify({ type: 'quote', quote: { status: 'error', estimatedBuyingAmount: '0' } }));
+    expect(await capturePromise).toBeNull();
+  });
+
+  it('returns null on global timeout when no tx received', async () => {
+    wsInstance = null;
+    const capturePromise = captureStellarBrokerTx(REQ, 'test-key', WITNESS, {
+      WebSocketConstructor: FakeWSClass, _burstWindowMs: 10, _totalTimeoutMs: 30,
+    });
+    wsInstance!.receive(JSON.stringify({ type: 'connected' }));
+    wsInstance!.receive(JSON.stringify({
+      type: 'quote',
+      quote: { status: 'success', estimatedBuyingAmount: '201', directTrade: { buying: '193' } },
+    }));
+    // trade sent but server never sends tx → global timeout fires (30 ms)
+    expect(await capturePromise).toBeNull();
+  });
+
+  it('responds to ping with pong containing matching uid', async () => {
+    wsInstance = null;
+    const capturePromise = captureStellarBrokerTx(REQ, 'test-key', WITNESS, {
+      WebSocketConstructor: FakeWSClass, _burstWindowMs: 10, _totalTimeoutMs: 80,
+    });
+    wsInstance!.receive(JSON.stringify({ type: 'connected' }));
+    wsInstance!.receive(JSON.stringify({ type: 'ping', uid: 'abc-123' }));
+    const pong = wsInstance!.sentMessages.find(m => JSON.parse(m).type === 'pong');
+    expect(pong).toBeDefined();
+    expect(JSON.parse(pong!).uid).toBe('abc-123');
+    await capturePromise; // let it time out cleanly
   });
 });
