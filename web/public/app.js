@@ -2144,7 +2144,7 @@ const Sankey = (function () {
   const LOCALE_MAP = { fr: 'fr-FR', en: 'en-US', es: 'es-ES', pt: 'pt-BR' };
   const fmtMargin = (m, lang) => (m === null || m === undefined) ? "—"
     : "+" + m.toLocaleString(LOCALE_MAP[lang] || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " %";
-  const fmtPct = p => p.toFixed(0) + " %";
+  const fmtPct = p => { const r = p.toFixed(0); return (r === '0' && p > 0) ? "<1 %" : r + " %"; };
 
   // ── buildGraph : fusion (from|to|tool) + rang complexité-first (copie verbatim maquette) ──
   function buildGraph(routes) {
@@ -2338,8 +2338,8 @@ const Sankey = (function () {
       const venueHtml = venueCell(r.tools) + (hasTail ? ` <span class="sk-caret">${tailOpen ? '▾' : '▸'}</span> <span class="muted">(${r.tail.length})</span>` : '');
       const rkey = keyOf(r);
       const strong = r.trendMag != null && Math.abs(r.trendMag) >= TREND_STRONG;
-      const trendHtml = r.trend === 'up'   ? `<span class="sk-tr sk-up${strong ? ' sk-strong' : ''}">${strong ? '▲' : '▴'}</span>`
-                      : r.trend === 'down' ? `<span class="sk-tr sk-down${strong ? ' sk-strong' : ''}">${strong ? '▼' : '▾'}</span>`
+      const trendHtml = r.trend === 'up'   ? `<span class="sk-tr sk-up">${strong ? '▲▲' : '▲'}</span>`
+                      : r.trend === 'down' ? `<span class="sk-tr sk-down">${strong ? '▼▼' : '▼'}</span>`
                       : r.trend === 'flat' ? '<span class="sk-tr sk-flat">→</span>' : '';
       let row = `<tr data-rk="${idx}"${hasTail ? ' data-sk-tail="1"' : ''} data-sk-key="${rkey.replace(/"/g, '&quot;')}" class="${selKeys.has(rkey) ? 'sk-sel' : ''}" style="cursor:pointer"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
         + `<td class="sk-route">${isGray ? '<span class="muted">—</span>' : escapeHtml(r.steps.join(' → '))}</td>`
@@ -2426,12 +2426,11 @@ const Sankey = (function () {
       if (subMode) { const solo = idxSet.size === 1; idxSet.forEach(i => drawSubSlice(i, solo)); }
       else if (on) linkEls.forEach(({ lk, color, sw, d }) => { if (lk.idxs && lk.idxs.some(i => idxSet.has(i))) topG.appendChild(E('path', { d, fill:'none', stroke:color, 'stroke-width':sw, 'stroke-opacity':0.95, 'pointer-events':'none' })); });
     }
-    // Éclairage PARTIEL d'UNE route : ruban de largeur = SA fréquence (constante = flux conservé), posé à
-    // son OFFSET empilé DANS CHAQUE bande fusionnée. ⚠ l'offset/la fraction sont PROPRES à chaque bande
-    // (la part globale 4 % ne « remplit » pas un segment, elle en occupe sa juste tranche) → le fil weave.
+    // Éclairage PARTIEL d'UNE route : ruban posé à son OFFSET empilé DANS CHAQUE bande fusionnée, à
+    // l'échelle LOCALE de la bande TRACÉE (lscale, rognée par le gap) → la route occupe sa juste tranche,
+    // nichée dans sa mère (jamais hors-bande) ; l'offset est PROPRE à chaque bande → le fil weave.
     function drawSubSlice(ri, solo) {
       const r = routes[ri]; if (!r) return;
-      const scale = graph.links.length ? (graph.links[0].width / graph.links[0].value) : 1;
       const w = r.winPct;
       for (let i = 0; i < r.steps.length - 1; i++) {
         const from = r.steps[i], to = r.steps[i + 1], tool = r.hopTools[i];
@@ -2439,18 +2438,13 @@ const Sankey = (function () {
         if (!L) continue;
         const members = L.idxs.slice().sort((a, b) => (routes[b].winPct - routes[a].winPct) || (a - b));
         let off = 0; for (const m of members) { if (m === ri) break; off += routes[m].winPct; }
-        let dY, sw;
-        if (solo) {
-          // 1 route : fil aminci qui « tisse » à son offset dans la part pleine + halo contrasté (validé)
-          dY = (off + w / 2 - L.value / 2) * scale;
-          sw = Math.max(2, w * scale - Math.min(LINK_GAP, w * scale * 0.45));
-        } else {
-          // multi : on répartit DANS la largeur tracée de la bande (swFull) → les fils REMPLISSENT le
-          // segment, CONTIGUS (aucune séparation) ; seule la couleur d'outil les distingue → « tout Comet » = bande pleine.
-          const swFull = Math.max(2.5, L.width - Math.min(LINK_GAP, L.width * 0.45)), lscale = swFull / L.value;
-          dY = (off + w / 2 - L.value / 2) * lscale;
-          sw = Math.max(2, w * lscale);
-        }
+        // Solo OU multi : on répartit DANS la largeur TRACÉE de la bande (swFull, rognée par le gap), PAS
+        // dans son étendue pleine (L.value*scale global) — sinon un fil en bord de bande tombe HORS de la
+        // bande mère rendue (blanc entre la mère et le fil). lscale = échelle locale de la bande tracée →
+        // chaque route occupe sa tranche proportionnelle EXACTE, nichée dans sa mère, aucune sur-pondérée.
+        const swFull = Math.max(2.5, L.width - Math.min(LINK_GAP, L.width * 0.45)), lscale = swFull / L.value;
+        const dY = (off + w / 2 - L.value / 2) * lscale;
+        const sw = Math.max(2, w * lscale);
         const d = ribbonPath(L.points.map(p => [p[0], p[1] + dY]));
         const col = L.tool === '—' ? '#9ca3af' : venueColor(L.tool);
         if (solo) topG.appendChild(E('path', { d, fill:'none', stroke: dark ? 'rgba(248,250,252,0.6)' : 'rgba(15,23,42,0.45)', 'stroke-width': sw + 3, 'pointer-events':'none' })); // halo = pop d'un fil isolé
