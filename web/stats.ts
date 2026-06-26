@@ -306,13 +306,13 @@ function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string, am
     const wn = toNumber(winNet);
     if (wn <= 0) continue;
     const margin = ((wn - toNumber(secondNet)) / wn) * 100;
-    const key = String(r['source_id'] ?? '') + ' ' + String(r['route_summary'] ?? '');
+    const key = String(r['source_id'] ?? '') + '\x00' + String(r['route_summary'] ?? '');
     let arr = marginSamples.get(key);
     if (!arr) { arr = []; marginSamples.set(key, arr); }
     arr.push(margin);
   }
   const marginFor = (sourceId: string, routeSummary: string): number | null => {
-    const arr = marginSamples.get(sourceId + ' ' + routeSummary);
+    const arr = marginSamples.get(sourceId + '\x00' + routeSummary);
     if (!arr || arr.length === 0) return null;
     const med = median(arr);
     return med == null ? null : Math.round(med * 100) / 100;
