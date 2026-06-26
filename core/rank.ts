@@ -1,6 +1,6 @@
 // Classement des cotations par netOut = BRUT (montant cible recu, net des frais de swap + impact ;
 // le gas XLM n'est PAS deduit, paye a part). Strictement comparable entre sources. StellarBroker est
-// classe sur son plancher (son adapter met netOut = plancher), donc un simple tri descendant suffit.
+// classe sur son estimate WS (son adapter met netOut = estimate), donc un simple tri descendant suffit.
 import type { NormalizedQuote } from './sources/types.js';
 import { toNumber } from './amount.js';
 

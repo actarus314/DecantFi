@@ -9,6 +9,7 @@ import { rankQuotes, type Ranking } from './rank.js';
 import { fetchPrices, targetEvmPerUnit, targetLocalPerUnit, priceImpactPct, type Prices } from './prices.js';
 import { convertXlmToTarget } from './gas.js';
 import { compareEurc, type EurcComparison } from './eurc.js';
+import { isExecutableSource } from './executable.js';
 import { analyzeSplit, type SplitAnalysis } from './split.js';
 import { diag, type Diag } from './sources/diag.js';
 
@@ -123,7 +124,7 @@ export async function quote(opts: QuoteOptions): Promise<QuoteResult> {
       blndToEurc: (amt) => quoteAllFor(BLND, EURC, amt),
       blndToUsdc: (amt) => quoteAllFor(BLND, USDC, amt),
       usdcToEurc: (amt) => quoteAllFor(USDC, EURC, amt),
-    }, cfg.reSimLeg);
+    }, cfg.reSimLeg, isExecutableSource);
   }
 
   let split: SplitAnalysis | undefined;

@@ -1,6 +1,7 @@
 // Cotation live et balance wallet pour l'UI web.
 // ponytail: Number = affichage, jamais règlement.
 import { quote as engineQuote } from '../core/engine.js';
+import { isExecutableSource } from '../core/executable.js';
 import { rankQuotes } from '../core/rank.js';
 import { simulateAquariusNet, simulateXbullNet } from './execute.js';
 import { withTimeout } from '../core/timeout.js';
@@ -486,7 +487,7 @@ export async function liveQuote(
     sourceId: r.source,
     // Les lignes composites (EURC via-USDC = "leg1+leg2") = 2 tx non atomiques → JAMAIS exécutables en 1 clic
     // (sinon un clic exécuterait un swap direct 1-leg ≠ les 2 tx revues). Seules les venues simples le sont.
-    executable: !r.source.includes('+') && ['xbull', 'soroswap', 'horizon', 'aquarius', 'comet', 'ultrastellar'].includes(r.source.trim()),
+    executable: isExecutableSource(r.source),
     legs: r.legs,
     floor: r.floor,
   }));
