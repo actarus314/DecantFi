@@ -14,8 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   light move, a doubled one (▲▲/▼▼) for a strong shift in win frequency (≥10 points between the two
   halves of the window); the backend exposes the signed magnitude (`trendMag`) so the table can
   tell them apart. Win frequencies below 1% now read "<1 %" instead of a misleading "0 %". When a
-  single route is highlighted, its thread now nests inside its parent band instead of spilling
-  below it (the partial-highlight offset uses the drawn band's local scale, not the full-flow one).
+  single route is highlighted, its thread now nests inside its parent band instead of detaching from
+  it: the partial-highlight offset is taken perpendicular to the ribbon's local tangent (sampled along
+  the curve), not as a constant vertical shift, so edge-of-band routes on bent/relay-routed segments
+  fill their true sub-slice instead of bunching toward the centerline. Band widths are unchanged.
 
 ## [0.2.10] - 2026-06-25
 

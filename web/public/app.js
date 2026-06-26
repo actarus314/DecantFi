@@ -2273,6 +2273,27 @@ const Sankey = (function () {
     for (let i = 1; i < pts.length; i++) { const x0 = pts[i-1][0], y0 = pts[i-1][1], x1 = pts[i][0], y1 = pts[i][1], xm = (x0 + x1) / 2; d += 'C' + xm + ',' + y0 + ' ' + xm + ',' + y1 + ' ' + x1 + ',' + y1; }
     return d;
   }
+  // Échantillonne la MÊME cubique que ribbonPath (curveBumpX : C1=(xm,y0), C2=(xm,y1)) et décale chaque
+  // point de `pd` PERPENDICULAIREMENT à la tangente locale (normale unitaire), au lieu d'un décalage
+  // vertical constant. Indispensable sur les bandes COUDÉES (relais) : aux extrémités la tangente est
+  // horizontale → normale verticale → identique à l'ancien +pd ; dans les arcs raides la normale s'incline
+  // → le fil reste DANS sa bande mère au lieu de se tasser vers l'axe et d'en sortir.
+  function offsetAlongRibbon(pts, pd, STEP) {
+    const out = [];
+    for (let i = 1; i < pts.length; i++) {
+      const x0 = pts[i-1][0], y0 = pts[i-1][1], x1 = pts[i][0], y1 = pts[i][1], xm = (x0 + x1) / 2;
+      for (let k = (i === 1 ? 0 : 1); k <= STEP; k++) {
+        const t = k / STEP, u = 1 - t;
+        const bx = u*u*u*x0 + 3*u*u*t*xm + 3*u*t*t*xm + t*t*t*x1;
+        const by = u*u*u*y0 + 3*u*u*t*y0 + 3*u*t*t*y1 + t*t*t*y1;
+        const dx = 3*u*u*(xm - x0) + 3*t*t*(x1 - xm);
+        const dy = 6*u*t*(y1 - y0);
+        const len = Math.hypot(dx, dy) || 1;
+        out.push([bx - pd*dy/len, by + pd*dx/len]);
+      }
+    }
+    return out;
+  }
   const E = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
   // ── Données RÉELLES : overview.bestRoutes[sonde] (RouteRank {path,tools,winPct}) → routes du moteur.
   // path 'BLND → USDC → EURC' → steps ; tools 'Comet + Aquarius' → legs ; hopTools dérivé (1 outil =
@@ -2427,8 +2448,10 @@ const Sankey = (function () {
       else if (on) linkEls.forEach(({ lk, color, sw, d }) => { if (lk.idxs && lk.idxs.some(i => idxSet.has(i))) topG.appendChild(E('path', { d, fill:'none', stroke:color, 'stroke-width':sw, 'stroke-opacity':0.95, 'pointer-events':'none' })); });
     }
     // Éclairage PARTIEL d'UNE route : ruban posé à son OFFSET empilé DANS CHAQUE bande fusionnée, à
-    // l'échelle LOCALE de la bande TRACÉE (lscale, rognée par le gap) → la route occupe sa juste tranche,
-    // nichée dans sa mère (jamais hors-bande) ; l'offset est PROPRE à chaque bande → le fil weave.
+    // l'échelle LOCALE de la bande TRACÉE (lscale, rognée par le gap). ⚠ l'offset est PERPENDICULAIRE à
+    // la tangente locale (pas vertical, cf. offsetAlongRibbon) : sinon, sur une bande COUDÉE (routée via
+    // relais, ex. USDC→EURC), un fil en bord de bande se tasse vers l'axe et SORT de sa mère
+    // (« rapprochement », pas fusion). Ainsi chaque route occupe sa juste tranche nichée ; largeurs intactes.
     function drawSubSlice(ri, solo) {
       const r = routes[ri]; if (!r) return;
       const w = r.winPct;
@@ -2443,9 +2466,9 @@ const Sankey = (function () {
         // bande mère rendue (blanc entre la mère et le fil). lscale = échelle locale de la bande tracée →
         // chaque route occupe sa tranche proportionnelle EXACTE, nichée dans sa mère, aucune sur-pondérée.
         const swFull = Math.max(2.5, L.width - Math.min(LINK_GAP, L.width * 0.45)), lscale = swFull / L.value;
-        const dY = (off + w / 2 - L.value / 2) * lscale;
+        const pd = (off + w / 2 - L.value / 2) * lscale;
         const sw = Math.max(2, w * lscale);
-        const d = ribbonPath(L.points.map(p => [p[0], p[1] + dY]));
+        const d = 'M' + offsetAlongRibbon(L.points, pd, 16).map(p => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join('L');
         const col = L.tool === '—' ? '#9ca3af' : venueColor(L.tool);
         if (solo) topG.appendChild(E('path', { d, fill:'none', stroke: dark ? 'rgba(248,250,252,0.6)' : 'rgba(15,23,42,0.45)', 'stroke-width': sw + 3, 'pointer-events':'none' })); // halo = pop d'un fil isolé
         topG.appendChild(E('path', { d, fill:'none', stroke: col, 'stroke-width': sw, 'stroke-opacity': 0.98, 'pointer-events':'none' }));
