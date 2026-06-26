@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Flow-map readability.** The route map's tail threshold drops from 3% to 2%, so fewer routes
+  get folded into "Others". The aggregated "Others" row no longer shows a fabricated single route
+  (it now reads "—", like its margin). Trend arrows now encode magnitude: a small triangle (▴/▾)
+  for a light move, a larger bold one (▲/▼) for a strong shift in win frequency (≥10 points
+  between the two halves of the window). The backend exposes the signed magnitude (`trendMag`) so
+  the table can tell the two apart.
+
 ## [0.2.10] - 2026-06-25
 
 ### Added

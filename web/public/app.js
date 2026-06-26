@@ -2065,7 +2065,7 @@ function buildPage() {
 // Sankey des routes — moteur de layout MAISON (zéro-dépendance) + rendu SVG vanilla.
 // Alimenté par la VRAIE BDD : overview.bestRoutes[sonde] (RouteRank) mappé en routes
 // du moteur (cf. mapRank/routesFor). marge-au-2ᵉ absente du backend → colonne retirée ;
-// traîne < 3 % agrégée en « autres ». ⚠ stats 7j polluées jusqu'à ~2026-06-27.
+// traîne < 2 % agrégée en « autres ». ⚠ stats 7j polluées jusqu'à ~2026-06-27.
 // Reste phase 2 : réutiliser #tipPortal au lieu du #sk-tip dédié. Module ISOLÉ (IIFE) →
 // un seul global, aucune collision. ribbonPath pinné ≡ d3.curveBumpX.
 // ════════════════════════════════════════════════════════════════════════════
@@ -2074,7 +2074,8 @@ const Sankey = (function () {
   const W = 960, H = 620, LINK_GAP = 16; // viewBox ; le SVG est responsive (CSS width:100% + height:auto → remplit la box sans letterbox)
   const LY = { VM: 24, GAP: 14, MIN_H: 10, PAD: 24, NODE_W: 50 };
 
-  const TAIL_PCT = 3; // traîne < ce % agrégée en « autres » — SAUF si la route n'emprunte que des bandes déjà tracées (cf. routesFor)
+  const TAIL_PCT = 2; // traîne < ce % agrégée en « autres » — SAUF si la route n'emprunte que des bandes déjà tracées (cf. routesFor)
+  const TREND_STRONG = 0.10; // |Δ part-de-victoires| ≥ ce seuil → mouvement « fort » (grand triangle ▲/▼) ; sinon « léger » (petit triangle ▴/▾)
 
   // Décisions FIGÉES (Romain) : fond = thème de la page (blanc en clair) · départ BLND = ARDOISE.
   // Les sélecteurs de test (fond gris / ambre-ardoise) ont été retirés.
@@ -2284,7 +2285,8 @@ const Sankey = (function () {
     if (legs.length <= 1) hopTools = new Array(hops).fill(legs[0] || r.tools || '—');
     else { const piv = steps.indexOf('USDC'); hopTools = []; for (let i = 0; i < hops; i++) hopTools.push((piv > 0 && i >= piv) ? legs[1] : legs[0]); }
     const trend = (r.trend === 'up' || r.trend === 'down' || r.trend === 'flat') ? r.trend : null;
-    return { tools: r.tools, winPct: r.winPct, marginPct: (typeof r.marginPct === 'number' ? r.marginPct : null), trend, composite: legs.length > 1, steps, hopTools };
+    const trendMag = (typeof r.trendMag === 'number') ? r.trendMag : null;
+    return { tools: r.tools, winPct: r.winPct, marginPct: (typeof r.marginPct === 'number' ? r.marginPct : null), trend, trendMag, composite: legs.length > 1, steps, hopTools };
   }
   // Lit l'overview courant (déjà spécifique à la paire) ; agrège la traîne < TAIL_PCT en bande « autres ».
   function routesFor(sonde) {
@@ -2312,7 +2314,7 @@ const Sankey = (function () {
     if (tail.length) {
       const SRC = mapped[0].steps[0], TGT = mapped[0].steps[mapped[0].steps.length - 1];
       const sum = Math.round(tail.reduce((s, r) => s + r.winPct, 0) * 10) / 10;
-      keep.push({ tools: 'autres', winPct: sum, marginPct: null, trend: null, composite: false, steps: [SRC, TGT], hopTools: ['—'], tail });
+      keep.push({ tools: 'autres', winPct: sum, marginPct: null, trend: null, trendMag: null, composite: false, steps: [SRC, TGT], hopTools: ['—'], tail });
     }
     return keep;
   }
@@ -2335,10 +2337,14 @@ const Sankey = (function () {
       const hasTail = isGray && Array.isArray(r.tail) && r.tail.length > 0;
       const venueHtml = venueCell(r.tools) + (hasTail ? ` <span class="sk-caret">${tailOpen ? '▾' : '▸'}</span> <span class="muted">(${r.tail.length})</span>` : '');
       const rkey = keyOf(r);
+      const strong = r.trendMag != null && Math.abs(r.trendMag) >= TREND_STRONG;
+      const trendHtml = r.trend === 'up'   ? `<span class="sk-tr sk-up${strong ? ' sk-strong' : ''}">${strong ? '▲' : '▴'}</span>`
+                      : r.trend === 'down' ? `<span class="sk-tr sk-down${strong ? ' sk-strong' : ''}">${strong ? '▼' : '▾'}</span>`
+                      : r.trend === 'flat' ? '<span class="sk-tr sk-flat">→</span>' : '';
       let row = `<tr data-rk="${idx}"${hasTail ? ' data-sk-tail="1"' : ''} data-sk-key="${rkey.replace(/"/g, '&quot;')}" class="${selKeys.has(rkey) ? 'sk-sel' : ''}" style="cursor:pointer"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
-        + `<td class="sk-route">${escapeHtml(r.steps.join(' → '))}</td>`
+        + `<td class="sk-route">${isGray ? '<span class="muted">—</span>' : escapeHtml(r.steps.join(' → '))}</td>`
         + `<td>${(isGray || r.marginPct == null) ? '<span class="muted">—</span>' : `<span style="color:${mc};font-weight:700">${fmtMargin(r.marginPct, lang)}</span>`}</td>`
-        + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b>${r.trend==='up'?'<span class="sk-tr sk-up">▲</span>':r.trend==='down'?'<span class="sk-tr sk-down">▼</span>':r.trend==='flat'?'<span class="sk-tr sk-flat">→</span>':''}</span></td></tr>`;
+        + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b>${trendHtml}</span></td></tr>`;
       if (hasTail && tailOpen) {
         row += r.tail.slice().sort((a, b) => b.winPct - a.winPct).map(tr => `<tr class="sk-tail-row"><td><span class="sk-venue">${venueCell(tr.tools)}${tr.composite ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td><td class="sk-route">${escapeHtml(tr.steps.join(' → '))}</td><td><span class="muted">—</span></td><td><b>${fmtPct(tr.winPct)}</b></td></tr>`).join('');
       }
