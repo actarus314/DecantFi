@@ -2068,6 +2068,23 @@ function buildPage() {
 // traîne < 2 % agrégée en « autres ». ⚠ stats 7j polluées jusqu'à ~2026-06-27.
 // Reste phase 2 : réutiliser #tipPortal au lieu du #sk-tip dédié. Module ISOLÉ (IIFE) →
 // un seul global, aucune collision. ribbonPath pinné ≡ d3.curveBumpX.
+// ────────────────────────────────────────────────────────────────────────────
+// ⚠ MÉTHODE POUR MODIFIER CE GRAPHE (leçon dure 2026-06-26 — ~5 tours perdus sur le sous-fil) :
+//  1. RAISONNER DANS LE CODE du moteur (buildGraph → layout → ribbonPath → draw/drawSubSlice),
+//     PAS à l'œil sur des captures. Les bugs sont GÉOMÉTRIQUES, ~invisibles au screenshot ;
+//     une mauvaise lecture visuelle a envoyé droit dans 3 fausses pistes (réduire le gap,
+//     épaissir les bandes mères, « non-proportionnalité » du rognage) — toutes RÉFUTÉES.
+//  2. COMPARAISON CONTRÔLÉE avant toute hypothèse : si une route va bien et une autre non,
+//     isoler ce qui DIFFÈRE structurellement. Décisif ici : good (Comet+SB) & bad (Aquarius+SB,
+//     Soroswap+SB) sont enfants de la MÊME bande ⇒ largeur/fusion de bande HORS DE CAUSE,
+//     seul l'OFFSET du fil diffère. Cette seule déduction tranchait le bug — la faire EN PREMIER.
+//  3. INVARIANTS à ne jamais violer : largeur tracée ∝ flux (= Σ winPct enfants · lscale ; AUCUNE
+//     sur-pondération, ne pas épaissir/rétrécir une bande pour « réparer » un fil) ; tout fil ou
+//     sous-tranche se place à l'échelle de la bande RENDUE (lscale = swFull/L.value, post-gap),
+//     PERPENDICULAIREMENT à la tangente locale (offsetAlongRibbon) — jamais échelle globale ni Δy vertical.
+//  4. ASYMÉTRIE clé : USDC→EURC enjambe col1→col3 → ruban COUDÉ via relais col2 (≥3 pts) ; BLND→USDC
+//     est DIRECTE (2 pts, ~plate). Tester TOUT changement de tracé sur une bande coudée ET une directe.
+//  Détail + fausses pistes : mémoire [[sankey-graph-design-model]].
 // ════════════════════════════════════════════════════════════════════════════
 const Sankey = (function () {
   const NS = 'http://www.w3.org/2000/svg';
