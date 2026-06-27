@@ -21007,11 +21007,162 @@ function validateStreamedTx(tx, expected) {
   }
   return { ok: true, reason: "all operations passed validation" };
 }
+
+// web/sb-mediator-flow.js
+function makeGuardedTap({ origOnMessage, expected, onBlocked }) {
+  return function guardedOnMessage(ev) {
+    let m;
+    try {
+      m = JSON.parse(ev.data);
+    } catch {
+      return origOnMessage(ev);
+    }
+    if (m.type === "tx") {
+      let tx;
+      try {
+        tx = TransactionBuilder.fromXDR(m.xdr, Networks.PUBLIC);
+      } catch {
+        onBlocked({ ok: false, reason: "unparseable tx" });
+        return;
+      }
+      const verdict = validateStreamedTx(tx, expected);
+      if (!verdict.ok) {
+        onBlocked(verdict);
+        return;
+      }
+      return origOnMessage(ev);
+    }
+    return origOnMessage(ev);
+  };
+}
+async function executeSbMediatorSwap({
+  partnerKey,
+  sourcePub,
+  sellAsset,
+  buyAsset,
+  amount,
+  signXdr,
+  onProgress,
+  networkPassphrase = Networks.PUBLIC,
+  _mediatorFactory,
+  _clientFactory
+}) {
+  const signTx2 = async (tx) => {
+    const s = await signXdr(tx.toXDR(), "StellarBroker funding");
+    return TransactionBuilder.fromXDR(s, networkPassphrase);
+  };
+  const mediator = (_mediatorFactory ?? ((...a) => new Mediator(...a)))(
+    sourcePub,
+    sellAsset,
+    buyAsset,
+    amount,
+    signTx2
+  );
+  try {
+    onProgress?.({ step: "init", msg: "Initialising mediator account (funds ephemeral)" });
+    const secret = await mediator.init();
+    const ephemeral = Keypair.fromSecret(secret);
+    const mediatorAddress = mediator.mediatorAddress;
+    onProgress?.({ step: "funding", msg: `Mediator account: ${mediatorAddress}` });
+    const ephemeralAuth = (tx) => {
+      tx.sign(ephemeral);
+      return tx;
+    };
+    const expected = {
+      trader: mediatorAddress,
+      maxSellAmount: parseFloat(amount),
+      routerContractId: SB_ROUTER_CONTRACT,
+      feeAccount: SB_FEE_ACCOUNT,
+      maxFeeAmount: parseFloat(amount) * 5e-3
+    };
+    const client = (_clientFactory ?? ((o) => new StellarBrokerClient(o)))({
+      partnerKey,
+      account: mediatorAddress,
+      authorization: ephemeralAuth
+    });
+    let finished;
+    try {
+      onProgress?.({ step: "streaming", msg: "Connecting to StellarBroker" });
+      finished = await new Promise((resolve, reject) => {
+        let settled = false;
+        const done = (r) => {
+          if (!settled) {
+            settled = true;
+            resolve(r);
+          }
+        };
+        const fail = (e) => {
+          if (!settled) {
+            settled = true;
+            reject(e);
+          }
+        };
+        client.on("error", (e) => fail(new Error(String(e?.error ?? e?.message ?? e))));
+        client.on("finished", (e) => done(e.detail ?? e));
+        client.on("progress", (e) => onProgress?.({ step: "streaming", detail: e.detail ?? e }));
+        client.on("quote", () => {
+          try {
+            client.confirmQuote(mediatorAddress, ephemeralAuth);
+          } catch (err2) {
+            fail(err2);
+          }
+        });
+        client.connect().then(() => {
+          const orig = client.socket.onmessage.bind(client.socket);
+          client.socket.onmessage = makeGuardedTap({
+            origOnMessage: orig,
+            expected,
+            onBlocked: (v) => {
+              onProgress?.({ step: "guard", blocked: true, reason: v.reason });
+              fail(new Error("guard-blocked"));
+            }
+          });
+          client.quote({
+            sellingAsset: sellAsset,
+            buyingAsset: buyAsset,
+            sellingAmount: amount,
+            slippageTolerance: 0.01
+          });
+        }).catch(fail);
+        setTimeout(() => fail(new Error("swap timeout")), 6e4);
+      });
+    } catch (e) {
+      if (e.message === "guard-blocked") {
+        return { ok: true, blocked: true };
+      }
+      return { ok: false, error: e.message };
+    }
+    onProgress?.({ step: "finished", detail: finished });
+    return { ok: true, finished };
+  } finally {
+    try {
+      onProgress?.({ step: "dispose", msg: "Returning funds and merging mediator account" });
+      await mediator.dispose();
+    } catch {
+    }
+  }
+}
+function hasObsoleteMediators(sourcePub) {
+  return Mediator.hasObsoleteMediators(sourcePub);
+}
+async function disposeObsoleteMediators({ sourcePub, signXdr, networkPassphrase = Networks.PUBLIC, onProgress }) {
+  const signTx2 = async (tx) => {
+    const s = await signXdr(tx.toXDR(), "StellarBroker mediator dispose");
+    return TransactionBuilder.fromXDR(s, networkPassphrase);
+  };
+  onProgress?.({ step: "dispose-obsolete", msg: "Disposing orphaned mediator accounts" });
+  await Mediator.disposeObsoleteMediators(sourcePub, signTx2);
+  onProgress?.({ step: "dispose-obsolete-done", msg: "Done" });
+}
 export {
   Mediator,
   SB_FEE_ACCOUNT,
   SB_ROUTER_CONTRACT,
   StellarBrokerClient,
+  disposeObsoleteMediators,
+  executeSbMediatorSwap,
+  hasObsoleteMediators,
+  makeGuardedTap,
   validateStreamedTx
 };
 /*! Bundled license information:
