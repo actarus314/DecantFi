@@ -268,6 +268,13 @@ const STRINGS = {
     exec_sb_floor: 'Exécuter le plancher (SDEX)',
     exec_sb_floor_note: 'L\'estimate StellarBroker nécessite leur propre couche d\'exécution. On exécute ici le plancher SDEX strict-send réalisable.',
     ladder_pick_hint: 'Cliquez une ligne pour exécuter via cet outil (re-clic = retour au choix auto).',
+    exec_sb_mediator: 'Exécuter via StellarBroker',
+    sb_mediator_funding: 'StellarBroker demande UNE signature wallet (compte médiateur temporaire)',
+    sb_mediator_streaming: 'Connexion à StellarBroker…',
+    sb_blocked: 'Bloqué par la garde de sécurité — fonds retournés, rien n\'a été exécuté.',
+    sb_not_configured: 'StellarBroker n\'est pas configuré sur ce serveur.',
+    sb_orphan_notice: 'Comptes médiateurs StellarBroker non clôturés détectés — des fonds peuvent nécessiter une récupération.',
+    sb_orphan_recover_btn: 'Récupérer les fonds',
   },
   en: {
     // Topbar / brand
@@ -537,6 +544,13 @@ const STRINGS = {
     exec_sb_floor: 'Execute floor (SDEX)',
     exec_sb_floor_note: 'StellarBroker\'s estimate requires their own execution layer. Executing the realizable SDEX strict-send floor instead.',
     ladder_pick_hint: 'Click a row to execute via that tool (click again to revert to auto).',
+    exec_sb_mediator: 'Execute via StellarBroker',
+    sb_mediator_funding: 'StellarBroker needs ONE wallet signature to fund a temporary mediator account',
+    sb_mediator_streaming: 'Connecting to StellarBroker…',
+    sb_blocked: 'Safety guard blocked — no funds spent, execution aborted.',
+    sb_not_configured: 'StellarBroker is not configured on this server.',
+    sb_orphan_notice: 'Orphaned StellarBroker mediator accounts detected — funds may need recovery.',
+    sb_orphan_recover_btn: 'Recover funds',
   },
   es: {
     // Topbar / brand
@@ -806,6 +820,13 @@ const STRINGS = {
     exec_sb_floor: 'Ejecutar el mínimo (SDEX)',
     exec_sb_floor_note: 'La estimación de StellarBroker requiere su propia capa de ejecución. Se ejecuta en su lugar el mínimo SDEX strict-send realizable.',
     ladder_pick_hint: 'Haga clic en una fila para ejecutar vía esa herramienta (haga clic de nuevo para volver a automático).',
+    exec_sb_mediator: 'Ejecutar vía StellarBroker',
+    sb_mediator_funding: 'StellarBroker necesita UNA firma del wallet (cuenta mediadora temporal)',
+    sb_mediator_streaming: 'Conectando a StellarBroker…',
+    sb_blocked: 'Bloqueado por el guardia de seguridad — fondos devueltos, nada fue ejecutado.',
+    sb_not_configured: 'StellarBroker no está configurado en este servidor.',
+    sb_orphan_notice: 'Cuentas mediadoras de StellarBroker no cerradas detectadas — es posible que algunos fondos necesiten recuperación.',
+    sb_orphan_recover_btn: 'Recuperar fondos',
   },
   pt: {
     brand_dim: 'BLND swaps - com precisão',
@@ -1025,6 +1046,13 @@ const STRINGS = {
     exec_sb_floor: 'Executar o piso (SDEX)',
     exec_sb_floor_note: 'A estimativa do StellarBroker requer a própria camada de execução deles. Executando em vez disso o piso SDEX strict-send realizável.',
     ladder_pick_hint: 'Clique em uma linha para executar via essa ferramenta (clique novamente para voltar ao automático).',
+    exec_sb_mediator: 'Executar via StellarBroker',
+    sb_mediator_funding: 'StellarBroker precisa de UMA assinatura da carteira (conta mediadora temporária)',
+    sb_mediator_streaming: 'Conectando ao StellarBroker…',
+    sb_blocked: 'Bloqueado pela guarda de segurança — fundos devolvidos, nada foi executado.',
+    sb_not_configured: 'StellarBroker não está configurado neste servidor.',
+    sb_orphan_notice: 'Contas mediadoras StellarBroker não encerradas detectadas — alguns fundos podem precisar de recuperação.',
+    sb_orphan_recover_btn: 'Recuperar fundos',
   },
 };
 
@@ -1092,6 +1120,8 @@ let coherenceModal = null;
 let impactMode = (() => { const v = localStorage.getItem('impactMode'); return v === 'evm' ? 'evm' : 'local'; })();
 // Modal avertissement passage en EVM : null = fermée, sinon 'pending'
 let impactEvmModalOpen = false;
+// Orphaned StellarBroker mediator accounts (localStorage msb_*) detected for current wallet
+let sbOrphanNotice = false;
 
 function selectSource(id) {
   selectedSource = (selectedSource === id) ? null : id; // re-clic = désélection
@@ -1567,9 +1597,10 @@ function simCard() {
       </div>`;
     } else if (selRow && !selRow.executable) {
       if (selRow.sourceId === 'stellarbroker') {
-        // StellarBroker: offer to execute the realizable SDEX floor (not the estimate)
+        // StellarBroker: primary = Mediator WS flow (reaches the estimate); secondary = realizable SDEX floor
         resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-          <button class="btn primary" data-act="doExecuteSbFloor">${t('exec_sb_floor')}</button>
+          <button class="btn primary" data-act="doExecuteSbMediator">${t('exec_sb_mediator')}</button>
+          <button class="btn" data-act="doExecuteSbFloor">${t('exec_sb_floor')}</button>
         </div>`;
       } else {
         // Other non-integrated venues: coming-soon message
@@ -2028,7 +2059,7 @@ function buildPage() {
   })() : '';
 
   return `${topbarHtml}
-
+  ${sbOrphanNotice ? `<div style="background:rgba(230,168,23,.12);border:1px solid var(--amber,#e6a817);border-radius:.4rem;padding:.55rem .9rem;margin:.5rem 1rem;display:flex;align-items:center;gap:.7rem;font-size:13px;flex-wrap:wrap"><span>${t('sb_orphan_notice')}</span><button class="btn" data-act="recoverSbMediators" style="margin-left:auto;white-space:nowrap">${t('sb_orphan_recover_btn')}</button></div>` : ''}
   <div class="zone-group">
     <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}</div>${simCard()}</div>
 
@@ -2700,6 +2731,14 @@ const TRUSTLINE_ISSUERS = {
   USDC: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
   EURC: 'GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2',
 };
+// StellarBroker Mediator SDK asset format: 'CODE-ISSUER' (dash) or 'native' for XLM.
+// Mirrors core/assets.ts toStellarBrokerStr(). Used by doExecuteSbMediator only.
+const BLND_ISSUER = 'GDJEHTBE6ZHUXSWFI642DCGLUOECLHPF3KSXHPXTSTJ7E3JF6MQ5EZYY';
+const SB_ASSET_STRS = {
+  BLND: `BLND-${BLND_ISSUER}`,
+  USDC: `USDC-${TRUSTLINE_ISSUERS.USDC}`,
+  EURC: `EURC-${TRUSTLINE_ISSUERS.EURC}`,
+};
 
 function mapExecError(code, fallback) {
   if (code === 'trustline') return t('err_trustline', target, TRUSTLINE_ISSUERS[target] || target);
@@ -2717,6 +2756,9 @@ async function connectWallet() {
     localStorage.setItem('walletAddress', address);
     try { walletId = SWK.selectedModule.productId; localStorage.setItem('walletId', walletId); }
     catch { walletId = null; localStorage.removeItem('walletId'); }
+    // Cheap localStorage check for orphaned SB mediator accounts — does NOT import the 686 KB bundle.
+    const _sbOrphan = Object.keys(localStorage).some(k => k.startsWith('msb_') && localStorage.getItem(k) === address);
+    if (_sbOrphan) sbOrphanNotice = true;
     await loadBalance();
     renderApp();
   } catch (e) { /* user closed modal: ignore */ }
@@ -2730,6 +2772,7 @@ async function disconnectWallet() {
   localStorage.removeItem('walletId');
   walletBlnd = 0;
   walletConfigured = false;
+  sbOrphanNotice = false;
   renderApp();
 }
 
@@ -2797,6 +2840,93 @@ async function doExecuteSbFloor() {
     if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code }; }
     else { execState = { phase: 'review', build: j, sbFloor: true }; } // sbFloor flag → honest note in review
   } catch (e) { execState = { phase: 'error', errorMsg: t('err_down') }; }
+  renderApp();
+}
+
+// Execute a swap via the StellarBroker Mediator WS flow (client-side, keyless after key fetch).
+// The sell asset is always BLND (from-USDC deferred); the buy asset is the current `target`.
+// ONE wallet signature funds the ephemeral mediator account; the swap then runs fully client-side.
+async function doExecuteSbMediator() {
+  if (!simResult || !simActive || simAmt <= 0) return;
+  if (!walletAddress) {
+    execState = { phase: 'error', errorMsg: t('exec_connect_first') };
+    renderApp();
+    return;
+  }
+  await ensureKit(); // ensure SWK + KIT_NET are ready before signXdr is invoked
+  const sellAsset = SB_ASSET_STRS.BLND; // sell is always BLND (from-USDC flow deferred)
+  const buyAsset = SB_ASSET_STRS[target];
+  execState = { phase: 'sb_mediator', sbStep: 'funding' };
+  renderApp();
+  try {
+    const r = await fetch('/api/sb-mediator-key');
+    if (!r.ok) {
+      execState = { phase: 'error', errorMsg: t('sb_not_configured') };
+      renderApp();
+      return;
+    }
+    const { key } = await r.json();
+    const signXdr = async (xdr) => {
+      const { signedTxXdr } = await SWK.signTransaction(xdr, { address: walletAddress, networkPassphrase: KIT_NET });
+      return signedTxXdr;
+    };
+    const onProgress = (ev) => {
+      if (ev.step === 'streaming') {
+        execState = { phase: 'sb_mediator', sbStep: 'streaming' };
+        renderApp();
+      }
+    };
+    const m = await import('/sb-mediator.js');
+    const res = await m.executeSbMediatorSwap({
+      partnerKey: key,
+      sourcePub: walletAddress,
+      sellAsset,
+      buyAsset,
+      amount: String(simAmt),
+      signXdr,
+      onProgress,
+      networkPassphrase: KIT_NET,
+    });
+    if (res.blocked) {
+      execState = { phase: 'sb_blocked' };
+    } else if (res.ok && res.finished) {
+      execState = { phase: 'sb_done', finished: res.finished };
+    } else {
+      execState = { phase: 'error', errorMsg: escapeHtml(res.error || t('exec_failed')) };
+    }
+  } catch (e) {
+    const msg = (e && e.message) || '';
+    execState = { phase: 'error', errorMsg: /reject/i.test(msg) ? t('exec_rejected') : (msg ? escapeHtml(msg) : t('exec_failed')) };
+  }
+  renderApp();
+}
+
+// Recover funds from orphaned StellarBroker mediator accounts (localStorage msb_*).
+// Triggered by the sbOrphanNotice banner shown on wallet connect when stale entries are found.
+async function recoverSbMediators() {
+  if (!walletAddress) return;
+  await ensureKit();
+  execState = { phase: 'sb_mediator', sbStep: 'funding' };
+  renderApp();
+  try {
+    const m = await import('/sb-mediator.js');
+    const signXdr = async (xdr) => {
+      const { signedTxXdr } = await SWK.signTransaction(xdr, { address: walletAddress, networkPassphrase: KIT_NET });
+      return signedTxXdr;
+    };
+    const onProgress = (ev) => {
+      if (ev.step === 'dispose-obsolete') {
+        execState = { phase: 'sb_mediator', sbStep: 'streaming' };
+        renderApp();
+      }
+    };
+    await m.disposeObsoleteMediators({ sourcePub: walletAddress, signXdr, networkPassphrase: KIT_NET, onProgress });
+    sbOrphanNotice = false;
+    execState = { phase: 'sb_done', finished: null };
+  } catch (e) {
+    const msg = (e && e.message) || '';
+    execState = { phase: 'error', errorMsg: /reject/i.test(msg) ? t('exec_rejected') : (msg ? escapeHtml(msg) : t('exec_failed')) };
+  }
   renderApp();
 }
 
@@ -3023,7 +3153,7 @@ function cancelExecute() {
 
 function onModalBackdrop() {
   // backdrop self-click is enforced by the delegated dispatcher (data-self-only)
-  if (execState && (execState.phase === 'done' || execState.phase === 'error')) {
+  if (execState && (execState.phase === 'done' || execState.phase === 'error' || execState.phase === 'sb_blocked' || execState.phase === 'sb_done')) {
     cancelExecute();
   }
 }
@@ -3285,6 +3415,28 @@ function execModal() {
       </div>`;
   } else if (phase === 'leg1_confirming') {
     content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0">${t('comp_leg1_confirming')}</p>`;
+  } else if (phase === 'sb_mediator') {
+    const sbMsg = execState.sbStep === 'streaming' ? t('sb_mediator_streaming') : t('sb_mediator_funding');
+    content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem"><span class="pulse">${sbMsg}</span></p>`;
+  } else if (phase === 'sb_blocked') {
+    content = `
+      <p style="font-size:14px;font-weight:700;color:var(--amber);margin:0 0 .5rem">${t('exec_failed')}</p>
+      <p class="help" style="margin:0 0 .9rem">${t('sb_blocked')}</p>
+      <div style="display:flex;gap:.55rem;justify-content:flex-end">
+        <button class="btn primary" data-act="cancelExecute">${t('exec_close')}</button>
+      </div>`;
+  } else if (phase === 'sb_done') {
+    const fin = execState.finished;
+    const sbHash = fin && typeof fin.hash === 'string' && /^[0-9a-fA-F]{64}$/.test(fin.hash) ? fin.hash : '';
+    content = `
+      <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.8rem">
+        <span style="font-size:22px;color:var(--green);line-height:1">✓</span>
+        <span style="font-size:15px;font-weight:700;color:var(--green)">${t('exec_success')}</span>
+      </div>
+      <div style="display:flex;gap:.55rem;margin-top:1rem;align-items:center;justify-content:flex-end;flex-wrap:wrap">
+        ${sbHash ? `<a class="btn openlink" href="https://stellar.expert/explorer/public/tx/${encodeURIComponent(sbHash)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:.3rem">${t('exec_view')}</a>` : ''}
+        <button class="btn primary" data-act="cancelExecute">${t('exec_close')}</button>
+      </div>`;
   } else if (phase === 'done') {
     const rv = build && build.review;
     const doneTarget = (rv && rv.target) || target;
@@ -3540,7 +3692,7 @@ function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() 
 (() => {
   const CLICK = {
     doRefresh, toggleImpactMode, cancelImpactEvm, confirmImpactEvm, selectSource,
-    doExecuteComposite, doExecute, doExecuteSbFloor, useWallet, doSim, clearSim, nudgeSlippage,
+    doExecuteComposite, doExecute, doExecuteSbFloor, doExecuteSbMediator, recoverSbMediators, useWallet, doSim, clearSim, nudgeSlippage,
     selectDay, openCoherence, setView, setSonde, setTarget, disconnectWallet,
     connectWallet, toggleTheme, setLang, closeCoherence, cancelExecute,
     confirmExecute, retryCompositeLeg2, addTrustline, onModalBackdrop,

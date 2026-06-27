@@ -486,6 +486,17 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return;
     }
 
+    if (req.method === 'GET' && path === '/api/sb-mediator-key') {
+      const ip = clientIp(req);
+      if (rateLimited(ip, 60, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      // Deliberately serves the StellarBroker partner key to the browser for the client-side
+      // Mediator WS flow. The key is partner-scoped, low-criticality; the swap revenue model
+      // makes a leaked quote-key harmless (decided 2026-06-26).
+      if (!cfg.stellarBrokerApiKey) { json(res, req, 404, { error: 'stellarbroker not configured' }); return; }
+      json(res, req, 200, { key: cfg.stellarBrokerApiKey });
+      return;
+    }
+
     // Refresh manuel : journalise un tick (note='manual', purgé au prochain poll programmé),
     // puis renvoie l'overview rafraîchi de la paire demandée.
     if (req.method === 'POST' && path === '/api/refresh') {
