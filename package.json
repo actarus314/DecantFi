@@ -19,7 +19,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "web": "tsx web/server.ts",
-    "build:walletkit": "node scripts/build-walletkit.mjs"
+    "build:walletkit": "node scripts/build-walletkit.mjs",
+    "build:sb-mediator": "node scripts/build-sb-mediator.mjs"
   },
   "devDependencies": {
     "@creit.tech/stellar-wallets-kit": "^2.3.0",
@@ -31,6 +32,7 @@
   },
   "dependencies": {
     "@soroswap/sdk": "^0.4.0",
+    "@stellar-broker/client": "0.6.14",
     "@stellar/stellar-sdk": "^16.0.1",
     "soroswap-router-sdk": "^1.4.6"
   }

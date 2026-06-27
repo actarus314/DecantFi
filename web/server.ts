@@ -84,6 +84,9 @@ const htmlAsset = staticAsset(Buffer.from(htmlStr), 'text/html; charset=utf-8');
 const walletkitPath = fileURLToPath(new URL('./public/walletkit.js', import.meta.url));
 const walletkitAsset = staticAsset(readFileSync(walletkitPath), 'text/javascript; charset=utf-8');
 
+const sbMediatorPath = fileURLToPath(new URL('./public/sb-mediator.js', import.meta.url));
+const sbMediatorAsset = staticAsset(readFileSync(sbMediatorPath), 'text/javascript; charset=utf-8');
+
 // App logic extracted from index.html (CSP: served as 'self', no inline script needed).
 const appJsPath = fileURLToPath(new URL('./public/app.js', import.meta.url));
 const appJsAsset = staticAsset(readFileSync(appJsPath), 'text/javascript; charset=utf-8');
@@ -164,7 +167,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' wss://api.stellar.broker https://horizon.stellar.org; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   'Cross-Origin-Resource-Policy': 'same-origin',
   'Permissions-Policy': 'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()',
@@ -286,6 +289,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/walletkit.js') {
       sendStatic(req, res, walletkitAsset, 'no-cache', RESOURCE_HEADERS);
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/sb-mediator.js') {
+      sendStatic(req, res, sbMediatorAsset, 'no-cache', RESOURCE_HEADERS);
       return;
     }
 
