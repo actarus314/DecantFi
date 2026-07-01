@@ -21377,6 +21377,11 @@ async function executeSbMediatorSwap({
       result = { ok: true, finished };
     } catch (e) {
       result = e.message === "guard-blocked" ? { ok: true, blocked: true } : { ok: false, error: e.message };
+    } finally {
+      try {
+        client.stop();
+      } catch {
+      }
     }
   } catch (e) {
     result = { ok: false, error: e.message };

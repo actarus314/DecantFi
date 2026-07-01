@@ -240,6 +240,7 @@ describe('executeSbMediatorSwap', () => {
       connect: vi.fn(async (): Promise<void> => {
         client.socket = { onmessage: origSpy as unknown };
       }),
+      stop:         vi.fn(),
       quote:        vi.fn(),
       confirmQuote: vi.fn(),
       // socket is mutated by connect() and again by the guard-tap installation.
@@ -348,6 +349,8 @@ describe('executeSbMediatorSwap', () => {
     // The guard-blocked path resolves the swap as { ok: true, blocked: true }.
     const result = await p;
     expect(result).toMatchObject({ ok: true, blocked: true });
+    // client.stop() must be called once — streaming is over, WS must be closed.
+    expect(client.stop).toHaveBeenCalledOnce();
   });
 
   // ── EXEC-3 ──────────────────────────────────────────────────────────────────
@@ -366,6 +369,8 @@ describe('executeSbMediatorSwap', () => {
     expect(result.finished).toEqual({ hash: 'a'.repeat(64) });
     expect(mediator.dispose).toHaveBeenCalledOnce();
     expect(result.needsRecovery).toBeUndefined();
+    // client.stop() must be called once — WS must be closed after streaming settles.
+    expect(client.stop).toHaveBeenCalledOnce();
   });
 
   // ── EXEC-4 ──────────────────────────────────────────────────────────────────

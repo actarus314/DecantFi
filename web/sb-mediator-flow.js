@@ -179,6 +179,11 @@ export async function executeSbMediatorSwap({
       result = { ok: true, finished };
     } catch (e) {
       result = e.message === 'guard-blocked' ? { ok: true, blocked: true } : { ok: false, error: e.message };
+    } finally {
+      // Streaming is over (blocked / error / finished): close the SB session so it stops
+      // emitting progress events (which would otherwise flip the UI back to "streaming"),
+      // and to close the WS cleanly server-side (design §8: avoid ban/rate-limit).
+      try { client.stop(); } catch { /* socket already closing — ignore */ }
     }
   } catch (e) {
     // init/funding failed — nothing was funded, nothing to recover.
