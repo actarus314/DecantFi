@@ -1,6 +1,6 @@
 {
   "name": "decantfi",
-  "version": "0.2.10",
+  "version": "0.3.0",
   "private": true,
   "description": "Recommandeur de route nette BLND -> USDC/EURC sur Stellar (meta-agregateur de cotations, read-only). DecantFi.",
   "license": "GPL-3.0-or-later",
