@@ -8,22 +8,34 @@ describe('isExecutableSource', () => {
     }
   });
 
-  it('returns false for stellarbroker (not yet wired for execution)', () => {
-    expect(isExecutableSource('stellarbroker')).toBe(false);
+  it('returns true for stellarbroker (wired for direct Mediator execution, P3)', () => {
+    expect(isExecutableSource('stellarbroker')).toBe(true);
   });
 
   it('returns false for composite rows (contain "+")', () => {
     expect(isExecutableSource('xbull+soroswap')).toBe(false);
     expect(isExecutableSource('aquarius+xbull')).toBe(false);
+    // composite with SB is still false (+ present)
+    expect(isExecutableSource('comet+stellarbroker')).toBe(false);
   });
 
   it('trims whitespace before matching', () => {
     expect(isExecutableSource(' xbull ')).toBe(true);
-    expect(isExecutableSource(' stellarbroker ')).toBe(false);
+    expect(isExecutableSource(' stellarbroker ')).toBe(true);
   });
 
   it('returns false for unknown sources', () => {
     expect(isExecutableSource('phoenix')).toBe(false);
     expect(isExecutableSource('')).toBe(false);
+  });
+
+  it('engine composite-leg predicate: isExecutableSource(s) && s !== stellarbroker', () => {
+    // This is the predicate engine.ts passes to compareEurc (P3: SB excluded from composite legs
+    // until leg2-via-SB is wired in P4, preserving the displayed==executed invariant).
+    const compositeFilter = (s: string) => isExecutableSource(s) && s !== 'stellarbroker';
+    expect(compositeFilter('xbull')).toBe(true);
+    expect(compositeFilter('soroswap')).toBe(true);
+    expect(compositeFilter('stellarbroker')).toBe(false);
+    expect(compositeFilter('phoenix')).toBe(false);
   });
 });

@@ -64,39 +64,42 @@ describe('compareEurc', () => {
     expect(r.bestNetEurc).toBeUndefined();
   });
 
-  describe('isExecutable filter — composite legs must be executable', () => {
-    // Scenario: stellarbroker offers the best leg2 netOut but is not executable.
-    // The next best (ultrastellar) is executable and must win when the filter is active.
-    function quotersWithNonExecLeg2(): EurcQuoters {
+  describe('composite-leg filter — SB excluded from composite legs until P4', () => {
+    // P3: isExecutableSource('stellarbroker') is now true (honest badge, direct Mediator execution).
+    // Engine passes (s) => isExecutableSource(s) && s !== 'stellarbroker' to compareEurc so that
+    // a displayed composite never has an SB leg we cannot execute via the 2-tx server flow.
+    const p3CompositeFilter = (s: string) => isExecutableSource(s) && s !== 'stellarbroker';
+
+    function quotersWithSbLeg2(): EurcQuoters {
       return {
         blndToEurc: async () => [],
         blndToUsdc: async () => [quote('xbull', toStroops('50'))],
         usdcToEurc: async (amt) => [
-          // stellarbroker quotes higher but is not executable
+          // stellarbroker quotes higher but is excluded from composite legs by the engine predicate
           quote('stellarbroker', toStroops('47'), { sellAsset: USDC, buyAsset: EURC, amountIn: amt }),
-          // ultrastellar is executable and slightly lower
+          // ultrastellar is eligible and slightly lower
           quote('ultrastellar', toStroops('45'), { sellAsset: USDC, buyAsset: EURC, amountIn: amt }),
         ],
       };
     }
 
     it('without filter: stellarbroker (highest) wins leg2', async () => {
-      const r = await compareEurc(toStroops('1000'), quotersWithNonExecLeg2());
+      const r = await compareEurc(toStroops('1000'), quotersWithSbLeg2());
       expect(r.viaUsdc?.leg2.source).toBe('stellarbroker');
       expect(r.viaUsdc?.netEurc).toBe(toStroops('47'));
     });
 
-    it('with isExecutable filter: ultrastellar (executable) wins leg2, not stellarbroker', async () => {
-      const r = await compareEurc(toStroops('1000'), quotersWithNonExecLeg2(), undefined, isExecutableSource);
+    it('with P3 composite filter: ultrastellar wins leg2 (SB excluded from composite)', async () => {
+      const r = await compareEurc(toStroops('1000'), quotersWithSbLeg2(), undefined, p3CompositeFilter);
       expect(r.viaUsdc?.leg2.source).toBe('ultrastellar');
       expect(r.viaUsdc?.netEurc).toBe(toStroops('45'));
     });
 
-    it('with isExecutable filter: non-exec leg1 is skipped in favour of executable runner-up', async () => {
+    it('with P3 composite filter: SB leg1 is excluded in favour of runner-up', async () => {
       const qs: EurcQuoters = {
         blndToEurc: async () => [],
         blndToUsdc: async () => [
-          // stellarbroker quotes the best leg1 but is not executable
+          // stellarbroker quotes the best leg1 but is excluded from composite legs
           quote('stellarbroker', toStroops('55')),
           quote('xbull', toStroops('50')),
         ],
@@ -108,9 +111,9 @@ describe('compareEurc', () => {
           }),
         ],
       };
-      const r = await compareEurc(toStroops('1000'), qs, undefined, isExecutableSource);
+      const r = await compareEurc(toStroops('1000'), qs, undefined, p3CompositeFilter);
       expect(r.viaUsdc?.leg1.source).toBe('xbull');
-      // usdcMid must reflect the executable leg1 grossOut (50, not 55)
+      // usdcMid must reflect the eligible leg1 grossOut (50, not 55)
       expect(r.viaUsdc?.usdcMid).toBe(toStroops('50'));
     });
   });

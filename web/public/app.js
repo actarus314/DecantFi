@@ -1615,19 +1615,19 @@ function simCard() {
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
         <button class="btn primary" data-act="doExecuteComposite">${t('exec_composite')}</button>
       </div>`;
+    } else if (exec.row && exec.row.sourceId === 'stellarbroker') {
+      // StellarBroker: primary = Mediator WS flow (reaches the estimate); secondary = realizable SDEX floor.
+      // Keyed on exec.row (= selRow || winRow) so it covers both explicit selection and auto-winner,
+      // and fires regardless of the executable flag (honest badge now set; P3).
+      resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+        <button class="btn primary" data-act="doExecuteSbMediator">${t('exec_sb_mediator')}</button>
+        <button class="btn" data-act="doExecuteSbFloor">${t('exec_sb_floor')}</button>
+      </div>`;
     } else if (selRow && !selRow.executable) {
-      if (selRow.sourceId === 'stellarbroker') {
-        // StellarBroker: primary = Mediator WS flow (reaches the estimate); secondary = realizable SDEX floor
-        resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-          <button class="btn primary" data-act="doExecuteSbMediator">${t('exec_sb_mediator')}</button>
-          <button class="btn" data-act="doExecuteSbFloor">${t('exec_sb_floor')}</button>
-        </div>`;
-      } else {
-        // Other non-integrated venues: coming-soon message
-        resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-          <span style="font-size:12px;color:var(--caption)">${t('exec_integrated_soon')}</span>
-        </div>`;
-      }
+      // Other non-integrated venues: coming-soon message
+      resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--caption)">${t('exec_integrated_soon')}</span>
+      </div>`;
     } else {
       const execLabel = selRow ? t('exec_via', selRow.display)
         : (winRow && winRow.executable && !winRow.sourceId.includes('+') ? t('exec_via', winRow.display) : t('exec_btn'));
@@ -2813,6 +2813,12 @@ async function doExecute() {
   // Composite EURC → flux guidé 2 jambes, sur la ligne composite choisie.
   if (isComposite) {
     await startCompositeLeg1(chosenRow);
+    return;
+  }
+  // Defensive: StellarBroker executes client-side via the Mediator WS flow.
+  // venue:'stellarbroker' must never reach /api/build (server rejects it with 400 — not a valid Venue).
+  if (chosenRow && !isComposite && chosenRow.sourceId === 'stellarbroker') {
+    await doExecuteSbMediator();
     return;
   }
   // Venue à forcer : la ligne sélectionnée si exécutable, sinon le GAGNANT affiché s'il est exécutable.
