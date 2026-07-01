@@ -21,6 +21,7 @@ import {
   validateStreamedTx,
   SB_ROUTER_CONTRACT,
   SB_FEE_ACCOUNT,
+  type ValidateExpected,
 } from './stellarbroker-guard.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -410,5 +411,168 @@ describe('validateStreamedTx — regression tests for confirmed holes', () => {
     });
     // 5 > 5 is false → should pass (no tolerance on fees by design)
     expect(result).toMatchObject({ ok: true });
+  });
+});
+
+// ── P5a: USDC→EURC leg2 shape hermetic coverage ───────────────────────────────
+//
+// Proves validateStreamedTx is correct for the composite EURC leg2 shape where:
+//   expected.maxSellAmount = usdcReceived  (USDC from leg1, e.g. 10.66)
+//   trader                 = mediator ephemeral account (TRADER_EURC from fixture)
+//   feeAccount / maxFeeAmount wired as for any SB swap (0.5% of sell amount)
+//
+// The guard is asset-agnostic: hand-crafted ops use Asset.native() for simplicity;
+// the guard only inspects destinations and amounts, never asset codes.
+// TRADER_EURC is decoded from usdc-eurc-1000-0.xdr (same fixture used in tests 6–7).
+
+describe('validateStreamedTx — P5a USDC→EURC leg2 shape hermetic coverage', () => {
+  // USDC amount received from leg1 — the cap for leg2.
+  const LEG2_AMOUNT = 10.66;
+  const LEG2_FEE   = LEG2_AMOUNT * 0.005; // 0.053 (StellarBroker fee ceiling at 0.5%)
+  // capRaw reference (stroops): ceil(10.66 × 1.001 × 10_000_000) = 106_710_660n
+
+  /** Baseline expected for leg2 with optional per-test overrides. */
+  function leg2Expected(override: Partial<ValidateExpected> = {}): ValidateExpected {
+    return {
+      trader:           TRADER_EURC,
+      maxSellAmount:    LEG2_AMOUNT,
+      routerContractId: SB_ROUTER_CONTRACT,
+      feeAccount:       SB_FEE_ACCOUNT,
+      maxFeeAmount:     LEG2_FEE,
+      ...override,
+    };
+  }
+
+  // ── L2-1: ACCEPT — classic USDC→EURC self-delivery ──────────────────────
+  it('L2-1: ACCEPT — pathPaymentStrictSend self-delivery (dest=trader, sendAmount at cap) → ok:true', () => {
+    const tx = buildTx(
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  String(LEG2_AMOUNT), // '10.66' — exactly at cap; 10.66 ≤ 10.66×1.001=10.6707
+        destination: TRADER_EURC,
+        destAsset:   Asset.native(),
+        destMin:     '1',
+        path:        [],
+      }),
+    );
+    expect(validateStreamedTx(tx, leg2Expected())).toMatchObject({ ok: true });
+  });
+
+  // ── L2-2: ACCEPT — self-delivery + fee leg ──────────────────────────────
+  it('L2-2: ACCEPT — self-delivery op + fee-leg op (both within caps) → ok:true', () => {
+    const tx = buildTx(
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '10',
+        destination: TRADER_EURC,
+        destAsset:   Asset.native(),
+        destMin:     '1',
+        path:        [],
+      }),
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '0.05',         // < LEG2_FEE (0.053) → within cap
+        destination: SB_FEE_ACCOUNT,
+        destAsset:   Asset.native(),
+        destMin:     '0.0000001',
+        path:        [],
+      }),
+    );
+    expect(validateStreamedTx(tx, leg2Expected())).toMatchObject({ ok: true });
+  });
+
+  // ── L2-3: ACCEPT — Soroban USDC→EURC ────────────────────────────────────
+  it('L2-3: ACCEPT — invokeHostFunction swap on SB_ROUTER, routes within cap, trader matches → ok:true', () => {
+    // 10 USDC = 100_000_000 stroops; capRaw = 106_710_660 → within budget.
+    const tx = buildMixedTx(makeSwapOp([100_000_000n], TRADER_EURC));
+    expect(validateStreamedTx(tx, leg2Expected())).toMatchObject({ ok: true });
+  });
+
+  // ── L2-4: REJECT — drain to third party ─────────────────────────────────
+  it('L2-4: REJECT — pathPaymentStrictSend to third-party dest (≠ trader, ≠ feeAccount) → DRAIN DETECTED', () => {
+    const tx = buildTx(
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '10',
+        destination: DRAIN_DEST,    // attacker address — neither trader nor fee account
+        destAsset:   Asset.native(),
+        destMin:     '1',
+        path:        [],
+      }),
+    );
+    const result = validateStreamedTx(tx, leg2Expected());
+    expect(result).toMatchObject({ ok: false });
+    expect(result.reason).toMatch(/DRAIN DETECTED/);
+  });
+
+  // ── L2-5: REJECT — sold over cap ─────────────────────────────────────────
+  it('L2-5: REJECT — self-delivery sendAmount 10.72 > maxSellAmount × TOLERANCE (10.6707) → ok:false', () => {
+    const tx = buildTx(
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '10.72',       // > 10.66 × 1.001 = 10.6707 → over cap
+        destination: TRADER_EURC,
+        destAsset:   Asset.native(),
+        destMin:     '1',
+        path:        [],
+      }),
+    );
+    const result = validateStreamedTx(tx, leg2Expected());
+    expect(result).toMatchObject({ ok: false });
+    expect(result.reason).toMatch(/exceeds maxSellAmount/);
+  });
+
+  // ── L2-6: REJECT — fee leg without maxFeeAmount ──────────────────────────
+  it('L2-6: REJECT — fee payment to feeAccount with maxFeeAmount omitted → ok:false', () => {
+    const tx = buildTx(
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '0.05',
+        destination: SB_FEE_ACCOUNT,
+        destAsset:   Asset.native(),
+        destMin:     '0.0000001',
+        path:        [],
+      }),
+    );
+    const result = validateStreamedTx(tx, leg2Expected({ maxFeeAmount: undefined }));
+    expect(result).toMatchObject({ ok: false });
+    expect(result.reason).toMatch(/maxFeeAmount is required/);
+  });
+
+  // ── L2-7: MIXED burst — Soroban + classic in the same tx ─────────────────
+  it('L2-7a: ACCEPT — mixed burst (Soroban within cap + classic self-delivery within cap) → ok:true', () => {
+    // Soroban leg:  5 USDC = 50_000_000 stroops < capRaw (106_710_660).
+    // Classic leg:  sendAmount '5' ≤ 10.66 × 1.001 (per-op cap).
+    const tx = buildMixedTx(
+      makeSwapOp([50_000_000n], TRADER_EURC),
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '5',
+        destination: TRADER_EURC,
+        destAsset:   Asset.native(),
+        destMin:     '1',
+        path:        [],
+      }),
+    );
+    expect(validateStreamedTx(tx, leg2Expected())).toMatchObject({ ok: true });
+  });
+
+  it('L2-7b: REJECT — mixed burst where classic self-delivery (10.72) exceeds per-op cap → ok:false', () => {
+    // Soroban op (5 USDC) passes its aggregate check; classic op then fails its per-op check.
+    // 10.72 > 10.66 × 1.001 = 10.6707 → guard rejects before the tx can be signed.
+    const tx = buildMixedTx(
+      makeSwapOp([50_000_000n], TRADER_EURC),
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '10.72',
+        destination: TRADER_EURC,
+        destAsset:   Asset.native(),
+        destMin:     '1',
+        path:        [],
+      }),
+    );
+    const result = validateStreamedTx(tx, leg2Expected());
+    expect(result).toMatchObject({ ok: false });
+    expect(result.reason).toMatch(/exceeds maxSellAmount/);
   });
 });

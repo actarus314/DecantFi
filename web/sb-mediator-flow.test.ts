@@ -434,4 +434,77 @@ describe('executeSbMediatorSwap', () => {
     expect(mediator.dispose).not.toHaveBeenCalled();
     expect(result.needsRecovery).toBeUndefined();
   });
+
+  // ── EXEC-LEG2 ────────────────────────────────────────────────────────────────
+  // Proves expected.maxSellAmount = parseFloat(amount) for the USDC→EURC leg2 cap.
+  //
+  // P4 passes `amount = usdcReceived` to executeSbMediatorSwap for leg2.
+  // expected.maxSellAmount must equal that USDC amount — not a BLND amount.
+  //
+  // Observed indirectly via the installed guard tap:
+  //   (a) at-cap tx (sendAmount = amount) passes → origSpy called → maxSellAmount ≥ amount
+  //   (b) over-cap tx (sendAmount > amount×TOLERANCE) is blocked → maxSellAmount ≈ amount
+  // If maxSellAmount were accidentally e.g. 5000 (a BLND amount), over-cap test (b) would
+  // NOT block → origSpy would be called → test fails → bug caught.
+
+  it('EXEC-LEG2a: at-cap self-delivery passes guard (proves maxSellAmount = usdcReceived)', async () => {
+    const usdcReceived = '10.66';
+    const { client, factory: cf } = makeFakeClient();
+    const { factory: mf, mediatorAddress } = makeFakeMediator();
+
+    const p = executeSbMediatorSwap({ ...baseOpts(cf, mf), amount: usdcReceived });
+    await tick(); // init() resolves + connect().then() installs the guard tap
+
+    // Self-delivery at exactly the cap: sendAmount === usdcReceived.
+    // If maxSellAmount === 10.66: 10.66 ≤ 10.66×1.001=10.6707 → PASS → origSpy called.
+    const legitXdr = buildTx({
+      sendAsset:   Asset.native(),
+      sendAmount:  usdcReceived,    // at cap
+      destination: mediatorAddress, // must equal expected.trader
+      destAsset:   Asset.native(),
+      destMin:     '1',
+      path:        [],
+    });
+
+    const tap = client.socket.onmessage as (ev: { data: string }) => void;
+    tap({ data: JSON.stringify({ type: 'tx', xdr: legitXdr }) });
+
+    // Guard passed → SDK handler (origSpy) must have been called exactly once.
+    expect(client.origSpy).toHaveBeenCalledOnce();
+
+    // Settle the swap normally.
+    client.fire('finished', { hash: 'leg2-ok' });
+    const result = await p;
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('EXEC-LEG2b: over-cap tx blocked — proves cap = usdcReceived, not a BLND amount', async () => {
+    const usdcReceived = '10.66';
+    const { client, factory: cf } = makeFakeClient();
+    const { factory: mf, mediatorAddress } = makeFakeMediator();
+
+    const p = executeSbMediatorSwap({ ...baseOpts(cf, mf), amount: usdcReceived });
+    await tick(); // guard tap installed
+
+    // 10.72 > 10.66×1.001 = 10.6707 → blocked if maxSellAmount === 10.66.
+    // But if maxSellAmount were 5000: 10.72 ≤ 5000×1.001 → NOT blocked → this test fails → bug caught.
+    const overCapXdr = buildTx({
+      sendAsset:   Asset.native(),
+      sendAmount:  '10.72',
+      destination: mediatorAddress,
+      destAsset:   Asset.native(),
+      destMin:     '1',
+      path:        [],
+    });
+
+    const tap = client.socket.onmessage as (ev: { data: string }) => void;
+    tap({ data: JSON.stringify({ type: 'tx', xdr: overCapXdr }) });
+
+    // Guard blocked → SDK handler must NOT have been called.
+    expect(client.origSpy).not.toHaveBeenCalled();
+
+    // Guard-blocked path resolves the swap as { ok: true, blocked: true }.
+    const result = await p;
+    expect(result).toMatchObject({ ok: true, blocked: true });
+  });
 });
