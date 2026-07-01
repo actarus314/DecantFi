@@ -1205,6 +1205,8 @@ describe('simulateStellarBrokerNet', () => {
         makeClassicXdr(WITNESS, '879.1223392'),    // trader leg → add destMin (a floor)
       ],
       _rpcServer: neverCalled,
+      // Simulate Horizon unavailable → fallback to destMin floor (tests the non-exact path)
+      _quoteHorizon: async () => null,
     });
     expect(result).not.toBeNull();
     // 879.1223392 × 10^7 = 8_791_223_392 stroops
@@ -1254,6 +1256,7 @@ describe('simulateStellarBrokerNet', () => {
 
   it('mixes a REAL Soroban leg with classic legs: sums trader destMin, excludes fee leg, exact=false', async () => {
     // Real Soroban leg (sim → 100) + classic trader leg (destMin 50, a floor) + classic fee leg (excluded).
+    // _quoteHorizon returns null → fallback to destMin (tests the non-exact fallback path).
     const result = await simulateStellarBrokerNet({
       sellAsset: USDC, buyAsset: EURC,
       amountIn: 1000_0000000n, slippageBps: 50,
@@ -1264,11 +1267,65 @@ describe('simulateStellarBrokerNet', () => {
         makeClassicXdr(WITNESS, '50.0'),          // trader leg → destMin 50 added
       ],
       _rpcServer: makeFakeRpc(100_0000000n),
+      // Horizon unavailable → destMin fallback ensures exact=false
+      _quoteHorizon: async () => null,
     });
     expect(result).not.toBeNull();
     // 100 (Soroban sim) + 50 (trader destMin); fee leg excluded
     expect(result!.net).toBe(150_0000000n);
     // a classic destMin floor contributed → cannot be labelled observed
+    expect(result!.exact).toBe(false);
+  });
+
+  // ─── P1: classic legs observed via Horizon strict-send ───────────────────────
+
+  it('P1: mixed burst (Soroban + classic) with Horizon fill → sums real fills, exact=true', async () => {
+    // Soroban leg observed via RPC sim; classic trader leg observed via Horizon strict-send.
+    // No classic destMin floor ever summed → exact stays true.
+    const sorobanFill = 100_0000000n;
+    const horizonFill = 900_0000000n;
+    const result = await simulateStellarBrokerNet({
+      sellAsset: USDC, buyAsset: EURC,
+      amountIn: 1000_0000000n, slippageBps: 50,
+      apiKey: 'test', rpcUrl: 'https://rpc.test',
+      _capturedXdrs: [
+        makeSorobanXdr(),                       // Soroban leg → retval[1] = sorobanFill
+        makeClassicXdr(SB_FEE_ACCOUNT, '0.0001'), // fee leg → excluded
+        makeClassicXdr(WITNESS, '879.1223392'), // trader leg → real fill from Horizon
+      ],
+      _rpcServer: makeFakeRpc(sorobanFill),
+      // Horizon returns a real observed fill for the classic trader leg
+      _quoteHorizon: async () => ({ venue: 'horizon' as const, netOut: horizonFill, path: [] }),
+    });
+    expect(result).not.toBeNull();
+    // net = Soroban fill + Horizon fill (fee leg excluded; destMin floor never summed)
+    expect(result!.net).toBe(sorobanFill + horizonFill);
+    // All legs observed (Soroban recording-mode sim + Horizon strict-send) → exact
+    expect(result!.exact).toBe(true);
+  });
+
+  it('P1: mixed burst with Horizon failure falls back to destMin floor → exact=false', async () => {
+    // Soroban leg observed; classic trader leg: Horizon returns null → destMin floor used.
+    // Honesty invariant: any destMin contribution forces exact=false.
+    const sorobanFill = 100_0000000n;
+    const destMinStroops = 8_791_223_392n; // '879.1223392' × 10^7
+    const result = await simulateStellarBrokerNet({
+      sellAsset: USDC, buyAsset: EURC,
+      amountIn: 1000_0000000n, slippageBps: 50,
+      apiKey: 'test', rpcUrl: 'https://rpc.test',
+      _capturedXdrs: [
+        makeSorobanXdr(),                       // Soroban leg → retval[1] = sorobanFill
+        makeClassicXdr(SB_FEE_ACCOUNT, '0.0001'), // fee leg → excluded
+        makeClassicXdr(WITNESS, '879.1223392'), // trader leg → Horizon fails → destMin floor
+      ],
+      _rpcServer: makeFakeRpc(sorobanFill),
+      // Horizon unavailable: classic leg falls back to destMin (a floor, not an observed fill)
+      _quoteHorizon: async () => null,
+    });
+    expect(result).not.toBeNull();
+    // net = Soroban fill + destMin floor (conservative lower bound)
+    expect(result!.net).toBe(sorobanFill + destMinStroops);
+    // destMin floor contributed → cannot be labelled observed
     expect(result!.exact).toBe(false);
   });
 });

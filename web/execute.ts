@@ -1,6 +1,6 @@
 // Orchestrateur d'exécution : BLND → USDC/EURC via xBull, Soroswap, Horizon ou Aquarius.
 // Money-path : bigint stroops partout, jamais de float pour les calculs.
-import { BLND, USDC, EURC, bySac, classicColon, type Asset } from '../core/assets.js';
+import { BLND, USDC, EURC, XLM, ASSETS, bySac, classicColon, type Asset } from '../core/assets.js';
 import { decodeTransfers, routeFromTransfers, type Transfer } from '../core/soroban-route.js';
 import { bumpRpc } from '../core/rpc-meter.js';
 import { withTimeout } from '../core/timeout.js';
@@ -53,6 +53,15 @@ function trustlineMissingError(buy: Asset, sender: string): ExecError {
 }
 
 // ─── Helpers purs exportés ───────────────────────────────────────────────────
+
+/** Converts a Stellar SDK Asset object (decoded from XDR) to a core Asset,
+ *  or null if the asset is not in the known registry (unknown → cannot route). */
+function sdkAssetToCore(a: { isNative(): boolean; getCode(): string; getIssuer(): string }): Asset | null {
+  if (a.isNative()) return XLM;
+  const code = a.getCode();
+  const issuer = a.getIssuer();
+  return ASSETS.find((x) => x.code === code && x.issuer === issuer) ?? null;
+}
 
 /** Floor-division : net * (10000-bps) / 10000. Lance si bps invalide. */
 export function minReceivedStroops(net: bigint, slippageBps: number): bigint {
@@ -473,6 +482,13 @@ export async function simulateStellarBrokerNet(opts: {
   _capturedXdrs?: string[];
   /** For testing: override the RPC server. */
   _rpcServer?: { simulateTransaction(tx: unknown): Promise<unknown> };
+  /** Execution deps (fetchJson) used by quoteHorizon for classic-leg re-quote.
+   *  Defaults to defaultDeps() when not provided. */
+  deps?: ExecDeps;
+  /** Horizon base URL passed through to quoteHorizon. Defaults to HORIZON_BASE_DEFAULT. */
+  horizonUrl?: string;
+  /** For testing: override quoteHorizon to avoid real network calls. */
+  _quoteHorizon?: typeof quoteHorizon;
 }): Promise<{ net: bigint; route: string[]; exact: boolean } | null> {
   // All AQUARIUS_WITNESSES hold BLND, USDC, EURC — pick the first as witness/trader
   const witness = AQUARIUS_WITNESSES[0]!;
@@ -503,6 +519,11 @@ export async function simulateStellarBrokerNet(opts: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const server: { simulateTransaction(tx: unknown): Promise<unknown> } =
     opts._rpcServer ?? new rpc.Server((opts.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
+
+  // Horizon re-quote seam: injectable for tests, real implementation otherwise.
+  const qhFn = opts._quoteHorizon ?? quoteHorizon;
+  // fetchJson provider for quoteHorizon calls; defaultDeps() as fallback.
+  const execDeps = opts.deps ?? defaultDeps();
 
   let totalNet = 0n;
   // True as soon as a classic trader-leg destMin (a floor, not an observed fill) is summed
@@ -549,18 +570,54 @@ export async function simulateStellarBrokerNet(opts: {
       if (invokeOps.length > 0) continue; // tx was Soroban — classic branch below not applicable
 
       // Classic pathPaymentStrictSend legs
-      for (const op of (tx.operations as Array<{ type: string; destination?: string; destMin?: string }>)) {
+      type ClassicOp = {
+        type: string;
+        destination?: string;
+        destMin?: string;
+        sendAsset?: { isNative(): boolean; getCode(): string; getIssuer(): string };
+        sendAmount?: string;
+        destAsset?: { isNative(): boolean; getCode(): string; getIssuer(): string };
+      };
+      for (const op of (tx.operations as ClassicOp[])) {
         if (op.type !== 'pathPaymentStrictSend') continue;
         if (op.destination === SB_FEE_ACCOUNT) continue; // fee leg → skip
-        // Trader leg: destMin is a guaranteed FLOOR, never an observed fill. Summing it
-        // makes the net a conservative lower bound → mark non-exact so callers keep the
-        // honest estimate label instead of promoting to "observed".
-        if (op.destMin) {
-          try {
-            const destMinStroops = toStroops(op.destMin);
-            if (destMinStroops > 0n) { totalNet += destMinStroops; classicContributed = true; }
-          } catch { /* malformed destMin — skip */ }
+
+        // Attempt to observe the real fill via Horizon strict-send.
+        // Only possible when sendAsset and destAsset are known (in our ASSETS registry).
+        // On any failure (Horizon down, timeout, unknown asset) → fall back to destMin floor.
+        let observedFill: bigint | null = null;
+        if (op.sendAsset && op.sendAmount && op.destAsset) {
+          const sendCore = sdkAssetToCore(op.sendAsset);
+          const destCore = sdkAssetToCore(op.destAsset);
+          if (sendCore && destCore) {
+            try {
+              const sendAmountStroops = toStroops(op.sendAmount);
+              const hResult = await withTimeout(
+                qhFn(sendCore, destCore, sendAmountStroops, execDeps, opts.horizonUrl),
+                SIM_TIMEOUT_MS,
+                'sb classic horizon',
+              ).catch(() => null);
+              if (hResult && hResult.netOut > 0n) observedFill = hResult.netOut;
+            } catch { /* toStroops failure or other sync error — fall through to destMin */ }
+          }
         }
+
+        if (observedFill !== null) {
+          // Real fill from Horizon strict-send — this IS an observed fill.
+          // Do NOT set classicContributed: exact stays true if all other legs are also observed.
+          totalNet += observedFill;
+        } else {
+          // Fallback: destMin is a slippage FLOOR, never an observed fill.
+          // Summing it makes the net a conservative lower bound → mark non-exact so callers
+          // keep the honest estimate label instead of promoting to "observed".
+          if (op.destMin) {
+            try {
+              const destMinStroops = toStroops(op.destMin);
+              if (destMinStroops > 0n) { totalNet += destMinStroops; classicContributed = true; }
+            } catch { /* malformed destMin — skip */ }
+          }
+        }
+
         if (!routeSyms.includes(opts.buyAsset.symbol)) routeSyms.push(opts.buyAsset.symbol);
       }
     } catch {

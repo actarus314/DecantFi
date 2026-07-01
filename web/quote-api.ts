@@ -147,7 +147,7 @@ function buildRoute(hops: RouteHop[], amountIn: bigint, netOut: bigint, pairUi: 
  * si toutes les jambes sont des sims Soroban observées (sinon la cote estimée reste intacte).
  */
 export function makeReSimLeg(
-  cfg: { rpcUrl: string; stellarBrokerApiKey?: string },
+  cfg: { rpcUrl: string; stellarBrokerApiKey?: string; horizonUrl?: string },
   deps?: {
     simulateAquariusNet?: typeof simulateAquariusNet;
     simulateXbullNet?: typeof simulateXbullNet;
@@ -193,6 +193,7 @@ export function makeReSimLeg(
               slippageBps: 50, // default; slippage irrelevant for fill observation
               apiKey: cfg.stellarBrokerApiKey,
               rpcUrl: cfg.rpcUrl,
+              horizonUrl: cfg.horizonUrl,
             }),
             simTimeoutMs,
             'sb leg re-sim',
@@ -233,7 +234,7 @@ export async function resimAquariusXbull(
   result: QuoteResult,
   pairUi: string,
   amountStroops: bigint,
-  cfg: { rpcUrl: string; stellarBrokerApiKey?: string },
+  cfg: { rpcUrl: string; stellarBrokerApiKey?: string; horizonUrl?: string },
   deps?: {
     simulateAquariusNet?: typeof simulateAquariusNet;
     simulateXbullNet?: typeof simulateXbullNet;
@@ -287,6 +288,7 @@ export async function resimAquariusXbull(
           slippageBps: 50,
           apiKey: cfg.stellarBrokerApiKey,
           rpcUrl: cfg.rpcUrl,
+          horizonUrl: cfg.horizonUrl,
         }), simTimeoutMs, 'sb re-sim').catch(() => null))
       : Promise.resolve({ r: null as Awaited<ReturnType<typeof simFnSb>> | null, ms: 0 }),
   ]);
@@ -426,14 +428,14 @@ export async function liveQuote(
       rpcCache: new Map(),
       // Re-simulation honnête des jambes EURC via-USDC (xBull/Aquarius seulement).
       // Best-effort : un échec RPC laisse la cote brute, ne casse pas la cotation.
-      reSimLeg: pairUi === 'EURC' ? makeReSimLeg({ rpcUrl: cfg.rpcUrl, stellarBrokerApiKey: cfg.stellarBrokerApiKey }, deps) : undefined,
+      reSimLeg: pairUi === 'EURC' ? makeReSimLeg({ rpcUrl: cfg.rpcUrl, stellarBrokerApiKey: cfg.stellarBrokerApiKey, horizonUrl: cfg.horizonUrl }, deps) : undefined,
     },
   });
 
   // ─── Re-simulation Aquarius + xBull : remplace les nets sur-cotés par les vrais fills simulés ───
   // Aquarius find-path sur-cote ~0,2 % sur les routes via-XLM.
   // xBull /swaps/quote sur-cote ~0,1 % (skim routeur non divulgué).
-  await resimAquariusXbull(result, pairUi, amountStroops, { rpcUrl: cfg.rpcUrl, stellarBrokerApiKey: cfg.stellarBrokerApiKey }, deps);
+  await resimAquariusXbull(result, pairUi, amountStroops, { rpcUrl: cfg.rpcUrl, stellarBrokerApiKey: cfg.stellarBrokerApiKey, horizonUrl: cfg.horizonUrl }, deps);
 
   // Pour EURC : si le gagnant est via-usdc, utiliser result.eurc
   let bestQuote: import('../core/sources/types.js').NormalizedQuote | undefined = result.ranking.best;
