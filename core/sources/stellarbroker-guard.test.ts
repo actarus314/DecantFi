@@ -21,6 +21,7 @@ import {
   validateStreamedTx,
   SB_ROUTER_CONTRACT,
   SB_FEE_ACCOUNT,
+  RECEIVED_TOLERANCE,
   type ValidateExpected,
 } from './stellarbroker-guard.js';
 
@@ -574,5 +575,164 @@ describe('validateStreamedTx — P5a USDC→EURC leg2 shape hermetic coverage', 
     const result = validateStreamedTx(tx, leg2Expected());
     expect(result).toMatchObject({ ok: false });
     expect(result.reason).toMatch(/exceeds maxSellAmount/);
+  });
+});
+
+// ── P5b: received-side floor check ────────────────────────────────────────────
+//
+// The guard is asset-agnostic; Asset.native() is used for all ops here.
+// Trader = TRADER_BLND (self-delivery destination).
+// RECEIVED_TOLERANCE = 0.9 → floor threshold = minReceivedRate × 0.9.
+// Existing tests never set minReceivedRate → they remain fail-open (no regression).
+
+describe('validateStreamedTx — P5b received-side floor', () => {
+  // ── P5b-1: ACCEPT — honest fill ────────────────────────────────────────────
+  it('P5b-1: ACCEPT — destMin/sendAmount rate equals declared floor (0.5 ≥ 0.5×0.9=0.45) → ok:true', () => {
+    // sendAmount 5000, destMin 2500 → actualRate = 0.5; threshold = 0.5 × 0.9 = 0.45
+    const tx = buildTx(
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '5000',
+        destination: TRADER_BLND,
+        destAsset:   Asset.native(),
+        destMin:     '2500',
+        path:        [],
+      }),
+    );
+    const result = validateStreamedTx(tx, {
+      trader:          TRADER_BLND,
+      maxSellAmount:   5000,
+      routerContractId: SB_ROUTER_CONTRACT,
+      minReceivedRate: 0.5,
+    });
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  // ── P5b-2: REJECT — egregiously low destMin ────────────────────────────────
+  it('P5b-2: REJECT — destMin 100 vs sendAmount 5000 (rate 0.02 < 0.45 threshold) → ok:false, reason "received floor"', () => {
+    // actualRate = 100/5000 = 0.02; threshold = 0.5 × 0.9 = 0.45 → blocked
+    const tx = buildTx(
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '5000',
+        destination: TRADER_BLND,
+        destAsset:   Asset.native(),
+        destMin:     '100',
+        path:        [],
+      }),
+    );
+    const result = validateStreamedTx(tx, {
+      trader:          TRADER_BLND,
+      maxSellAmount:   5000,
+      routerContractId: SB_ROUTER_CONTRACT,
+      minReceivedRate: 0.5,
+    });
+    expect(result).toMatchObject({ ok: false });
+    expect(result.reason).toMatch(/received floor/);
+  });
+
+  // ── P5b-3: ACCEPT (fail-open) — minReceivedRate absent ───────────────────
+  it('P5b-3: ACCEPT (fail-open) — minReceivedRate undefined, destMin egregiously low → ok:true (check skipped)', () => {
+    // Low destMin but minReceivedRate is NOT set → guard skips the floor check entirely.
+    const tx = buildTx(
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '5000',
+        destination: TRADER_BLND,
+        destAsset:   Asset.native(),
+        destMin:     '100',
+        path:        [],
+      }),
+    );
+    const result = validateStreamedTx(tx, {
+      trader:          TRADER_BLND,
+      maxSellAmount:   5000,
+      routerContractId: SB_ROUTER_CONTRACT,
+      // minReceivedRate intentionally omitted → fail-open
+    });
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  // ── P5b-4: ACCEPT — slippage within the 0.9 tolerance margin ──────────────
+  it('P5b-4: ACCEPT — destMin 2340 vs sendAmount 5000 (rate 0.468 ≥ threshold 0.45) → ok:true', () => {
+    // actualRate = 2340/5000 = 0.468; threshold = 0.5 × 0.9 = 0.45 → passes
+    // Proves honest ~6% slippage below the declared floor is accepted by the loose tolerance.
+    const tx = buildTx(
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '5000',
+        destination: TRADER_BLND,
+        destAsset:   Asset.native(),
+        destMin:     '2340',
+        path:        [],
+      }),
+    );
+    const result = validateStreamedTx(tx, {
+      trader:          TRADER_BLND,
+      maxSellAmount:   5000,
+      routerContractId: SB_ROUTER_CONTRACT,
+      minReceivedRate: 0.5,
+    });
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  // ── P5b-5: NOT-APPLIED to pathPaymentStrictReceive ────────────────────────
+  it('P5b-5: NOT-APPLIED to strictReceive — floor check only runs on strictSend; strictReceive passes → ok:true', () => {
+    // pathPaymentStrictReceive has no destMin (has destAmount instead); the P5b check
+    // must be skipped entirely for this op type even when minReceivedRate is set.
+    // sendMax 5000 ≤ maxSellAmount×TOLERANCE → sell cap also passes.
+    const tx = buildMixedTx(
+      Operation.pathPaymentStrictReceive({
+        sendAsset:   Asset.native(),
+        sendMax:     '5000',
+        destination: TRADER_BLND,
+        destAsset:   Asset.native(),
+        destAmount:  '1',    // low, but P5b does not inspect destAmount for strictReceive
+        path:        [],
+      }),
+    );
+    const result = validateStreamedTx(tx, {
+      trader:          TRADER_BLND,
+      maxSellAmount:   5000,
+      routerContractId: SB_ROUTER_CONTRACT,
+      minReceivedRate: 0.5,  // set, but must NOT trigger for strictReceive
+    });
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  // ── P5b-6: NOT-APPLIED to fee op ──────────────────────────────────────────
+  it('P5b-6: NOT-APPLIED to fee op — feeAccount pathPaymentStrictSend with low destMin not rejected by floor → ok:true', () => {
+    // The fee op goes to SB_FEE_ACCOUNT (feeAccount branch), NOT the self-delivery branch.
+    // The P5b floor check lives ONLY inside the self-delivery (dest===trader) block.
+    // A low destMin on the fee op must NOT trigger the received-floor rejection.
+    const tx = buildTx(
+      // Valid self-delivery (sendAmount within cap, normal destMin)
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '5000',
+        destination: TRADER_BLND,
+        destAsset:   Asset.native(),
+        destMin:     '2500',
+        path:        [],
+      }),
+      // Fee op to feeAccount: within maxFeeAmount but destMin extremely low
+      Operation.pathPaymentStrictSend({
+        sendAsset:   Asset.native(),
+        sendAmount:  '0.05',
+        destination: SB_FEE_ACCOUNT,
+        destAsset:   Asset.native(),
+        destMin:     '0.0000001', // egregiously low, but P5b must NOT apply here
+        path:        [],
+      }),
+    );
+    const result = validateStreamedTx(tx, {
+      trader:          TRADER_BLND,
+      maxSellAmount:   5000,
+      routerContractId: SB_ROUTER_CONTRACT,
+      feeAccount:      SB_FEE_ACCOUNT,
+      maxFeeAmount:    1,
+      minReceivedRate: 0.5,  // set, but must NOT trigger for the fee op
+    });
+    expect(result).toMatchObject({ ok: true });
   });
 });

@@ -22,6 +22,13 @@ export const SB_ROUTER_CONTRACT = 'CBWP275BNGLHWFTQVB6QHA67MLX7WTX6YZ5LNSUVOK7W2
 /** Allow 0.1% rounding slack on amounts. */
 export const TOLERANCE = 1.001;
 
+/** Received-side floor: reject a self-delivery whose destMin/sendAmount rate falls
+ *  below this fraction of SB's declared floor rate. Loose by design — blocks only
+ *  egregious shortfalls (destMin set well under SB's own committed floor), never
+ *  honest ~1% slippage. Tunable at the live gate. Applied only when
+ *  expected.minReceivedRate is provided (fail-open otherwise). */
+export const RECEIVED_TOLERANCE = 0.9;
+
 /** Stroops per human unit for 7-decimal Stellar assets (BLND/USDC/EURC). */
 const STROOP_SCALE = 10_000_000;
 
@@ -36,6 +43,11 @@ export interface ValidateExpected {
   feeAccount?: string;
   /** Max fee op amount in human units. */
   maxFeeAmount?: number;
+  /** Optional received-side floor rate (buy-units per sell-unit) = SB's declared floor
+   *  (directTrade.buying / soldAmount, human units). When set, a pathPaymentStrictSend
+   *  self-delivery whose destMin/sendAmount < minReceivedRate × RECEIVED_TOLERANCE is
+   *  rejected. Undefined → check skipped (fail-open). */
+  minReceivedRate?: number;
 }
 
 /**
@@ -58,7 +70,7 @@ export function validateStreamedTx(
   tx: Transaction,
   expected: ValidateExpected,
 ): { ok: boolean; reason: string } {
-  const { trader, maxSellAmount, routerContractId, feeAccount, maxFeeAmount } = expected;
+  const { trader, maxSellAmount, routerContractId, feeAccount, maxFeeAmount, minReceivedRate } = expected;
   const ops = tx.operations;
 
   if (!ops || ops.length === 0) {
@@ -212,6 +224,19 @@ export function validateStreamedTx(
           ok: false,
           reason: `op[${i}] self-delivery amount ${amount} exceeds maxSellAmount ${maxSellAmount}`,
         };
+      }
+      // Received-side floor (P5b): reject a dishonestly-low destMin. Only strictSend
+      // carries a variable destMin; strictReceive delivers a fixed destAmount (no risk).
+      // amount === sendAmount here for strictSend. Fail-open when minReceivedRate unset.
+      if (op.type === 'pathPaymentStrictSend' && minReceivedRate !== undefined && amount > 0) {
+        const destMin = parseFloat(op.destMin ?? '0');
+        const actualRate = destMin / amount;
+        if (actualRate < minReceivedRate * RECEIVED_TOLERANCE) {
+          return {
+            ok: false,
+            reason: `op[${i}] self-delivery received floor: destMin/sold rate ${actualRate} < declared ${minReceivedRate} × ${RECEIVED_TOLERANCE} — degraded fill rejected`,
+          };
+        }
       }
       continue;
     }

@@ -146,7 +146,23 @@ export async function executeSbMediatorSwap({
         client.on('error',    (e) => fail(new Error(String(e?.error ?? e?.message ?? e))));
         client.on('finished', (e) => done(e.detail ?? e));
         client.on('progress', (e) => onProgress?.({ step: 'streaming', detail: e.detail ?? e }));
-        client.on('quote', () => {
+        client.on('quote', (e) => {
+          try {
+            // Received-side floor (P5b): capture SB's DECLARED floor (directTrade.buying,
+            // human buy-asset units) → rate vs sold amount, stored on `expected` (same ref
+            // the guard TAP reads). NEVER estimatedBuyingAmount (optimistic → false-block).
+            // Defensive: any parse miss leaves minReceivedRate undefined → guard fail-open.
+            // The quote event precedes the tx burst, so the guard sees the rate in time.
+            const q = (e && e.detail) ? e.detail : e;
+            const buying = q && (q.directTrade && q.directTrade.buying !== undefined
+              ? q.directTrade.buying
+              : (q.quote && q.quote.directTrade ? q.quote.directTrade.buying : undefined));
+            const floor = parseFloat(buying);
+            const sold = parseFloat(amount);
+            if (Number.isFinite(floor) && floor > 0 && Number.isFinite(sold) && sold > 0) {
+              expected.minReceivedRate = floor / sold;
+            }
+          } catch { /* fail-open: leave minReceivedRate undefined */ }
           try { client.confirmQuote(mediatorAddress, ephemeralAuth); }
           catch (err) { fail(err); }
         });

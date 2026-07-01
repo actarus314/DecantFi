@@ -21103,9 +21103,10 @@ var SB_FEE_ACCOUNT = "GD53CUDUMAIX5BCS4LU5ZZ46RON7B3HCH3JYHR6LLC3OWH3KLRFUQD5I";
 // core/sources/stellarbroker-guard.ts
 var SB_ROUTER_CONTRACT = "CBWP275BNGLHWFTQVB6QHA67MLX7WTX6YZ5LNSUVOK7W2TMKWX7OPYOJ";
 var TOLERANCE = 1.001;
+var RECEIVED_TOLERANCE = 0.9;
 var STROOP_SCALE = 1e7;
 function validateStreamedTx(tx, expected) {
-  const { trader, maxSellAmount, routerContractId, feeAccount, maxFeeAmount } = expected;
+  const { trader, maxSellAmount, routerContractId, feeAccount, maxFeeAmount, minReceivedRate } = expected;
   const ops = tx.operations;
   if (!ops || ops.length === 0) {
     return { ok: false, reason: "tx has no operations" };
@@ -21215,6 +21216,16 @@ function validateStreamedTx(tx, expected) {
           ok: false,
           reason: `op[${i}] self-delivery amount ${amount} exceeds maxSellAmount ${maxSellAmount}`
         };
+      }
+      if (op.type === "pathPaymentStrictSend" && minReceivedRate !== void 0 && amount > 0) {
+        const destMin = parseFloat(op.destMin ?? "0");
+        const actualRate = destMin / amount;
+        if (actualRate < minReceivedRate * RECEIVED_TOLERANCE) {
+          return {
+            ok: false,
+            reason: `op[${i}] self-delivery received floor: destMin/sold rate ${actualRate} < declared ${minReceivedRate} \xD7 ${RECEIVED_TOLERANCE} \u2014 degraded fill rejected`
+          };
+        }
       }
       continue;
     }
@@ -21347,7 +21358,17 @@ async function executeSbMediatorSwap({
         client.on("error", (e) => fail(new Error(String(e?.error ?? e?.message ?? e))));
         client.on("finished", (e) => done(e.detail ?? e));
         client.on("progress", (e) => onProgress?.({ step: "streaming", detail: e.detail ?? e }));
-        client.on("quote", () => {
+        client.on("quote", (e) => {
+          try {
+            const q = e && e.detail ? e.detail : e;
+            const buying = q && (q.directTrade && q.directTrade.buying !== void 0 ? q.directTrade.buying : q.quote && q.quote.directTrade ? q.quote.directTrade.buying : void 0);
+            const floor = parseFloat(buying);
+            const sold = parseFloat(amount);
+            if (Number.isFinite(floor) && floor > 0 && Number.isFinite(sold) && sold > 0) {
+              expected.minReceivedRate = floor / sold;
+            }
+          } catch {
+          }
           try {
             client.confirmQuote(mediatorAddress, ephemeralAuth);
           } catch (err2) {
