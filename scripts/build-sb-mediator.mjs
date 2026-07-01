@@ -37,6 +37,7 @@ await build({
   format: 'esm',
   platform: 'browser',
   define: { global: 'globalThis' },
+  inject: [path.join(repoRoot, 'scripts', 'sb-mediator-shims.js')],
   target: 'es2020',
   outfile,
   banner: { js: banner },

@@ -106,9 +106,14 @@ export async function executeSbMediatorSwap({
     const mediatorAddress = mediator.mediatorAddress;
     onProgress?.({ step: 'funding', msg: `Mediator account: ${mediatorAddress}` });
 
-    // ephemeralAuth: the SDK calls this to sign Soroban txs with the ephemeral key.
-    // It is only invoked on txs that have already passed makeGuardedTap.
-    const ephemeralAuth = (tx) => { tx.sign(ephemeral); return tx; };
+    // ephemeralAuth: the SDK calls this to authorize with the ephemeral key. The payload is a
+    // Transaction (has .sign) for full-tx / fee-bump signing, or a 32-byte Buffer hash for
+    // Soroban auth entries (blind-signed). Mirrors AuthorizationWrapper's Keypair branch.
+    // Only ever invoked on txs that already passed makeGuardedTap.
+    const ephemeralAuth = (payload) => {
+      if (payload.sign) { payload.sign(ephemeral); return payload; } // Transaction → sign & return
+      return ephemeral.sign(payload); // Buffer auth-entry hash → return raw signature
+    };
 
     // expected: what the guard considers acceptable for this specific swap session.
     // maxSellAmount = exact user amount; the guard adds its own 1.001 dust tolerance.

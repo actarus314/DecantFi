@@ -7,6 +7,14 @@ var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __esm = (fn, res, err2) => function __init() {
+  if (err2) throw err2[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err2 = [e], e;
+  }
+};
 var __commonJS = (cb, mod) => function __require() {
   try {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
@@ -40,6 +48,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 var require_base64_js = __commonJS({
   "node_modules/base64-js/index.js"(exports) {
     "use strict";
+    init_sb_mediator_shims();
     exports.byteLength = byteLength;
     exports.toByteArray = toByteArray;
     exports.fromByteArray = fromByteArray;
@@ -140,6 +149,7 @@ var require_base64_js = __commonJS({
 // node_modules/ieee754/index.js
 var require_ieee754 = __commonJS({
   "node_modules/ieee754/index.js"(exports) {
+    init_sb_mediator_shims();
     exports.read = function(buffer, offset, isLE, mLen, nBytes) {
       var e, m;
       var eLen = nBytes * 8 - mLen - 1;
@@ -224,16 +234,17 @@ var require_ieee754 = __commonJS({
 var require_buffer = __commonJS({
   "node_modules/buffer/index.js"(exports) {
     "use strict";
+    init_sb_mediator_shims();
     var base64 = require_base64_js();
     var ieee754 = require_ieee754();
     var customInspectSymbol = typeof Symbol === "function" && typeof Symbol["for"] === "function" ? Symbol["for"]("nodejs.util.inspect.custom") : null;
-    exports.Buffer = Buffer29;
+    exports.Buffer = Buffer30;
     exports.SlowBuffer = SlowBuffer;
     exports.INSPECT_MAX_BYTES = 50;
     var K_MAX_LENGTH = 2147483647;
     exports.kMaxLength = K_MAX_LENGTH;
-    Buffer29.TYPED_ARRAY_SUPPORT = typedArraySupport();
-    if (!Buffer29.TYPED_ARRAY_SUPPORT && typeof console !== "undefined" && typeof console.error === "function") {
+    Buffer30.TYPED_ARRAY_SUPPORT = typedArraySupport();
+    if (!Buffer30.TYPED_ARRAY_SUPPORT && typeof console !== "undefined" && typeof console.error === "function") {
       console.error(
         "This browser lacks typed array (Uint8Array) support which is required by `buffer` v5.x. Use `buffer` v4.x if you require old browser support."
       );
@@ -251,17 +262,17 @@ var require_buffer = __commonJS({
         return false;
       }
     }
-    Object.defineProperty(Buffer29.prototype, "parent", {
+    Object.defineProperty(Buffer30.prototype, "parent", {
       enumerable: true,
       get: function() {
-        if (!Buffer29.isBuffer(this)) return void 0;
+        if (!Buffer30.isBuffer(this)) return void 0;
         return this.buffer;
       }
     });
-    Object.defineProperty(Buffer29.prototype, "offset", {
+    Object.defineProperty(Buffer30.prototype, "offset", {
       enumerable: true,
       get: function() {
-        if (!Buffer29.isBuffer(this)) return void 0;
+        if (!Buffer30.isBuffer(this)) return void 0;
         return this.byteOffset;
       }
     });
@@ -270,10 +281,10 @@ var require_buffer = __commonJS({
         throw new RangeError('The value "' + length + '" is invalid for option "size"');
       }
       const buf = new Uint8Array(length);
-      Object.setPrototypeOf(buf, Buffer29.prototype);
+      Object.setPrototypeOf(buf, Buffer30.prototype);
       return buf;
     }
-    function Buffer29(arg, encodingOrOffset, length) {
+    function Buffer30(arg, encodingOrOffset, length) {
       if (typeof arg === "number") {
         if (typeof encodingOrOffset === "string") {
           throw new TypeError(
@@ -284,7 +295,7 @@ var require_buffer = __commonJS({
       }
       return from(arg, encodingOrOffset, length);
     }
-    Buffer29.poolSize = 8192;
+    Buffer30.poolSize = 8192;
     function from(value, encodingOrOffset, length) {
       if (typeof value === "string") {
         return fromString(value, encodingOrOffset);
@@ -310,22 +321,22 @@ var require_buffer = __commonJS({
       }
       const valueOf = value.valueOf && value.valueOf();
       if (valueOf != null && valueOf !== value) {
-        return Buffer29.from(valueOf, encodingOrOffset, length);
+        return Buffer30.from(valueOf, encodingOrOffset, length);
       }
       const b = fromObject(value);
       if (b) return b;
       if (typeof Symbol !== "undefined" && Symbol.toPrimitive != null && typeof value[Symbol.toPrimitive] === "function") {
-        return Buffer29.from(value[Symbol.toPrimitive]("string"), encodingOrOffset, length);
+        return Buffer30.from(value[Symbol.toPrimitive]("string"), encodingOrOffset, length);
       }
       throw new TypeError(
         "The first argument must be one of type string, Buffer, ArrayBuffer, Array, or Array-like Object. Received type " + typeof value
       );
     }
-    Buffer29.from = function(value, encodingOrOffset, length) {
+    Buffer30.from = function(value, encodingOrOffset, length) {
       return from(value, encodingOrOffset, length);
     };
-    Object.setPrototypeOf(Buffer29.prototype, Uint8Array.prototype);
-    Object.setPrototypeOf(Buffer29, Uint8Array);
+    Object.setPrototypeOf(Buffer30.prototype, Uint8Array.prototype);
+    Object.setPrototypeOf(Buffer30, Uint8Array);
     function assertSize(size) {
       if (typeof size !== "number") {
         throw new TypeError('"size" argument must be of type number');
@@ -343,24 +354,24 @@ var require_buffer = __commonJS({
       }
       return createBuffer(size);
     }
-    Buffer29.alloc = function(size, fill, encoding) {
+    Buffer30.alloc = function(size, fill, encoding) {
       return alloc(size, fill, encoding);
     };
     function allocUnsafe(size) {
       assertSize(size);
       return createBuffer(size < 0 ? 0 : checked(size) | 0);
     }
-    Buffer29.allocUnsafe = function(size) {
+    Buffer30.allocUnsafe = function(size) {
       return allocUnsafe(size);
     };
-    Buffer29.allocUnsafeSlow = function(size) {
+    Buffer30.allocUnsafeSlow = function(size) {
       return allocUnsafe(size);
     };
     function fromString(string, encoding) {
       if (typeof encoding !== "string" || encoding === "") {
         encoding = "utf8";
       }
-      if (!Buffer29.isEncoding(encoding)) {
+      if (!Buffer30.isEncoding(encoding)) {
         throw new TypeError("Unknown encoding: " + encoding);
       }
       const length = byteLength(string, encoding) | 0;
@@ -401,11 +412,11 @@ var require_buffer = __commonJS({
       } else {
         buf = new Uint8Array(array, byteOffset, length);
       }
-      Object.setPrototypeOf(buf, Buffer29.prototype);
+      Object.setPrototypeOf(buf, Buffer30.prototype);
       return buf;
     }
     function fromObject(obj) {
-      if (Buffer29.isBuffer(obj)) {
+      if (Buffer30.isBuffer(obj)) {
         const len = checked(obj.length) | 0;
         const buf = createBuffer(len);
         if (buf.length === 0) {
@@ -434,15 +445,15 @@ var require_buffer = __commonJS({
       if (+length != length) {
         length = 0;
       }
-      return Buffer29.alloc(+length);
+      return Buffer30.alloc(+length);
     }
-    Buffer29.isBuffer = function isBuffer(b) {
-      return b != null && b._isBuffer === true && b !== Buffer29.prototype;
+    Buffer30.isBuffer = function isBuffer(b) {
+      return b != null && b._isBuffer === true && b !== Buffer30.prototype;
     };
-    Buffer29.compare = function compare2(a, b) {
-      if (isInstance(a, Uint8Array)) a = Buffer29.from(a, a.offset, a.byteLength);
-      if (isInstance(b, Uint8Array)) b = Buffer29.from(b, b.offset, b.byteLength);
-      if (!Buffer29.isBuffer(a) || !Buffer29.isBuffer(b)) {
+    Buffer30.compare = function compare2(a, b) {
+      if (isInstance(a, Uint8Array)) a = Buffer30.from(a, a.offset, a.byteLength);
+      if (isInstance(b, Uint8Array)) b = Buffer30.from(b, b.offset, b.byteLength);
+      if (!Buffer30.isBuffer(a) || !Buffer30.isBuffer(b)) {
         throw new TypeError(
           'The "buf1", "buf2" arguments must be one of type Buffer or Uint8Array'
         );
@@ -461,7 +472,7 @@ var require_buffer = __commonJS({
       if (y < x) return 1;
       return 0;
     };
-    Buffer29.isEncoding = function isEncoding(encoding) {
+    Buffer30.isEncoding = function isEncoding(encoding) {
       switch (String(encoding).toLowerCase()) {
         case "hex":
         case "utf8":
@@ -479,12 +490,12 @@ var require_buffer = __commonJS({
           return false;
       }
     };
-    Buffer29.concat = function concat(list, length) {
+    Buffer30.concat = function concat(list, length) {
       if (!Array.isArray(list)) {
         throw new TypeError('"list" argument must be an Array of Buffers');
       }
       if (list.length === 0) {
-        return Buffer29.alloc(0);
+        return Buffer30.alloc(0);
       }
       let i;
       if (length === void 0) {
@@ -493,13 +504,13 @@ var require_buffer = __commonJS({
           length += list[i].length;
         }
       }
-      const buffer = Buffer29.allocUnsafe(length);
+      const buffer = Buffer30.allocUnsafe(length);
       let pos = 0;
       for (i = 0; i < list.length; ++i) {
         let buf = list[i];
         if (isInstance(buf, Uint8Array)) {
           if (pos + buf.length > buffer.length) {
-            if (!Buffer29.isBuffer(buf)) buf = Buffer29.from(buf);
+            if (!Buffer30.isBuffer(buf)) buf = Buffer30.from(buf);
             buf.copy(buffer, pos);
           } else {
             Uint8Array.prototype.set.call(
@@ -508,7 +519,7 @@ var require_buffer = __commonJS({
               pos
             );
           }
-        } else if (!Buffer29.isBuffer(buf)) {
+        } else if (!Buffer30.isBuffer(buf)) {
           throw new TypeError('"list" argument must be an Array of Buffers');
         } else {
           buf.copy(buffer, pos);
@@ -518,7 +529,7 @@ var require_buffer = __commonJS({
       return buffer;
     };
     function byteLength(string, encoding) {
-      if (Buffer29.isBuffer(string)) {
+      if (Buffer30.isBuffer(string)) {
         return string.length;
       }
       if (ArrayBuffer.isView(string) || isInstance(string, ArrayBuffer)) {
@@ -560,7 +571,7 @@ var require_buffer = __commonJS({
         }
       }
     }
-    Buffer29.byteLength = byteLength;
+    Buffer30.byteLength = byteLength;
     function slowToString(encoding, start, end) {
       let loweredCase = false;
       if (start === void 0 || start < 0) {
@@ -607,13 +618,13 @@ var require_buffer = __commonJS({
         }
       }
     }
-    Buffer29.prototype._isBuffer = true;
+    Buffer30.prototype._isBuffer = true;
     function swap(b, n, m) {
       const i = b[n];
       b[n] = b[m];
       b[m] = i;
     }
-    Buffer29.prototype.swap16 = function swap16() {
+    Buffer30.prototype.swap16 = function swap16() {
       const len = this.length;
       if (len % 2 !== 0) {
         throw new RangeError("Buffer size must be a multiple of 16-bits");
@@ -623,7 +634,7 @@ var require_buffer = __commonJS({
       }
       return this;
     };
-    Buffer29.prototype.swap32 = function swap32() {
+    Buffer30.prototype.swap32 = function swap32() {
       const len = this.length;
       if (len % 4 !== 0) {
         throw new RangeError("Buffer size must be a multiple of 32-bits");
@@ -634,7 +645,7 @@ var require_buffer = __commonJS({
       }
       return this;
     };
-    Buffer29.prototype.swap64 = function swap64() {
+    Buffer30.prototype.swap64 = function swap64() {
       const len = this.length;
       if (len % 8 !== 0) {
         throw new RangeError("Buffer size must be a multiple of 64-bits");
@@ -647,19 +658,19 @@ var require_buffer = __commonJS({
       }
       return this;
     };
-    Buffer29.prototype.toString = function toString() {
+    Buffer30.prototype.toString = function toString() {
       const length = this.length;
       if (length === 0) return "";
       if (arguments.length === 0) return utf8Slice(this, 0, length);
       return slowToString.apply(this, arguments);
     };
-    Buffer29.prototype.toLocaleString = Buffer29.prototype.toString;
-    Buffer29.prototype.equals = function equals(b) {
-      if (!Buffer29.isBuffer(b)) throw new TypeError("Argument must be a Buffer");
+    Buffer30.prototype.toLocaleString = Buffer30.prototype.toString;
+    Buffer30.prototype.equals = function equals(b) {
+      if (!Buffer30.isBuffer(b)) throw new TypeError("Argument must be a Buffer");
       if (this === b) return true;
-      return Buffer29.compare(this, b) === 0;
+      return Buffer30.compare(this, b) === 0;
     };
-    Buffer29.prototype.inspect = function inspect() {
+    Buffer30.prototype.inspect = function inspect() {
       let str = "";
       const max = exports.INSPECT_MAX_BYTES;
       str = this.toString("hex", 0, max).replace(/(.{2})/g, "$1 ").trim();
@@ -667,13 +678,13 @@ var require_buffer = __commonJS({
       return "<Buffer " + str + ">";
     };
     if (customInspectSymbol) {
-      Buffer29.prototype[customInspectSymbol] = Buffer29.prototype.inspect;
+      Buffer30.prototype[customInspectSymbol] = Buffer30.prototype.inspect;
     }
-    Buffer29.prototype.compare = function compare2(target, start, end, thisStart, thisEnd) {
+    Buffer30.prototype.compare = function compare2(target, start, end, thisStart, thisEnd) {
       if (isInstance(target, Uint8Array)) {
-        target = Buffer29.from(target, target.offset, target.byteLength);
+        target = Buffer30.from(target, target.offset, target.byteLength);
       }
-      if (!Buffer29.isBuffer(target)) {
+      if (!Buffer30.isBuffer(target)) {
         throw new TypeError(
           'The "target" argument must be one of type Buffer or Uint8Array. Received type ' + typeof target
         );
@@ -746,9 +757,9 @@ var require_buffer = __commonJS({
         else return -1;
       }
       if (typeof val === "string") {
-        val = Buffer29.from(val, encoding);
+        val = Buffer30.from(val, encoding);
       }
-      if (Buffer29.isBuffer(val)) {
+      if (Buffer30.isBuffer(val)) {
         if (val.length === 0) {
           return -1;
         }
@@ -816,13 +827,13 @@ var require_buffer = __commonJS({
       }
       return -1;
     }
-    Buffer29.prototype.includes = function includes(val, byteOffset, encoding) {
+    Buffer30.prototype.includes = function includes(val, byteOffset, encoding) {
       return this.indexOf(val, byteOffset, encoding) !== -1;
     };
-    Buffer29.prototype.indexOf = function indexOf(val, byteOffset, encoding) {
+    Buffer30.prototype.indexOf = function indexOf(val, byteOffset, encoding) {
       return bidirectionalIndexOf(this, val, byteOffset, encoding, true);
     };
-    Buffer29.prototype.lastIndexOf = function lastIndexOf(val, byteOffset, encoding) {
+    Buffer30.prototype.lastIndexOf = function lastIndexOf(val, byteOffset, encoding) {
       return bidirectionalIndexOf(this, val, byteOffset, encoding, false);
     };
     function hexWrite(buf, string, offset, length) {
@@ -860,7 +871,7 @@ var require_buffer = __commonJS({
     function ucs2Write(buf, string, offset, length) {
       return blitBuffer(utf16leToBytes(string, buf.length - offset), buf, offset, length);
     }
-    Buffer29.prototype.write = function write(string, offset, length, encoding) {
+    Buffer30.prototype.write = function write(string, offset, length, encoding) {
       if (offset === void 0) {
         encoding = "utf8";
         length = this.length;
@@ -915,7 +926,7 @@ var require_buffer = __commonJS({
         }
       }
     };
-    Buffer29.prototype.toJSON = function toJSON() {
+    Buffer30.prototype.toJSON = function toJSON() {
       return {
         type: "Buffer",
         data: Array.prototype.slice.call(this._arr || this, 0)
@@ -1038,7 +1049,7 @@ var require_buffer = __commonJS({
       }
       return res;
     }
-    Buffer29.prototype.slice = function slice(start, end) {
+    Buffer30.prototype.slice = function slice(start, end) {
       const len = this.length;
       start = ~~start;
       end = end === void 0 ? len : ~~end;
@@ -1056,14 +1067,14 @@ var require_buffer = __commonJS({
       }
       if (end < start) end = start;
       const newBuf = this.subarray(start, end);
-      Object.setPrototypeOf(newBuf, Buffer29.prototype);
+      Object.setPrototypeOf(newBuf, Buffer30.prototype);
       return newBuf;
     };
     function checkOffset(offset, ext, length) {
       if (offset % 1 !== 0 || offset < 0) throw new RangeError("offset is not uint");
       if (offset + ext > length) throw new RangeError("Trying to access beyond buffer length");
     }
-    Buffer29.prototype.readUintLE = Buffer29.prototype.readUIntLE = function readUIntLE(offset, byteLength2, noAssert) {
+    Buffer30.prototype.readUintLE = Buffer30.prototype.readUIntLE = function readUIntLE(offset, byteLength2, noAssert) {
       offset = offset >>> 0;
       byteLength2 = byteLength2 >>> 0;
       if (!noAssert) checkOffset(offset, byteLength2, this.length);
@@ -1075,7 +1086,7 @@ var require_buffer = __commonJS({
       }
       return val;
     };
-    Buffer29.prototype.readUintBE = Buffer29.prototype.readUIntBE = function readUIntBE(offset, byteLength2, noAssert) {
+    Buffer30.prototype.readUintBE = Buffer30.prototype.readUIntBE = function readUIntBE(offset, byteLength2, noAssert) {
       offset = offset >>> 0;
       byteLength2 = byteLength2 >>> 0;
       if (!noAssert) {
@@ -1088,32 +1099,32 @@ var require_buffer = __commonJS({
       }
       return val;
     };
-    Buffer29.prototype.readUint8 = Buffer29.prototype.readUInt8 = function readUInt8(offset, noAssert) {
+    Buffer30.prototype.readUint8 = Buffer30.prototype.readUInt8 = function readUInt8(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 1, this.length);
       return this[offset];
     };
-    Buffer29.prototype.readUint16LE = Buffer29.prototype.readUInt16LE = function readUInt16LE(offset, noAssert) {
+    Buffer30.prototype.readUint16LE = Buffer30.prototype.readUInt16LE = function readUInt16LE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 2, this.length);
       return this[offset] | this[offset + 1] << 8;
     };
-    Buffer29.prototype.readUint16BE = Buffer29.prototype.readUInt16BE = function readUInt16BE(offset, noAssert) {
+    Buffer30.prototype.readUint16BE = Buffer30.prototype.readUInt16BE = function readUInt16BE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 2, this.length);
       return this[offset] << 8 | this[offset + 1];
     };
-    Buffer29.prototype.readUint32LE = Buffer29.prototype.readUInt32LE = function readUInt32LE(offset, noAssert) {
+    Buffer30.prototype.readUint32LE = Buffer30.prototype.readUInt32LE = function readUInt32LE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 4, this.length);
       return (this[offset] | this[offset + 1] << 8 | this[offset + 2] << 16) + this[offset + 3] * 16777216;
     };
-    Buffer29.prototype.readUint32BE = Buffer29.prototype.readUInt32BE = function readUInt32BE(offset, noAssert) {
+    Buffer30.prototype.readUint32BE = Buffer30.prototype.readUInt32BE = function readUInt32BE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 4, this.length);
       return this[offset] * 16777216 + (this[offset + 1] << 16 | this[offset + 2] << 8 | this[offset + 3]);
     };
-    Buffer29.prototype.readBigUInt64LE = defineBigIntMethod(function readBigUInt64LE(offset) {
+    Buffer30.prototype.readBigUInt64LE = defineBigIntMethod(function readBigUInt64LE(offset) {
       offset = offset >>> 0;
       validateNumber(offset, "offset");
       const first = this[offset];
@@ -1125,7 +1136,7 @@ var require_buffer = __commonJS({
       const hi = this[++offset] + this[++offset] * 2 ** 8 + this[++offset] * 2 ** 16 + last * 2 ** 24;
       return BigInt(lo) + (BigInt(hi) << BigInt(32));
     });
-    Buffer29.prototype.readBigUInt64BE = defineBigIntMethod(function readBigUInt64BE(offset) {
+    Buffer30.prototype.readBigUInt64BE = defineBigIntMethod(function readBigUInt64BE(offset) {
       offset = offset >>> 0;
       validateNumber(offset, "offset");
       const first = this[offset];
@@ -1137,7 +1148,7 @@ var require_buffer = __commonJS({
       const lo = this[++offset] * 2 ** 24 + this[++offset] * 2 ** 16 + this[++offset] * 2 ** 8 + last;
       return (BigInt(hi) << BigInt(32)) + BigInt(lo);
     });
-    Buffer29.prototype.readIntLE = function readIntLE(offset, byteLength2, noAssert) {
+    Buffer30.prototype.readIntLE = function readIntLE(offset, byteLength2, noAssert) {
       offset = offset >>> 0;
       byteLength2 = byteLength2 >>> 0;
       if (!noAssert) checkOffset(offset, byteLength2, this.length);
@@ -1151,7 +1162,7 @@ var require_buffer = __commonJS({
       if (val >= mul) val -= Math.pow(2, 8 * byteLength2);
       return val;
     };
-    Buffer29.prototype.readIntBE = function readIntBE(offset, byteLength2, noAssert) {
+    Buffer30.prototype.readIntBE = function readIntBE(offset, byteLength2, noAssert) {
       offset = offset >>> 0;
       byteLength2 = byteLength2 >>> 0;
       if (!noAssert) checkOffset(offset, byteLength2, this.length);
@@ -1165,35 +1176,35 @@ var require_buffer = __commonJS({
       if (val >= mul) val -= Math.pow(2, 8 * byteLength2);
       return val;
     };
-    Buffer29.prototype.readInt8 = function readInt8(offset, noAssert) {
+    Buffer30.prototype.readInt8 = function readInt8(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 1, this.length);
       if (!(this[offset] & 128)) return this[offset];
       return (255 - this[offset] + 1) * -1;
     };
-    Buffer29.prototype.readInt16LE = function readInt16LE(offset, noAssert) {
+    Buffer30.prototype.readInt16LE = function readInt16LE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 2, this.length);
       const val = this[offset] | this[offset + 1] << 8;
       return val & 32768 ? val | 4294901760 : val;
     };
-    Buffer29.prototype.readInt16BE = function readInt16BE(offset, noAssert) {
+    Buffer30.prototype.readInt16BE = function readInt16BE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 2, this.length);
       const val = this[offset + 1] | this[offset] << 8;
       return val & 32768 ? val | 4294901760 : val;
     };
-    Buffer29.prototype.readInt32LE = function readInt32LE(offset, noAssert) {
+    Buffer30.prototype.readInt32LE = function readInt32LE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 4, this.length);
       return this[offset] | this[offset + 1] << 8 | this[offset + 2] << 16 | this[offset + 3] << 24;
     };
-    Buffer29.prototype.readInt32BE = function readInt32BE(offset, noAssert) {
+    Buffer30.prototype.readInt32BE = function readInt32BE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 4, this.length);
       return this[offset] << 24 | this[offset + 1] << 16 | this[offset + 2] << 8 | this[offset + 3];
     };
-    Buffer29.prototype.readBigInt64LE = defineBigIntMethod(function readBigInt64LE(offset) {
+    Buffer30.prototype.readBigInt64LE = defineBigIntMethod(function readBigInt64LE(offset) {
       offset = offset >>> 0;
       validateNumber(offset, "offset");
       const first = this[offset];
@@ -1204,7 +1215,7 @@ var require_buffer = __commonJS({
       const val = this[offset + 4] + this[offset + 5] * 2 ** 8 + this[offset + 6] * 2 ** 16 + (last << 24);
       return (BigInt(val) << BigInt(32)) + BigInt(first + this[++offset] * 2 ** 8 + this[++offset] * 2 ** 16 + this[++offset] * 2 ** 24);
     });
-    Buffer29.prototype.readBigInt64BE = defineBigIntMethod(function readBigInt64BE(offset) {
+    Buffer30.prototype.readBigInt64BE = defineBigIntMethod(function readBigInt64BE(offset) {
       offset = offset >>> 0;
       validateNumber(offset, "offset");
       const first = this[offset];
@@ -1216,32 +1227,32 @@ var require_buffer = __commonJS({
       this[++offset] * 2 ** 16 + this[++offset] * 2 ** 8 + this[++offset];
       return (BigInt(val) << BigInt(32)) + BigInt(this[++offset] * 2 ** 24 + this[++offset] * 2 ** 16 + this[++offset] * 2 ** 8 + last);
     });
-    Buffer29.prototype.readFloatLE = function readFloatLE(offset, noAssert) {
+    Buffer30.prototype.readFloatLE = function readFloatLE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 4, this.length);
       return ieee754.read(this, offset, true, 23, 4);
     };
-    Buffer29.prototype.readFloatBE = function readFloatBE(offset, noAssert) {
+    Buffer30.prototype.readFloatBE = function readFloatBE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 4, this.length);
       return ieee754.read(this, offset, false, 23, 4);
     };
-    Buffer29.prototype.readDoubleLE = function readDoubleLE(offset, noAssert) {
+    Buffer30.prototype.readDoubleLE = function readDoubleLE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 8, this.length);
       return ieee754.read(this, offset, true, 52, 8);
     };
-    Buffer29.prototype.readDoubleBE = function readDoubleBE(offset, noAssert) {
+    Buffer30.prototype.readDoubleBE = function readDoubleBE(offset, noAssert) {
       offset = offset >>> 0;
       if (!noAssert) checkOffset(offset, 8, this.length);
       return ieee754.read(this, offset, false, 52, 8);
     };
     function checkInt(buf, value, offset, ext, max, min) {
-      if (!Buffer29.isBuffer(buf)) throw new TypeError('"buffer" argument must be a Buffer instance');
+      if (!Buffer30.isBuffer(buf)) throw new TypeError('"buffer" argument must be a Buffer instance');
       if (value > max || value < min) throw new RangeError('"value" argument is out of bounds');
       if (offset + ext > buf.length) throw new RangeError("Index out of range");
     }
-    Buffer29.prototype.writeUintLE = Buffer29.prototype.writeUIntLE = function writeUIntLE(value, offset, byteLength2, noAssert) {
+    Buffer30.prototype.writeUintLE = Buffer30.prototype.writeUIntLE = function writeUIntLE(value, offset, byteLength2, noAssert) {
       value = +value;
       offset = offset >>> 0;
       byteLength2 = byteLength2 >>> 0;
@@ -1257,7 +1268,7 @@ var require_buffer = __commonJS({
       }
       return offset + byteLength2;
     };
-    Buffer29.prototype.writeUintBE = Buffer29.prototype.writeUIntBE = function writeUIntBE(value, offset, byteLength2, noAssert) {
+    Buffer30.prototype.writeUintBE = Buffer30.prototype.writeUIntBE = function writeUIntBE(value, offset, byteLength2, noAssert) {
       value = +value;
       offset = offset >>> 0;
       byteLength2 = byteLength2 >>> 0;
@@ -1273,14 +1284,14 @@ var require_buffer = __commonJS({
       }
       return offset + byteLength2;
     };
-    Buffer29.prototype.writeUint8 = Buffer29.prototype.writeUInt8 = function writeUInt8(value, offset, noAssert) {
+    Buffer30.prototype.writeUint8 = Buffer30.prototype.writeUInt8 = function writeUInt8(value, offset, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) checkInt(this, value, offset, 1, 255, 0);
       this[offset] = value & 255;
       return offset + 1;
     };
-    Buffer29.prototype.writeUint16LE = Buffer29.prototype.writeUInt16LE = function writeUInt16LE(value, offset, noAssert) {
+    Buffer30.prototype.writeUint16LE = Buffer30.prototype.writeUInt16LE = function writeUInt16LE(value, offset, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) checkInt(this, value, offset, 2, 65535, 0);
@@ -1288,7 +1299,7 @@ var require_buffer = __commonJS({
       this[offset + 1] = value >>> 8;
       return offset + 2;
     };
-    Buffer29.prototype.writeUint16BE = Buffer29.prototype.writeUInt16BE = function writeUInt16BE(value, offset, noAssert) {
+    Buffer30.prototype.writeUint16BE = Buffer30.prototype.writeUInt16BE = function writeUInt16BE(value, offset, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) checkInt(this, value, offset, 2, 65535, 0);
@@ -1296,7 +1307,7 @@ var require_buffer = __commonJS({
       this[offset + 1] = value & 255;
       return offset + 2;
     };
-    Buffer29.prototype.writeUint32LE = Buffer29.prototype.writeUInt32LE = function writeUInt32LE(value, offset, noAssert) {
+    Buffer30.prototype.writeUint32LE = Buffer30.prototype.writeUInt32LE = function writeUInt32LE(value, offset, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) checkInt(this, value, offset, 4, 4294967295, 0);
@@ -1306,7 +1317,7 @@ var require_buffer = __commonJS({
       this[offset] = value & 255;
       return offset + 4;
     };
-    Buffer29.prototype.writeUint32BE = Buffer29.prototype.writeUInt32BE = function writeUInt32BE(value, offset, noAssert) {
+    Buffer30.prototype.writeUint32BE = Buffer30.prototype.writeUInt32BE = function writeUInt32BE(value, offset, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) checkInt(this, value, offset, 4, 4294967295, 0);
@@ -1356,13 +1367,13 @@ var require_buffer = __commonJS({
       buf[offset] = hi;
       return offset + 8;
     }
-    Buffer29.prototype.writeBigUInt64LE = defineBigIntMethod(function writeBigUInt64LE(value, offset = 0) {
+    Buffer30.prototype.writeBigUInt64LE = defineBigIntMethod(function writeBigUInt64LE(value, offset = 0) {
       return wrtBigUInt64LE(this, value, offset, BigInt(0), BigInt("0xffffffffffffffff"));
     });
-    Buffer29.prototype.writeBigUInt64BE = defineBigIntMethod(function writeBigUInt64BE(value, offset = 0) {
+    Buffer30.prototype.writeBigUInt64BE = defineBigIntMethod(function writeBigUInt64BE(value, offset = 0) {
       return wrtBigUInt64BE(this, value, offset, BigInt(0), BigInt("0xffffffffffffffff"));
     });
-    Buffer29.prototype.writeIntLE = function writeIntLE(value, offset, byteLength2, noAssert) {
+    Buffer30.prototype.writeIntLE = function writeIntLE(value, offset, byteLength2, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) {
@@ -1381,7 +1392,7 @@ var require_buffer = __commonJS({
       }
       return offset + byteLength2;
     };
-    Buffer29.prototype.writeIntBE = function writeIntBE(value, offset, byteLength2, noAssert) {
+    Buffer30.prototype.writeIntBE = function writeIntBE(value, offset, byteLength2, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) {
@@ -1400,7 +1411,7 @@ var require_buffer = __commonJS({
       }
       return offset + byteLength2;
     };
-    Buffer29.prototype.writeInt8 = function writeInt8(value, offset, noAssert) {
+    Buffer30.prototype.writeInt8 = function writeInt8(value, offset, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) checkInt(this, value, offset, 1, 127, -128);
@@ -1408,7 +1419,7 @@ var require_buffer = __commonJS({
       this[offset] = value & 255;
       return offset + 1;
     };
-    Buffer29.prototype.writeInt16LE = function writeInt16LE(value, offset, noAssert) {
+    Buffer30.prototype.writeInt16LE = function writeInt16LE(value, offset, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) checkInt(this, value, offset, 2, 32767, -32768);
@@ -1416,7 +1427,7 @@ var require_buffer = __commonJS({
       this[offset + 1] = value >>> 8;
       return offset + 2;
     };
-    Buffer29.prototype.writeInt16BE = function writeInt16BE(value, offset, noAssert) {
+    Buffer30.prototype.writeInt16BE = function writeInt16BE(value, offset, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) checkInt(this, value, offset, 2, 32767, -32768);
@@ -1424,7 +1435,7 @@ var require_buffer = __commonJS({
       this[offset + 1] = value & 255;
       return offset + 2;
     };
-    Buffer29.prototype.writeInt32LE = function writeInt32LE(value, offset, noAssert) {
+    Buffer30.prototype.writeInt32LE = function writeInt32LE(value, offset, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) checkInt(this, value, offset, 4, 2147483647, -2147483648);
@@ -1434,7 +1445,7 @@ var require_buffer = __commonJS({
       this[offset + 3] = value >>> 24;
       return offset + 4;
     };
-    Buffer29.prototype.writeInt32BE = function writeInt32BE(value, offset, noAssert) {
+    Buffer30.prototype.writeInt32BE = function writeInt32BE(value, offset, noAssert) {
       value = +value;
       offset = offset >>> 0;
       if (!noAssert) checkInt(this, value, offset, 4, 2147483647, -2147483648);
@@ -1445,10 +1456,10 @@ var require_buffer = __commonJS({
       this[offset + 3] = value & 255;
       return offset + 4;
     };
-    Buffer29.prototype.writeBigInt64LE = defineBigIntMethod(function writeBigInt64LE(value, offset = 0) {
+    Buffer30.prototype.writeBigInt64LE = defineBigIntMethod(function writeBigInt64LE(value, offset = 0) {
       return wrtBigUInt64LE(this, value, offset, -BigInt("0x8000000000000000"), BigInt("0x7fffffffffffffff"));
     });
-    Buffer29.prototype.writeBigInt64BE = defineBigIntMethod(function writeBigInt64BE(value, offset = 0) {
+    Buffer30.prototype.writeBigInt64BE = defineBigIntMethod(function writeBigInt64BE(value, offset = 0) {
       return wrtBigUInt64BE(this, value, offset, -BigInt("0x8000000000000000"), BigInt("0x7fffffffffffffff"));
     });
     function checkIEEE754(buf, value, offset, ext, max, min) {
@@ -1464,10 +1475,10 @@ var require_buffer = __commonJS({
       ieee754.write(buf, value, offset, littleEndian, 23, 4);
       return offset + 4;
     }
-    Buffer29.prototype.writeFloatLE = function writeFloatLE(value, offset, noAssert) {
+    Buffer30.prototype.writeFloatLE = function writeFloatLE(value, offset, noAssert) {
       return writeFloat(this, value, offset, true, noAssert);
     };
-    Buffer29.prototype.writeFloatBE = function writeFloatBE(value, offset, noAssert) {
+    Buffer30.prototype.writeFloatBE = function writeFloatBE(value, offset, noAssert) {
       return writeFloat(this, value, offset, false, noAssert);
     };
     function writeDouble(buf, value, offset, littleEndian, noAssert) {
@@ -1479,14 +1490,14 @@ var require_buffer = __commonJS({
       ieee754.write(buf, value, offset, littleEndian, 52, 8);
       return offset + 8;
     }
-    Buffer29.prototype.writeDoubleLE = function writeDoubleLE(value, offset, noAssert) {
+    Buffer30.prototype.writeDoubleLE = function writeDoubleLE(value, offset, noAssert) {
       return writeDouble(this, value, offset, true, noAssert);
     };
-    Buffer29.prototype.writeDoubleBE = function writeDoubleBE(value, offset, noAssert) {
+    Buffer30.prototype.writeDoubleBE = function writeDoubleBE(value, offset, noAssert) {
       return writeDouble(this, value, offset, false, noAssert);
     };
-    Buffer29.prototype.copy = function copy(target, targetStart, start, end) {
-      if (!Buffer29.isBuffer(target)) throw new TypeError("argument should be a Buffer");
+    Buffer30.prototype.copy = function copy(target, targetStart, start, end) {
+      if (!Buffer30.isBuffer(target)) throw new TypeError("argument should be a Buffer");
       if (!start) start = 0;
       if (!end && end !== 0) end = this.length;
       if (targetStart >= target.length) targetStart = target.length;
@@ -1515,7 +1526,7 @@ var require_buffer = __commonJS({
       }
       return len;
     };
-    Buffer29.prototype.fill = function fill(val, start, end, encoding) {
+    Buffer30.prototype.fill = function fill(val, start, end, encoding) {
       if (typeof val === "string") {
         if (typeof start === "string") {
           encoding = start;
@@ -1528,7 +1539,7 @@ var require_buffer = __commonJS({
         if (encoding !== void 0 && typeof encoding !== "string") {
           throw new TypeError("encoding must be a string");
         }
-        if (typeof encoding === "string" && !Buffer29.isEncoding(encoding)) {
+        if (typeof encoding === "string" && !Buffer30.isEncoding(encoding)) {
           throw new TypeError("Unknown encoding: " + encoding);
         }
         if (val.length === 1) {
@@ -1557,7 +1568,7 @@ var require_buffer = __commonJS({
           this[i] = val;
         }
       } else {
-        const bytes = Buffer29.isBuffer(val) ? val : Buffer29.from(val, encoding);
+        const bytes = Buffer30.isBuffer(val) ? val : Buffer30.from(val, encoding);
         const len = bytes.length;
         if (len === 0) {
           throw new TypeError('The value "' + val + '" is invalid for argument "value"');
@@ -1812,10 +1823,20 @@ var require_buffer = __commonJS({
   }
 });
 
+// scripts/sb-mediator-shims.js
+var import_buffer;
+var init_sb_mediator_shims = __esm({
+  "scripts/sb-mediator-shims.js"() {
+    "use strict";
+    import_buffer = __toESM(require_buffer(), 1);
+  }
+});
+
 // node_modules/base32.js/base32.js
 var require_base32 = __commonJS({
   "node_modules/base32.js/base32.js"(exports) {
     "use strict";
+    init_sb_mediator_shims();
     var charmap = function(alphabet, mappings) {
       mappings || (mappings = {});
       alphabet.split("").forEach(function(c, i) {
@@ -1975,7 +1996,23 @@ var require_base32 = __commonJS({
   }
 });
 
+// web/sb-mediator.entry.js
+init_sb_mediator_shims();
+
+// web/sb-mediator-flow.js
+init_sb_mediator_shims();
+
+// node_modules/@stellar-broker/client/src/index.js
+init_sb_mediator_shims();
+
+// node_modules/@stellar-broker/client/src/client.js
+init_sb_mediator_shims();
+
+// node_modules/@stellar/stellar-sdk/lib/esm/index.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar/stellar-sdk/lib/esm/errors/network.js
+init_sb_mediator_shims();
 var NetworkError = class extends Error {
   constructor(message, response) {
     super(message);
@@ -1993,18 +2030,22 @@ var NetworkError = class extends Error {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/errors/not_found.js
+init_sb_mediator_shims();
 var NotFoundError = class extends NetworkError {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/errors/bad_request.js
+init_sb_mediator_shims();
 var BadRequestError = class extends NetworkError {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/errors/bad_response.js
+init_sb_mediator_shims();
 var BadResponseError = class extends NetworkError {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/errors/account_requires_memo.js
+init_sb_mediator_shims();
 var AccountRequiresMemoError = class extends Error {
   constructor(message, accountId, operationIndex) {
     super(message);
@@ -2016,6 +2057,7 @@ var AccountRequiresMemoError = class extends Error {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/config.js
+init_sb_mediator_shims();
 var defaultConfig = {
   allowHttp: false,
   timeout: 0
@@ -2061,7 +2103,11 @@ var Config = class {
   }
 };
 
+// node_modules/@stellar/stellar-sdk/lib/esm/http-client/fetch-client.js
+init_sb_mediator_shims();
+
 // node_modules/feaxios/dist/index.mjs
+init_sb_mediator_shims();
 async function prepareAxiosResponse(options, res) {
   const response = { config: options };
   response.status = res.status;
@@ -2362,6 +2408,7 @@ axios.create = (defaults) => createAxiosInstance(defaults);
 var src_default = axios;
 
 // node_modules/@stellar/stellar-sdk/lib/esm/http-client/types.js
+init_sb_mediator_shims();
 var CancelToken = class {
   constructor(executor) {
     __publicField(this, "promise");
@@ -2847,13 +2894,19 @@ function createFetchClient(fetchConfig = {}) {
 }
 var fetchClient = createFetchClient();
 
+// node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/int.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/xdr-type.js
-var import_buffer3 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer4 = __toESM(require_buffer(), 1);
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/serialization/xdr-reader.js
-var import_buffer = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer2 = __toESM(require_buffer(), 1);
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/errors.js
+init_sb_mediator_shims();
 var XdrWriterError = class extends TypeError {
   constructor(message) {
     super(`XDR Write Error: ${message}`);
@@ -2902,9 +2955,9 @@ var XdrReader = class {
      * @readonly
      */
     __publicField(this, "_index");
-    if (!import_buffer.Buffer.isBuffer(source)) {
+    if (!import_buffer2.Buffer.isBuffer(source)) {
       if (source instanceof Array || Array.isArray(source) || ArrayBuffer.isView(source)) {
-        source = import_buffer.Buffer.from(source);
+        source = import_buffer2.Buffer.from(source);
       } else {
         throw new XdrReaderError(`source invalid: ${source}`);
       }
@@ -3021,7 +3074,8 @@ var XdrReader = class {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/serialization/xdr-writer.js
-var import_buffer2 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer3 = __toESM(require_buffer(), 1);
 var BUFFER_CHUNK = 8192;
 var XdrWriter = class {
   /**
@@ -3047,9 +3101,9 @@ var XdrWriter = class {
      */
     __publicField(this, "_index", 0);
     if (typeof buffer === "number") {
-      buffer = import_buffer2.Buffer.allocUnsafe(buffer);
-    } else if (!(buffer instanceof import_buffer2.Buffer)) {
-      buffer = import_buffer2.Buffer.allocUnsafe(BUFFER_CHUNK);
+      buffer = import_buffer3.Buffer.allocUnsafe(buffer);
+    } else if (!(buffer instanceof import_buffer3.Buffer)) {
+      buffer = import_buffer3.Buffer.allocUnsafe(BUFFER_CHUNK);
     }
     this._buffer = buffer;
     this._length = buffer.length;
@@ -3076,7 +3130,7 @@ var XdrWriter = class {
    */
   resize(minRequiredSize) {
     const newLength = Math.ceil(minRequiredSize / BUFFER_CHUNK) * BUFFER_CHUNK;
-    const newBuffer = import_buffer2.Buffer.allocUnsafe(newLength);
+    const newBuffer = import_buffer3.Buffer.allocUnsafe(newLength);
     this._buffer.copy(newBuffer, 0, 0, this._length);
     this._buffer = newBuffer;
     this._length = newLength;
@@ -3106,8 +3160,8 @@ var XdrWriter = class {
       const offset = this.alloc(size);
       this._buffer.write(value, offset, "utf8");
     } else {
-      if (!(value instanceof import_buffer2.Buffer)) {
-        value = import_buffer2.Buffer.from(value);
+      if (!(value instanceof import_buffer3.Buffer)) {
+        value = import_buffer3.Buffer.from(value);
       }
       const offset = this.alloc(size);
       value.copy(this._buffer, offset, 0, size);
@@ -3352,9 +3406,9 @@ function decodeInput(input, format) {
     case "raw":
       return input;
     case "hex":
-      return import_buffer3.Buffer.from(input, "hex");
+      return import_buffer4.Buffer.from(input, "hex");
     case "base64":
-      return import_buffer3.Buffer.from(input, "base64");
+      return import_buffer4.Buffer.from(input, "base64");
     default:
       throw new InvalidXdrEncodingFormatError(format);
   }
@@ -3409,7 +3463,14 @@ var Int = class extends XdrPrimitiveType {
 Int.MAX_VALUE = MAX_VALUE;
 Int.MIN_VALUE = -MIN_VALUE;
 
+// node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/hyper.js
+init_sb_mediator_shims();
+
+// node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/large-int.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/bigint-encoder.js
+init_sb_mediator_shims();
 function encodeBigIntFromBits(parts, size, unsigned) {
   if (!(parts instanceof Array)) {
     parts = [parts];
@@ -3665,6 +3726,7 @@ var Hyper = class extends LargeInt {
 Hyper.defineIntBoundaries();
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/unsigned-int.js
+init_sb_mediator_shims();
 var MAX_VALUE2 = 4294967295;
 var MIN_VALUE2 = 0;
 var UnsignedInt = class extends XdrPrimitiveType {
@@ -3696,6 +3758,7 @@ UnsignedInt.MAX_VALUE = MAX_VALUE2;
 UnsignedInt.MIN_VALUE = MIN_VALUE2;
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/unsigned-hyper.js
+init_sb_mediator_shims();
 var UnsignedHyper = class extends LargeInt {
   /**
    * @param {Array<Number|BigInt|String>} parts - Slices to encode
@@ -3728,9 +3791,14 @@ var UnsignedHyper = class extends LargeInt {
 UnsignedHyper.defineIntBoundaries();
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/generated/curr_generated.js
-var import_buffer7 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer8 = __toESM(require_buffer(), 1);
+
+// node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/config.js
+init_sb_mediator_shims();
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/float.js
+init_sb_mediator_shims();
 var Float = class extends XdrPrimitiveType {
   /**
    * @inheritDoc
@@ -3754,6 +3822,7 @@ var Float = class extends XdrPrimitiveType {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/double.js
+init_sb_mediator_shims();
 var Double = class extends XdrPrimitiveType {
   /**
    * @inheritDoc
@@ -3777,6 +3846,7 @@ var Double = class extends XdrPrimitiveType {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/quadruple.js
+init_sb_mediator_shims();
 var Quadruple = class extends XdrPrimitiveType {
   static read() {
     throw new XdrDefinitionError("quadruple not supported");
@@ -3790,6 +3860,7 @@ var Quadruple = class extends XdrPrimitiveType {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/bool.js
+init_sb_mediator_shims();
 var Bool = class extends XdrPrimitiveType {
   /**
    * @inheritDoc
@@ -3821,7 +3892,8 @@ var Bool = class extends XdrPrimitiveType {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/string.js
-var import_buffer4 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer5 = __toESM(require_buffer(), 1);
 var String2 = class extends XdrCompositeType {
   constructor(maxLength = UnsignedInt.MAX_VALUE) {
     super();
@@ -3845,7 +3917,7 @@ var String2 = class extends XdrCompositeType {
    * @inheritDoc
    */
   write(value, writer) {
-    const size = typeof value === "string" ? import_buffer4.Buffer.byteLength(value, "utf8") : value.length;
+    const size = typeof value === "string" ? import_buffer5.Buffer.byteLength(value, "utf8") : value.length;
     if (size > this._maxLength)
       throw new XdrWriterError(
         `got ${value.length} bytes, max allowed is ${this._maxLength}`
@@ -3858,9 +3930,9 @@ var String2 = class extends XdrCompositeType {
    */
   isValid(value) {
     if (typeof value === "string") {
-      return import_buffer4.Buffer.byteLength(value, "utf8") <= this._maxLength;
+      return import_buffer5.Buffer.byteLength(value, "utf8") <= this._maxLength;
     }
-    if (value instanceof Array || import_buffer4.Buffer.isBuffer(value)) {
+    if (value instanceof Array || import_buffer5.Buffer.isBuffer(value)) {
       return value.length <= this._maxLength;
     }
     return false;
@@ -3868,7 +3940,8 @@ var String2 = class extends XdrCompositeType {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/opaque.js
-var import_buffer5 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer6 = __toESM(require_buffer(), 1);
 var Opaque = class extends XdrCompositeType {
   constructor(length) {
     super();
@@ -3895,12 +3968,13 @@ var Opaque = class extends XdrCompositeType {
    * @inheritDoc
    */
   isValid(value) {
-    return import_buffer5.Buffer.isBuffer(value) && value.length === this._length;
+    return import_buffer6.Buffer.isBuffer(value) && value.length === this._length;
   }
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/var-opaque.js
-var import_buffer6 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer7 = __toESM(require_buffer(), 1);
 var VarOpaque = class extends XdrCompositeType {
   constructor(maxLength = UnsignedInt.MAX_VALUE) {
     super();
@@ -3933,11 +4007,12 @@ var VarOpaque = class extends XdrCompositeType {
    * @inheritDoc
    */
   isValid(value) {
-    return import_buffer6.Buffer.isBuffer(value) && value.length <= this._maxLength;
+    return import_buffer7.Buffer.isBuffer(value) && value.length <= this._maxLength;
   }
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/array.js
+init_sb_mediator_shims();
 var Array2 = class extends NestedXdrType {
   constructor(childType, length, maxDepth = NestedXdrType.DEFAULT_MAX_DEPTH) {
     super(maxDepth);
@@ -3989,6 +4064,7 @@ var Array2 = class extends NestedXdrType {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/var-array.js
+init_sb_mediator_shims();
 var VarArray = class extends NestedXdrType {
   constructor(childType, maxLength = UnsignedInt.MAX_VALUE, maxDepth = NestedXdrType.DEFAULT_MAX_DEPTH) {
     super(maxDepth);
@@ -4046,6 +4122,7 @@ var VarArray = class extends NestedXdrType {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/option.js
+init_sb_mediator_shims();
 var Option = class extends NestedXdrType {
   constructor(childType, maxDepth = NestedXdrType.DEFAULT_MAX_DEPTH) {
     super(maxDepth);
@@ -4083,6 +4160,7 @@ var Option = class extends NestedXdrType {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/void.js
+init_sb_mediator_shims();
 var Void = class extends XdrPrimitiveType {
   /* jshint unused: false */
   static read() {
@@ -4098,6 +4176,7 @@ var Void = class extends XdrPrimitiveType {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/enum.js
+init_sb_mediator_shims();
 var Enum = class _Enum extends XdrPrimitiveType {
   constructor(name, value) {
     super();
@@ -4170,7 +4249,11 @@ var Enum = class _Enum extends XdrPrimitiveType {
   }
 };
 
+// node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/struct.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/reference.js
+init_sb_mediator_shims();
 var Reference = class extends XdrPrimitiveType {
   /* jshint unused: false */
   resolve() {
@@ -4249,6 +4332,7 @@ function createAccessorMethod(name) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/node_modules/.pnpm/@stellar_js-xdr@4.0.0/node_modules/@stellar/js-xdr/src/union.js
+init_sb_mediator_shims();
 var Union = class _Union extends NestedXdrType {
   constructor(aSwitch, value, maxDepth) {
     const resolvedMaxDepth = maxDepth ?? new.target?._maxDepth;
@@ -8344,7 +8428,14 @@ var types = config2((xdr) => {
   ]);
 });
 
+// node_modules/@stellar/stellar-sdk/node_modules/@noble/hashes/sha2.js
+init_sb_mediator_shims();
+
+// node_modules/@stellar/stellar-sdk/node_modules/@noble/hashes/_md.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar/stellar-sdk/node_modules/@noble/hashes/utils.js
+init_sb_mediator_shims();
 function isBytes(a) {
   return a instanceof Uint8Array || ArrayBuffer.isView(a) && a.constructor.name === "Uint8Array" && "BYTES_PER_ELEMENT" in a && a.BYTES_PER_ELEMENT === 1;
 }
@@ -8536,6 +8627,7 @@ var SHA512_IV = /* @__PURE__ */ Uint32Array.from([
 ]);
 
 // node_modules/@stellar/stellar-sdk/node_modules/@noble/hashes/_u64.js
+init_sb_mediator_shims();
 var U32_MASK64 = /* @__PURE__ */ BigInt(2 ** 32 - 1);
 var _32n = /* @__PURE__ */ BigInt(32);
 function fromBig(n, le = false) {
@@ -8929,9 +9021,11 @@ var sha512 = /* @__PURE__ */ createHasher(
 );
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/signing.js
-var import_buffer8 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer9 = __toESM(require_buffer(), 1);
 
 // node_modules/@noble/ed25519/index.js
+init_sb_mediator_shims();
 var ed25519_CURVE = Object.freeze({
   p: 0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffedn,
   n: 0x1000000000000000000000000000000014def9dea2f79cd65812631a5cf5d3edn,
@@ -9453,16 +9547,16 @@ var wNAF = (n) => {
 // node_modules/@stellar/stellar-sdk/lib/esm/base/signing.js
 hashes.sha512 = sha512;
 function generate(secretKey) {
-  return import_buffer8.Buffer.from(getPublicKey(secretKey));
+  return import_buffer9.Buffer.from(getPublicKey(secretKey));
 }
 function sign2(data, rawSecret) {
-  return import_buffer8.Buffer.from(sign(import_buffer8.Buffer.from(data), rawSecret));
+  return import_buffer9.Buffer.from(sign(import_buffer9.Buffer.from(data), rawSecret));
 }
 function verify2(data, signature, rawPublicKey) {
   return verify(
-    import_buffer8.Buffer.from(signature),
-    import_buffer8.Buffer.from(data),
-    import_buffer8.Buffer.from(rawPublicKey),
+    import_buffer9.Buffer.from(signature),
+    import_buffer9.Buffer.from(data),
+    import_buffer9.Buffer.from(rawPublicKey),
     {
       zip215: false
     }
@@ -9470,13 +9564,16 @@ function verify2(data, signature, rawPublicKey) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/keypair.js
-var import_buffer11 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer12 = __toESM(require_buffer(), 1);
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/strkey.js
-var import_buffer9 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer10 = __toESM(require_buffer(), 1);
 var import_base32 = __toESM(require_base32(), 1);
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/util/checksum.js
+init_sb_mediator_shims();
 function verifyChecksum(expected, actual) {
   if (expected.length !== actual.length) {
     return false;
@@ -9845,7 +9942,7 @@ function decodeCheck(versionByteName, encoded) {
   if (!verifyChecksum(expectedChecksum, checksum)) {
     throw new Error(`invalid checksum`);
   }
-  return import_buffer9.Buffer.from(data);
+  return import_buffer10.Buffer.from(data);
 }
 function encodeCheck(versionByteName, data) {
   if (data === null || data === void 0) {
@@ -9857,11 +9954,11 @@ function encodeCheck(versionByteName, data) {
     );
   }
   const versionByte = versionBytes[versionByteName];
-  data = import_buffer9.Buffer.from(data);
-  const versionBuffer = import_buffer9.Buffer.from([versionByte]);
-  const payload = import_buffer9.Buffer.concat([versionBuffer, data]);
-  const checksum = import_buffer9.Buffer.from(calculateChecksum(payload));
-  const unencoded = import_buffer9.Buffer.concat([payload, checksum]);
+  data = import_buffer10.Buffer.from(data);
+  const versionBuffer = import_buffer10.Buffer.from([versionByte]);
+  const payload = import_buffer10.Buffer.concat([versionBuffer, data]);
+  const checksum = import_buffer10.Buffer.from(calculateChecksum(payload));
+  const unencoded = import_buffer10.Buffer.concat([payload, checksum]);
   return import_base32.default.encode(unencoded);
 }
 function calculateChecksum(payload) {
@@ -10140,10 +10237,11 @@ function calculateChecksum(payload) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/hashing.js
-var import_buffer10 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer11 = __toESM(require_buffer(), 1);
 function hash(data) {
-  const bytes = typeof data === "string" ? import_buffer10.Buffer.from(data, "utf8") : data;
-  return import_buffer10.Buffer.from(sha256(bytes));
+  const bytes = typeof data === "string" ? import_buffer11.Buffer.from(data, "utf8") : data;
+  return import_buffer11.Buffer.from(sha256(bytes));
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/keypair.js
@@ -10165,18 +10263,18 @@ var Keypair = class {
     }
     this.type = keys.type;
     if ("secretKey" in keys) {
-      keys.secretKey = import_buffer11.Buffer.from(keys.secretKey);
+      keys.secretKey = import_buffer12.Buffer.from(keys.secretKey);
       if (keys.secretKey.length !== 32) {
         throw new Error("secretKey length is invalid");
       }
       this._secretSeed = keys.secretKey;
       this._publicKey = generate(keys.secretKey);
       this._secretKey = keys.secretKey;
-      if (keys.publicKey && !this._publicKey.equals(import_buffer11.Buffer.from(keys.publicKey))) {
+      if (keys.publicKey && !this._publicKey.equals(import_buffer12.Buffer.from(keys.publicKey))) {
         throw new Error("secretKey does not match publicKey");
       }
     } else if ("publicKey" in keys) {
-      this._publicKey = import_buffer11.Buffer.from(keys.publicKey);
+      this._publicKey = import_buffer12.Buffer.from(keys.publicKey);
       if (this._publicKey.length !== 32) {
         throw new Error("publicKey length is invalid");
       }
@@ -10231,7 +10329,7 @@ var Keypair = class {
    */
   static random() {
     const secretKey = utils.randomSecretKey();
-    return this.fromRawEd25519Seed(import_buffer11.Buffer.from(secretKey));
+    return this.fromRawEd25519Seed(import_buffer12.Buffer.from(secretKey));
   }
   /** Returns this public key as an xdr.AccountId. */
   xdrAccountId() {
@@ -10368,12 +10466,12 @@ var Keypair = class {
    * @see TransactionBase.addDecoratedSignature
    */
   signPayloadDecorated(data) {
-    const dataBuffer = import_buffer11.Buffer.isBuffer(data) ? data : import_buffer11.Buffer.from(data);
+    const dataBuffer = import_buffer12.Buffer.isBuffer(data) ? data : import_buffer12.Buffer.from(data);
     const signature = this.sign(dataBuffer);
     const keyHint = this.signatureHint();
-    let hint = import_buffer11.Buffer.from(dataBuffer.subarray(-4));
+    let hint = import_buffer12.Buffer.from(dataBuffer.subarray(-4));
     if (hint.length < 4) {
-      hint = import_buffer11.Buffer.concat([hint, import_buffer11.Buffer.alloc(4 - hint.length, 0)]);
+      hint = import_buffer12.Buffer.concat([hint, import_buffer12.Buffer.alloc(4 - hint.length, 0)]);
     }
     for (let i = 0; i < hint.length; i++) {
       hint[i] = hint[i] ^ keyHint[i];
@@ -10385,7 +10483,14 @@ var Keypair = class {
   }
 };
 
+// node_modules/@stellar/stellar-sdk/lib/esm/base/util/continued_fraction.js
+init_sb_mediator_shims();
+
+// node_modules/@stellar/stellar-sdk/lib/esm/base/util/bignumber.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar/stellar-sdk/node_modules/bignumber.js/dist/bignumber.mjs
+init_sb_mediator_shims();
 var BigNumber = clone();
 var isNumeric = /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
 var mathceil = Math.ceil;
@@ -11934,9 +12039,11 @@ function best_r(rawNumber) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/transaction_builder.js
-var import_buffer34 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer35 = __toESM(require_buffer(), 1);
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/account.js
+init_sb_mediator_shims();
 var Account = class {
   /**
    * @param accountId - ID of the account (ex.
@@ -11990,8 +12097,12 @@ var Account = class {
   }
 };
 
+// node_modules/@stellar/stellar-sdk/lib/esm/base/muxed_account.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar/stellar-sdk/lib/esm/base/util/decode_encode_muxed_account.js
-var import_buffer12 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer13 = __toESM(require_buffer(), 1);
 function decodeAddressToMuxedAccount(address) {
   if (StrKey.isValidMed25519PublicKey(address)) {
     return _decodeAddressFullyToMuxedAccount(address);
@@ -12045,7 +12156,7 @@ function _encodeMuxedAccountFullyToAddress(muxedAccount) {
   }
   const muxed = muxedAccount.med25519();
   return StrKey.encodeMed25519PublicKey(
-    import_buffer12.Buffer.concat([muxed.ed25519(), muxed.id().toXDR("raw")])
+    import_buffer13.Buffer.concat([muxed.ed25519(), muxed.id().toXDR("raw")])
   );
 }
 
@@ -12165,12 +12276,18 @@ var MuxedAccount = class _MuxedAccount {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/transaction.js
-var import_buffer25 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer26 = __toESM(require_buffer(), 1);
+
+// node_modules/@stellar/stellar-sdk/lib/esm/base/operation.js
+init_sb_mediator_shims();
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/asset.js
-var import_buffer13 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer14 = __toESM(require_buffer(), 1);
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/util/util.js
+init_sb_mediator_shims();
 var trimEnd = (input, char) => {
   const isNumber = typeof input === "number";
   let str = String(input);
@@ -12188,7 +12305,7 @@ var AssetType = {
   liquidityPoolShares: "liquidity_pool_shares"
 };
 function asciiCompare(a, b) {
-  return import_buffer13.Buffer.compare(import_buffer13.Buffer.from(a, "ascii"), import_buffer13.Buffer.from(b, "ascii"));
+  return import_buffer14.Buffer.compare(import_buffer14.Buffer.from(a, "ascii"), import_buffer14.Buffer.from(b, "ascii"));
 }
 var Asset = class _Asset {
   /**
@@ -12278,7 +12395,7 @@ var Asset = class _Asset {
    * **Warning:** This makes no guarantee that this contract actually *exists*.
    */
   contractId(networkPassphrase) {
-    const networkId = hash(import_buffer13.Buffer.from(networkPassphrase));
+    const networkId = hash(import_buffer14.Buffer.from(networkPassphrase));
     const preimage = types.HashIdPreimage.envelopeTypeContractId(
       new types.HashIdPreimageContractId({
         networkId,
@@ -12430,7 +12547,11 @@ var Asset = class _Asset {
   }
 };
 
+// node_modules/@stellar/stellar-sdk/lib/esm/base/liquidity_pool_asset.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar/stellar-sdk/lib/esm/base/get_liquidity_pool_id.js
+init_sb_mediator_shims();
 var LiquidityPoolFeeV18 = 30;
 function getLiquidityPoolId(liquidityPoolType, liquidityPoolParameters) {
   if (liquidityPoolType !== "constant_product") {
@@ -12560,6 +12681,7 @@ var LiquidityPoolAsset = class {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/claimant.js
+init_sb_mediator_shims();
 var Claimant = class {
   /**
    * @param destination - The destination account ID.
@@ -12700,7 +12822,8 @@ var Claimant = class {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/liquidity_pool_id.js
-var import_buffer14 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer15 = __toESM(require_buffer(), 1);
 var LiquidityPoolId = class _LiquidityPoolId {
   /**
    * @param liquidityPoolId - The ID of the liquidity pool in string 'hex'.
@@ -12735,7 +12858,7 @@ var LiquidityPoolId = class _LiquidityPoolId {
    * {@link Asset.toTrustLineXDRObject | `Asset.toTrustLineXDRObject`} method.
    */
   toXDRObject() {
-    const xdrPoolId = import_buffer14.Buffer.from(
+    const xdrPoolId = import_buffer15.Buffer.from(
       this.liquidityPoolId,
       "hex"
     );
@@ -12771,7 +12894,11 @@ var LiquidityPoolId = class _LiquidityPoolId {
   }
 };
 
+// node_modules/@stellar/stellar-sdk/lib/esm/base/operations/manage_sell_offer.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar/stellar-sdk/lib/esm/base/util/operations.js
+init_sb_mediator_shims();
 var ONE = 1e7;
 var MAX_INT64 = "9223372036854775807";
 function setSourceAccount(opAttributes, opts) {
@@ -12886,6 +13013,7 @@ function manageSellOffer(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/create_passive_sell_offer.js
+init_sb_mediator_shims();
 function createPassiveSellOffer(opts) {
   const selling = opts.selling.toXDRObject();
   const buying = opts.buying.toXDRObject();
@@ -12912,6 +13040,7 @@ function createPassiveSellOffer(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/account_merge.js
+init_sb_mediator_shims();
 function accountMerge(opts) {
   let body;
   try {
@@ -12930,7 +13059,8 @@ function accountMerge(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/allow_trust.js
-var import_buffer15 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer16 = __toESM(require_buffer(), 1);
 function allowTrust(opts) {
   if (!StrKey.isValidEd25519PublicKey(opts.trustor)) {
     throw new Error("trustor is invalid");
@@ -12938,10 +13068,10 @@ function allowTrust(opts) {
   const trustor = Keypair.fromPublicKey(opts.trustor).xdrAccountId();
   let asset;
   if (opts.assetCode.length <= 4) {
-    const code = import_buffer15.Buffer.from(opts.assetCode.padEnd(4, "\0"));
+    const code = import_buffer16.Buffer.from(opts.assetCode.padEnd(4, "\0"));
     asset = types.AssetCode.assetTypeCreditAlphanum4(code);
   } else if (opts.assetCode.length <= 12) {
-    const code = import_buffer15.Buffer.from(opts.assetCode.padEnd(12, "\0"));
+    const code = import_buffer16.Buffer.from(opts.assetCode.padEnd(12, "\0"));
     asset = types.AssetCode.assetTypeCreditAlphanum12(code);
   } else {
     throw new Error("Asset code must be 12 characters at max.");
@@ -12972,6 +13102,7 @@ function allowTrust(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/bump_sequence.js
+init_sb_mediator_shims();
 function bumpSequence(opts) {
   if (typeof opts.bumpTo !== "string") {
     throw new Error("bumpTo must be a string");
@@ -12992,6 +13123,7 @@ function bumpSequence(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/change_trust.js
+init_sb_mediator_shims();
 var MAX_INT642 = "9223372036854775807";
 function changeTrust(opts) {
   const asset = opts.asset ?? opts.line;
@@ -13017,6 +13149,7 @@ function changeTrust(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/create_account.js
+init_sb_mediator_shims();
 function createAccount(opts) {
   if (!StrKey.isValidEd25519PublicKey(opts.destination)) {
     throw new Error("destination is invalid");
@@ -13037,6 +13170,7 @@ function createAccount(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/create_claimable_balance.js
+init_sb_mediator_shims();
 function createClaimableBalance(opts) {
   if (!(opts.asset instanceof Asset)) {
     throw new Error(
@@ -13066,6 +13200,7 @@ function createClaimableBalance(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/claim_claimable_balance.js
+init_sb_mediator_shims();
 function claimClaimableBalance(opts = {}) {
   validateClaimableBalanceId(opts.balanceId);
   const balanceId = types.ClaimableBalanceId.fromXDR(
@@ -13089,6 +13224,7 @@ function validateClaimableBalanceId(balanceId) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/clawback_claimable_balance.js
+init_sb_mediator_shims();
 function clawbackClaimableBalance(opts = {}) {
   validateClaimableBalanceId(opts.balanceId);
   const balanceId = types.ClaimableBalanceId.fromXDR(
@@ -13106,6 +13242,7 @@ function clawbackClaimableBalance(opts = {}) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/inflation.js
+init_sb_mediator_shims();
 function inflation(opts = {}) {
   const opAttributes = {
     sourceAccount: null,
@@ -13116,17 +13253,18 @@ function inflation(opts = {}) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/manage_data.js
-var import_buffer16 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer17 = __toESM(require_buffer(), 1);
 function manageData(opts) {
   if (!(typeof opts.name === "string" && opts.name.length <= 64)) {
     throw new Error("name must be a string, up to 64 characters");
   }
-  if (typeof opts.value !== "string" && !import_buffer16.Buffer.isBuffer(opts.value) && opts.value !== null && opts.value !== void 0) {
+  if (typeof opts.value !== "string" && !import_buffer17.Buffer.isBuffer(opts.value) && opts.value !== null && opts.value !== void 0) {
     throw new Error("value must be a string, Buffer or null");
   }
   let dataValue;
   if (typeof opts.value === "string") {
-    dataValue = import_buffer16.Buffer.from(opts.value);
+    dataValue = import_buffer17.Buffer.from(opts.value);
   } else {
     dataValue = opts.value ?? null;
   }
@@ -13148,6 +13286,7 @@ function manageData(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/manage_buy_offer.js
+init_sb_mediator_shims();
 function manageBuyOffer(opts) {
   const selling = opts.selling.toXDRObject();
   const buying = opts.buying.toXDRObject();
@@ -13177,6 +13316,7 @@ function manageBuyOffer(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/path_payment_strict_receive.js
+init_sb_mediator_shims();
 function pathPaymentStrictReceive(opts) {
   if (!opts.sendAsset) {
     throw new Error("Must specify a send asset");
@@ -13214,6 +13354,7 @@ function pathPaymentStrictReceive(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/path_payment_strict_send.js
+init_sb_mediator_shims();
 function pathPaymentStrictSend(opts) {
   if (!opts.sendAsset) {
     throw new Error("Must specify a send asset");
@@ -13255,6 +13396,7 @@ function pathPaymentStrictSend(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/payment.js
+init_sb_mediator_shims();
 function payment(opts) {
   if (!opts.asset) {
     throw new Error("Must provide an asset for a payment operation");
@@ -13282,7 +13424,8 @@ function payment(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/set_options.js
-var import_buffer17 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer18 = __toESM(require_buffer(), 1);
 function weightCheckFunction(value, name) {
   if (value >= 0 && value <= 255) {
     return true;
@@ -13345,11 +13488,11 @@ function setOptions(opts) {
     if (opts.signer.preAuthTx) {
       let preAuthTx;
       if (typeof opts.signer.preAuthTx === "string") {
-        preAuthTx = import_buffer17.Buffer.from(opts.signer.preAuthTx, "hex");
+        preAuthTx = import_buffer18.Buffer.from(opts.signer.preAuthTx, "hex");
       } else {
         preAuthTx = opts.signer.preAuthTx;
       }
-      if (!(import_buffer17.Buffer.isBuffer(preAuthTx) && preAuthTx.length === 32)) {
+      if (!(import_buffer18.Buffer.isBuffer(preAuthTx) && preAuthTx.length === 32)) {
         throw new Error("signer.preAuthTx must be 32 bytes Buffer.");
       }
       key = types.SignerKey.signerKeyTypePreAuthTx(preAuthTx);
@@ -13358,11 +13501,11 @@ function setOptions(opts) {
     if (opts.signer.sha256Hash) {
       let sha256Hash;
       if (typeof opts.signer.sha256Hash === "string") {
-        sha256Hash = import_buffer17.Buffer.from(opts.signer.sha256Hash, "hex");
+        sha256Hash = import_buffer18.Buffer.from(opts.signer.sha256Hash, "hex");
       } else {
         sha256Hash = opts.signer.sha256Hash;
       }
-      if (!(import_buffer17.Buffer.isBuffer(sha256Hash) && sha256Hash.length === 32)) {
+      if (!(import_buffer18.Buffer.isBuffer(sha256Hash) && sha256Hash.length === 32)) {
         throw new Error("signer.sha256Hash must be 32 bytes Buffer.");
       }
       key = types.SignerKey.signerKeyTypeHashX(sha256Hash);
@@ -13412,6 +13555,7 @@ function setOptions(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/begin_sponsoring_future_reserves.js
+init_sb_mediator_shims();
 function beginSponsoringFutureReserves(opts) {
   if (!StrKey.isValidEd25519PublicKey(opts.sponsoredId)) {
     throw new Error("sponsoredId is invalid");
@@ -13428,6 +13572,7 @@ function beginSponsoringFutureReserves(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/end_sponsoring_future_reserves.js
+init_sb_mediator_shims();
 function endSponsoringFutureReserves(opts = {}) {
   const opAttributes = {
     sourceAccount: null,
@@ -13438,7 +13583,8 @@ function endSponsoringFutureReserves(opts = {}) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/revoke_sponsorship.js
-var import_buffer18 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer19 = __toESM(require_buffer(), 1);
 function revokeAccountSponsorship(opts = {}) {
   if (!StrKey.isValidEd25519PublicKey(opts.account)) {
     throw new Error("account is invalid");
@@ -13547,7 +13693,7 @@ function revokeLiquidityPoolSponsorship(opts = {}) {
   }
   const ledgerKey = types.LedgerKey.liquidityPool(
     new types.LedgerKeyLiquidityPool({
-      liquidityPoolId: import_buffer18.Buffer.from(
+      liquidityPoolId: import_buffer19.Buffer.from(
         opts.liquidityPoolId,
         "hex"
       )
@@ -13575,22 +13721,22 @@ function revokeSignerSponsorship(opts = {}) {
   } else if (opts.signer.preAuthTx) {
     let buffer;
     if (typeof opts.signer.preAuthTx === "string") {
-      buffer = import_buffer18.Buffer.from(opts.signer.preAuthTx, "hex");
+      buffer = import_buffer19.Buffer.from(opts.signer.preAuthTx, "hex");
     } else {
       buffer = opts.signer.preAuthTx;
     }
-    if (!(import_buffer18.Buffer.isBuffer(buffer) && buffer.length === 32)) {
+    if (!(import_buffer19.Buffer.isBuffer(buffer) && buffer.length === 32)) {
       throw new Error("signer.preAuthTx must be 32 bytes Buffer.");
     }
     key = types.SignerKey.signerKeyTypePreAuthTx(buffer);
   } else if (opts.signer.sha256Hash) {
     let buffer;
     if (typeof opts.signer.sha256Hash === "string") {
-      buffer = import_buffer18.Buffer.from(opts.signer.sha256Hash, "hex");
+      buffer = import_buffer19.Buffer.from(opts.signer.sha256Hash, "hex");
     } else {
       buffer = opts.signer.sha256Hash;
     }
-    if (!(import_buffer18.Buffer.isBuffer(buffer) && buffer.length === 32)) {
+    if (!(import_buffer19.Buffer.isBuffer(buffer) && buffer.length === 32)) {
       throw new Error("signer.sha256Hash must be 32 bytes Buffer.");
     }
     key = types.SignerKey.signerKeyTypeHashX(buffer);
@@ -13620,6 +13766,7 @@ function revokeSignerSponsorship(opts = {}) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/clawback.js
+init_sb_mediator_shims();
 function clawback(opts) {
   if (!isValidAmount(opts.amount)) {
     throw new TypeError(constructAmountRequirementsError("amount"));
@@ -13644,6 +13791,7 @@ function clawback(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/set_trustline_flags.js
+init_sb_mediator_shims();
 function setTrustLineFlags(opts) {
   if (typeof opts.flags !== "object" || Object.keys(opts.flags).length === 0) {
     throw new Error("opts.flags must be a map of boolean flags to modify");
@@ -13693,13 +13841,14 @@ function setTrustLineFlags(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/liquidity_pool_deposit.js
-var import_buffer19 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer20 = __toESM(require_buffer(), 1);
 function liquidityPoolDeposit(opts = {}) {
   const { liquidityPoolId, maxAmountA, maxAmountB, minPrice, maxPrice } = opts;
   if (!liquidityPoolId) {
     throw new TypeError("liquidityPoolId argument is required");
   }
-  const liquidityPoolIdXdr = import_buffer19.Buffer.from(
+  const liquidityPoolIdXdr = import_buffer20.Buffer.from(
     liquidityPoolId,
     "hex"
   );
@@ -13735,12 +13884,13 @@ function liquidityPoolDeposit(opts = {}) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/liquidity_pool_withdraw.js
-var import_buffer20 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer21 = __toESM(require_buffer(), 1);
 function liquidityPoolWithdraw(opts = {}) {
   if (!opts.liquidityPoolId) {
     throw new TypeError("liquidityPoolId argument is required");
   }
-  const liquidityPoolId = import_buffer20.Buffer.from(
+  const liquidityPoolId = import_buffer21.Buffer.from(
     opts.liquidityPoolId,
     "hex"
   );
@@ -13771,10 +13921,12 @@ function liquidityPoolWithdraw(opts = {}) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/invoke_host_function.js
-var import_buffer22 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer23 = __toESM(require_buffer(), 1);
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/address.js
-var import_buffer21 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer22 = __toESM(require_buffer(), 1);
 var Address = class _Address {
   /**
    * @param address - a {@link StrKey} of the address value
@@ -13869,7 +14021,7 @@ var Address = class _Address {
       case types.ScAddressType.scAddressTypeContract().value:
         return _Address.contract(scAddress.contractId());
       case types.ScAddressType.scAddressTypeMuxedAccount().value: {
-        const raw = import_buffer21.Buffer.concat([
+        const raw = import_buffer22.Buffer.concat([
           scAddress.muxedAccount().ed25519(),
           scAddress.muxedAccount().id().toXDR("raw")
         ]);
@@ -13878,7 +14030,7 @@ var Address = class _Address {
       case types.ScAddressType.scAddressTypeClaimableBalance().value: {
         const cbi = scAddress.claimableBalanceId();
         return _Address.claimableBalance(
-          import_buffer21.Buffer.concat([import_buffer21.Buffer.from([cbi.switch().value]), cbi.v0()])
+          import_buffer22.Buffer.concat([import_buffer22.Buffer.from([cbi.switch().value]), cbi.v0()])
         );
       }
       case types.ScAddressType.scAddressTypeLiquidityPool().value:
@@ -14017,7 +14169,7 @@ function invokeContractFunction(opts) {
   });
 }
 function createCustomContract(opts) {
-  const salt = import_buffer22.Buffer.from(opts.salt || getSalty());
+  const salt = import_buffer23.Buffer.from(opts.salt || getSalty());
   if (!opts.wasmHash || opts.wasmHash.length !== 32) {
     throw new TypeError(
       `expected hash(contract WASM) in 'opts.wasmHash', got ${String(opts.wasmHash)}`
@@ -14032,7 +14184,7 @@ function createCustomContract(opts) {
     func: types.HostFunction.hostFunctionTypeCreateContractV2(
       new types.CreateContractArgsV2({
         executable: types.ContractExecutable.contractExecutableWasm(
-          import_buffer22.Buffer.from(opts.wasmHash)
+          import_buffer23.Buffer.from(opts.wasmHash)
         ),
         contractIdPreimage: types.ContractIdPreimage.contractIdPreimageFromAddress(
           new types.ContractIdPreimageFromAddress({
@@ -14080,7 +14232,7 @@ function createStellarAssetContract(opts) {
 function uploadContractWasm(opts) {
   return invokeHostFunction({
     func: types.HostFunction.hostFunctionTypeUploadContractWasm(
-      import_buffer22.Buffer.from(opts.wasm)
+      import_buffer23.Buffer.from(opts.wasm)
       // coalesce so we can drop `Buffer` someday
     ),
     auth: opts.auth || [],
@@ -14092,6 +14244,7 @@ function getSalty() {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/extend_footprint_ttl.js
+init_sb_mediator_shims();
 function extendFootprintTtl(opts) {
   if ((opts.extendTo ?? -1) <= 0) {
     throw new RangeError("extendTo has to be positive");
@@ -14109,6 +14262,7 @@ function extendFootprintTtl(opts) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/operations/restore_footprint.js
+init_sb_mediator_shims();
 function restoreFootprint(opts = {}) {
   const op = new types.RestoreFootprintOp({
     ext: new types.ExtensionPoint(0)
@@ -14533,7 +14687,8 @@ function accountIdtoAddress(accountId) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/memo.js
-var import_buffer23 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer24 = __toESM(require_buffer(), 1);
 var MemoNone = "none";
 var MemoID = "id";
 var MemoText = "text";
@@ -14562,7 +14717,7 @@ var Memo = class _Memo {
       case MemoReturn:
         _Memo._validateHashValue(value);
         if (typeof value === "string") {
-          this._value = import_buffer23.Buffer.from(value, "hex");
+          this._value = import_buffer24.Buffer.from(value, "hex");
         }
         break;
       default:
@@ -14594,7 +14749,7 @@ var Memo = class _Memo {
         return this._value;
       case MemoHash:
       case MemoReturn:
-        return import_buffer23.Buffer.from(this._value);
+        return import_buffer24.Buffer.from(this._value);
       default:
         throw new Error("Invalid memo type");
     }
@@ -14634,10 +14789,10 @@ var Memo = class _Memo {
   }
   static _validateTextValue(value) {
     if (typeof value === "string") {
-      if (import_buffer23.Buffer.byteLength(value, "utf8") > 28) {
+      if (import_buffer24.Buffer.byteLength(value, "utf8") > 28) {
         throw new Error("Expects string, array or buffer, max 28 bytes");
       }
-    } else if (import_buffer23.Buffer.isBuffer(value)) {
+    } else if (import_buffer24.Buffer.isBuffer(value)) {
       if (value.length > 28) {
         throw new Error("Expects string, array or buffer, max 28 bytes");
       }
@@ -14659,9 +14814,9 @@ var Memo = class _Memo {
       if (!/^[0-9A-Fa-f]{64}$/g.test(value)) {
         throw error;
       }
-      valueBuffer = import_buffer23.Buffer.from(value, "hex");
-    } else if (import_buffer23.Buffer.isBuffer(value)) {
-      valueBuffer = import_buffer23.Buffer.from(value);
+      valueBuffer = import_buffer24.Buffer.from(value, "hex");
+    } else if (import_buffer24.Buffer.isBuffer(value)) {
+      valueBuffer = import_buffer24.Buffer.from(value);
     } else {
       throw error;
     }
@@ -14754,7 +14909,8 @@ var Memo = class _Memo {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/transaction_base.js
-var import_buffer24 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer25 = __toESM(require_buffer(), 1);
 var TransactionBase = class {
   constructor(tx, signatures, fee, networkPassphrase) {
     __publicField(this, "_tx");
@@ -14885,7 +15041,7 @@ var TransactionBase = class {
     }
     let keypair;
     let hint;
-    const signatureBuffer = import_buffer24.Buffer.from(signature, "base64");
+    const signatureBuffer = import_buffer25.Buffer.from(signature, "base64");
     try {
       keypair = Keypair.fromPublicKey(publicKey);
       hint = keypair.signatureHint();
@@ -14919,7 +15075,7 @@ var TransactionBase = class {
    */
   signHashX(preimage) {
     if (typeof preimage === "string") {
-      preimage = import_buffer24.Buffer.from(preimage, "hex");
+      preimage = import_buffer25.Buffer.from(preimage, "hex");
     }
     if (preimage.length > 64) {
       throw new Error("preimage cannot be longer than 64 bytes");
@@ -14960,7 +15116,7 @@ var Transaction = class extends TransactionBase {
    */
   constructor(envelope, networkPassphrase) {
     if (typeof envelope === "string") {
-      const buffer = import_buffer25.Buffer.from(envelope, "base64");
+      const buffer = import_buffer26.Buffer.from(envelope, "base64");
       envelope = types.TransactionEnvelope.fromXDR(buffer);
     }
     const envelopeType = envelope.switch();
@@ -15134,11 +15290,11 @@ var Transaction = class extends TransactionBase {
     let tx = this.tx;
     if (this._envelopeType === types.EnvelopeType.envelopeTypeTxV0()) {
       tx = types.Transaction.fromXDR(
-        import_buffer25.Buffer.concat([
+        import_buffer26.Buffer.concat([
           // TransactionV0 is a transaction with the AccountID discriminant
           // stripped off, we need to put it back to build a valid transaction
           // which we can use to build a TransactionSignaturePayloadTaggedTransaction
-          import_buffer25.Buffer.alloc(4),
+          import_buffer26.Buffer.alloc(4),
           // AccountID discriminant: publicKeyTypeEd25519 = 0
           tx.toXDR()
         ])
@@ -15231,7 +15387,8 @@ var Transaction = class extends TransactionBase {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/fee_bump_transaction.js
-var import_buffer26 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer27 = __toESM(require_buffer(), 1);
 var FeeBumpTransaction = class extends TransactionBase {
   /**
    * @param envelope - transaction envelope object or base64 encoded string.
@@ -15240,7 +15397,7 @@ var FeeBumpTransaction = class extends TransactionBase {
    */
   constructor(envelope, networkPassphrase) {
     if (typeof envelope === "string") {
-      const buffer = import_buffer26.Buffer.from(envelope, "base64");
+      const buffer = import_buffer27.Buffer.from(envelope, "base64");
       envelope = types.TransactionEnvelope.fromXDR(buffer);
     }
     const envelopeType = envelope.switch();
@@ -15316,7 +15473,8 @@ var FeeBumpTransaction = class extends TransactionBase {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/sorobandata_builder.js
-var import_buffer27 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer28 = __toESM(require_buffer(), 1);
 var SorobanDataBuilder = class _SorobanDataBuilder {
   /**
    * @param sorobanData - either a base64-encoded string that represents an
@@ -15354,7 +15512,7 @@ var SorobanDataBuilder = class _SorobanDataBuilder {
     if (typeof data === "string") {
       return types.SorobanTransactionData.fromXDR(data, "base64");
     } else {
-      return types.SorobanTransactionData.fromXDR(import_buffer27.Buffer.from(data), "raw");
+      return types.SorobanTransactionData.fromXDR(import_buffer28.Buffer.from(data), "raw");
     }
   }
   /**
@@ -15459,6 +15617,7 @@ var SorobanDataBuilder = class _SorobanDataBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/signerkey.js
+init_sb_mediator_shims();
 var SignerKey = class {
   /**
    * Decodes a StrKey address into an xdr.SignerKey instance.
@@ -15525,9 +15684,11 @@ var SignerKey = class {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/scval.js
-var import_buffer33 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer34 = __toESM(require_buffer(), 1);
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/contract.js
+init_sb_mediator_shims();
 var Contract = class {
   /**
    * @param contractId - ID of the contract (ex.
@@ -15591,11 +15752,16 @@ var Contract = class {
   }
 };
 
+// node_modules/@stellar/stellar-sdk/lib/esm/base/numbers/index.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar/stellar-sdk/lib/esm/base/numbers/xdr_large_int.js
-var import_buffer32 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer33 = __toESM(require_buffer(), 1);
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/numbers/uint128.js
-var import_buffer28 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer29 = __toESM(require_buffer(), 1);
 var Uint128 = class extends LargeInt {
   /**
    * Construct an unsigned 128-bit integer that can be XDR-encoded.
@@ -15616,7 +15782,8 @@ var Uint128 = class extends LargeInt {
 Uint128.defineIntBoundaries();
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/numbers/uint256.js
-var import_buffer29 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer30 = __toESM(require_buffer(), 1);
 var Uint256 = class extends LargeInt {
   /**
    * Construct an unsigned 256-bit integer that can be XDR-encoded.
@@ -15637,7 +15804,8 @@ var Uint256 = class extends LargeInt {
 Uint256.defineIntBoundaries();
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/numbers/int128.js
-var import_buffer30 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer31 = __toESM(require_buffer(), 1);
 var Int128 = class extends LargeInt {
   /**
    * Construct a signed 128-bit integer that can be XDR-encoded.
@@ -15658,7 +15826,8 @@ var Int128 = class extends LargeInt {
 Int128.defineIntBoundaries();
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/numbers/int256.js
-var import_buffer31 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer32 = __toESM(require_buffer(), 1);
 var Int256 = class extends LargeInt {
   /**
    * Construct a signed 256-bit integer that can be XDR-encoded.
@@ -15989,6 +16158,7 @@ function scValToBigInt(scv) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/numbers/sc_int.js
+init_sb_mediator_shims();
 var ScInt = class extends XdrLargeInt {
   /**
    * @param value - a single, integer-like value which will
@@ -16056,8 +16226,8 @@ function nativeToScVal(val, opts = {}) {
       if (val instanceof Contract) {
         return val.address().toScVal();
       }
-      if (val instanceof Uint8Array || import_buffer33.Buffer.isBuffer(val)) {
-        const copy = import_buffer33.Buffer.from(val);
+      if (val instanceof Uint8Array || import_buffer34.Buffer.isBuffer(val)) {
+        const copy = import_buffer34.Buffer.from(val);
         switch (opts?.type ?? "bytes") {
           case "bytes":
             return types.ScVal.scvBytes(copy);
@@ -16213,7 +16383,7 @@ function scValToNative(scv) {
     // the raw bytes are returned.
     case types.ScValType.scvSymbol().value: {
       const v = scv.sym();
-      if (import_buffer33.Buffer.isBuffer(v) || ArrayBuffer.isView(v) && typeof v !== "string") {
+      if (import_buffer34.Buffer.isBuffer(v) || ArrayBuffer.isView(v) && typeof v !== "string") {
         try {
           return new TextDecoder().decode(v);
         } catch {
@@ -16224,7 +16394,7 @@ function scValToNative(scv) {
     }
     case types.ScValType.scvString().value: {
       const v = scv.str();
-      if (import_buffer33.Buffer.isBuffer(v) || ArrayBuffer.isView(v) && typeof v !== "string") {
+      if (import_buffer34.Buffer.isBuffer(v) || ArrayBuffer.isView(v) && typeof v !== "string") {
         try {
           return new TextDecoder().decode(v);
         } catch {
@@ -17145,8 +17315,10 @@ __export(horizon_exports, {
   ServerApi: () => ServerApi,
   getCurrentServerTime: () => getCurrentServerTime
 });
+init_sb_mediator_shims();
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/horizon_api.js
+init_sb_mediator_shims();
 var HorizonApi;
 ((HorizonApi2) => {
   ((LiquidityPoolType2) => {
@@ -17229,7 +17401,11 @@ var HorizonApi;
   })(HorizonApi2.TransactionFailedResultCodes || (HorizonApi2.TransactionFailedResultCodes = {}));
 })(HorizonApi || (HorizonApi = {}));
 
+// node_modules/@stellar/stellar-sdk/lib/esm/horizon/server_api.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/types/effects.js
+init_sb_mediator_shims();
 var EffectType = /* @__PURE__ */ ((EffectType2) => {
   EffectType2[EffectType2["account_created"] = 0] = "account_created";
   EffectType2[EffectType2["account_removed"] = 1] = "account_removed";
@@ -17301,7 +17477,8 @@ var ServerApi;
 })(ServerApi || (ServerApi = {}));
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/account_response.js
-var import_buffer35 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer36 = __toESM(require_buffer(), 1);
 var import_base322 = __toESM(require_base32(), 1);
 var AccountResponse = class {
   constructor(response) {
@@ -17384,9 +17561,17 @@ var AccountResponse = class {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/server.js
-var import_buffer36 = __toESM(require_buffer(), 1);
+init_sb_mediator_shims();
+var import_buffer37 = __toESM(require_buffer(), 1);
+
+// node_modules/@stellar/stellar-sdk/lib/esm/horizon/call_builder.js
+init_sb_mediator_shims();
+
+// node_modules/@stellar/stellar-sdk/node_modules/eventsource/dist/index.js
+init_sb_mediator_shims();
 
 // node_modules/eventsource-parser/dist/index.js
+init_sb_mediator_shims();
 var ParseError = class extends Error {
   constructor(message, options) {
     super(message), this.name = "ParseError", this.type = options.type, this.field = options.field, this.value = options.value, this.line = options.line;
@@ -17866,6 +18051,7 @@ function getBaseURL() {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/horizon_axios_client.js
+init_sb_mediator_shims();
 var version = "16.0.1";
 var SERVER_TIME_MAP = {};
 function toSeconds(ms) {
@@ -17924,6 +18110,7 @@ function getCurrentServerTime(hostname) {
 }
 
 // node_modules/@stellar/stellar-sdk/lib/esm/utils/url.js
+init_sb_mediator_shims();
 function stringifyTemplateValue(value) {
   return Array.isArray(value) ? value.join(",") : value.toString();
 }
@@ -18300,6 +18487,7 @@ var CallBuilder = class {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/account_call_builder.js
+init_sb_mediator_shims();
 var AccountCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient) {
     super(serverUrl, httpClient);
@@ -18365,6 +18553,7 @@ var AccountCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/assets_call_builder.js
+init_sb_mediator_shims();
 var AssetsCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient) {
     super(serverUrl, httpClient);
@@ -18391,6 +18580,7 @@ var AssetsCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/claimable_balances_call_builder.js
+init_sb_mediator_shims();
 var ClaimableBalanceCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient) {
     super(serverUrl, httpClient);
@@ -18447,6 +18637,7 @@ var ClaimableBalanceCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/effect_call_builder.js
+init_sb_mediator_shims();
 var EffectCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient) {
     super(serverUrl, httpClient, "effects");
@@ -18502,6 +18693,7 @@ var EffectCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/friendbot_builder.js
+init_sb_mediator_shims();
 var FriendbotBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient, address) {
     super(serverUrl, httpClient);
@@ -18511,6 +18703,7 @@ var FriendbotBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/ledger_call_builder.js
+init_sb_mediator_shims();
 var LedgerCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient) {
     super(serverUrl, httpClient);
@@ -18528,6 +18721,7 @@ var LedgerCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/liquidity_pool_call_builder.js
+init_sb_mediator_shims();
 var LiquidityPoolCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient) {
     super(serverUrl, httpClient);
@@ -18574,6 +18768,7 @@ var LiquidityPoolCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/offer_call_builder.js
+init_sb_mediator_shims();
 var OfferCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient) {
     super(serverUrl, httpClient, "offers");
@@ -18664,6 +18859,7 @@ var OfferCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/operation_call_builder.js
+init_sb_mediator_shims();
 var OperationCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient) {
     super(serverUrl, httpClient, "operations");
@@ -18744,6 +18940,7 @@ var OperationCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/orderbook_call_builder.js
+init_sb_mediator_shims();
 var OrderbookCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient, selling, buying) {
     super(serverUrl, httpClient);
@@ -18768,6 +18965,7 @@ var OrderbookCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/payment_call_builder.js
+init_sb_mediator_shims();
 var PaymentCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient) {
     super(serverUrl, httpClient, "payments");
@@ -18814,6 +19012,7 @@ var PaymentCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/strict_receive_path_call_builder.js
+init_sb_mediator_shims();
 var StrictReceivePathCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient, source, destinationAsset, destinationAmount) {
     super(serverUrl, httpClient);
@@ -18848,6 +19047,7 @@ var StrictReceivePathCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/strict_send_path_call_builder.js
+init_sb_mediator_shims();
 var StrictSendPathCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient, sourceAsset, sourceAmount, destination) {
     super(serverUrl, httpClient);
@@ -18879,6 +19079,7 @@ var StrictSendPathCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/trade_aggregation_call_builder.js
+init_sb_mediator_shims();
 var allowedResolutions = [
   6e4,
   3e5,
@@ -18945,6 +19146,7 @@ var TradeAggregationCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/trades_call_builder.js
+init_sb_mediator_shims();
 var TradesCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient) {
     super(serverUrl, httpClient, "trades");
@@ -19014,6 +19216,7 @@ var TradesCallBuilder = class extends CallBuilder {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/horizon/transaction_call_builder.js
+init_sb_mediator_shims();
 var TransactionCallBuilder = class extends CallBuilder {
   constructor(serverUrl, httpClient) {
     super(serverUrl, httpClient, "transactions");
@@ -19778,9 +19981,10 @@ var HorizonServer = class {
 };
 
 // node_modules/@stellar/stellar-sdk/lib/esm/index.js
-var import_buffer37 = __toESM(require_buffer(), 1);
+var import_buffer38 = __toESM(require_buffer(), 1);
 
 // node_modules/@stellar/stellar-sdk/lib/esm/base/network.js
+init_sb_mediator_shims();
 var Networks = /* @__PURE__ */ ((Networks2) => {
   Networks2["PUBLIC"] = "Public Global Stellar Network ; September 2015";
   Networks2["TESTNET"] = "Test SDF Network ; September 2015";
@@ -19791,6 +19995,7 @@ var Networks = /* @__PURE__ */ ((Networks2) => {
 })(Networks || {});
 
 // node_modules/@stellar-broker/client/src/errors.js
+init_sb_mediator_shims();
 var StellarBrokerError = class extends Error {
   constructor(code, message) {
     super(message);
@@ -19844,6 +20049,7 @@ var errors = {
 var errors_default = errors;
 
 // node_modules/@stellar-broker/client/src/events.js
+init_sb_mediator_shims();
 function buildEvent(type, data, key) {
   const evt = new CustomEvent(type, { detail: data });
   evt[key || type] = data;
@@ -19851,6 +20057,7 @@ function buildEvent(type, data, key) {
 }
 
 // node_modules/@stellar-broker/client/src/tx-processor.js
+init_sb_mediator_shims();
 var networkIdCache = {};
 async function processTxRequest(client, txRequest) {
   let tx;
@@ -19881,7 +20088,7 @@ async function authorizeInvocation(client, tx) {
   addrAuth.signatureExpirationLedger(tx.ledgerBounds.maxLedger + 1);
   let networkId = networkIdCache[tx.networkPassphrase];
   if (!networkId) {
-    networkId = networkIdCache[tx.networkPassphrase] = hash(Buffer.from(tx.networkPassphrase));
+    networkId = networkIdCache[tx.networkPassphrase] = hash(import_buffer.Buffer.from(tx.networkPassphrase));
   }
   const preimage = types.HashIdPreimage.envelopeTypeSorobanAuthorization(
     new types.HashIdPreimageSorobanAuthorization({
@@ -19941,7 +20148,11 @@ function validateTransaction(client, tx) {
   return true;
 }
 
+// node_modules/@stellar-broker/client/src/quote-request.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar-broker/client/src/asset.js
+init_sb_mediator_shims();
 function convertToStellarAsset(asset) {
   if (asset instanceof Asset)
     return asset;
@@ -20031,7 +20242,11 @@ function parseSlippageTolerance(src, parameter) {
   return tolerance;
 }
 
+// node_modules/@stellar-broker/client/src/quote-result.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar-broker/client/src/stroops.js
+init_sb_mediator_shims();
 function toStroops(value, throwIfInvalid = false) {
   if (typeof value === "number") {
     if (value === 0)
@@ -20164,6 +20379,7 @@ var QuoteResult = class {
 };
 
 // node_modules/@stellar-broker/client/src/authorization.js
+init_sb_mediator_shims();
 var AuthorizationWrapper = class {
   /**
    * @param {ClientAuthorizationParams} authorization
@@ -20521,7 +20737,11 @@ function validateEventType(type) {
     throw errors_default.unsupportedEventType(type);
 }
 
+// node_modules/@stellar-broker/client/src/estimate.js
+init_sb_mediator_shims();
+
 // node_modules/@stellar-broker/client/src/mediator.js
+init_sb_mediator_shims();
 var defaultStoragePrefix = "msb_";
 var Mediator = class _Mediator {
   /**
@@ -20856,6 +21076,27 @@ function findTrustline(account, asset) {
   );
 }
 
+// core/sources/stellarbroker-guard.ts
+init_sb_mediator_shims();
+
+// core/sources/stellarbroker.ts
+init_sb_mediator_shims();
+
+// core/assets.ts
+init_sb_mediator_shims();
+
+// core/gas.ts
+init_sb_mediator_shims();
+
+// core/amount.ts
+init_sb_mediator_shims();
+
+// core/sources/types.ts
+init_sb_mediator_shims();
+
+// core/sources/util.ts
+init_sb_mediator_shims();
+
 // core/sources/stellarbroker.ts
 var SB_FEE_ACCOUNT = "GD53CUDUMAIX5BCS4LU5ZZ46RON7B3HCH3JYHR6LLC3OWH3KLRFUQD5I";
 
@@ -21064,9 +21305,12 @@ async function executeSbMediatorSwap({
     const ephemeral = Keypair.fromSecret(secret);
     const mediatorAddress = mediator.mediatorAddress;
     onProgress?.({ step: "funding", msg: `Mediator account: ${mediatorAddress}` });
-    const ephemeralAuth = (tx) => {
-      tx.sign(ephemeral);
-      return tx;
+    const ephemeralAuth = (payload) => {
+      if (payload.sign) {
+        payload.sign(ephemeral);
+        return payload;
+      }
+      return ephemeral.sign(payload);
     };
     const expected = {
       trader: mediatorAddress,
