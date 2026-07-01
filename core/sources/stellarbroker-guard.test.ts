@@ -1,5 +1,5 @@
 // Hermetic tests for the StellarBroker anti-drain guard.
-// Decodes REAL fixture XDRs from spike/sb-mediator/fixtures/ to verify rule enforcement
+// Decodes REAL fixture XDRs from test-fixtures/sb-mediator/ to verify rule enforcement
 // against ground-truth values (verified by decoding the fixtures independently).
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -27,10 +27,10 @@ import {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-/** Resolve a fixture file relative to the spike directory (from this test's location). */
+/** Resolve a committed test fixture (captured mainnet swap XDR). */
 function fixture(name: string): string {
   return fileURLToPath(
-    new URL(`../../spike/sb-mediator/fixtures/${name}`, import.meta.url),
+    new URL(`../../test-fixtures/sb-mediator/${name}`, import.meta.url),
   );
 }
 

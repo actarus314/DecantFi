@@ -28,10 +28,10 @@ import { makeGuardedTap, executeSbMediatorSwap } from './sb-mediator-flow.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-/** Resolve a fixture relative to the spike directory. */
+/** Resolve a committed test fixture (captured mainnet swap XDR). */
 function fixturePath(name: string): string {
   return fileURLToPath(
-    new URL(`../spike/sb-mediator/fixtures/${name}`, import.meta.url),
+    new URL(`../test-fixtures/sb-mediator/${name}`, import.meta.url),
   );
 }
 
