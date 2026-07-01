@@ -1,6 +1,6 @@
 # node:26-alpine (linux/amd64 + linux/arm64), multi-arch OCI index, pinned 2026-06-23 — Dependabot updates.
 # Alpine over -slim saves ~96 MB (~28%); the image floor is the node binary + stellar-sdk prod deps.
-FROM node:26-alpine@sha256:a2dc166a387cc6ca1e62d0c8e265e49ca985d6e60abc9fe6e6c3d6ce8e63f606 AS build
+FROM node:26-alpine@sha256:725aeba2364a9b16beae49e180d83bd597dbd0b15c47f1f28875c290bfd255b9 AS build
 WORKDIR /app
 # Build-only native toolchain: a transitive devDep (trezor -> usb, via @creit.tech/stellar-wallets-kit,
 # used only to pre-build the committed walletkit.js) needs libusb/eudev to compile under musl.
@@ -20,7 +20,7 @@ RUN npm run build
 # tweetnacl — fine here, signing happens wallet-side, never server-side.
 RUN npm prune --omit=dev
 
-FROM node:26-alpine@sha256:a2dc166a387cc6ca1e62d0c8e265e49ca985d6e60abc9fe6e6c3d6ce8e63f606 AS runtime
+FROM node:26-alpine@sha256:725aeba2364a9b16beae49e180d83bd597dbd0b15c47f1f28875c290bfd255b9 AS runtime
 ARG REV
 ENV APP_REV=${REV:-dev}
 ARG APP_VERSION
