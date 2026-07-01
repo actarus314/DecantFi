@@ -12,7 +12,7 @@
 //   TAP-3: non-tx control frame always passes through
 //   TAP-4: unparseable XDR is blocked (safe default)
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -24,7 +24,7 @@ import {
   Account,
 } from '@stellar/stellar-sdk';
 import { SB_ROUTER_CONTRACT } from '../core/sources/stellarbroker-guard.js';
-import { makeGuardedTap } from './sb-mediator-flow.js';
+import { makeGuardedTap, executeSbMediatorSwap } from './sb-mediator-flow.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -205,5 +205,228 @@ describe('makeGuardedTap', () => {
     const verdict = blocked.calls[0]![0] as { ok: boolean; reason: string };
     expect(verdict.ok).toBe(false);
     expect(verdict.reason).toBe('unparseable tx');
+  });
+});
+
+// ── executeSbMediatorSwap — hermetic wiring tests ─────────────────────────────
+//
+// These tests exercise the execution flow using injected fakes (_mediatorFactory,
+// _clientFactory) so no network, no real Stellar SDK client, and no timers > 0ms.
+//
+// Key bugs guarded against:
+//   EXEC-1 — ephemeralAuth calling tx.sign() on a Buffer (32-byte hash payload)
+//   EXEC-2 — guard tap not installed / origOnMessage called for blocked tx
+//   EXEC-3 through EXEC-6 — dispose-retry / needsRecovery lifecycle
+
+describe('executeSbMediatorSwap', () => {
+  // Flush all pending microtasks (lets async flow advance without real delays).
+  async function tick(n = 6): Promise<void> {
+    for (let i = 0; i < n; i++) await Promise.resolve();
+  }
+
+  // ── Fake WebSocket client ───────────────────────────────────────────────────
+  // Stores on() callbacks by event name; fire() dispatches them.
+  // connect() resolves immediately and plants origSpy as socket.onmessage.
+  // The flow's connect().then() then replaces it with the guard tap.
+  function makeFakeClient() {
+    const cbs: Record<string, Array<(...args: unknown[]) => void>> = {};
+    const origSpy = vi.fn();
+    let capturedAuth: ((p: unknown) => unknown) | undefined;
+
+    const client = {
+      on(event: string, cb: (...args: unknown[]) => void): void {
+        (cbs[event] ??= []).push(cb);
+      },
+      connect: vi.fn(async (): Promise<void> => {
+        client.socket = { onmessage: origSpy as unknown };
+      }),
+      quote:        vi.fn(),
+      confirmQuote: vi.fn(),
+      // socket is mutated by connect() and again by the guard-tap installation.
+      socket: { onmessage: origSpy as unknown },
+      fire(event: string, payload: unknown): void {
+        (cbs[event] ?? []).forEach((cb) => cb(payload));
+      },
+      origSpy,
+    };
+
+    function factory(opts: { authorization: (p: unknown) => unknown }) {
+      capturedAuth = opts.authorization;
+      return client;
+    }
+
+    return { client, factory, getAuth: (): ((p: unknown) => unknown) => capturedAuth! };
+  }
+
+  // ── Fake Mediator ───────────────────────────────────────────────────────────
+  function makeFakeMediator(opts: {
+    initRejects?: boolean;
+    disposeFn?:   () => Promise<void>;
+  } = {}) {
+    const secret          = Keypair.random().secret();
+    const mediatorAddress = Keypair.random().publicKey();
+    const dispose = vi.fn(opts.disposeFn ?? ((): Promise<void> => Promise.resolve()));
+    const init    = vi.fn(async (): Promise<string> => {
+      if (opts.initRejects) throw new Error('init failed');
+      return secret;
+    });
+    const mediator = { init, dispose, mediatorAddress };
+    function factory() { return mediator; }
+    return { factory, mediator, mediatorAddress };
+  }
+
+  // ── Base call options ───────────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function baseOpts(cf: (...a: any[]) => any, mf: (...a: any[]) => any) {
+    return {
+      partnerKey:        'TEST_KEY',
+      sourcePub:         Keypair.random().publicKey(),
+      sellAsset:         'BLND-GABC',
+      buyAsset:          'USDC-GDEF',
+      amount:            '1000',
+      signXdr:           async (x: string): Promise<string> => x,
+      _disposeBackoffMs: 0,
+      _clientFactory:    cf,
+      _mediatorFactory:  mf,
+    };
+  }
+
+  // ── EXEC-1 ──────────────────────────────────────────────────────────────────
+  // Regression test for the "tx.sign is not a function" bug.
+  // The ephemeralAuth callback must handle two payload shapes:
+  //   (a) a Transaction-like object (has .sign)  → call .sign(ephemeral) and return it
+  //   (b) a 32-byte Buffer hash                  → return a raw signature, never throw
+  it('EXEC-1: ephemeralAuth handles Transaction payload and Buffer hash without throwing', async () => {
+    const { client, factory: cf, getAuth } = makeFakeClient();
+    const { factory: mf } = makeFakeMediator();
+
+    const p = executeSbMediatorSwap(baseOpts(cf, mf));
+    // One tick: init() resolves and _clientFactory is called → authorization captured.
+    await tick();
+
+    const auth = getAuth();
+    expect(auth, 'authorization callback must be captured by _clientFactory').toBeDefined();
+
+    // (a) Transaction-like payload: .sign() must be called, same object returned.
+    const signMock = vi.fn();
+    const fakeTx   = { sign: signMock };
+    const txResult = auth(fakeTx);
+    expect(signMock).toHaveBeenCalledOnce();
+    expect(txResult).toBe(fakeTx);
+
+    // (b) 32-byte Buffer hash: must NOT throw "tx.sign is not a function",
+    //     must return a truthy signature (Buffer / Uint8Array).
+    const hash = Buffer.alloc(32, 0xbe);
+    let sig: unknown;
+    expect(() => { sig = auth(hash); }).not.toThrow();
+    expect(sig).toBeTruthy();
+
+    // Settle the pending promise (drive flow to completion via error event).
+    client.fire('error', { error: 'cleanup' });
+    await p; // resolves as { ok: false, error: 'cleanup' } — does not reject
+  });
+
+  // ── EXEC-2 ──────────────────────────────────────────────────────────────────
+  // After connect() the flow must replace socket.onmessage with the guard tap.
+  // A blocked tx must NOT reach origSpy; the swap must settle as { ok:true, blocked:true }.
+  it('EXEC-2: guard tap installed on connect; unparseable XDR blocks without calling origSpy', async () => {
+    const { client, factory: cf } = makeFakeClient();
+    const { factory: mf } = makeFakeMediator();
+
+    const p = executeSbMediatorSwap(baseOpts(cf, mf));
+    await tick(); // init + connect().then() run → tap installed
+
+    // Tap must have replaced the original spy.
+    expect(client.socket.onmessage).not.toBe(client.origSpy);
+    expect(typeof client.socket.onmessage).toBe('function');
+
+    // Feed unparseable XDR — the tap blocks it and must NOT forward to origSpy.
+    const tap = client.socket.onmessage as (ev: { data: string }) => void;
+    tap({ data: JSON.stringify({ type: 'tx', xdr: 'not-valid-xdr' }) });
+    expect(client.origSpy).not.toHaveBeenCalled();
+
+    // The guard-blocked path resolves the swap as { ok: true, blocked: true }.
+    const result = await p;
+    expect(result).toMatchObject({ ok: true, blocked: true });
+  });
+
+  // ── EXEC-3 ──────────────────────────────────────────────────────────────────
+  it('EXEC-3: happy path — finished resolves, dispose called once, no needsRecovery', async () => {
+    const { client, factory: cf } = makeFakeClient();
+    const { factory: mf, mediator } = makeFakeMediator();
+
+    const p = executeSbMediatorSwap(baseOpts(cf, mf));
+    await tick();
+
+    client.fire('quote',    {});
+    client.fire('finished', { detail: { hash: 'a'.repeat(64) } });
+
+    const result = await p as { ok: boolean; finished?: { hash: string }; needsRecovery?: unknown };
+    expect(result.ok).toBe(true);
+    expect(result.finished).toEqual({ hash: 'a'.repeat(64) });
+    expect(mediator.dispose).toHaveBeenCalledOnce();
+    expect(result.needsRecovery).toBeUndefined();
+  });
+
+  // ── EXEC-4 ──────────────────────────────────────────────────────────────────
+  // dispose throws on the 1st attempt, succeeds on the 2nd.
+  // Final result must NOT have needsRecovery; dispose must have been called twice.
+  it('EXEC-4: dispose retry — 1st call throws, 2nd succeeds, no needsRecovery', async () => {
+    let calls = 0;
+    const { client, factory: cf } = makeFakeClient();
+    const { factory: mf, mediator } = makeFakeMediator({
+      disposeFn: async (): Promise<void> => {
+        calls += 1;
+        if (calls < 2) throw new Error('dispose race');
+      },
+    });
+
+    const p = executeSbMediatorSwap(baseOpts(cf, mf));
+    await tick();
+
+    client.fire('quote',    {});
+    client.fire('finished', { detail: { hash: 'b'.repeat(64) } });
+
+    // await processes the two setTimeout(0) macrotasks for the retry backoff.
+    const result = await p as { ok: boolean; needsRecovery?: unknown };
+    expect(result.ok).toBe(true);
+    expect(result.needsRecovery).toBeUndefined();
+    expect(mediator.dispose).toHaveBeenCalledTimes(2);
+  });
+
+  // ── EXEC-5 ──────────────────────────────────────────────────────────────────
+  // dispose always throws (exhausts all 3 attempts).
+  // Result must have needsRecovery:true and mediatorAddress set; dispose called 3×.
+  it('EXEC-5: dispose exhausted — needsRecovery:true, mediatorAddress set, dispose called 3×', async () => {
+    const { client, factory: cf } = makeFakeClient();
+    const { factory: mf, mediator, mediatorAddress } = makeFakeMediator({
+      disposeFn: async (): Promise<void> => { throw new Error('always fails'); },
+    });
+
+    const p = executeSbMediatorSwap(baseOpts(cf, mf));
+    await tick();
+
+    client.fire('quote',    {});
+    client.fire('finished', { detail: { hash: 'c'.repeat(64) } });
+
+    const result = await p as { ok: boolean; needsRecovery?: boolean; mediatorAddress?: string };
+    expect(result.needsRecovery).toBe(true);
+    expect(result.mediatorAddress).toBe(mediatorAddress);
+    expect(mediator.dispose).toHaveBeenCalledTimes(3);
+  });
+
+  // ── EXEC-6 ──────────────────────────────────────────────────────────────────
+  // init() throws → result is { ok:false, error } with no dispose and no needsRecovery.
+  it('EXEC-6: init failure — ok:false returned, dispose never called, no needsRecovery', async () => {
+    const { factory: cf } = makeFakeClient();
+    const { factory: mf, mediator } = makeFakeMediator({ initRejects: true });
+
+    const result = await executeSbMediatorSwap(baseOpts(cf, mf)) as {
+      ok: boolean; error?: string; needsRecovery?: unknown;
+    };
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('init failed');
+    expect(mediator.dispose).not.toHaveBeenCalled();
+    expect(result.needsRecovery).toBeUndefined();
   });
 });

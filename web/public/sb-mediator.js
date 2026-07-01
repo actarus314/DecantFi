@@ -21286,7 +21286,8 @@ async function executeSbMediatorSwap({
   onProgress,
   networkPassphrase = Networks.PUBLIC,
   _mediatorFactory,
-  _clientFactory
+  _clientFactory,
+  _disposeBackoffMs = 3e3
 }) {
   const signTx2 = async (tx) => {
     const s = await signXdr(tx.toXDR(), "StellarBroker funding");
@@ -21299,9 +21300,12 @@ async function executeSbMediatorSwap({
     amount,
     signTx2
   );
+  let inited = false;
+  let result;
   try {
     onProgress?.({ step: "init", msg: "Initialising mediator account (funds ephemeral)" });
     const secret = await mediator.init();
+    inited = true;
     const ephemeral = Keypair.fromSecret(secret);
     const mediatorAddress = mediator.mediatorAddress;
     onProgress?.({ step: "funding", msg: `Mediator account: ${mediatorAddress}` });
@@ -21324,10 +21328,9 @@ async function executeSbMediatorSwap({
       account: mediatorAddress,
       authorization: ephemeralAuth
     });
-    let finished;
     try {
       onProgress?.({ step: "streaming", msg: "Connecting to StellarBroker" });
-      finished = await new Promise((resolve, reject) => {
+      const finished = await new Promise((resolve, reject) => {
         let settled = false;
         const done = (r) => {
           if (!settled) {
@@ -21370,21 +21373,31 @@ async function executeSbMediatorSwap({
         }).catch(fail);
         setTimeout(() => fail(new Error("swap timeout")), 6e4);
       });
+      onProgress?.({ step: "finished", detail: finished });
+      result = { ok: true, finished };
     } catch (e) {
-      if (e.message === "guard-blocked") {
-        return { ok: true, blocked: true };
-      }
-      return { ok: false, error: e.message };
+      result = e.message === "guard-blocked" ? { ok: true, blocked: true } : { ok: false, error: e.message };
     }
-    onProgress?.({ step: "finished", detail: finished });
-    return { ok: true, finished };
+  } catch (e) {
+    result = { ok: false, error: e.message };
   } finally {
-    try {
-      onProgress?.({ step: "dispose", msg: "Returning funds and merging mediator account" });
-      await mediator.dispose();
-    } catch {
+    if (inited) {
+      let disposed = false;
+      for (let attempt = 1; attempt <= 3 && !disposed; attempt++) {
+        try {
+          onProgress?.({ step: "dispose", msg: "Returning funds and merging mediator account" });
+          await mediator.dispose();
+          disposed = true;
+        } catch {
+          if (attempt < 3) await new Promise((r) => setTimeout(r, _disposeBackoffMs * attempt));
+        }
+      }
+      if (!disposed) {
+        result = { ...result, needsRecovery: true, mediatorAddress: mediator.mediatorAddress };
+      }
     }
   }
+  return result;
 }
 function hasObsoleteMediators(sourcePub) {
   return Mediator.hasObsoleteMediators(sourcePub);

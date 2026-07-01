@@ -73,7 +73,7 @@ export function makeGuardedTap({ origOnMessage, expected, onBlocked }) {
  * @param {string}    [opts.networkPassphrase]  Default: Networks.PUBLIC
  * @param {function}  [opts._mediatorFactory]   Test injection: replaces `new Mediator(...args)`
  * @param {function}  [opts._clientFactory]     Test injection: replaces `new StellarBrokerClient(opts)`
- * @returns {Promise<{ok: boolean, blocked?: boolean, finished?: object, error?: string}>}
+ * @returns {Promise<{ok: boolean, blocked?: boolean, finished?: object, error?: string, needsRecovery?: boolean, mediatorAddress?: string}>}
  */
 export async function executeSbMediatorSwap({
   partnerKey,
@@ -86,6 +86,7 @@ export async function executeSbMediatorSwap({
   networkPassphrase = Networks.PUBLIC,
   _mediatorFactory,
   _clientFactory,
+  _disposeBackoffMs = 3000,
 }) {
   // signTx wraps signXdr so the wallet can sign a raw XDR string while this
   // bundle's TransactionBuilder re-parses the result — guaranteeing that the
@@ -99,9 +100,12 @@ export async function executeSbMediatorSwap({
     sourcePub, sellAsset, buyAsset, amount, signTx,
   );
 
+  let inited = false;
+  let result;
   try {
     onProgress?.({ step: 'init', msg: 'Initialising mediator account (funds ephemeral)' });
     const secret = await mediator.init();
+    inited = true;
     const ephemeral = Keypair.fromSecret(secret);
     const mediatorAddress = mediator.mediatorAddress;
     onProgress?.({ step: 'funding', msg: `Mediator account: ${mediatorAddress}` });
@@ -132,10 +136,9 @@ export async function executeSbMediatorSwap({
       authorization: ephemeralAuth,
     });
 
-    let finished;
     try {
       onProgress?.({ step: 'streaming', msg: 'Connecting to StellarBroker' });
-      finished = await new Promise((resolve, reject) => {
+      const finished = await new Promise((resolve, reject) => {
         let settled = false;
         const done = (r) => { if (!settled) { settled = true; resolve(r); } };
         const fail = (e) => { if (!settled) { settled = true; reject(e); } };
@@ -172,26 +175,35 @@ export async function executeSbMediatorSwap({
         // Hard timeout: 60 s, same as the spike.
         setTimeout(() => fail(new Error('swap timeout')), 60_000);
       });
+      onProgress?.({ step: 'finished', detail: finished });
+      result = { ok: true, finished };
     } catch (e) {
-      if (e.message === 'guard-blocked') {
-        // Guard blocked a drain attempt — report as ok:true, blocked:true
-        // (funds are still in the mediator; dispose() will return them).
-        return { ok: true, blocked: true };
-      }
-      return { ok: false, error: e.message };
+      result = e.message === 'guard-blocked' ? { ok: true, blocked: true } : { ok: false, error: e.message };
     }
-
-    onProgress?.({ step: 'finished', detail: finished });
-    return { ok: true, finished };
+  } catch (e) {
+    // init/funding failed — nothing was funded, nothing to recover.
+    result = { ok: false, error: e.message };
   } finally {
-    // ALWAYS attempt dispose: returns sell-asset balance + merges ephemeral account.
-    try {
-      onProgress?.({ step: 'dispose', msg: 'Returning funds and merging mediator account' });
-      await mediator.dispose();
-    } catch {
-      // dispose errors are non-fatal to the returned result; caller sees the swap outcome.
+    if (inited) {
+      // Retry dispose to survive the post-swap sequence/ledger settle race.
+      // dispose() reloads the account each call, so a later attempt gets a fresh sequence.
+      let disposed = false;
+      for (let attempt = 1; attempt <= 3 && !disposed; attempt++) {
+        try {
+          onProgress?.({ step: 'dispose', msg: 'Returning funds and merging mediator account' });
+          await mediator.dispose();
+          disposed = true;
+        } catch {
+          if (attempt < 3) await new Promise((r) => setTimeout(r, _disposeBackoffMs * attempt));
+        }
+      }
+      if (!disposed) {
+        // Swap may have completed but funds are still in the mediator — surface honestly.
+        result = { ...result, needsRecovery: true, mediatorAddress: mediator.mediatorAddress };
+      }
     }
   }
+  return result;
 }
 
 /**

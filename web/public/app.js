@@ -275,6 +275,11 @@ const STRINGS = {
     sb_not_configured: 'StellarBroker n\'est pas configuré sur ce serveur.',
     sb_orphan_notice: 'Comptes médiateurs StellarBroker non clôturés détectés — des fonds peuvent nécessiter une récupération.',
     sb_orphan_recover_btn: 'Récupérer les fonds',
+    sb_recover_signing: 'Récupération — signez pour rapatrier vos fonds',
+    sb_recover_submitting: 'Rapatriement des fonds en cours…',
+    sb_recover_done: 'Fonds récupérés',
+    sb_recover_needed_title: 'Fonds à rapatrier',
+    sb_recover_needed_msg: "Le rapatriement automatique n'a pas abouti. Vos fonds sont saufs dans le compte médiateur ci-dessous et récupérables en un clic.",
   },
   en: {
     // Topbar / brand
@@ -551,6 +556,11 @@ const STRINGS = {
     sb_not_configured: 'StellarBroker is not configured on this server.',
     sb_orphan_notice: 'Orphaned StellarBroker mediator accounts detected — funds may need recovery.',
     sb_orphan_recover_btn: 'Recover funds',
+    sb_recover_signing: 'Recovery — sign to return your funds',
+    sb_recover_submitting: 'Returning funds…',
+    sb_recover_done: 'Funds recovered',
+    sb_recover_needed_title: 'Funds to recover',
+    sb_recover_needed_msg: 'Automatic return did not complete. Your funds are safe in the mediator account below and recoverable in one click.',
   },
   es: {
     // Topbar / brand
@@ -827,6 +837,11 @@ const STRINGS = {
     sb_not_configured: 'StellarBroker no está configurado en este servidor.',
     sb_orphan_notice: 'Cuentas mediadoras de StellarBroker no cerradas detectadas — es posible que algunos fondos necesiten recuperación.',
     sb_orphan_recover_btn: 'Recuperar fondos',
+    sb_recover_signing: 'Recuperación — firma para devolver tus fondos',
+    sb_recover_submitting: 'Devolviendo fondos…',
+    sb_recover_done: 'Fondos recuperados',
+    sb_recover_needed_title: 'Fondos por recuperar',
+    sb_recover_needed_msg: 'La devolución automática no se completó. Tus fondos están seguros en la cuenta mediadora de abajo y se pueden recuperar con un clic.',
   },
   pt: {
     brand_dim: 'BLND swaps - com precisão',
@@ -1053,6 +1068,11 @@ const STRINGS = {
     sb_not_configured: 'StellarBroker não está configurado neste servidor.',
     sb_orphan_notice: 'Contas mediadoras StellarBroker não encerradas detectadas — alguns fundos podem precisar de recuperação.',
     sb_orphan_recover_btn: 'Recuperar fundos',
+    sb_recover_signing: 'Recuperação — assine para devolver seus fundos',
+    sb_recover_submitting: 'Devolvendo fundos…',
+    sb_recover_done: 'Fundos recuperados',
+    sb_recover_needed_title: 'Fundos a recuperar',
+    sb_recover_needed_msg: 'A devolução automática não foi concluída. Seus fundos estão seguros na conta mediadora abaixo e podem ser recuperados com um clique.',
   },
 };
 
@@ -2887,7 +2907,9 @@ async function doExecuteSbMediator() {
       onProgress,
       networkPassphrase: KIT_NET,
     });
-    if (res.blocked) {
+    if (res.needsRecovery) {
+      execState = { phase: 'sb_recover_needed', mediatorAddress: res.mediatorAddress };
+    } else if (res.blocked) {
       execState = { phase: 'sb_blocked' };
     } else if (res.ok && res.finished) {
       execState = { phase: 'sb_done', finished: res.finished };
@@ -2906,7 +2928,7 @@ async function doExecuteSbMediator() {
 async function recoverSbMediators() {
   if (!walletAddress) return;
   await ensureKit();
-  execState = { phase: 'sb_mediator', sbStep: 'funding' };
+  execState = { phase: 'sb_mediator', sbStep: 'funding', recover: true };
   renderApp();
   try {
     const m = await import('/sb-mediator.js');
@@ -2916,13 +2938,13 @@ async function recoverSbMediators() {
     };
     const onProgress = (ev) => {
       if (ev.step === 'dispose-obsolete') {
-        execState = { phase: 'sb_mediator', sbStep: 'streaming' };
+        execState = { phase: 'sb_mediator', sbStep: 'streaming', recover: true };
         renderApp();
       }
     };
     await m.disposeObsoleteMediators({ sourcePub: walletAddress, signXdr, networkPassphrase: KIT_NET, onProgress });
     sbOrphanNotice = false;
-    execState = { phase: 'sb_done', finished: null };
+    execState = { phase: 'sb_done', finished: null, recover: true };
   } catch (e) {
     const msg = (e && e.message) || '';
     execState = { phase: 'error', errorMsg: /reject/i.test(msg) ? t('exec_rejected') : (msg ? escapeHtml(msg) : t('exec_failed')) };
@@ -3153,7 +3175,7 @@ function cancelExecute() {
 
 function onModalBackdrop() {
   // backdrop self-click is enforced by the delegated dispatcher (data-self-only)
-  if (execState && (execState.phase === 'done' || execState.phase === 'error' || execState.phase === 'sb_blocked' || execState.phase === 'sb_done')) {
+  if (execState && (execState.phase === 'done' || execState.phase === 'error' || execState.phase === 'sb_blocked' || execState.phase === 'sb_done' || execState.phase === 'sb_recover_needed')) {
     cancelExecute();
   }
 }
@@ -3416,8 +3438,19 @@ function execModal() {
   } else if (phase === 'leg1_confirming') {
     content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0">${t('comp_leg1_confirming')}</p>`;
   } else if (phase === 'sb_mediator') {
-    const sbMsg = execState.sbStep === 'streaming' ? t('sb_mediator_streaming') : t('sb_mediator_funding');
+    const sbMsg = execState.recover
+      ? (execState.sbStep === 'streaming' ? t('sb_recover_submitting') : t('sb_recover_signing'))
+      : (execState.sbStep === 'streaming' ? t('sb_mediator_streaming') : t('sb_mediator_funding'));
     content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem"><span class="pulse">${sbMsg}</span></p>`;
+  } else if (phase === 'sb_recover_needed') {
+    content = `
+      <p style="font-size:14px;font-weight:700;color:var(--amber);margin:0 0 .5rem">${t('sb_recover_needed_title')}</p>
+      <p class="help" style="margin:0 0 .5rem">${t('sb_recover_needed_msg')}</p>
+      <p class="help" style="font-family:monospace;font-size:11px;word-break:break-all;margin:0 0 .9rem">${escapeHtml(execState.mediatorAddress || '')}</p>
+      <div style="display:flex;gap:.55rem;justify-content:flex-end">
+        <button class="btn primary" data-act="recoverSbMediators">${t('sb_orphan_recover_btn')}</button>
+        <button class="btn" data-act="cancelExecute">${t('exec_close')}</button>
+      </div>`;
   } else if (phase === 'sb_blocked') {
     content = `
       <p style="font-size:14px;font-weight:700;color:var(--amber);margin:0 0 .5rem">${t('exec_failed')}</p>
@@ -3426,17 +3459,28 @@ function execModal() {
         <button class="btn primary" data-act="cancelExecute">${t('exec_close')}</button>
       </div>`;
   } else if (phase === 'sb_done') {
-    const fin = execState.finished;
-    const sbHash = fin && typeof fin.hash === 'string' && /^[0-9a-fA-F]{64}$/.test(fin.hash) ? fin.hash : '';
-    content = `
-      <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.8rem">
-        <span style="font-size:22px;color:var(--green);line-height:1">✓</span>
-        <span style="font-size:15px;font-weight:700;color:var(--green)">${t('exec_success')}</span>
-      </div>
-      <div style="display:flex;gap:.55rem;margin-top:1rem;align-items:center;justify-content:flex-end;flex-wrap:wrap">
-        ${sbHash ? `<a class="btn openlink" href="https://stellar.expert/explorer/public/tx/${encodeURIComponent(sbHash)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:.3rem">${t('exec_view')}</a>` : ''}
-        <button class="btn primary" data-act="cancelExecute">${t('exec_close')}</button>
-      </div>`;
+    if (execState.recover) {
+      content = `
+        <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.8rem">
+          <span style="font-size:22px;color:var(--green);line-height:1">✓</span>
+          <span style="font-size:15px;font-weight:700;color:var(--green)">${t('sb_recover_done')}</span>
+        </div>
+        <div style="display:flex;gap:.55rem;margin-top:1rem;justify-content:flex-end">
+          <button class="btn primary" data-act="cancelExecute">${t('exec_close')}</button>
+        </div>`;
+    } else {
+      const fin = execState.finished;
+      const sbHash = fin && typeof fin.hash === 'string' && /^[0-9a-fA-F]{64}$/.test(fin.hash) ? fin.hash : '';
+      content = `
+        <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.8rem">
+          <span style="font-size:22px;color:var(--green);line-height:1">✓</span>
+          <span style="font-size:15px;font-weight:700;color:var(--green)">${t('exec_success')}</span>
+        </div>
+        <div style="display:flex;gap:.55rem;margin-top:1rem;align-items:center;justify-content:flex-end;flex-wrap:wrap">
+          ${sbHash ? `<a class="btn openlink" href="https://stellar.expert/explorer/public/tx/${encodeURIComponent(sbHash)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:.3rem">${t('exec_view')}</a>` : ''}
+          <button class="btn primary" data-act="cancelExecute">${t('exec_close')}</button>
+        </div>`;
+    }
   } else if (phase === 'done') {
     const rv = build && build.review;
     const doneTarget = (rv && rv.target) || target;
