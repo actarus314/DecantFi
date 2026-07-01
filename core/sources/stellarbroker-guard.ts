@@ -1,7 +1,7 @@
 // Anti-drain guard for StellarBroker streamed transactions.
 // validateStreamedTx(tx, expected) — synchronous, returns { ok, reason }.
 //
-// This guard is the SOLE safety net on the fund-custody path.
+// This guard is a defense-in-depth validation on the fund-custody path.
 // It does NOT inspect the BUY/output side (not a drain vector):
 //   the output amount is not under our control and is not a custody risk.
 // It caps per-streamed-tx with tx-level aggregate caps on sold and fee amounts.

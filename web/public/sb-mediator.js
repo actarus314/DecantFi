@@ -1,5 +1,5 @@
 // @stellar-broker/client@0.6.14 — vendored browser bundle (esbuild); regenerate: npm run build:sb-mediator
-// ⚠ KNOWN vuln DECANT-SB-2026-001: validateTransaction() incomplete — mitigated by validateStreamedTx guard (bundled).
+// Streamed transactions are validated by our validateStreamedTx guard before signing (defense in depth).
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;

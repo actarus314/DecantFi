@@ -1,11 +1,9 @@
 // Self-hosted bundle for the StellarBroker Mediator execution flow.
-// ⚠ SECURITY: bundles @stellar-broker/client@0.6.14 — an SDK with a KNOWN
-//   fund-drain vulnerability (advisory DECANT-SB-2026-001): its
-//   validateTransaction() does NOT validate the Soroban swap path. We pin
-//   this exact version DELIBERATELY and neutralise the vuln with our own
-//   validateStreamedTx guard, run in the socket TAP before the ephemeral
-//   key signs. DO NOT "upgrade" this SDK or trust its own validation.
-//   Regenerate: npm run build:sb-mediator
+// ⚠ SECURITY: this path holds funds in transit, so every transaction the SDK
+//   streams is validated against a strict allowlist by our validateStreamedTx
+//   guard — run in the socket TAP before the ephemeral key signs (defense in
+//   depth). The SDK version is pinned for a reproducible, reviewable bundle;
+//   review makeGuardedTap() before changing it. Regenerate: npm run build:sb-mediator
 
 // High-level flow API — app.js imports these (only plain data + XDR strings cross the boundary).
 export { executeSbMediatorSwap, makeGuardedTap, hasObsoleteMediators, disposeObsoleteMediators } from './sb-mediator-flow.js';

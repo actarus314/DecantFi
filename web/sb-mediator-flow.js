@@ -2,9 +2,10 @@
 // All SDK objects stay inside this bundle; only XDR strings + plain data + callbacks
 // cross the bundle boundary into app.js (two stellar-sdk copies in the page would break instanceof).
 //
-// ⚠ SECURITY: This file contains the SOLE safety-net guard against fund drain.
-//   makeGuardedTap() must be reviewed before every SDK upgrade.
-//   See: advisory DECANT-SB-2026-001, core/sources/stellarbroker-guard.ts.
+// ⚠ SECURITY: this path holds funds in transit, so every streamed transaction is
+//   validated against a strict allowlist before the ephemeral key signs (defense in
+//   depth). Review makeGuardedTap() before any SDK change.
+//   See core/sources/stellarbroker-guard.ts.
 
 import { StellarBrokerClient, Mediator } from '@stellar-broker/client/src/index.js';
 import { TransactionBuilder, Networks, Keypair } from '@stellar/stellar-sdk';

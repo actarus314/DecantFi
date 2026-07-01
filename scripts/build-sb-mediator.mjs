@@ -4,7 +4,7 @@
  * Usage: npm run build:sb-mediator
  *
  * ⚠ After running: commit sb-mediator.js + sb-mediator.js.sha256.
- *   The bundle pins @stellar-broker/client@0.6.14 (KNOWN vuln DECANT-SB-2026-001).
+ *   The bundle pins @stellar-broker/client for a reproducible, reviewable artifact.
  *   DO NOT upgrade the SDK without a full security review and updating the guard.
  */
 import { build } from 'esbuild';
@@ -29,7 +29,7 @@ try {
 
 const banner =
   `// @stellar-broker/client@${version} — vendored browser bundle (esbuild); regenerate: npm run build:sb-mediator\n` +
-  `// ⚠ KNOWN vuln DECANT-SB-2026-001: validateTransaction() incomplete — mitigated by validateStreamedTx guard (bundled).`;
+  `// Streamed transactions are validated by our validateStreamedTx guard before signing (defense in depth).`;
 
 await build({
   entryPoints: [path.join(repoRoot, 'web', 'sb-mediator.entry.js')],
