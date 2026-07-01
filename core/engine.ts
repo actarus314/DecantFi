@@ -124,9 +124,7 @@ export async function quote(opts: QuoteOptions): Promise<QuoteResult> {
       blndToEurc: (amt) => quoteAllFor(BLND, EURC, amt),
       blndToUsdc: (amt) => quoteAllFor(BLND, USDC, amt),
       usdcToEurc: (amt) => quoteAllFor(USDC, EURC, amt),
-      // SB composite leg (leg2-via-SB) is wired in P4; excluded here until then
-    // so a displayed composite never has an SB leg we cannot execute (preserves displayed==executed).
-  }, cfg.reSimLeg, (s: string) => isExecutableSource(s) && s !== 'stellarbroker');
+    }, cfg.reSimLeg, isExecutableSource);
   }
 
   let split: SplitAnalysis | undefined;

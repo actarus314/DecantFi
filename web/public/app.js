@@ -2870,24 +2870,33 @@ async function doExecuteSbFloor() {
 }
 
 // Execute a swap via the StellarBroker Mediator WS flow (client-side, keyless after key fetch).
-// The sell asset is always BLND (from-USDC deferred); the buy asset is the current `target`.
 // ONE wallet signature funds the ephemeral mediator account; the swap then runs fully client-side.
-async function doExecuteSbMediator() {
-  if (!simResult || !simActive || simAmt <= 0) return;
+// opts (optional): { sellAsset, buyAsset, amount, comp } for composite leg2 dispatch (P4).
+//   When opts is absent (direct call from button / doExecute): sell=BLND, buy=target, amount=simAmt.
+//   When opts is provided (leg2 of composite): uses opts.sellAsset/buyAsset/amount; threads comp
+//   through all exec state transitions so the modal stays coherent.
+async function doExecuteSbMediator(opts) {
+  const fromComp = opts != null && typeof opts === 'object';
+  if (!fromComp) {
+    // Direct (atomic) path: guards on simResult/simActive/simAmt apply
+    if (!simResult || !simActive || simAmt <= 0) return;
+  }
   if (!walletAddress) {
     execState = { phase: 'error', errorMsg: t('exec_connect_first') };
     renderApp();
     return;
   }
   await ensureKit(); // ensure SWK + KIT_NET are ready before signXdr is invoked
-  const sellAsset = SB_ASSET_STRS.BLND; // sell is always BLND (from-USDC flow deferred)
-  const buyAsset = SB_ASSET_STRS[target];
-  execState = { phase: 'sb_mediator', sbStep: 'funding' };
+  const sellAsset = (fromComp && opts.sellAsset) ? opts.sellAsset : SB_ASSET_STRS.BLND;
+  const buyAsset = (fromComp && opts.buyAsset) ? opts.buyAsset : SB_ASSET_STRS[target];
+  const amount = (fromComp && opts.amount != null) ? opts.amount : String(simAmt);
+  const comp = (fromComp && opts.comp) ? opts.comp : null;
+  execState = { phase: 'sb_mediator', sbStep: 'funding', ...(comp ? { comp } : {}) };
   renderApp();
   try {
     const r = await fetch('/api/sb-mediator-key');
     if (!r.ok) {
-      execState = { phase: 'error', errorMsg: t('sb_not_configured') };
+      execState = { phase: 'error', errorMsg: t('sb_not_configured'), ...(comp ? { comp } : {}) };
       renderApp();
       return;
     }
@@ -2898,7 +2907,7 @@ async function doExecuteSbMediator() {
     };
     const onProgress = (ev) => {
       if (ev.step === 'streaming') {
-        execState = { phase: 'sb_mediator', sbStep: 'streaming' };
+        execState = { phase: 'sb_mediator', sbStep: 'streaming', ...(comp ? { comp } : {}) };
         renderApp();
       }
     };
@@ -2908,23 +2917,23 @@ async function doExecuteSbMediator() {
       sourcePub: walletAddress,
       sellAsset,
       buyAsset,
-      amount: String(simAmt),
+      amount,
       signXdr,
       onProgress,
       networkPassphrase: KIT_NET,
     });
     if (res.needsRecovery) {
-      execState = { phase: 'sb_recover_needed', mediatorAddress: res.mediatorAddress };
+      execState = { phase: 'sb_recover_needed', mediatorAddress: res.mediatorAddress, ...(comp ? { comp } : {}) };
     } else if (res.blocked) {
-      execState = { phase: 'sb_blocked' };
+      execState = { phase: 'sb_blocked', ...(comp ? { comp } : {}) };
     } else if (res.ok && res.finished) {
-      execState = { phase: 'sb_done', finished: res.finished };
+      execState = { phase: 'sb_done', finished: res.finished, ...(comp ? { comp } : {}) };
     } else {
-      execState = { phase: 'error', errorMsg: escapeHtml(res.error || t('exec_failed')) };
+      execState = { phase: 'error', errorMsg: escapeHtml(res.error || t('exec_failed')), ...(comp ? { comp } : {}) };
     }
   } catch (e) {
     const msg = (e && e.message) || '';
-    execState = { phase: 'error', errorMsg: /reject/i.test(msg) ? t('exec_rejected') : (msg ? escapeHtml(msg) : t('exec_failed')) };
+    execState = { phase: 'error', errorMsg: /reject/i.test(msg) ? t('exec_rejected') : (msg ? escapeHtml(msg) : t('exec_failed')), ...(comp ? { comp } : {}) };
   }
   renderApp();
 }
@@ -2973,6 +2982,7 @@ async function doExecuteComposite() {
 async function startCompositeLeg1(compRow) {
   const leg1Source = (compRow.legs && compRow.legs[0] && compRow.legs[0].sourceId)
     || compRow.sourceId.split('+')[0].trim();
+  const leg2Source = (compRow.legs && compRow.legs[1] && compRow.legs[1].sourceId) || null;
   // Lire le solde USDC avant (non bloquant)
   let usdcBefore = null;
   if (walletAddress) {
@@ -2986,7 +2996,7 @@ async function startCompositeLeg1(compRow) {
     const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pair: 'USDC', amount: simAmt, sender: walletAddress, slippageBps: Math.round(execSlippagePct * 100), venue: leg1Source }) });
     const j = await r.json();
-    const comp1 = { leg: 1, leg1Source, usdcBefore, usdcReceived: null, hash1: null };
+    const comp1 = { leg: 1, leg1Source, leg2Source, usdcBefore, usdcReceived: null, hash1: null };
     // Erreur leg1 (typiquement trustline USDC manquante) : préserve comp{leg:1} + l'actif manquant
     // (j.asset = USDC ici) → le front ajoute/relance la BONNE trustline, pas le target global (EURC).
     if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, asset: j.asset, comp: comp1 }; }
@@ -3127,6 +3137,13 @@ async function confirmExecute() {
 }
 
 async function buildCompositeLeg2(comp) {
+  // P4: when leg2 was quoted via StellarBroker, dispatch to the Mediator WS flow instead
+  // of /api/build (SB is not a valid server venue). Mediator handles USDC→EURC client-side;
+  // the user must already have the EURC trustline (same assumption as the server-build path).
+  if (chooseLeg2Dispatch(comp) === 'stellarbroker') {
+    await doExecuteSbMediator({ sellAsset: SB_ASSET_STRS.USDC, buyAsset: SB_ASSET_STRS.EURC, amount: String(comp.usdcReceived), comp: { ...comp, leg: 2 } });
+    return;
+  }
   try {
     const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pair: 'EURC', from: 'USDC', amount: comp.usdcReceived, sender: walletAddress, slippageBps: Math.round(execSlippagePct * 100) }) });

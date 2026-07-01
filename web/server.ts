@@ -94,6 +94,9 @@ const appJsAsset = staticAsset(readFileSync(appJsPath), 'text/javascript; charse
 const chooseExecPath = fileURLToPath(new URL('./public/choose-exec.js', import.meta.url));
 const chooseExecAsset = staticAsset(readFileSync(chooseExecPath), 'text/javascript; charset=utf-8');
 
+const compositeLeg2DispatchPath = fileURLToPath(new URL('./public/composite-leg2-dispatch.js', import.meta.url));
+const compositeLeg2DispatchAsset = staticAsset(readFileSync(compositeLeg2DispatchPath), 'text/javascript; charset=utf-8');
+
 const faviconPath = fileURLToPath(new URL('./public/favicon.svg', import.meta.url));
 const faviconAsset = staticAsset(readFileSync(faviconPath), 'image/svg+xml; charset=utf-8');
 
@@ -304,6 +307,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/choose-exec.js') {
       sendStatic(req, res, chooseExecAsset, 'no-cache', RESOURCE_HEADERS);
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/composite-leg2-dispatch.js') {
+      sendStatic(req, res, compositeLeg2DispatchAsset, 'no-cache', RESOURCE_HEADERS);
       return;
     }
 
