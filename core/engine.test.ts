@@ -97,15 +97,16 @@ describe('quote vers USDC', () => {
 
 describe('quote vers EURC', () => {
   it('compare direct vs via-USDC et choisit le meilleur net EURC', async () => {
+    // Use an executable source id so the composite legs pass the isExecutableSource filter.
     const dynamic: SourceAdapter = {
-      id: 'dyn',
+      id: 'xbull',
       available: () => true,
       async quote(req) {
         const pair = `${req.sellAsset.symbol}->${req.buyAsset.symbol}`;
         const map: Record<string, string> = { 'BLND->EURC': '43.6', 'BLND->USDC': '50.8', 'USDC->EURC': '46.7' };
         const v = map[pair];
         if (!v) return null;
-        return mk('dyn', toStroops(v), {
+        return mk('xbull', toStroops(v), {
           sellAsset: req.sellAsset,
           buyAsset: req.buyAsset,
           amountIn: req.amountIn,

@@ -1,12 +1,13 @@
 // Orchestrateur d'exécution : BLND → USDC/EURC via xBull, Soroswap, Horizon ou Aquarius.
 // Money-path : bigint stroops partout, jamais de float pour les calculs.
-import { BLND, USDC, EURC, bySac, classicColon, type Asset } from '../core/assets.js';
+import { BLND, USDC, EURC, XLM, ASSETS, bySac, classicColon, type Asset } from '../core/assets.js';
 import { decodeTransfers, routeFromTransfers, type Transfer } from '../core/soroban-route.js';
 import { bumpRpc } from '../core/rpc-meter.js';
 import { withTimeout } from '../core/timeout.js';
 import { toNumber, fromStroops, toStroops } from '../core/amount.js';
 import { stroopsOrNull, bigintOrNull } from '../core/sources/util.js';
 import { COMET_POOL, COMET_WITNESSES, decodeCometOut } from '../core/sources/comet.js';
+import { SB_FEE_ACCOUNT } from '../core/sources/stellarbroker.js';
 import { parseBlndBalance } from '../core/balance.js';
 import { SoroswapSDK, SupportedNetworks, SupportedProtocols, TradeType } from '@soroswap/sdk';
 
@@ -52,6 +53,15 @@ function trustlineMissingError(buy: Asset, sender: string): ExecError {
 }
 
 // ─── Helpers purs exportés ───────────────────────────────────────────────────
+
+/** Converts a Stellar SDK Asset object (decoded from XDR) to a core Asset,
+ *  or null if the asset is not in the known registry (unknown → cannot route). */
+function sdkAssetToCore(a: { isNative(): boolean; getCode(): string; getIssuer(): string }): Asset | null {
+  if (a.isNative()) return XLM;
+  const code = a.getCode();
+  const issuer = a.getIssuer();
+  return ASSETS.find((x) => x.code === code && x.issuer === issuer) ?? null;
+}
 
 /** Floor-division : net * (10000-bps) / 10000. Lance si bps invalide. */
 export function minReceivedStroops(net: bigint, slippageBps: number): bigint {
@@ -435,6 +445,248 @@ export async function simulateXbullNet(
     }
   }
   return null;
+}
+
+// ─── Simulation StellarBroker (empty-auth recording-mode) ────────────────────
+
+// SB_FEE_ACCOUNT is defined canonically in core/sources/stellarbroker.ts; re-export for callers/tests.
+export { SB_FEE_ACCOUNT };
+
+/**
+ * Re-simulate a StellarBroker swap using the empty-auth recording-mode technique
+ * proven in spike/sb-mediator/scripts/t5b-emptyauth-sim.mjs.
+ *
+ * Opens a WS trade session against a witness (no signing), captures the unsigned
+ * tx burst, then for each XDR:
+ *   - invokeHostFunction: rebuild with witness as source, auth:[], no sorobanData;
+ *     simulateTransaction in recording mode; contribution = scValToNative(retval)[1].
+ *   - pathPaymentStrictSend to trader (≠ SB_FEE_ACCOUNT): contribution = destMin.
+ *   - pathPaymentStrictSend to SB_FEE_ACCOUNT: excluded (fee leg).
+ *
+ * Net = Σ contributions. Returns null on capture failure or zero net.
+ *
+ * `exact` is true ONLY when every contributing leg was a Soroban recording-mode
+ * sim (a real observed fill). If any classic trader leg contributed its destMin
+ * (a slippage FLOOR, not an observed fill), `exact` is false: the net is then a
+ * conservative lower bound and callers MUST NOT relabel it "observed".
+ */
+export async function simulateStellarBrokerNet(opts: {
+  sellAsset: Asset;
+  buyAsset: Asset;
+  amountIn: bigint;
+  slippageBps: number;
+  apiKey: string;
+  rpcUrl: string;
+  wsConstructor?: typeof WebSocket;
+  /** For testing: skip real WS capture, use these XDRs directly. */
+  _capturedXdrs?: string[];
+  /** For testing: override the RPC server. */
+  _rpcServer?: { simulateTransaction(tx: unknown): Promise<unknown> };
+  /** Execution deps (fetchJson) used by quoteHorizon for classic-leg re-quote.
+   *  Defaults to defaultDeps() when not provided. */
+  deps?: ExecDeps;
+  /** Horizon base URL passed through to quoteHorizon. Defaults to HORIZON_BASE_DEFAULT. */
+  horizonUrl?: string;
+  /** For testing: override quoteHorizon to avoid real network calls. */
+  _quoteHorizon?: typeof quoteHorizon;
+}): Promise<{ net: bigint; route: string[]; exact: boolean } | null> {
+  // All AQUARIUS_WITNESSES hold BLND, USDC, EURC — pick the first as witness/trader
+  const witness = AQUARIUS_WITNESSES[0]!;
+
+  let capturedXdrs: string[];
+
+  if (opts._capturedXdrs) {
+    capturedXdrs = opts._capturedXdrs;
+  } else {
+    const { captureStellarBrokerTx } = await import('../core/sources/stellarbroker.js');
+    const capture = await withTimeout(
+      captureStellarBrokerTx(
+        { sellAsset: opts.sellAsset, buyAsset: opts.buyAsset, amountIn: opts.amountIn, slippageBps: opts.slippageBps },
+        opts.apiKey,
+        witness,
+        { WebSocketConstructor: opts.wsConstructor },
+      ),
+      SIM_TIMEOUT_MS,
+      'sb capture',
+    ).catch(() => null);
+    if (!capture || capture.xdrs.length === 0) return null;
+    capturedXdrs = capture.xdrs;
+  }
+
+  const sdk = await import('@stellar/stellar-sdk');
+  const { rpc, TransactionBuilder, Networks, Account, Operation, scValToNative, FeeBumpTransaction } = sdk;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const server: { simulateTransaction(tx: unknown): Promise<unknown> } =
+    opts._rpcServer ?? new rpc.Server((opts.rpcUrl || 'https://mainnet.sorobanrpc.com').replace(/\/$/, ''));
+
+  // Horizon re-quote seam: injectable for tests, real implementation otherwise.
+  const qhFn = opts._quoteHorizon ?? quoteHorizon;
+  // fetchJson provider for quoteHorizon calls; defaultDeps() as fallback.
+  const execDeps = opts.deps ?? defaultDeps();
+
+  let totalNet = 0n;
+  // True as soon as a classic trader-leg destMin (a floor, not an observed fill) is summed
+  // into the net → the result can no longer be honestly labelled "observed/exact".
+  let classicContributed = false;
+
+  // Track contributions per captured XDR (= per sub-tx). Used to select the dominant route.
+  // SB bursts can be parallel splits across multiple XDRs; we display the route of the sub-tx
+  // with the LARGEST fill contribution. This is a deliberate simplification consistent with the
+  // linear-route convention used by xBull/Aquarius: rendering true parallel fan-outs is out of P2.
+  const subTxContribs: Array<{ fill: bigint; route: string[] }> = [];
+
+  for (const xdrStr of capturedXdrs) {
+    try {
+      const parsed = TransactionBuilder.fromXDR(xdrStr, Networks.PUBLIC);
+      // Unwrap FeeBump if present
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tx = (parsed instanceof FeeBumpTransaction) ? (parsed as any).innerTransaction : parsed;
+
+      // Check for invokeHostFunction ops (Soroban swap legs)
+      const invokeOps = (tx.operations as Array<{ type: string }>).filter((o) => o.type === 'invokeHostFunction');
+
+      if (invokeOps.length > 0) {
+        // ── Soroban leg ────────────────────────────────────────────────────────
+        let xdrFill = 0n;
+        let xdrRoute: string[] = [];
+
+        for (const invokeOp of invokeOps) {
+          // Rebuild with witness as source, empty auth, no sorobanData → recording mode
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const func = (invokeOp as any).func;
+          const rebuilt = new TransactionBuilder(new Account(witness, '0'), {
+            fee: '1000000',
+            networkPassphrase: Networks.PUBLIC,
+          })
+            .addOperation(Operation.invokeHostFunction({ func, auth: [] }))
+            .setTimeout(120)
+            .build();
+          bumpRpc();
+          const sim = await withTimeout(
+            server.simulateTransaction(rebuilt),
+            SIM_TIMEOUT_MS,
+            'sb soroban sim',
+          );
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (rpc.Api.isSimulationError(sim as any) || !(sim as any)?.result?.retval) continue;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const native = scValToNative((sim as any).result.retval);
+          if (!Array.isArray(native) || native.length < 2) continue;
+          const leg = BigInt(native[1]);
+          if (leg > 0n) {
+            totalNet += leg;
+            xdrFill += leg;
+          }
+          // Decode real route from SAC transfer events, mirroring simulateXbullNet.
+          // Falls back to [] when the RPC returns no events (e.g. in test stubs).
+          if (xdrRoute.length < 2) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const transfers = await decodeTransfers((sim as any).events ?? []);
+            const decoded = routeFromTransfers(transfers);
+            if (decoded.length >= 2) xdrRoute = decoded;
+          }
+        }
+
+        if (xdrFill > 0n) subTxContribs.push({ fill: xdrFill, route: xdrRoute });
+        continue; // tx was Soroban — classic branch below not applicable
+      }
+
+      // ── Classic pathPaymentStrictSend legs ────────────────────────────────
+      type ClassicOp = {
+        type: string;
+        destination?: string;
+        destMin?: string;
+        sendAsset?: { isNative(): boolean; getCode(): string; getIssuer(): string };
+        sendAmount?: string;
+        destAsset?: { isNative(): boolean; getCode(): string; getIssuer(): string };
+        /** Intermediate hops in the path (SDK Asset objects). */
+        path?: Array<{ isNative(): boolean; getCode(): string }>;
+      };
+      // Convert SDK Asset → display symbol: native → 'XLM', else asset code.
+      const assetSym = (a: { isNative(): boolean; getCode(): string }): string =>
+        a.isNative() ? 'XLM' : a.getCode();
+
+      let xdrFill = 0n;
+      let xdrRoute: string[] = [];
+
+      for (const op of (tx.operations as ClassicOp[])) {
+        if (op.type !== 'pathPaymentStrictSend') continue;
+        if (op.destination === SB_FEE_ACCOUNT) continue; // fee leg → skip
+
+        // Decode route from this classic op: [sendAsset, ...path, destAsset].
+        // Captured once from the first non-fee trader leg of this XDR.
+        if (op.sendAsset && op.destAsset && xdrRoute.length < 2) {
+          const sendSym = assetSym(op.sendAsset);
+          const pathSyms = (op.path ?? []).map(assetSym);
+          const destSym = assetSym(op.destAsset);
+          xdrRoute = [sendSym, ...pathSyms, destSym];
+        }
+
+        // Attempt to observe the real fill via Horizon strict-send.
+        // Only possible when sendAsset and destAsset are known (in our ASSETS registry).
+        // On any failure (Horizon down, timeout, unknown asset) → fall back to destMin floor.
+        let observedFill: bigint | null = null;
+        if (op.sendAsset && op.sendAmount && op.destAsset) {
+          const sendCore = sdkAssetToCore(op.sendAsset);
+          const destCore = sdkAssetToCore(op.destAsset);
+          if (sendCore && destCore) {
+            try {
+              const sendAmountStroops = toStroops(op.sendAmount);
+              const hResult = await withTimeout(
+                qhFn(sendCore, destCore, sendAmountStroops, execDeps, opts.horizonUrl),
+                SIM_TIMEOUT_MS,
+                'sb classic horizon',
+              ).catch(() => null);
+              if (hResult && hResult.netOut > 0n) observedFill = hResult.netOut;
+            } catch { /* toStroops failure or other sync error — fall through to destMin */ }
+          }
+        }
+
+        let legFill = 0n;
+        if (observedFill !== null) {
+          // Real fill from Horizon strict-send — this IS an observed fill.
+          // Do NOT set classicContributed: exact stays true if all other legs are also observed.
+          totalNet += observedFill;
+          legFill = observedFill;
+        } else {
+          // Fallback: destMin is a slippage FLOOR, never an observed fill.
+          // Summing it makes the net a conservative lower bound → mark non-exact so callers
+          // keep the honest estimate label instead of promoting to "observed".
+          if (op.destMin) {
+            try {
+              const destMinStroops = toStroops(op.destMin);
+              if (destMinStroops > 0n) {
+                totalNet += destMinStroops;
+                classicContributed = true;
+                legFill = destMinStroops;
+              }
+            } catch { /* malformed destMin — skip */ }
+          }
+        }
+
+        if (legFill > 0n) xdrFill += legFill;
+      }
+
+      if (xdrFill > 0n) subTxContribs.push({ fill: xdrFill, route: xdrRoute });
+    } catch {
+      // Malformed XDR — skip
+    }
+  }
+
+  if (totalNet <= 0n) return null;
+
+  // Select the dominant route: the sub-tx with the largest fill contribution.
+  // In a split burst this is the main path; true parallel routing is not rendered in P2.
+  const dominant = subTxContribs.reduce<{ fill: bigint; route: string[] } | null>(
+    (best, cur) => (!best || cur.fill > best.fill) ? cur : best,
+    null,
+  );
+  const route = (dominant?.route?.length ?? 0) >= 2
+    ? dominant!.route
+    : [opts.sellAsset.symbol, opts.buyAsset.symbol];
+
+  return { net: totalNet, route, exact: !classicContributed };
 }
 
 /** Simule swap_chained Aquarius et retourne les Transfer[] bruts (pour la sonde de cohérence).

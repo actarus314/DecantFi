@@ -52,6 +52,7 @@ export interface RouteRank {
   winPct: number;
   marginPct: number | null;  // marge au 2ᵉ : médiane sur les ticks gagnés de (net_gagnant−net_2ᵉ)/net_gagnant ×100 ; null si non calculable
   trend: 'up' | 'down' | 'flat' | null;  // évolution : part de victoires sur la 2e moitié de la fenêtre vs la 1ère ; null si données insuffisantes
+  trendMag: number | null;  // magnitude signée de l'évolution (Δ part-de-victoires 2e moitié − 1ère) ; sert au tableau à distinguer fort/léger ; null si données insuffisantes
 }
 
 export interface Overview {
@@ -305,13 +306,13 @@ function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string, am
     const wn = toNumber(winNet);
     if (wn <= 0) continue;
     const margin = ((wn - toNumber(secondNet)) / wn) * 100;
-    const key = String(r['source_id'] ?? '') + ' ' + String(r['route_summary'] ?? '');
+    const key = String(r['source_id'] ?? '') + '\x00' + String(r['route_summary'] ?? '');
     let arr = marginSamples.get(key);
     if (!arr) { arr = []; marginSamples.set(key, arr); }
     arr.push(margin);
   }
   const marginFor = (sourceId: string, routeSummary: string): number | null => {
-    const arr = marginSamples.get(sourceId + ' ' + routeSummary);
+    const arr = marginSamples.get(sourceId + '\x00' + routeSummary);
     if (!arr || arr.length === 0) return null;
     const med = median(arr);
     return med == null ? null : Math.round(med * 100) / 100;
@@ -326,7 +327,7 @@ function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string, am
     ORDER BY t.started_at
   `);
   const times = (amountIn != null ? tStmt.all(pair, windowStart, amountIn) : tStmt.all(pair, windowStart)).map((x) => String((x as Record<string, unknown>)['sa']));
-  const trendMap = new Map<string, 'up' | 'down' | 'flat'>();
+  const trendMap = new Map<string, number>();  // clé → magnitude signée d (Δ part-de-victoires) ; le sens up/down/flat ET la force en dérivent
   if (times.length >= 4) {
     const mid = times[Math.floor(times.length / 2)]!;
     const hStmt = prepBig(db, `
@@ -343,11 +344,19 @@ function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string, am
     if (totRec > 0 && totOld > 0) {
       for (const x of hRows) {
         const d = Number(x['rec'] as bigint) / totRec - Number(x['old'] as bigint) / totOld;
-        trendMap.set(String(x['source_id'] ?? '') + ' ' + String(x['route_summary'] ?? ''), d > 0.02 ? 'up' : d < -0.02 ? 'down' : 'flat');
+        trendMap.set(String(x['source_id'] ?? '') + ' ' + String(x['route_summary'] ?? ''), d);
       }
     }
   }
-  const trendOf = (sourceId: string, routeSummary: string): 'up' | 'down' | 'flat' | null => trendMap.get(sourceId + ' ' + routeSummary) ?? null;
+  const dOf = (sourceId: string, routeSummary: string): number | undefined => trendMap.get(sourceId + ' ' + routeSummary);
+  const trendOf = (sourceId: string, routeSummary: string): 'up' | 'down' | 'flat' | null => {
+    const d = dOf(sourceId, routeSummary);
+    return d === undefined ? null : d > 0.02 ? 'up' : d < -0.02 ? 'down' : 'flat';
+  };
+  const trendMagOf = (sourceId: string, routeSummary: string): number | null => {
+    const d = dOf(sourceId, routeSummary);
+    return d === undefined ? null : Math.round(d * 1000) / 1000;
+  };
 
   return rows.map((r) => {
     const wins = Number(r['wins'] as bigint);
@@ -360,6 +369,7 @@ function buildBestRoutes(db: DatabaseSync, pair: string, windowStart: string, am
       winPct: Math.round((wins / totalNum) * 1000) / 10,
       marginPct: marginFor(sourceId, routeSummary),
       trend: trendOf(sourceId, routeSummary),
+      trendMag: trendMagOf(sourceId, routeSummary),
     };
   });
 }

@@ -251,6 +251,13 @@ describe('bestRoutes', () => {
     expect(routes[0]!.marginPct!).toBeGreaterThan(0.05);
     // Évolution : valeur valide pour chaque route.
     for (const r of routes) expect(['up', 'down', 'flat', null]).toContain(r.trend);
+    // trendMag : magnitude signée, cohérente avec le sens (sert au tableau à distinguer fort/léger).
+    for (const r of routes) {
+      expect(r.trendMag === null || typeof r.trendMag === 'number').toBe(true);
+      if (r.trendMag != null && r.trend === 'up') expect(r.trendMag).toBeGreaterThan(0.02);
+      if (r.trendMag != null && r.trend === 'down') expect(r.trendMag).toBeLessThan(-0.02);
+      if (r.trendMag != null && r.trend === 'flat') expect(Math.abs(r.trendMag)).toBeLessThanOrEqual(0.02);
+    }
   });
 });
 

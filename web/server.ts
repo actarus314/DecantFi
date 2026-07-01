@@ -84,12 +84,18 @@ const htmlAsset = staticAsset(Buffer.from(htmlStr), 'text/html; charset=utf-8');
 const walletkitPath = fileURLToPath(new URL('./public/walletkit.js', import.meta.url));
 const walletkitAsset = staticAsset(readFileSync(walletkitPath), 'text/javascript; charset=utf-8');
 
+const sbMediatorPath = fileURLToPath(new URL('./public/sb-mediator.js', import.meta.url));
+const sbMediatorAsset = staticAsset(readFileSync(sbMediatorPath), 'text/javascript; charset=utf-8');
+
 // App logic extracted from index.html (CSP: served as 'self', no inline script needed).
 const appJsPath = fileURLToPath(new URL('./public/app.js', import.meta.url));
 const appJsAsset = staticAsset(readFileSync(appJsPath), 'text/javascript; charset=utf-8');
 
 const chooseExecPath = fileURLToPath(new URL('./public/choose-exec.js', import.meta.url));
 const chooseExecAsset = staticAsset(readFileSync(chooseExecPath), 'text/javascript; charset=utf-8');
+
+const compositeLeg2DispatchPath = fileURLToPath(new URL('./public/composite-leg2-dispatch.js', import.meta.url));
+const compositeLeg2DispatchAsset = staticAsset(readFileSync(compositeLeg2DispatchPath), 'text/javascript; charset=utf-8');
 
 const faviconPath = fileURLToPath(new URL('./public/favicon.svg', import.meta.url));
 const faviconAsset = staticAsset(readFileSync(faviconPath), 'image/svg+xml; charset=utf-8');
@@ -164,7 +170,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' wss://api.stellar.broker https://horizon.stellar.org; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   'Cross-Origin-Resource-Policy': 'same-origin',
   'Permissions-Policy': 'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()',
@@ -289,6 +295,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return;
     }
 
+    if (req.method === 'GET' && path === '/sb-mediator.js') {
+      sendStatic(req, res, sbMediatorAsset, 'no-cache', RESOURCE_HEADERS);
+      return;
+    }
+
     if (req.method === 'GET' && path === '/app.js') {
       sendStatic(req, res, appJsAsset, 'no-cache', RESOURCE_HEADERS);
       return;
@@ -296,6 +307,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (req.method === 'GET' && path === '/choose-exec.js') {
       sendStatic(req, res, chooseExecAsset, 'no-cache', RESOURCE_HEADERS);
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/composite-leg2-dispatch.js') {
+      sendStatic(req, res, compositeLeg2DispatchAsset, 'no-cache', RESOURCE_HEADERS);
       return;
     }
 
@@ -475,6 +491,17 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const asset = TARGETS[pair];
       const balance = await readAssetBalance(address, asset, { horizonUrl: cfg.horizonUrl, timeoutMs: cfg.timeoutMs });
       json(res, req, 200, { balance });
+      return;
+    }
+
+    if (req.method === 'GET' && path === '/api/sb-mediator-key') {
+      const ip = clientIp(req);
+      if (rateLimited(ip, 60, 60_000)) { logBlock(req, 429, 'rate', path); json(res, req, 429, { error: 'trop de requêtes' }); return; }
+      // Deliberately serves the StellarBroker partner key to the browser for the client-side
+      // Mediator WS flow. The key is partner-scoped, low-criticality; the swap revenue model
+      // makes a leaked quote-key harmless (decided 2026-06-26).
+      if (!cfg.stellarBrokerApiKey) { json(res, req, 404, { error: 'stellarbroker not configured' }); return; }
+      json(res, req, 200, { key: cfg.stellarBrokerApiKey });
       return;
     }
 

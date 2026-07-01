@@ -41,6 +41,7 @@ export async function compareEurc(
   amountBlnd: Stroops,
   q: EurcQuoters,
   reSimLeg?: (quotes: NormalizedQuote[], amountIn: Stroops) => Promise<NormalizedQuote[]>,
+  isExecutable?: (source: string) => boolean,
 ): Promise<EurcComparison> {
   const [directRaw, leg1List] = await Promise.all([
     q.blndToEurc(amountBlnd),
@@ -50,17 +51,19 @@ export async function compareEurc(
 
   let viaUsdc: ViaUsdcResult | undefined;
   const leg1Honest = reSimLeg ? await reSimLeg(leg1List, amountBlnd) : leg1List;
-  const leg1 = rankQuotes(leg1Honest).best;
+  // Filter composite legs to executable sources only — ensures displayed composite == executable composite.
+  const leg1Candidates = isExecutable ? leg1Honest.filter((q) => isExecutable(q.source)) : leg1Honest;
+  const leg1 = rankQuotes(leg1Candidates).best;
   if (leg1 && leg1.grossOut > 0n) {
     // Recote sur l'USDC REELLEMENT recu = grossOut (le gas est paye en XLM, pas preleve sur l'USDC).
     const usdcReceived = leg1.grossOut;
     const leg2List = await q.usdcToEurc(usdcReceived);
     const leg2Honest = reSimLeg ? await reSimLeg(leg2List, usdcReceived) : leg2List;
-    const leg2 = rankQuotes(leg2Honest).best;
+    const leg2Candidates = isExecutable ? leg2Honest.filter((q) => isExecutable(q.source)) : leg2Honest;
+    const leg2 = rankQuotes(leg2Candidates).best;
     if (leg2 && leg2.netOut > 0n) {
       // net = BRUT partout (le gas Soroban se paie en XLM, à part — variable par tx, affiché par le
-      // wallet/explorer). On ne déduit plus le gas du leg 1 du résultat EURC. (Le composite reste de
-      // toute façon NON exécutable / informatif, cf. décision EURC composite 2-tx abandonné.)
+      // wallet/explorer). On ne déduit plus le gas du leg 1 du résultat EURC.
       const netEurc = leg2.netOut;
       if (netEurc > 0n) viaUsdc = { leg1, leg2, usdcMid: usdcReceived, netEurc, txCount: 2 };
     }

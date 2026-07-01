@@ -5,6 +5,9 @@
 .claude/
 CLAUDE.md
 
+# security PoC — PRIVATE, never commit to this PUBLIC repo (lives in a separate private repo)
+spike/
+
 # deps
 node_modules/
 

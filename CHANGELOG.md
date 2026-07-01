@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-02
+
+### Added
+- **StellarBroker is now an executable venue, not just a quote source.** It executes in-browser
+  through the Mediator pattern: a single wallet signature funds a short-lived ephemeral account
+  that signs the streamed swap, so your private key never leaves the wallet. Available for direct
+  BLND→USDC/EURC and as the USDC→EURC second leg of the composite EURC route. Validated with real
+  swaps on mainnet.
+- **Strict pre-signature transaction guard for StellarBroker execution.** Because the Mediator
+  path holds funds in transit, every transaction StellarBroker streams is checked against a strict
+  structural allowlist before the ephemeral key signs it — operation type, router contract, `swap`
+  function, a per-transaction cap on the amount sold, and destinations limited to your own account
+  or the StellarBroker fee account. Anything outside the allowlist is refused and never signed.
+  Verified on mainnet by forcing a mismatch and confirming zero swap operations were signed.
+- **Received-side floor.** A self-delivery whose guaranteed minimum received falls well below
+  StellarBroker's own declared floor is refused before signing — an on-chain-enforced check on top
+  of the sell-side caps.
+- **Honest fills and real routes for StellarBroker.** Classic StellarBroker legs are now observed
+  via a Horizon strict-send quote (the real fill, not the guaranteed-minimum floor), so EURC legs
+  can reach the "Observed" confidence level; the real multi-hop route is decoded and shown instead
+  of a synthetic two-hop.
+
+### Changed
+- **Flow-map readability.** The route map's tail threshold drops from 3% to 2%, so fewer routes
+  get folded into "Others". The aggregated "Others" row no longer shows a fabricated single route
+  (it now reads "—", like its margin). Trend arrows encode magnitude: a single arrow (▲/▼) for a
+  light move, a doubled one (▲▲/▼▼) for a strong shift in win frequency (≥10 points between the two
+  halves of the window); the backend exposes the signed magnitude (`trendMag`) so the table can
+  tell them apart. Win frequencies below 1% now read "<1 %" instead of a misleading "0 %". When a
+  single route is highlighted, its thread now nests inside its parent band instead of detaching from
+  it: the partial-highlight offset is taken perpendicular to the ribbon's local tangent (sampled along
+  the curve), not as a constant vertical shift, so edge-of-band routes on bent/relay-routed segments
+  fill their true sub-slice instead of bunching toward the centerline. Band widths are unchanged.
+
+### Security
+- The StellarBroker Mediator SDK is self-hosted (vendored bundle) rather than loaded from a
+  third-party origin at runtime, under a tightened Content-Security-Policy.
+
+### Fixed
+- Robust StellarBroker Mediator auto-dispose with retry and an honest recovery state; the client
+  connection is closed when streaming ends so the UI no longer flips back to a stale view.
+
 ## [0.2.10] - 2026-06-25
 
 ### Added
@@ -216,7 +258,11 @@ Initial public release.
 - Custom zero-dependency Sankey route visualization and a 4-language UI (English, French,
   Spanish, Brazilian Portuguese).
 
-[Unreleased]: https://github.com/actarus314/DecantFi/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/actarus314/DecantFi/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/actarus314/DecantFi/compare/v0.2.10...v0.3.0
+[0.2.10]: https://github.com/actarus314/DecantFi/compare/v0.2.9...v0.2.10
+[0.2.9]: https://github.com/actarus314/DecantFi/compare/v0.2.8...v0.2.9
+[0.2.8]: https://github.com/actarus314/DecantFi/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/actarus314/DecantFi/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/actarus314/DecantFi/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/actarus314/DecantFi/compare/v0.2.4...v0.2.5

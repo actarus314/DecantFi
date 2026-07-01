@@ -268,6 +268,18 @@ const STRINGS = {
     exec_sb_floor: 'Exécuter le plancher (SDEX)',
     exec_sb_floor_note: 'L\'estimate StellarBroker nécessite leur propre couche d\'exécution. On exécute ici le plancher SDEX strict-send réalisable.',
     ladder_pick_hint: 'Cliquez une ligne pour exécuter via cet outil (re-clic = retour au choix auto).',
+    exec_sb_mediator: 'Exécuter via StellarBroker',
+    sb_mediator_funding: 'StellarBroker demande UNE signature wallet (compte médiateur temporaire)',
+    sb_mediator_streaming: 'Connexion à StellarBroker…',
+    sb_blocked: 'Bloqué par la garde de sécurité — fonds retournés, rien n\'a été exécuté.',
+    sb_not_configured: 'StellarBroker n\'est pas configuré sur ce serveur.',
+    sb_orphan_notice: 'Comptes médiateurs StellarBroker non clôturés détectés — des fonds peuvent nécessiter une récupération.',
+    sb_orphan_recover_btn: 'Récupérer les fonds',
+    sb_recover_signing: 'Récupération — signez pour rapatrier vos fonds',
+    sb_recover_submitting: 'Rapatriement des fonds en cours…',
+    sb_recover_done: 'Fonds récupérés',
+    sb_recover_needed_title: 'Fonds à rapatrier',
+    sb_recover_needed_msg: "Le rapatriement automatique n'a pas abouti. Vos fonds sont saufs dans le compte médiateur ci-dessous et récupérables en un clic.",
   },
   en: {
     // Topbar / brand
@@ -537,6 +549,18 @@ const STRINGS = {
     exec_sb_floor: 'Execute floor (SDEX)',
     exec_sb_floor_note: 'StellarBroker\'s estimate requires their own execution layer. Executing the realizable SDEX strict-send floor instead.',
     ladder_pick_hint: 'Click a row to execute via that tool (click again to revert to auto).',
+    exec_sb_mediator: 'Execute via StellarBroker',
+    sb_mediator_funding: 'StellarBroker needs ONE wallet signature to fund a temporary mediator account',
+    sb_mediator_streaming: 'Connecting to StellarBroker…',
+    sb_blocked: 'Safety guard blocked — no funds spent, execution aborted.',
+    sb_not_configured: 'StellarBroker is not configured on this server.',
+    sb_orphan_notice: 'Orphaned StellarBroker mediator accounts detected — funds may need recovery.',
+    sb_orphan_recover_btn: 'Recover funds',
+    sb_recover_signing: 'Recovery — sign to return your funds',
+    sb_recover_submitting: 'Returning funds…',
+    sb_recover_done: 'Funds recovered',
+    sb_recover_needed_title: 'Funds to recover',
+    sb_recover_needed_msg: 'Automatic return did not complete. Your funds are safe in the mediator account below and recoverable in one click.',
   },
   es: {
     // Topbar / brand
@@ -806,6 +830,18 @@ const STRINGS = {
     exec_sb_floor: 'Ejecutar el mínimo (SDEX)',
     exec_sb_floor_note: 'La estimación de StellarBroker requiere su propia capa de ejecución. Se ejecuta en su lugar el mínimo SDEX strict-send realizable.',
     ladder_pick_hint: 'Haga clic en una fila para ejecutar vía esa herramienta (haga clic de nuevo para volver a automático).',
+    exec_sb_mediator: 'Ejecutar vía StellarBroker',
+    sb_mediator_funding: 'StellarBroker necesita UNA firma del wallet (cuenta mediadora temporal)',
+    sb_mediator_streaming: 'Conectando a StellarBroker…',
+    sb_blocked: 'Bloqueado por el guardia de seguridad — fondos devueltos, nada fue ejecutado.',
+    sb_not_configured: 'StellarBroker no está configurado en este servidor.',
+    sb_orphan_notice: 'Cuentas mediadoras de StellarBroker no cerradas detectadas — es posible que algunos fondos necesiten recuperación.',
+    sb_orphan_recover_btn: 'Recuperar fondos',
+    sb_recover_signing: 'Recuperación — firma para devolver tus fondos',
+    sb_recover_submitting: 'Devolviendo fondos…',
+    sb_recover_done: 'Fondos recuperados',
+    sb_recover_needed_title: 'Fondos por recuperar',
+    sb_recover_needed_msg: 'La devolución automática no se completó. Tus fondos están seguros en la cuenta mediadora de abajo y se pueden recuperar con un clic.',
   },
   pt: {
     brand_dim: 'BLND swaps - com precisão',
@@ -1025,6 +1061,18 @@ const STRINGS = {
     exec_sb_floor: 'Executar o piso (SDEX)',
     exec_sb_floor_note: 'A estimativa do StellarBroker requer a própria camada de execução deles. Executando em vez disso o piso SDEX strict-send realizável.',
     ladder_pick_hint: 'Clique em uma linha para executar via essa ferramenta (clique novamente para voltar ao automático).',
+    exec_sb_mediator: 'Executar via StellarBroker',
+    sb_mediator_funding: 'StellarBroker precisa de UMA assinatura da carteira (conta mediadora temporária)',
+    sb_mediator_streaming: 'Conectando ao StellarBroker…',
+    sb_blocked: 'Bloqueado pela guarda de segurança — fundos devolvidos, nada foi executado.',
+    sb_not_configured: 'StellarBroker não está configurado neste servidor.',
+    sb_orphan_notice: 'Contas mediadoras StellarBroker não encerradas detectadas — alguns fundos podem precisar de recuperação.',
+    sb_orphan_recover_btn: 'Recuperar fundos',
+    sb_recover_signing: 'Recuperação — assine para devolver seus fundos',
+    sb_recover_submitting: 'Devolvendo fundos…',
+    sb_recover_done: 'Fundos recuperados',
+    sb_recover_needed_title: 'Fundos a recuperar',
+    sb_recover_needed_msg: 'A devolução automática não foi concluída. Seus fundos estão seguros na conta mediadora abaixo e podem ser recuperados com um clique.',
   },
 };
 
@@ -1092,6 +1140,8 @@ let coherenceModal = null;
 let impactMode = (() => { const v = localStorage.getItem('impactMode'); return v === 'evm' ? 'evm' : 'local'; })();
 // Modal avertissement passage en EVM : null = fermée, sinon 'pending'
 let impactEvmModalOpen = false;
+// Orphaned StellarBroker mediator accounts (localStorage msb_*) detected for current wallet
+let sbOrphanNotice = false;
 
 function selectSource(id) {
   selectedSource = (selectedSource === id) ? null : id; // re-clic = désélection
@@ -1565,18 +1615,19 @@ function simCard() {
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
         <button class="btn primary" data-act="doExecuteComposite">${t('exec_composite')}</button>
       </div>`;
+    } else if (exec.row && exec.row.sourceId === 'stellarbroker') {
+      // StellarBroker: primary = Mediator WS flow (reaches the estimate); secondary = realizable SDEX floor.
+      // Keyed on exec.row (= selRow || winRow) so it covers both explicit selection and auto-winner,
+      // and fires regardless of the executable flag (honest badge now set; P3).
+      resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+        <button class="btn primary" data-act="doExecuteSbMediator">${t('exec_sb_mediator')}</button>
+        <button class="btn" data-act="doExecuteSbFloor">${t('exec_sb_floor')}</button>
+      </div>`;
     } else if (selRow && !selRow.executable) {
-      if (selRow.sourceId === 'stellarbroker') {
-        // StellarBroker: offer to execute the realizable SDEX floor (not the estimate)
-        resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-          <button class="btn primary" data-act="doExecuteSbFloor">${t('exec_sb_floor')}</button>
-        </div>`;
-      } else {
-        // Other non-integrated venues: coming-soon message
-        resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-          <span style="font-size:12px;color:var(--caption)">${t('exec_integrated_soon')}</span>
-        </div>`;
-      }
+      // Other non-integrated venues: coming-soon message
+      resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--caption)">${t('exec_integrated_soon')}</span>
+      </div>`;
     } else {
       const execLabel = selRow ? t('exec_via', selRow.display)
         : (winRow && winRow.executable && !winRow.sourceId.includes('+') ? t('exec_via', winRow.display) : t('exec_btn'));
@@ -2028,7 +2079,7 @@ function buildPage() {
   })() : '';
 
   return `${topbarHtml}
-
+  ${sbOrphanNotice ? `<div style="background:rgba(230,168,23,.12);border:1px solid var(--amber,#e6a817);border-radius:.4rem;padding:.55rem .9rem;margin:.5rem 1rem;display:flex;align-items:center;gap:.7rem;font-size:13px;flex-wrap:wrap"><span>${t('sb_orphan_notice')}</span><button class="btn" data-act="recoverSbMediators" style="margin-left:auto;white-space:nowrap">${t('sb_orphan_recover_btn')}</button></div>` : ''}
   <div class="zone-group">
     <div class="zone"><div class="zone-h">${t('section_sim')} BLND → ${u}</div>${simCard()}</div>
 
@@ -2065,16 +2116,34 @@ function buildPage() {
 // Sankey des routes — moteur de layout MAISON (zéro-dépendance) + rendu SVG vanilla.
 // Alimenté par la VRAIE BDD : overview.bestRoutes[sonde] (RouteRank) mappé en routes
 // du moteur (cf. mapRank/routesFor). marge-au-2ᵉ absente du backend → colonne retirée ;
-// traîne < 3 % agrégée en « autres ». ⚠ stats 7j polluées jusqu'à ~2026-06-27.
+// traîne < 2 % agrégée en « autres ». ⚠ stats 7j polluées jusqu'à ~2026-06-27.
 // Reste phase 2 : réutiliser #tipPortal au lieu du #sk-tip dédié. Module ISOLÉ (IIFE) →
 // un seul global, aucune collision. ribbonPath pinné ≡ d3.curveBumpX.
+// ────────────────────────────────────────────────────────────────────────────
+// ⚠ MÉTHODE POUR MODIFIER CE GRAPHE (leçon dure 2026-06-26 — ~5 tours perdus sur le sous-fil) :
+//  1. RAISONNER DANS LE CODE du moteur (buildGraph → layout → ribbonPath → draw/drawSubSlice),
+//     PAS à l'œil sur des captures. Les bugs sont GÉOMÉTRIQUES, ~invisibles au screenshot ;
+//     une mauvaise lecture visuelle a envoyé droit dans 3 fausses pistes (réduire le gap,
+//     épaissir les bandes mères, « non-proportionnalité » du rognage) — toutes RÉFUTÉES.
+//  2. COMPARAISON CONTRÔLÉE avant toute hypothèse : si une route va bien et une autre non,
+//     isoler ce qui DIFFÈRE structurellement. Décisif ici : good (Comet+SB) & bad (Aquarius+SB,
+//     Soroswap+SB) sont enfants de la MÊME bande ⇒ largeur/fusion de bande HORS DE CAUSE,
+//     seul l'OFFSET du fil diffère. Cette seule déduction tranchait le bug — la faire EN PREMIER.
+//  3. INVARIANTS à ne jamais violer : largeur tracée ∝ flux (= Σ winPct enfants · lscale ; AUCUNE
+//     sur-pondération, ne pas épaissir/rétrécir une bande pour « réparer » un fil) ; tout fil ou
+//     sous-tranche se place à l'échelle de la bande RENDUE (lscale = swFull/L.value, post-gap),
+//     PERPENDICULAIREMENT à la tangente locale (offsetAlongRibbon) — jamais échelle globale ni Δy vertical.
+//  4. ASYMÉTRIE clé : USDC→EURC enjambe col1→col3 → ruban COUDÉ via relais col2 (≥3 pts) ; BLND→USDC
+//     est DIRECTE (2 pts, ~plate). Tester TOUT changement de tracé sur une bande coudée ET une directe.
+//  Détail + fausses pistes : mémoire [[sankey-graph-design-model]].
 // ════════════════════════════════════════════════════════════════════════════
 const Sankey = (function () {
   const NS = 'http://www.w3.org/2000/svg';
   const W = 960, H = 620, LINK_GAP = 16; // viewBox ; le SVG est responsive (CSS width:100% + height:auto → remplit la box sans letterbox)
   const LY = { VM: 24, GAP: 14, MIN_H: 10, PAD: 24, NODE_W: 50 };
 
-  const TAIL_PCT = 3; // traîne < ce % agrégée en « autres » — SAUF si la route n'emprunte que des bandes déjà tracées (cf. routesFor)
+  const TAIL_PCT = 2; // traîne < ce % agrégée en « autres » — SAUF si la route n'emprunte que des bandes déjà tracées (cf. routesFor)
+  const TREND_STRONG = 0.10; // |Δ part-de-victoires| ≥ ce seuil → mouvement « fort » (grand triangle ▲/▼) ; sinon « léger » (petit triangle ▴/▾)
 
   // Décisions FIGÉES (Romain) : fond = thème de la page (blanc en clair) · départ BLND = ARDOISE.
   // Les sélecteurs de test (fond gris / ambre-ardoise) ont été retirés.
@@ -2143,7 +2212,7 @@ const Sankey = (function () {
   const LOCALE_MAP = { fr: 'fr-FR', en: 'en-US', es: 'es-ES', pt: 'pt-BR' };
   const fmtMargin = (m, lang) => (m === null || m === undefined) ? "—"
     : "+" + m.toLocaleString(LOCALE_MAP[lang] || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " %";
-  const fmtPct = p => p.toFixed(0) + " %";
+  const fmtPct = p => { const r = p.toFixed(0); return (r === '0' && p > 0) ? "<1 %" : r + " %"; };
 
   // ── buildGraph : fusion (from|to|tool) + rang complexité-first (copie verbatim maquette) ──
   function buildGraph(routes) {
@@ -2272,6 +2341,27 @@ const Sankey = (function () {
     for (let i = 1; i < pts.length; i++) { const x0 = pts[i-1][0], y0 = pts[i-1][1], x1 = pts[i][0], y1 = pts[i][1], xm = (x0 + x1) / 2; d += 'C' + xm + ',' + y0 + ' ' + xm + ',' + y1 + ' ' + x1 + ',' + y1; }
     return d;
   }
+  // Échantillonne la MÊME cubique que ribbonPath (curveBumpX : C1=(xm,y0), C2=(xm,y1)) et décale chaque
+  // point de `pd` PERPENDICULAIREMENT à la tangente locale (normale unitaire), au lieu d'un décalage
+  // vertical constant. Indispensable sur les bandes COUDÉES (relais) : aux extrémités la tangente est
+  // horizontale → normale verticale → identique à l'ancien +pd ; dans les arcs raides la normale s'incline
+  // → le fil reste DANS sa bande mère au lieu de se tasser vers l'axe et d'en sortir.
+  function offsetAlongRibbon(pts, pd, STEP) {
+    const out = [];
+    for (let i = 1; i < pts.length; i++) {
+      const x0 = pts[i-1][0], y0 = pts[i-1][1], x1 = pts[i][0], y1 = pts[i][1], xm = (x0 + x1) / 2;
+      for (let k = (i === 1 ? 0 : 1); k <= STEP; k++) {
+        const t = k / STEP, u = 1 - t;
+        const bx = u*u*u*x0 + 3*u*u*t*xm + 3*u*t*t*xm + t*t*t*x1;
+        const by = u*u*u*y0 + 3*u*u*t*y0 + 3*u*t*t*y1 + t*t*t*y1;
+        const dx = 3*u*u*(xm - x0) + 3*t*t*(x1 - xm);
+        const dy = 6*u*t*(y1 - y0);
+        const len = Math.hypot(dx, dy) || 1;
+        out.push([bx - pd*dy/len, by + pd*dx/len]);
+      }
+    }
+    return out;
+  }
   const E = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
   // ── Données RÉELLES : overview.bestRoutes[sonde] (RouteRank {path,tools,winPct}) → routes du moteur.
   // path 'BLND → USDC → EURC' → steps ; tools 'Comet + Aquarius' → legs ; hopTools dérivé (1 outil =
@@ -2284,7 +2374,8 @@ const Sankey = (function () {
     if (legs.length <= 1) hopTools = new Array(hops).fill(legs[0] || r.tools || '—');
     else { const piv = steps.indexOf('USDC'); hopTools = []; for (let i = 0; i < hops; i++) hopTools.push((piv > 0 && i >= piv) ? legs[1] : legs[0]); }
     const trend = (r.trend === 'up' || r.trend === 'down' || r.trend === 'flat') ? r.trend : null;
-    return { tools: r.tools, winPct: r.winPct, marginPct: (typeof r.marginPct === 'number' ? r.marginPct : null), trend, composite: legs.length > 1, steps, hopTools };
+    const trendMag = (typeof r.trendMag === 'number') ? r.trendMag : null;
+    return { tools: r.tools, winPct: r.winPct, marginPct: (typeof r.marginPct === 'number' ? r.marginPct : null), trend, trendMag, composite: legs.length > 1, steps, hopTools };
   }
   // Lit l'overview courant (déjà spécifique à la paire) ; agrège la traîne < TAIL_PCT en bande « autres ».
   function routesFor(sonde) {
@@ -2312,7 +2403,7 @@ const Sankey = (function () {
     if (tail.length) {
       const SRC = mapped[0].steps[0], TGT = mapped[0].steps[mapped[0].steps.length - 1];
       const sum = Math.round(tail.reduce((s, r) => s + r.winPct, 0) * 10) / 10;
-      keep.push({ tools: 'autres', winPct: sum, marginPct: null, trend: null, composite: false, steps: [SRC, TGT], hopTools: ['—'], tail });
+      keep.push({ tools: 'autres', winPct: sum, marginPct: null, trend: null, trendMag: null, composite: false, steps: [SRC, TGT], hopTools: ['—'], tail });
     }
     return keep;
   }
@@ -2335,10 +2426,14 @@ const Sankey = (function () {
       const hasTail = isGray && Array.isArray(r.tail) && r.tail.length > 0;
       const venueHtml = venueCell(r.tools) + (hasTail ? ` <span class="sk-caret">${tailOpen ? '▾' : '▸'}</span> <span class="muted">(${r.tail.length})</span>` : '');
       const rkey = keyOf(r);
+      const strong = r.trendMag != null && Math.abs(r.trendMag) >= TREND_STRONG;
+      const trendHtml = r.trend === 'up'   ? `<span class="sk-tr sk-up">${strong ? '▲▲' : '▲'}</span>`
+                      : r.trend === 'down' ? `<span class="sk-tr sk-down">${strong ? '▼▼' : '▼'}</span>`
+                      : r.trend === 'flat' ? '<span class="sk-tr sk-flat">→</span>' : '';
       let row = `<tr data-rk="${idx}"${hasTail ? ' data-sk-tail="1"' : ''} data-sk-key="${rkey.replace(/"/g, '&quot;')}" class="${selKeys.has(rkey) ? 'sk-sel' : ''}" style="cursor:pointer"><td><span class="sk-venue">${venueHtml}${isTwoTx ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td>`
-        + `<td class="sk-route">${escapeHtml(r.steps.join(' → '))}</td>`
+        + `<td class="sk-route">${isGray ? '<span class="muted">—</span>' : escapeHtml(r.steps.join(' → '))}</td>`
         + `<td>${(isGray || r.marginPct == null) ? '<span class="muted">—</span>' : `<span style="color:${mc};font-weight:700">${fmtMargin(r.marginPct, lang)}</span>`}</td>`
-        + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b>${r.trend==='up'?'<span class="sk-tr sk-up">▲</span>':r.trend==='down'?'<span class="sk-tr sk-down">▼</span>':r.trend==='flat'?'<span class="sk-tr sk-flat">→</span>':''}</span></td></tr>`;
+        + `<td><span class="sk-freq"><span class="sk-freqbg"><span class="sk-freqfill" style="width:${r.winPct}%"></span></span><b>${fmtPct(r.winPct)}</b>${trendHtml}</span></td></tr>`;
       if (hasTail && tailOpen) {
         row += r.tail.slice().sort((a, b) => b.winPct - a.winPct).map(tr => `<tr class="sk-tail-row"><td><span class="sk-venue">${venueCell(tr.tools)}${tr.composite ? ' <span class="sk-2tx">2 tx</span>' : ''}</span></td><td class="sk-route">${escapeHtml(tr.steps.join(' → '))}</td><td><span class="muted">—</span></td><td><b>${fmtPct(tr.winPct)}</b></td></tr>`).join('');
       }
@@ -2420,12 +2515,13 @@ const Sankey = (function () {
       if (subMode) { const solo = idxSet.size === 1; idxSet.forEach(i => drawSubSlice(i, solo)); }
       else if (on) linkEls.forEach(({ lk, color, sw, d }) => { if (lk.idxs && lk.idxs.some(i => idxSet.has(i))) topG.appendChild(E('path', { d, fill:'none', stroke:color, 'stroke-width':sw, 'stroke-opacity':0.95, 'pointer-events':'none' })); });
     }
-    // Éclairage PARTIEL d'UNE route : ruban de largeur = SA fréquence (constante = flux conservé), posé à
-    // son OFFSET empilé DANS CHAQUE bande fusionnée. ⚠ l'offset/la fraction sont PROPRES à chaque bande
-    // (la part globale 4 % ne « remplit » pas un segment, elle en occupe sa juste tranche) → le fil weave.
+    // Éclairage PARTIEL d'UNE route : ruban posé à son OFFSET empilé DANS CHAQUE bande fusionnée, à
+    // l'échelle LOCALE de la bande TRACÉE (lscale, rognée par le gap). ⚠ l'offset est PERPENDICULAIRE à
+    // la tangente locale (pas vertical, cf. offsetAlongRibbon) : sinon, sur une bande COUDÉE (routée via
+    // relais, ex. USDC→EURC), un fil en bord de bande se tasse vers l'axe et SORT de sa mère
+    // (« rapprochement », pas fusion). Ainsi chaque route occupe sa juste tranche nichée ; largeurs intactes.
     function drawSubSlice(ri, solo) {
       const r = routes[ri]; if (!r) return;
-      const scale = graph.links.length ? (graph.links[0].width / graph.links[0].value) : 1;
       const w = r.winPct;
       for (let i = 0; i < r.steps.length - 1; i++) {
         const from = r.steps[i], to = r.steps[i + 1], tool = r.hopTools[i];
@@ -2433,19 +2529,14 @@ const Sankey = (function () {
         if (!L) continue;
         const members = L.idxs.slice().sort((a, b) => (routes[b].winPct - routes[a].winPct) || (a - b));
         let off = 0; for (const m of members) { if (m === ri) break; off += routes[m].winPct; }
-        let dY, sw;
-        if (solo) {
-          // 1 route : fil aminci qui « tisse » à son offset dans la part pleine + halo contrasté (validé)
-          dY = (off + w / 2 - L.value / 2) * scale;
-          sw = Math.max(2, w * scale - Math.min(LINK_GAP, w * scale * 0.45));
-        } else {
-          // multi : on répartit DANS la largeur tracée de la bande (swFull) → les fils REMPLISSENT le
-          // segment, CONTIGUS (aucune séparation) ; seule la couleur d'outil les distingue → « tout Comet » = bande pleine.
-          const swFull = Math.max(2.5, L.width - Math.min(LINK_GAP, L.width * 0.45)), lscale = swFull / L.value;
-          dY = (off + w / 2 - L.value / 2) * lscale;
-          sw = Math.max(2, w * lscale);
-        }
-        const d = ribbonPath(L.points.map(p => [p[0], p[1] + dY]));
+        // Solo OU multi : on répartit DANS la largeur TRACÉE de la bande (swFull, rognée par le gap), PAS
+        // dans son étendue pleine (L.value*scale global) — sinon un fil en bord de bande tombe HORS de la
+        // bande mère rendue (blanc entre la mère et le fil). lscale = échelle locale de la bande tracée →
+        // chaque route occupe sa tranche proportionnelle EXACTE, nichée dans sa mère, aucune sur-pondérée.
+        const swFull = Math.max(2.5, L.width - Math.min(LINK_GAP, L.width * 0.45)), lscale = swFull / L.value;
+        const pd = (off + w / 2 - L.value / 2) * lscale;
+        const sw = Math.max(2, w * lscale);
+        const d = 'M' + offsetAlongRibbon(L.points, pd, 16).map(p => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join('L');
         const col = L.tool === '—' ? '#9ca3af' : venueColor(L.tool);
         if (solo) topG.appendChild(E('path', { d, fill:'none', stroke: dark ? 'rgba(248,250,252,0.6)' : 'rgba(15,23,42,0.45)', 'stroke-width': sw + 3, 'pointer-events':'none' })); // halo = pop d'un fil isolé
         topG.appendChild(E('path', { d, fill:'none', stroke: col, 'stroke-width': sw, 'stroke-opacity': 0.98, 'pointer-events':'none' }));
@@ -2660,6 +2751,14 @@ const TRUSTLINE_ISSUERS = {
   USDC: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
   EURC: 'GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2',
 };
+// StellarBroker Mediator SDK asset format: 'CODE-ISSUER' (dash) or 'native' for XLM.
+// Mirrors core/assets.ts toStellarBrokerStr(). Used by doExecuteSbMediator only.
+const BLND_ISSUER = 'GDJEHTBE6ZHUXSWFI642DCGLUOECLHPF3KSXHPXTSTJ7E3JF6MQ5EZYY';
+const SB_ASSET_STRS = {
+  BLND: `BLND-${BLND_ISSUER}`,
+  USDC: `USDC-${TRUSTLINE_ISSUERS.USDC}`,
+  EURC: `EURC-${TRUSTLINE_ISSUERS.EURC}`,
+};
 
 function mapExecError(code, fallback) {
   if (code === 'trustline') return t('err_trustline', target, TRUSTLINE_ISSUERS[target] || target);
@@ -2677,6 +2776,9 @@ async function connectWallet() {
     localStorage.setItem('walletAddress', address);
     try { walletId = SWK.selectedModule.productId; localStorage.setItem('walletId', walletId); }
     catch { walletId = null; localStorage.removeItem('walletId'); }
+    // Cheap localStorage check for orphaned SB mediator accounts — does NOT import the 686 KB bundle.
+    const _sbOrphan = Object.keys(localStorage).some(k => k.startsWith('msb_') && localStorage.getItem(k) === address);
+    if (_sbOrphan) sbOrphanNotice = true;
     await loadBalance();
     renderApp();
   } catch (e) { /* user closed modal: ignore */ }
@@ -2690,6 +2792,7 @@ async function disconnectWallet() {
   localStorage.removeItem('walletId');
   walletBlnd = 0;
   walletConfigured = false;
+  sbOrphanNotice = false;
   renderApp();
 }
 
@@ -2710,6 +2813,12 @@ async function doExecute() {
   // Composite EURC → flux guidé 2 jambes, sur la ligne composite choisie.
   if (isComposite) {
     await startCompositeLeg1(chosenRow);
+    return;
+  }
+  // Defensive: StellarBroker executes client-side via the Mediator WS flow.
+  // venue:'stellarbroker' must never reach /api/build (server rejects it with 400 — not a valid Venue).
+  if (chosenRow && !isComposite && chosenRow.sourceId === 'stellarbroker') {
+    await doExecuteSbMediator();
     return;
   }
   // Venue à forcer : la ligne sélectionnée si exécutable, sinon le GAGNANT affiché s'il est exécutable.
@@ -2760,6 +2869,104 @@ async function doExecuteSbFloor() {
   renderApp();
 }
 
+// Execute a swap via the StellarBroker Mediator WS flow (client-side, keyless after key fetch).
+// ONE wallet signature funds the ephemeral mediator account; the swap then runs fully client-side.
+// opts (optional): { sellAsset, buyAsset, amount, comp } for composite leg2 dispatch (P4).
+//   When opts is absent (direct call from button / doExecute): sell=BLND, buy=target, amount=simAmt.
+//   When opts is provided (leg2 of composite): uses opts.sellAsset/buyAsset/amount; threads comp
+//   through all exec state transitions so the modal stays coherent.
+async function doExecuteSbMediator(opts) {
+  const fromComp = opts != null && typeof opts === 'object';
+  if (!fromComp) {
+    // Direct (atomic) path: guards on simResult/simActive/simAmt apply
+    if (!simResult || !simActive || simAmt <= 0) return;
+  }
+  if (!walletAddress) {
+    execState = { phase: 'error', errorMsg: t('exec_connect_first') };
+    renderApp();
+    return;
+  }
+  await ensureKit(); // ensure SWK + KIT_NET are ready before signXdr is invoked
+  const sellAsset = (fromComp && opts.sellAsset) ? opts.sellAsset : SB_ASSET_STRS.BLND;
+  const buyAsset = (fromComp && opts.buyAsset) ? opts.buyAsset : SB_ASSET_STRS[target];
+  const amount = (fromComp && opts.amount != null) ? opts.amount : String(simAmt);
+  const comp = (fromComp && opts.comp) ? opts.comp : null;
+  execState = { phase: 'sb_mediator', sbStep: 'funding', ...(comp ? { comp } : {}) };
+  renderApp();
+  try {
+    const r = await fetch('/api/sb-mediator-key');
+    if (!r.ok) {
+      execState = { phase: 'error', errorMsg: t('sb_not_configured'), ...(comp ? { comp } : {}) };
+      renderApp();
+      return;
+    }
+    const { key } = await r.json();
+    const signXdr = async (xdr) => {
+      const { signedTxXdr } = await SWK.signTransaction(xdr, { address: walletAddress, networkPassphrase: KIT_NET });
+      return signedTxXdr;
+    };
+    const onProgress = (ev) => {
+      if (ev.step === 'streaming') {
+        execState = { phase: 'sb_mediator', sbStep: 'streaming', ...(comp ? { comp } : {}) };
+        renderApp();
+      }
+    };
+    const m = await import('/sb-mediator.js');
+    const res = await m.executeSbMediatorSwap({
+      partnerKey: key,
+      sourcePub: walletAddress,
+      sellAsset,
+      buyAsset,
+      amount,
+      signXdr,
+      onProgress,
+      networkPassphrase: KIT_NET,
+    });
+    if (res.needsRecovery) {
+      execState = { phase: 'sb_recover_needed', mediatorAddress: res.mediatorAddress, ...(comp ? { comp } : {}) };
+    } else if (res.blocked) {
+      execState = { phase: 'sb_blocked', ...(comp ? { comp } : {}) };
+    } else if (res.ok && res.finished) {
+      execState = { phase: 'sb_done', finished: res.finished, ...(comp ? { comp } : {}) };
+    } else {
+      execState = { phase: 'error', errorMsg: escapeHtml(res.error || t('exec_failed')), ...(comp ? { comp } : {}) };
+    }
+  } catch (e) {
+    const msg = (e && e.message) || '';
+    execState = { phase: 'error', errorMsg: /reject/i.test(msg) ? t('exec_rejected') : (msg ? escapeHtml(msg) : t('exec_failed')), ...(comp ? { comp } : {}) };
+  }
+  renderApp();
+}
+
+// Recover funds from orphaned StellarBroker mediator accounts (localStorage msb_*).
+// Triggered by the sbOrphanNotice banner shown on wallet connect when stale entries are found.
+async function recoverSbMediators() {
+  if (!walletAddress) return;
+  await ensureKit();
+  execState = { phase: 'sb_mediator', sbStep: 'funding', recover: true };
+  renderApp();
+  try {
+    const m = await import('/sb-mediator.js');
+    const signXdr = async (xdr) => {
+      const { signedTxXdr } = await SWK.signTransaction(xdr, { address: walletAddress, networkPassphrase: KIT_NET });
+      return signedTxXdr;
+    };
+    const onProgress = (ev) => {
+      if (ev.step === 'dispose-obsolete') {
+        execState = { phase: 'sb_mediator', sbStep: 'streaming', recover: true };
+        renderApp();
+      }
+    };
+    await m.disposeObsoleteMediators({ sourcePub: walletAddress, signXdr, networkPassphrase: KIT_NET, onProgress });
+    sbOrphanNotice = false;
+    execState = { phase: 'sb_done', finished: null, recover: true };
+  } catch (e) {
+    const msg = (e && e.message) || '';
+    execState = { phase: 'error', errorMsg: /reject/i.test(msg) ? t('exec_rejected') : (msg ? escapeHtml(msg) : t('exec_failed')) };
+  }
+  renderApp();
+}
+
 // Lance le flux composite 2-tx. Cible explicitement la ligne dont le sourceId contient
 // '+' (la composite EURC via-USDC), sans dépendre du flag `winner` : pour EURC c'est
 // justement la composite qui est en tête (raw[0], donc winner), mais ce bouton n'est
@@ -2775,6 +2982,7 @@ async function doExecuteComposite() {
 async function startCompositeLeg1(compRow) {
   const leg1Source = (compRow.legs && compRow.legs[0] && compRow.legs[0].sourceId)
     || compRow.sourceId.split('+')[0].trim();
+  const leg2Source = (compRow.legs && compRow.legs[1] && compRow.legs[1].sourceId) || null;
   // Lire le solde USDC avant (non bloquant)
   let usdcBefore = null;
   if (walletAddress) {
@@ -2788,7 +2996,7 @@ async function startCompositeLeg1(compRow) {
     const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pair: 'USDC', amount: simAmt, sender: walletAddress, slippageBps: Math.round(execSlippagePct * 100), venue: leg1Source }) });
     const j = await r.json();
-    const comp1 = { leg: 1, leg1Source, usdcBefore, usdcReceived: null, hash1: null };
+    const comp1 = { leg: 1, leg1Source, leg2Source, usdcBefore, usdcReceived: null, hash1: null };
     // Erreur leg1 (typiquement trustline USDC manquante) : préserve comp{leg:1} + l'actif manquant
     // (j.asset = USDC ici) → le front ajoute/relance la BONNE trustline, pas le target global (EURC).
     if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, asset: j.asset, comp: comp1 }; }
@@ -2929,6 +3137,13 @@ async function confirmExecute() {
 }
 
 async function buildCompositeLeg2(comp) {
+  // P4: when leg2 was quoted via StellarBroker, dispatch to the Mediator WS flow instead
+  // of /api/build (SB is not a valid server venue). Mediator handles USDC→EURC client-side;
+  // the user must already have the EURC trustline (same assumption as the server-build path).
+  if (chooseLeg2Dispatch(comp) === 'stellarbroker') {
+    await doExecuteSbMediator({ sellAsset: SB_ASSET_STRS.USDC, buyAsset: SB_ASSET_STRS.EURC, amount: String(comp.usdcReceived), comp: { ...comp, leg: 2 } });
+    return;
+  }
   try {
     const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pair: 'EURC', from: 'USDC', amount: comp.usdcReceived, sender: walletAddress, slippageBps: Math.round(execSlippagePct * 100) }) });
@@ -2983,7 +3198,7 @@ function cancelExecute() {
 
 function onModalBackdrop() {
   // backdrop self-click is enforced by the delegated dispatcher (data-self-only)
-  if (execState && (execState.phase === 'done' || execState.phase === 'error')) {
+  if (execState && (execState.phase === 'done' || execState.phase === 'error' || execState.phase === 'sb_blocked' || execState.phase === 'sb_done' || execState.phase === 'sb_recover_needed')) {
     cancelExecute();
   }
 }
@@ -3245,6 +3460,50 @@ function execModal() {
       </div>`;
   } else if (phase === 'leg1_confirming') {
     content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0">${t('comp_leg1_confirming')}</p>`;
+  } else if (phase === 'sb_mediator') {
+    const sbMsg = execState.recover
+      ? (execState.sbStep === 'streaming' ? t('sb_recover_submitting') : t('sb_recover_signing'))
+      : (execState.sbStep === 'streaming' ? t('sb_mediator_streaming') : t('sb_mediator_funding'));
+    content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0 0 .5rem"><span class="pulse">${sbMsg}</span></p>`;
+  } else if (phase === 'sb_recover_needed') {
+    content = `
+      <p style="font-size:14px;font-weight:700;color:var(--amber);margin:0 0 .5rem">${t('sb_recover_needed_title')}</p>
+      <p class="help" style="margin:0 0 .5rem">${t('sb_recover_needed_msg')}</p>
+      <p class="help" style="font-family:monospace;font-size:11px;word-break:break-all;margin:0 0 .9rem">${escapeHtml(execState.mediatorAddress || '')}</p>
+      <div style="display:flex;gap:.55rem;justify-content:flex-end">
+        <button class="btn primary" data-act="recoverSbMediators">${t('sb_orphan_recover_btn')}</button>
+        <button class="btn" data-act="cancelExecute">${t('exec_close')}</button>
+      </div>`;
+  } else if (phase === 'sb_blocked') {
+    content = `
+      <p style="font-size:14px;font-weight:700;color:var(--amber);margin:0 0 .5rem">${t('exec_failed')}</p>
+      <p class="help" style="margin:0 0 .9rem">${t('sb_blocked')}</p>
+      <div style="display:flex;gap:.55rem;justify-content:flex-end">
+        <button class="btn primary" data-act="cancelExecute">${t('exec_close')}</button>
+      </div>`;
+  } else if (phase === 'sb_done') {
+    if (execState.recover) {
+      content = `
+        <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.8rem">
+          <span style="font-size:22px;color:var(--green);line-height:1">✓</span>
+          <span style="font-size:15px;font-weight:700;color:var(--green)">${t('sb_recover_done')}</span>
+        </div>
+        <div style="display:flex;gap:.55rem;margin-top:1rem;justify-content:flex-end">
+          <button class="btn primary" data-act="cancelExecute">${t('exec_close')}</button>
+        </div>`;
+    } else {
+      const fin = execState.finished;
+      const sbHash = fin && typeof fin.hash === 'string' && /^[0-9a-fA-F]{64}$/.test(fin.hash) ? fin.hash : '';
+      content = `
+        <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.8rem">
+          <span style="font-size:22px;color:var(--green);line-height:1">✓</span>
+          <span style="font-size:15px;font-weight:700;color:var(--green)">${t('exec_success')}</span>
+        </div>
+        <div style="display:flex;gap:.55rem;margin-top:1rem;align-items:center;justify-content:flex-end;flex-wrap:wrap">
+          ${sbHash ? `<a class="btn openlink" href="https://stellar.expert/explorer/public/tx/${encodeURIComponent(sbHash)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:.3rem">${t('exec_view')}</a>` : ''}
+          <button class="btn primary" data-act="cancelExecute">${t('exec_close')}</button>
+        </div>`;
+    }
   } else if (phase === 'done') {
     const rv = build && build.review;
     const doneTarget = (rv && rv.target) || target;
@@ -3500,7 +3759,7 @@ function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() 
 (() => {
   const CLICK = {
     doRefresh, toggleImpactMode, cancelImpactEvm, confirmImpactEvm, selectSource,
-    doExecuteComposite, doExecute, doExecuteSbFloor, useWallet, doSim, clearSim, nudgeSlippage,
+    doExecuteComposite, doExecute, doExecuteSbFloor, doExecuteSbMediator, recoverSbMediators, useWallet, doSim, clearSim, nudgeSlippage,
     selectDay, openCoherence, setView, setSonde, setTarget, disconnectWallet,
     connectWallet, toggleTheme, setLang, closeCoherence, cancelExecute,
     confirmExecute, retryCompositeLeg2, addTrustline, onModalBackdrop,
