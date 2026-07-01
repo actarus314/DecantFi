@@ -422,6 +422,41 @@ describe('makeReSimLeg — StellarBroker re-sim', () => {
     await reSimLeg([sbQ as any], AMT);
     expect(fakeSimSb).not.toHaveBeenCalled();
   });
+
+  // ─── P2: route threading + priceImpact neutralization ────────────────────────
+
+  it('P2: threads decoded multi-hop route into StellarBroker composite leg promotion', async () => {
+    const sbQ = makeSbQuote();
+    // Decoded route with an intermediate hop: BLND → XLM → USDC
+    const fakeSimSb = vi.fn(async () => ({ net: 4_9500000n, route: ['BLND', 'XLM', 'USDC'], exact: true }));
+    const reSimLeg = makeReSimLeg(
+      { rpcUrl: 'https://rpc.test', stellarBrokerApiKey: 'key' },
+      { simulateStellarBrokerNet: fakeSimSb as any },
+    );
+    const result = await reSimLeg([sbQ as any], AMT);
+    expect(result).toHaveLength(1);
+    const updated = result[0]!;
+    expect(updated.route).toEqual([
+      { venue: 'stellarbroker', sell: 'BLND', buy: 'XLM' },
+      { venue: 'stellarbroker', sell: 'XLM', buy: 'USDC' },
+    ]);
+  });
+
+  it('P2: neutralizes stale priceImpact on StellarBroker composite leg promotion (no price context in makeReSimLeg)', async () => {
+    // makeReSimLeg has no access to result.prices → cannot recalculate priceImpact on the new net.
+    // Honesty: drop the stale value rather than leaving an impact computed on the old (overquoted) net.
+    const sbQ = makeSbQuote({ priceImpactPct: -5, priceImpactLocalPct: -5 } as any);
+    const fakeSimSb = vi.fn(async () => ({ net: 4_9500000n, route: ['BLND', 'USDC'], exact: true }));
+    const reSimLeg = makeReSimLeg(
+      { rpcUrl: 'https://rpc.test', stellarBrokerApiKey: 'key' },
+      { simulateStellarBrokerNet: fakeSimSb as any },
+    );
+    const result = await reSimLeg([sbQ as any], AMT);
+    expect(result).toHaveLength(1);
+    const updated = result[0]!;
+    expect(updated.priceImpactPct).toBeUndefined();      // neutralized, not stale
+    expect((updated as any).priceImpactLocalPct).toBeUndefined(); // neutralized
+  });
 });
 
 describe('makeReSimLeg — Aquarius structural failure exclusion', () => {
@@ -575,6 +610,42 @@ describe('resimAquariusXbull — StellarBroker branch', () => {
     expect(fakeSimSb).not.toHaveBeenCalled();
     // netConfidence unchanged
     expect(fakeResult.ranking.ranked[0].netConfidence).toBe('estimate');
+  });
+
+  // ─── P2: route threading ───────────────────────────────────────────────────
+
+  it('P2: threads decoded multi-hop SB route into promoted row (resimAquariusXbull)', async () => {
+    vi.mocked(priceImpactPct).mockReturnValue(1.5);
+
+    const sbQ = {
+      source: 'stellarbroker' as const,
+      sellAsset: BLND, buyAsset: USDC, amountIn: AMT,
+      grossOut: 5_0000000n, feeBreakdown: [{ kind: 'aggregator' as const, note: 'opaque' }],
+      gasXlm: 0n, gasInTarget: 0n, netOut: 5_0000000n,
+      netConfidence: 'estimate' as const, netRange: { low: 4_8000000n, high: 5_0000000n },
+      route: [], priceImpactPct: -1, priceImpactLocalPct: -1, raw: {},
+    };
+    const fakeResult = {
+      request: { sell: 'BLND', buy: 'USDC', amountIn: AMT, slippageBps: 50 },
+      prices: { blndUsd: 0.05, eurcUsd: 1.08, eurcStellarMid: null, xlmUsd: 0.12 },
+      ranking: { ranked: [sbQ as any], best: sbQ as any },
+      errors: [],
+    } as any;
+
+    // Multi-hop decoded route: BLND → XLM → USDC (3 symbols → 2 hops)
+    const fakeSimSb = vi.fn(async () => ({ net: 4_9200000n, route: ['BLND', 'XLM', 'USDC'], exact: true }));
+    await resimAquariusXbull(
+      fakeResult, 'USDC', AMT,
+      { rpcUrl: 'https://rpc.test', stellarBrokerApiKey: 'key' },
+      { simulateStellarBrokerNet: fakeSimSb as any },
+    );
+
+    const sbRow = fakeResult.ranking.ranked.find((q: any) => q.source === 'stellarbroker');
+    expect(sbRow).toBeDefined();
+    expect(sbRow!.route).toEqual([
+      { venue: 'stellarbroker', sell: 'BLND', buy: 'XLM' },
+      { venue: 'stellarbroker', sell: 'XLM', buy: 'USDC' },
+    ]);
   });
 });
 

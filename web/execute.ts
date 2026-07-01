@@ -529,7 +529,12 @@ export async function simulateStellarBrokerNet(opts: {
   // True as soon as a classic trader-leg destMin (a floor, not an observed fill) is summed
   // into the net → the result can no longer be honestly labelled "observed/exact".
   let classicContributed = false;
-  const routeSyms: string[] = [opts.sellAsset.symbol];
+
+  // Track contributions per captured XDR (= per sub-tx). Used to select the dominant route.
+  // SB bursts can be parallel splits across multiple XDRs; we display the route of the sub-tx
+  // with the LARGEST fill contribution. This is a deliberate simplification consistent with the
+  // linear-route convention used by xBull/Aquarius: rendering true parallel fan-outs is out of P2.
+  const subTxContribs: Array<{ fill: bigint; route: string[] }> = [];
 
   for (const xdrStr of capturedXdrs) {
     try {
@@ -540,36 +545,54 @@ export async function simulateStellarBrokerNet(opts: {
 
       // Check for invokeHostFunction ops (Soroban swap legs)
       const invokeOps = (tx.operations as Array<{ type: string }>).filter((o) => o.type === 'invokeHostFunction');
-      for (const invokeOp of invokeOps) {
-        // Rebuild with witness as source, empty auth, no sorobanData → recording mode
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const func = (invokeOp as any).func;
-        const rebuilt = new TransactionBuilder(new Account(witness, '0'), {
-          fee: '1000000',
-          networkPassphrase: Networks.PUBLIC,
-        })
-          .addOperation(Operation.invokeHostFunction({ func, auth: [] }))
-          .setTimeout(120)
-          .build();
-        bumpRpc();
-        const sim = await withTimeout(
-          server.simulateTransaction(rebuilt),
-          SIM_TIMEOUT_MS,
-          'sb soroban sim',
-        );
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (rpc.Api.isSimulationError(sim as any) || !(sim as any)?.result?.retval) continue;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const native = scValToNative((sim as any).result.retval);
-        if (!Array.isArray(native) || native.length < 2) continue;
-        const leg = BigInt(native[1]);
-        if (leg > 0n) totalNet += leg;
-        if (!routeSyms.includes(opts.buyAsset.symbol)) routeSyms.push(opts.buyAsset.symbol);
+
+      if (invokeOps.length > 0) {
+        // ── Soroban leg ────────────────────────────────────────────────────────
+        let xdrFill = 0n;
+        let xdrRoute: string[] = [];
+
+        for (const invokeOp of invokeOps) {
+          // Rebuild with witness as source, empty auth, no sorobanData → recording mode
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const func = (invokeOp as any).func;
+          const rebuilt = new TransactionBuilder(new Account(witness, '0'), {
+            fee: '1000000',
+            networkPassphrase: Networks.PUBLIC,
+          })
+            .addOperation(Operation.invokeHostFunction({ func, auth: [] }))
+            .setTimeout(120)
+            .build();
+          bumpRpc();
+          const sim = await withTimeout(
+            server.simulateTransaction(rebuilt),
+            SIM_TIMEOUT_MS,
+            'sb soroban sim',
+          );
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (rpc.Api.isSimulationError(sim as any) || !(sim as any)?.result?.retval) continue;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const native = scValToNative((sim as any).result.retval);
+          if (!Array.isArray(native) || native.length < 2) continue;
+          const leg = BigInt(native[1]);
+          if (leg > 0n) {
+            totalNet += leg;
+            xdrFill += leg;
+          }
+          // Decode real route from SAC transfer events, mirroring simulateXbullNet.
+          // Falls back to [] when the RPC returns no events (e.g. in test stubs).
+          if (xdrRoute.length < 2) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const transfers = await decodeTransfers((sim as any).events ?? []);
+            const decoded = routeFromTransfers(transfers);
+            if (decoded.length >= 2) xdrRoute = decoded;
+          }
+        }
+
+        if (xdrFill > 0n) subTxContribs.push({ fill: xdrFill, route: xdrRoute });
+        continue; // tx was Soroban — classic branch below not applicable
       }
 
-      if (invokeOps.length > 0) continue; // tx was Soroban — classic branch below not applicable
-
-      // Classic pathPaymentStrictSend legs
+      // ── Classic pathPaymentStrictSend legs ────────────────────────────────
       type ClassicOp = {
         type: string;
         destination?: string;
@@ -577,10 +600,28 @@ export async function simulateStellarBrokerNet(opts: {
         sendAsset?: { isNative(): boolean; getCode(): string; getIssuer(): string };
         sendAmount?: string;
         destAsset?: { isNative(): boolean; getCode(): string; getIssuer(): string };
+        /** Intermediate hops in the path (SDK Asset objects). */
+        path?: Array<{ isNative(): boolean; getCode(): string }>;
       };
+      // Convert SDK Asset → display symbol: native → 'XLM', else asset code.
+      const assetSym = (a: { isNative(): boolean; getCode(): string }): string =>
+        a.isNative() ? 'XLM' : a.getCode();
+
+      let xdrFill = 0n;
+      let xdrRoute: string[] = [];
+
       for (const op of (tx.operations as ClassicOp[])) {
         if (op.type !== 'pathPaymentStrictSend') continue;
         if (op.destination === SB_FEE_ACCOUNT) continue; // fee leg → skip
+
+        // Decode route from this classic op: [sendAsset, ...path, destAsset].
+        // Captured once from the first non-fee trader leg of this XDR.
+        if (op.sendAsset && op.destAsset && xdrRoute.length < 2) {
+          const sendSym = assetSym(op.sendAsset);
+          const pathSyms = (op.path ?? []).map(assetSym);
+          const destSym = assetSym(op.destAsset);
+          xdrRoute = [sendSym, ...pathSyms, destSym];
+        }
 
         // Attempt to observe the real fill via Horizon strict-send.
         // Only possible when sendAsset and destAsset are known (in our ASSETS registry).
@@ -602,10 +643,12 @@ export async function simulateStellarBrokerNet(opts: {
           }
         }
 
+        let legFill = 0n;
         if (observedFill !== null) {
           // Real fill from Horizon strict-send — this IS an observed fill.
           // Do NOT set classicContributed: exact stays true if all other legs are also observed.
           totalNet += observedFill;
+          legFill = observedFill;
         } else {
           // Fallback: destMin is a slippage FLOOR, never an observed fill.
           // Summing it makes the net a conservative lower bound → mark non-exact so callers
@@ -613,20 +656,37 @@ export async function simulateStellarBrokerNet(opts: {
           if (op.destMin) {
             try {
               const destMinStroops = toStroops(op.destMin);
-              if (destMinStroops > 0n) { totalNet += destMinStroops; classicContributed = true; }
+              if (destMinStroops > 0n) {
+                totalNet += destMinStroops;
+                classicContributed = true;
+                legFill = destMinStroops;
+              }
             } catch { /* malformed destMin — skip */ }
           }
         }
 
-        if (!routeSyms.includes(opts.buyAsset.symbol)) routeSyms.push(opts.buyAsset.symbol);
+        if (legFill > 0n) xdrFill += legFill;
       }
+
+      if (xdrFill > 0n) subTxContribs.push({ fill: xdrFill, route: xdrRoute });
     } catch {
       // Malformed XDR — skip
     }
   }
 
   if (totalNet <= 0n) return null;
-  return { net: totalNet, route: routeSyms, exact: !classicContributed };
+
+  // Select the dominant route: the sub-tx with the largest fill contribution.
+  // In a split burst this is the main path; true parallel routing is not rendered in P2.
+  const dominant = subTxContribs.reduce<{ fill: bigint; route: string[] } | null>(
+    (best, cur) => (!best || cur.fill > best.fill) ? cur : best,
+    null,
+  );
+  const route = (dominant?.route?.length ?? 0) >= 2
+    ? dominant!.route
+    : [opts.sellAsset.symbol, opts.buyAsset.symbol];
+
+  return { net: totalNet, route, exact: !classicContributed };
 }
 
 /** Simule swap_chained Aquarius et retourne les Transfer[] bruts (pour la sonde de cohérence).

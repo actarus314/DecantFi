@@ -202,6 +202,15 @@ export function makeReSimLeg(
           // A mixed burst (Soroban + classic destMin floor) is a conservative lower bound we did
           // not fully observe → keep the honest estimate row untouched, never relabel it observed.
           if (sbResult && sbResult.net > 0n && sbResult.exact) {
+            // Build route hops from decoded symbols, same venue-tag convention as xBull.
+            const sbRoute = sbResult.route;
+            const sbHopsLeg = sbRoute.length >= 2
+              ? sbRoute.slice(0, -1).map((sell: string, i: number) => ({
+                  venue: 'stellarbroker' as const,
+                  sell,
+                  buy: sbRoute[i + 1]!,
+                }))
+              : undefined;
             return {
               ...q,
               netOut: sbResult.net,
@@ -209,6 +218,12 @@ export function makeReSimLeg(
               netConfidence: 'exact' as const,
               netRange: { low: sbResult.net, high: sbResult.net },
               feeBreakdown: [{ kind: 'aggregator' as const, note: 'fill observed via empty-auth Soroban simulation' }],
+              // priceImpact neutralized: net changed but makeReSimLeg has no price context for
+              // recalculation (unlike resimAquariusXbull which has result.prices). Consistent with
+              // how xBull/Aquarius legs in this function also do not recalculate impact.
+              priceImpactPct: undefined,
+              priceImpactLocalPct: undefined,
+              ...(sbHopsLeg ? { route: sbHopsLeg } : {}),
             };
           }
           // capture/sim failure OR mixed (non-exact) net → keep original (no downgrade, no relabel)
@@ -251,6 +266,7 @@ export async function resimAquariusXbull(
   let aquariusSimOk = false; // sim succeeded (real fill observed) → 'exact' even if it equals the find-path quote
   let xbullSimNet: bigint | undefined;
   let sbSimNet: bigint | undefined;
+  let sbHops: RouteHop[] | undefined;
   let sbSimMs = 0;
   // Tracks whether a sim was attempted but failed (→ downgrade to 'estimate')
   let aquariusSimFailed = false;
@@ -319,10 +335,17 @@ export async function resimAquariusXbull(
   // Promote SB only when the whole net was observed via Soroban sims (exact). A mixed
   // (Soroban + classic destMin floor) net is a conservative lower bound → leave the SB
   // estimate quote untouched rather than relabel a partly-unobserved number as "observed".
-  if (sbRanked && sbT.r && sbT.r.net > 0n && sbT.r.exact) sbSimNet = sbT.r.net;
+  if (sbRanked && sbT.r && sbT.r.net > 0n && sbT.r.exact) {
+    sbSimNet = sbT.r.net;
+    // Thread decoded route: mirror xBull hop-building (venue tag, sell→buy per hop).
+    const sbRoute = sbT.r.route;
+    if (sbRoute.length >= 2) {
+      sbHops = sbRoute.slice(0, -1).map((sell, i) => ({ venue: 'stellarbroker' as const, sell, buy: sbRoute[i + 1]! }));
+    }
+  }
 
   if (aquariusSimOk || aquariusSimNet !== undefined || xbullSimNet !== undefined || xbullHops !== undefined
-    || aquariusSimFailed || xbullSimFailed || sbSimNet !== undefined) {
+    || aquariusSimFailed || xbullSimFailed || sbSimNet !== undefined || sbHops !== undefined) {
     const newQuotes = result.ranking.ranked.map((q) => {
       if (q.source === 'aquarius') {
         if (aquariusSimOk)
@@ -364,6 +387,7 @@ export async function resimAquariusXbull(
           feeBreakdown: [{ kind: 'aggregator' as const, note: 'fill observed via empty-auth Soroban simulation' }],
           priceImpactPct: priceImpactPct(q.amountIn, sbSimNet, result.prices.blndUsd, targetEvmPerUnit(pairUi, result.prices)) ?? q.priceImpactPct,
           priceImpactLocalPct: priceImpactPct(q.amountIn, sbSimNet, result.prices.blndUsd, targetLocalPerUnit(pairUi, result.prices)) ?? q.priceImpactLocalPct,
+          ...(sbHops ? { route: sbHops } : {}),
           durationMs: (q.durationMs ?? 0) + sbSimMs,
         };
       }

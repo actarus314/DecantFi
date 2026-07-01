@@ -1328,4 +1328,66 @@ describe('simulateStellarBrokerNet', () => {
     // destMin floor contributed → cannot be labelled observed
     expect(result!.exact).toBe(false);
   });
+
+  // ─── P2: real route decoding ──────────────────────────────────────────────────
+
+  it('P2: classic burst with non-empty op.path returns full multi-hop route [send, ...path, dest]', async () => {
+    // Build a classic pathPaymentStrictSend with an intermediate XLM hop: USDC → XLM → EURC.
+    // This exercises the op.path route decode path (NOT [sell, buy] fallback).
+    function makeMultiHopClassicXdr(destination: string, destMin: string): string {
+      const account = new Account(WITNESS, '101');
+      const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: Networks.PUBLIC })
+        .addOperation(Operation.pathPaymentStrictSend({
+          sendAsset: new SdkAsset('USDC', USDC_ISSUER),
+          sendAmount: '1000',
+          destination,
+          destAsset: new SdkAsset('EURC', EURC_ISSUER),
+          destMin,
+          path: [SdkAsset.native()], // XLM as intermediate hop
+        }))
+        .setTimeout(180)
+        .build();
+      return tx.toXDR();
+    }
+
+    const result = await simulateStellarBrokerNet({
+      sellAsset: USDC, buyAsset: EURC,
+      amountIn: 1000_0000000n, slippageBps: 50,
+      apiKey: 'test', rpcUrl: 'https://rpc.test',
+      _capturedXdrs: [
+        makeClassicXdr(SB_FEE_ACCOUNT, '0.0001'),  // fee leg → excluded
+        makeMultiHopClassicXdr(WITNESS, '900.0'),   // trader leg: USDC → XLM → EURC
+      ],
+      _rpcServer: { async simulateTransaction(): Promise<never> { throw new Error('should not be called'); } },
+      // Horizon unavailable → fall back to destMin (exercises the classic route decode + destMin path)
+      _quoteHorizon: async () => null,
+    });
+
+    expect(result).not.toBeNull();
+    // Route must reflect the actual op.path: [sendAsset, XLM, destAsset]
+    expect(result!.route).toEqual(['USDC', 'XLM', 'EURC']);
+    expect(result!.exact).toBe(false); // destMin floor contributed
+  });
+
+  it('P2: Soroban burst with no events falls back to [sell, buy] route', async () => {
+    // When the RPC stub returns no events, decodeTransfers([]) → routeFromTransfers([]) → [].
+    // The dominant-route selector falls back to [sellAsset.symbol, buyAsset.symbol].
+    const fakeRpcNoEvents = {
+      async simulateTransaction(_tx: unknown) {
+        // No 'events' field — simulates an RPC that omits diagnostic events
+        return { result: { retval: nativeToScVal([10_000_0000000n, 100_0000000n, 0n]) } };
+      },
+    };
+    const result = await simulateStellarBrokerNet({
+      sellAsset: BLND, buyAsset: USDC,
+      amountIn: 5000_0000000n, slippageBps: 50,
+      apiKey: 'test', rpcUrl: 'https://rpc.test',
+      _capturedXdrs: [makeSorobanXdr()],
+      _rpcServer: fakeRpcNoEvents,
+    });
+    expect(result).not.toBeNull();
+    // No events → decoded route is empty → fallback to [sell, buy]
+    expect(result!.route).toEqual(['BLND', 'USDC']);
+    expect(result!.exact).toBe(true);
+  });
 });
