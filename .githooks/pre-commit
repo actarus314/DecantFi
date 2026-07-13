@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Blocks a commit whose staged changes contain a secret.
+#
+# On a PRIVATE repository under a Free plan, GitHub provides no secret scanning and no
+# push protection: this hook is the only barrier. It is therefore a hard failure, not a
+# warning — a missing scanner must never look like a clean scan.
+#
+# Enabled by `git config core.hooksPath .githooks` (done by init-project.sh; a fresh clone
+# must run it once). Hooks are bypassable with `git commit --no-verify`, so CI runs
+# gitleaks again on the full history as the enforced backstop.
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "✗ gitleaks is not installed — cannot verify staged changes."
+  echo "  Install it:  brew install gitleaks"
+  exit 1
+fi
+
+# --staged: scans what is about to be committed. Exit code 1 when a secret is found.
+# --redact: never print the secret value itself.
+# Output is held back and shown only on failure, so a clean commit stays silent.
+if ! output=$(gitleaks git --staged --no-banner --redact 2>&1); then
+  printf '%s\n' "$output"
+  echo
+  echo "✗ Secret detected in staged changes — commit blocked."
+  echo "  Remove the secret, then commit again."
+  echo "  App keys belong in .env, the GitHub PAT in .envrc — both are gitignored."
+  echo
+  echo "  False positive? Add a narrow rule to .gitleaksignore, never bypass blindly."
+  exit 1
+fi

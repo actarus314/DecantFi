@@ -1,0 +1,15 @@
+# gitleaks — false positives, pinned by fingerprint (commit:file:rule:line).
+# Narrow by design: a new secret in the same file is still caught.
+#
+# Test fixtures: Stellar contract/account addresses (C…/G…) and XDR transactions.
+# These are PUBLIC identifiers by nature, not credentials. Verified 2026-07-13:
+# no Stellar secret seed (S…) anywhere in history.
+3113d77d0457b185656e6b12b04138db219486fb:core/sources/__fixtures__/aquarius.request.json:generic-api-key:5
+3113d77d0457b185656e6b12b04138db219486fb:core/sources/__fixtures__/aquarius.request.json:generic-api-key:6
+3113d77d0457b185656e6b12b04138db219486fb:core/sources/__fixtures__/comet.blnd-usdc.json:generic-api-key:1
+3113d77d0457b185656e6b12b04138db219486fb:core/sources/__fixtures__/comet.request.json:generic-api-key:22
+3113d77d0457b185656e6b12b04138db219486fb:core/sources/__fixtures__/comet.request.json:generic-api-key:24
+3113d77d0457b185656e6b12b04138db219486fb:core/sources/__fixtures__/soroswap.blnd-usdc.json:generic-api-key:20
+3113d77d0457b185656e6b12b04138db219486fb:core/sources/__fixtures__/soroswap.blnd-usdc.json:generic-api-key:21
+3113d77d0457b185656e6b12b04138db219486fb:core/sources/__fixtures__/soroswap.blnd-usdc.json:generic-api-key:40
+3113d77d0457b185656e6b12b04138db219486fb:core/sources/__fixtures__/soroswap.blnd-usdc.json:generic-api-key:45
