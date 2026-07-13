@@ -23,7 +23,7 @@
     "build:sb-mediator": "node scripts/build-sb-mediator.mjs"
   },
   "devDependencies": {
-    "@creit.tech/stellar-wallets-kit": "^2.3.0",
+    "@creit.tech/stellar-wallets-kit": "^2.5.0",
     "@types/node": "^26.0.1",
     "esbuild": "^0.28.1",
     "tsx": "^4.22.4",
