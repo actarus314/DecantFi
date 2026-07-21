@@ -31,14 +31,47 @@ Both must be green before opening a PR.
 - `collector/` + `db/` — quote-logging daemon + SQLite layer
 - `web/` — self-hosted web UI (server + static assets)
 
+## Before opening a PR
+
+- For anything non-trivial, open an issue first to discuss the approach.
+- Run it locally and check the change actually works.
+- No new dependencies for what a few lines of code can do.
+
 ## Branch and PR process
 
-1. Fork or branch from `main`.
-2. Name branches descriptively: `feat/my-feature`, `fix/issue-42`, `chore/update-deps`.
-3. Keep commits atomic and the message clear ("why", not just "what").
-4. Open a PR against `main`. Title ≤ 70 characters.
-5. All CI checks (typecheck, tests, Docker build) must pass.
-6. One approval required before merge.
+Three stages, because there is a real staging host to validate against before production.
+
+- `feat/…` branches off `develop`, not `main`.
+- `develop` is staging: merged there first, deployed to the staging host, validated there.
+- `main` is production: `develop` reaches it through a pull request.
+
+**Keep `develop` short-lived** — merge in days, not weeks. A staging branch that lingers drifts
+from `main`, and that is exactly how an environment branch turns into the anti-pattern it's often
+accused of being.
+
+A `v*` tag publishes the `decantfi-collector` image to ghcr. Whoever deploys it runs a **pinned
+tag** (`X.Y.Z`), never `:latest` and never a branch — what gets promoted is the artifact, not the
+branch.
+
+1. Name branches descriptively: `feat/my-feature`, `fix/issue-42`, `chore/update-deps`.
+2. Keep commits atomic and the message clear ("why", not just "what").
+3. Open a PR against `develop`. Title ≤ 70 characters.
+4. All CI checks (typecheck, tests, Docker build) must pass.
+5. One approval required before merge.
+
+**CI must be green before a merge.** Check it:
+
+```bash
+sha=$(gh pr view <n> --json headRefOid --jq .headRefOid)
+gh run list --commit "$sha" --json workflowName,status,conclusion
+```
+
+Green means **every expected workflow is `completed` / `success`** — `CI`, `Publish image`, and
+`CodeQL`. A workflow **missing** from the list is **not** a green: it has not reported yet.
+
+⚠️ **Match on `workflowName`, not on `name`.** CodeQL runs through GitHub's *default setup*, so it
+has no workflow file: its `name` reads `Push on main` — the run's title. Only `workflowName` says
+`CodeQL`.
 
 ## Bilingual documentation rule
 
@@ -117,14 +150,48 @@ Les deux doivent être verts avant d'ouvrir une PR.
 - `collector/` + `db/` — daemon de logging + couche SQLite
 - `web/` — UI web auto-hébergée (serveur + assets statiques)
 
+## Avant d'ouvrir une PR
+
+- Pour tout changement non trivial, ouvrir une issue au préalable pour discuter de l'approche.
+- Le lancer en local et vérifier que le changement fonctionne réellement.
+- Pas de nouvelle dépendance pour ce que quelques lignes de code peuvent faire.
+
 ## Processus de branche et PR
 
-1. Forker ou brancher depuis `main`.
-2. Nommer les branches de manière explicite : `feat/ma-feature`, `fix/issue-42`, `chore/update-deps`.
-3. Garder les commits atomiques avec un message clair (le « pourquoi », pas seulement le « quoi »).
-4. Ouvrir une PR contre `main`. Titre ≤ 70 caractères.
-5. Tous les checks CI (typecheck, tests, build Docker) doivent passer.
-6. Une approbation requise avant merge.
+Trois étages, parce qu'il existe un vrai host de staging à valider avant la production.
+
+- `feat/…` part de `develop`, pas de `main`.
+- `develop` est le staging : on y merge en premier, on déploie sur le host de staging, on y valide.
+- `main` est la production : `develop` l'atteint via une pull request.
+
+**Garder `develop` de courte durée** — merger en jours, pas en semaines. Une branche de staging
+qui traîne dérive de `main`, et c'est précisément ainsi qu'une branche d'environnement devient
+l'anti-pattern qu'on lui reproche souvent.
+
+Un tag `v*` publie l'image `decantfi-collector` sur ghcr. Qui la déploie tourne un **tag épinglé**
+(`X.Y.Z`), jamais `:latest` et jamais une branche — ce qui est promu, c'est l'artefact, pas la
+branche.
+
+1. Nommer les branches de manière explicite : `feat/ma-feature`, `fix/issue-42`, `chore/update-deps`.
+2. Garder les commits atomiques avec un message clair (le « pourquoi », pas seulement le « quoi »).
+3. Ouvrir une PR contre `develop`. Titre ≤ 70 caractères.
+4. Tous les checks CI (typecheck, tests, build Docker) doivent passer.
+5. Une approbation requise avant merge.
+
+**La CI doit être verte avant un merge.** Vérifier :
+
+```bash
+sha=$(gh pr view <n> --json headRefOid --jq .headRefOid)
+gh run list --commit "$sha" --json workflowName,status,conclusion
+```
+
+Vert signifie **tout workflow attendu en `completed` / `success`** — `CI`, `Publish image`, et
+`CodeQL`. Un workflow **absent** de la liste n'est **pas** un vert : il n'a simplement pas encore
+rapporté.
+
+⚠️ **Matcher sur `workflowName`, pas sur `name`.** CodeQL tourne via le *default setup* de GitHub,
+donc n'a pas de fichier de workflow : son `name` affiche `Push on main` — le titre du run. Seul
+`workflowName` indique `CodeQL`.
 
 ## Règle de documentation bilingue
 

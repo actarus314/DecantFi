@@ -1,0 +1,10 @@
+# Vulnerabilities acknowledged and deliberately not failing CI.
+# Auto-discovered by osv-scanner because it sits next to package-lock.json.
+#
+# This file is ONLY for advisories with no published fix. Anything fixable is bumped —
+# through `overrides` in package.json when the vulnerable package is a transitive dep.
+
+[[IgnoredVulns]]
+id = "GHSA-848j-6mx2-7j84"
+ignoreUntil = 2026-10-21
+reason = "elliptic 6.6.1: no fixed version published. Transitive devDependency of @creit.tech/stellar-wallets-kit, through @trezor/connect and @hot-wallet/sdk. It reaches neither deliverable: the runtime image runs `npm prune --omit=dev`, and the vendored web/public/walletkit.js carries no trace of those chains (checked). Signing happens wallet-side, never here. Re-evaluate when a fix ships."

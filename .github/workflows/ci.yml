@@ -1,0 +1,143 @@
+# Installed as .github/workflows/ci.yml by `init-project.sh --type node`. Job name MUST stay
+# `checks` (the ruleset requires it).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions: {}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GITLEAKS_VERSION: v8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+      ACTIONLINT_VERSION: v1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+      OSV_VERSION: v2.4.0
+      OSV_SHA256: 15314940c10d26af9c6649f150b8a47c1262e8fc7e17b1d1029b0e479e8ed8a0
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      # Blocks a vulnerable/badly-licensed dependency BEFORE the merge. Dependabot only alerts
+      # AFTER it has landed on the default branch — the two are complementary, not redundant.
+      # Requires the dependency graph, which on a PRIVATE repo needs GitHub Advanced Security:
+      # "Dependency review is not supported on this repository" — it would fail on EVERY pull
+      # request for the whole private phase (i.e. the whole development), and a permanently red CI
+      # stops being read. Same gate, same treatment as CodeQL and Pages: skipped while private,
+      # wakes up on its own once the repo goes public.
+      # `!= 'private'` (never `== 'public'`): a missing field means RUN, never "silently off".
+      - name: Dependency review (PR only, public repo only)
+        if: github.event_name == 'pull_request' && github.event.repository.visibility != 'private'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      # A freshly scaffolded repo has no package.json yet. A REQUIRED check that cannot possibly
+      # pass on the scaffold is a structural red — the very thing that makes a CI stop being read.
+      # These steps wake up on their own as soon as the manifest exists.
+      - name: No package.json yet (scaffolded repo)
+        if: hashFiles('package.json') == ''
+        run: echo "No package.json yet — nothing to check. These steps activate once it exists."
+      - run: npm ci
+        if: hashFiles('package.json') != ''
+      - run: npm test
+        if: hashFiles('package.json') != ''
+      - run: npm run typecheck
+        if: hashFiles('package.json') != ''
+      # Project-specific gate: `web/public/walletkit.js` is a VENDORED bundle, pre-built from
+      # @creit.tech/stellar-wallets-kit and committed. Renovate bumps the lockfile but never
+      # regenerates a committed bundle, so the checksum is the only thing that catches a
+      # lockfile/bundle mismatch — a build that ships the old bundle looks exactly like one
+      # that shipped the new one.
+      - name: Vendored bundle matches its checksum
+        run: sha256sum -c web/public/walletkit.js.sha256
+      # No `npm audit` here, and that is deliberate. It was a STRICT SUBSET of the osv-scanner step
+      # further down: same advisory database (npm audit has been powered by the GitHub Advisory
+      # Database since 2021; OSV aggregates GHSA too), same lockfile, same job, same moment — and
+      # `--omit=dev` made it narrower still. A second scanner that finds a subset of the first
+      # adds no signal; it only adds a step to maintain, and a false sense of depth.
+      - name: Install gitleaks (pinned + checksum-verified)
+        run: |
+          set -euo pipefail
+          v="${GITLEAKS_VERSION#v}"   # the tag carries the `v`, the asset name does not
+          f="gitleaks_${v}_linux_x64.tar.gz"
+          curl -sSfL -o "$f" \
+            "https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/${f}"
+          echo "${GITLEAKS_SHA256}  ${f}" | sha256sum -c -
+          tar -xzf "$f" gitleaks
+      - name: Secret scan (full history)
+        run: ./gitleaks git --no-banner --redact
+      - name: Lint workflows (actionlint, pinned + checksum-verified)
+        run: |
+          set -euo pipefail
+          v="${ACTIONLINT_VERSION#v}"
+          f="actionlint_${v}_linux_amd64.tar.gz"
+          curl -sSfL -o "$f" \
+            "https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}/${f}"
+          echo "${ACTIONLINT_SHA256}  ${f}" | sha256sum -c -
+          tar -xzf "$f" actionlint
+          ./actionlint -color
+      # Semgrep + osv-scanner — why BOTH, and what each one ACTUALLY does.
+      #
+      # semgrep = the ONLY static analysis of the CODE that runs while PRIVATE. CodeQL is barred
+      #   there by LICENCE (not by a technical limit), and a repository spends its whole youth
+      #   private: without semgrep the code is NEVER analysed until the flip, where CodeQL then
+      #   dumps the entire backlog at once.
+      #   ⚠ Do NOT write "semgrep catches what CodeQL misses". That is the comfortable line, and
+      #     NOTHING backs it. Semgrep CE is intra-file AND intra-function — inter-procedural
+      #     dataflow lives in the paid Pro edition — where CodeQL does cross-file dataflow. semgrep
+      #     PRECEDES CodeQL, it does not surpass it. It is kept for the PRIVATE PHASE: that reason
+      #     is sufficient on its own, and a false one added on top helps nobody.
+      #
+      # osv-scanner = the pre-merge dependency GATE.
+      #   ⚠ Do NOT write "nothing else sees vulnerabilities while private": Dependabot ALERTS does
+      #     work on a private repository, for free. But it alerts AFTER THE FACT, on the default
+      #     branch — once the code is ALREADY in. osv-scanner BLOCKS THE PULL REQUEST. A different
+      #     role, not a duplicate. (`dependency-review` is the NATIVE gate — but it requires a
+      #     public repository, or GHAS.)
+      #
+      # --exclude=.github: the workflows have their own linters (actionlint + zizmor), which enforce
+      #   THIS REPOSITORY'S PINNING POLICY (SHA for third-party actions, a major tag tolerated for
+      #   actions/* and github/* — compromising those means compromising GitHub itself). semgrep's
+      #   workflow rules CONTRADICT that policy and would fail every scaffold on day one.
+      #   ⚠ Do NOT write "one scope each, no overlap": that has been FALSE since April 2025. CodeQL
+      #     now analyses the `actions` language (GA, and ACTIVE IN DEFAULT SETUP, no opt-in): its
+      #     default suite already covers most of what zizmor does — code-injection, artifact/cache
+      #     poisoning, untrusted-checkout, exposed secrets, missing-workflow-permissions. THE
+      #     OVERLAP IS REAL. What zizmor keeps ON ITS OWN, and what justifies keeping it: this
+      #     repository's pinning policy (`zizmor.yml`) — the CodeQL `unpinned-tag` query sits in
+      #     security-extended, NOT in default — plus artipacked (persist-credentials),
+      #     impostor-commit, ref-confusion, typosquat-uses.
+      - name: Static analysis (semgrep, pinned)
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet -r requirements-ci.txt
+          semgrep scan --error --quiet --metrics=off --exclude=.github \
+            --config p/security-audit --config p/owasp-top-ten .
+      # osv-scanner auto-discovers every lockfile/manifest (`-r .`), not just package-lock.json;
+      # `--allow-no-lockfiles` keeps it green if none are present. No guard: always runs and reports.
+      # One exception, and it is NOT a hand-kept list: CI-only tooling (requirements-ci.txt) is
+      # subtracted in .gitignore, which osv honours — see that file for why (dev tools, never shipped).
+      - name: Vulnerable dependencies (osv-scanner, pinned + checksum-verified)
+        run: |
+          set -euo pipefail
+          curl -sSfL -o osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SHA256}  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+          ./osv-scanner scan source -r . --allow-no-lockfiles
+      - name: Audit workflows (zizmor)
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet -r requirements-ci.txt
+          zizmor --persona regular --config .github/zizmor.yml .github/workflows/

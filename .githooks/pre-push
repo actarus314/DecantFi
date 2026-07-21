@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Refuses a direct push to a protected branch (main, develop).
+#
+# WHY THIS EXISTS — on a PRIVATE repository under a Free plan, GitHub provides NO rulesets.
+# Nothing on the server requires a pull request, and nothing forbids pushing straight to main.
+# Every CI check still runs, but NONE of them is required: a red pull request can be merged,
+# and main can be written to directly. This hook is the ONLY thing standing there.
+#
+# It is not theoretical. On dEURO (2026-05-01) a direct push to main removed a compose `user:`
+# directive; the distroless image forces UID 65532, SQLite lost write access to its bind mount,
+# and production broke on the NUC — after :latest had already been pulled. A pull request would
+# have shown the diff. This hook is that missed guardrail, brought back to the one place that
+# still works while the repo is private: the developer's machine.
+#
+# Kept active even once the repo is public, where the server-side ruleset refuses the same push:
+# defence in depth, and the local message is far clearer than a remote rejection.
+#
+# Enabled by `git config core.hooksPath .githooks` (done by init-project.sh; a fresh clone must
+# run it once). Bypassable with `git push --no-verify` — deliberately: it must remain possible
+# to repair an emergency. Bypassing is a decision, not an accident.
+set -euo pipefail
+
+PROTECTED="main develop"
+ZERO='0000000000000000000000000000000000000000'
+
+# git feeds pre-push on stdin, one line per ref being pushed:
+#   <local ref> <local sha> <remote ref> <remote sha>
+while read -r _local_ref _local_sha remote_ref remote_sha; do
+  [ -n "${remote_ref:-}" ] || continue
+  branch="${remote_ref#refs/heads/}"
+
+  # The branch does not exist on the remote yet => this is its CREATION (the very first push
+  # of a new repository). Refusing it would make the repo impossible to initialise.
+  [ "$remote_sha" = "$ZERO" ] && continue
+
+  for p in $PROTECTED; do
+    if [ "$branch" = "$p" ]; then
+      echo "✗ Direct push to '$branch' refused."
+      echo ""
+      echo "  While the repo is PRIVATE there is no ruleset: the server would accept this push."
+      echo "  That is exactly how a change reaches production without ever being reviewed."
+      echo ""
+      echo "  Go through a pull request:"
+      echo "      git switch -c feat/<subject>"
+      echo "      git push -u origin feat/<subject>"
+      echo "      gh pr create --fill"
+      echo ""
+      echo ""
+      echo "  Merge only once the CI is green. NOT with 'gh pr checks': that command needs the"
+      echo "  'Checks' permission, which does NOT exist in the fine-grained token UI and cannot"
+      echo "  be granted. It always fails here. Use this instead:"
+      echo ""
+      echo "      sha=\$(gh pr view <n> --json headRefOid --jq .headRefOid)"
+      echo "      gh run list --commit \"\$sha\" --json workflowName,status,conclusion"
+      echo ""
+      echo "  Green means EVERY expected workflow is completed/success — CI, plus 'Publish image'"
+      echo "  if the repo ships one, plus 'CodeQL' once the repo is public. A workflow MISSING"
+      echo "  from that list is NOT a green: it has simply not reported yet."
+      echo "  (Match on workflowName, never on name: CodeQL runs via GitHub's default setup, so"
+      echo "   its 'name' field reads 'Push on main' — only workflowName says 'CodeQL'.)"
+      echo ""
+      echo "  Real emergency: git push --no-verify (a decision, not an accident)."
+      exit 1
+    fi
+  done
+done
+
+exit 0

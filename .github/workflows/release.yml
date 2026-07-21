@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions: {}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the GitHub Release
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The guard stays: pushing a tag twice, or re-running the workflow, must not fail.
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists — skipping."
+            exit 0
+          fi
+          # The release notes carry the pinned image reference: whoever deploys this reads the
+          # release, not the workflow. `--generate-notes` cannot prepend anything, so the notes
+          # are fetched through the API and the image block is placed in front of them.
+          notes=$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="${GITHUB_REF_NAME}" --jq .body)
+          gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes "## Image
+
+          \`\`\`yaml
+          image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/decantfi-collector:${GITHUB_REF_NAME#v}
+          \`\`\`
+
+          ${notes}"

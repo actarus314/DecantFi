@@ -1,0 +1,11 @@
+# Aligns zizmor on the project standard: third-party actions MUST be pinned by full SHA (a tag is
+# mutable — in March 2026, 75 of the 76 tags of aquasecurity/trivy-action were force-pushed).
+# GitHub's own actions/* are allowed a major tag: compromising them means compromising GitHub
+# itself, and pinning them by SHA costs a bump PR per action per release for no real gain.
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        actions/*: ref-pin
+        github/*: ref-pin
+        "*": hash-pin
