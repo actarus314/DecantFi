@@ -34,6 +34,11 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY web/public ./dist/web/public
 COPY package.json ./
+# npm is a BUILD tool, never a runtime one: nothing here shells out to it (the CMD, the compose
+# command and both healthchecks all call `node` directly). Leaving it in ships npm's whole
+# dependency tree — and its CVEs — into the runtime image: Trivy fails `build-check` on
+# brace-expansion/tar/undici that belong to npm itself, not to this app.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /root/.npm
 # root:root (deliberate) — custom container users explored and rejected (too much volume-ownership
 # friction). Hardening lives in the compose directives: cap_drop ALL, read_only, no-new-privileges, tmpfs.
 # nosemgrep: dockerfile.security.missing-user.missing-user
