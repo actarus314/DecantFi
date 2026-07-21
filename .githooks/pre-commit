@@ -29,3 +29,28 @@ if ! output=$(gitleaks git --staged --no-banner --redact 2>&1); then
   echo "  False positive? Add a narrow rule to .gitleaksignore, never bypass blindly."
   exit 1
 fi
+
+# --- "local == github" pre-flight, throttled and CONSULTATIVE -----------------------------------
+# So nobody has to remember to run ./check.sh: if its last run is older than N hours (24 by
+# default, tune with CHECK_MAX_AGE_HOURS), replay it here. This is CONSULTATIVE — never a block:
+# the one HARD gate in this hook stays gitleaks, above. Drift found by check.sh is REPORTED (the
+# CI will block it at push time) but the commit goes through — otherwise an unrelated lint, or
+# simply being offline, would wedge a commit and breed the --no-verify reflex, which erodes the
+# real safety net. The timestamp is written even on drift: remind once per window, not per commit.
+if [ -x ./check.sh ]; then
+  stamp=.ci-tools/.last-check
+  max_h="${CHECK_MAX_AGE_HOURS:-24}"
+  now=$(date +%s)
+  last=0
+  [ -f "$stamp" ] && last=$(stat -f %m "$stamp" 2>/dev/null || stat -c %Y "$stamp" 2>/dev/null || echo 0)
+  if [ $(( (now - last) / 3600 )) -ge "$max_h" ]; then
+    echo "▸ local == github pre-flight (last run > ${max_h} h ago) — consultative…"
+    ./check.sh || {
+      echo "⚠ check.sh reported drift (see above) — commit NOT blocked (consultative)."
+      echo "  Fix it before pushing: the CI will block."
+    }
+    mkdir -p .ci-tools && touch "$stamp"
+  fi
+fi
+
+exit 0

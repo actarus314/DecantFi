@@ -1,0 +1,10 @@
+# Same exclusion as `.gitattributes` already applies to CodeQL (linguist-generated):
+# `walletkit.js` is a pre-bundled third-party dependency we do not maintain and never edit.
+# Its integrity is guaranteed by `walletkit.js.sha256`, checked in CI — not by linting minified
+# upstream code we cannot fix. Reporting on it would mean permanent findings nobody can action.
+web/public/walletkit.js
+
+# Semgrep's own defaults are NOT inherited once this file exists — restate them.
+node_modules/
+dist/
+.git/

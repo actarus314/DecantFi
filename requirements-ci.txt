@@ -1,0 +1,12 @@
+# The CI's Python tooling, pinned.
+#
+# WHY THIS FILE RATHER THAN A `pip install zizmor==X` IN THE YAML:
+# an update bot NEVER reads a shell command. A version pinned inside a `run:` is watched by
+# NOBODY — it rots in place, and a frozen security scanner ends up missing what it exists to
+# find. Here, Renovate tracks it NATIVELY (auto-detected `pip_requirements` manager), without
+# a single line of custom configuration.
+#
+# Pinned to the EXACT version (`==`): a CI has to be reproducible, and bumping a scanner can
+# surface new findings — that gets reviewed in a pull request, not on a random morning.
+zizmor==1.27.0
+semgrep==1.170.0

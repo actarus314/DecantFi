@@ -36,4 +36,5 @@ COPY web/public ./dist/web/public
 COPY package.json ./
 # root:root (deliberate) — custom container users explored and rejected (too much volume-ownership
 # friction). Hardening lives in the compose directives: cap_drop ALL, read_only, no-new-privileges, tmpfs.
+# nosemgrep: dockerfile.security.missing-user.missing-user
 CMD ["node", "dist/collector/daemon.js"]

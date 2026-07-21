@@ -1,0 +1,105 @@
+name: Publish image
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    # BOTH branches, not just main. WITH the `staging` capability the flow is feat/ -> develop ->
+    # main, and the ruleset makes `build-check` a REQUIRED check on develop too. Listening on main
+    # only would leave every PR into develop stuck forever on "Expected — waiting for status".
+    # Harmless without `staging`: the branch simply never matches.
+    branches: [main, develop]
+
+permissions: {}
+
+jobs:
+  build-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write   # write the GHA layer cache
+    env:
+      TRIVY_VERSION: v0.72.0
+      TRIVY_SHA256: bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # No Dockerfile yet (fresh scaffold)? The JOB must still run and go green: `build-check` is
+      # a REQUIRED check, and a required check that never reports leaves the PR stuck forever on
+      # "Expected — waiting for status". So the job stays, and only the steps are conditional.
+      - name: No Dockerfile yet (scaffolded repo)
+        if: hashFiles('Dockerfile') == ''
+        run: echo "No Dockerfile yet — nothing to build or scan. These steps activate once it exists."
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        if: hashFiles('Dockerfile') != ''
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        if: hashFiles('Dockerfile') != ''
+        with:
+          context: .
+          push: false
+          load: true           # keep the image in the local daemon so Trivy can scan it
+          tags: candidate:pr
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # Raw binary, NOT aquasecurity/trivy-action: in March 2026, 75 of that action's 76 tags were
+      # force-pushed. Pinning the action by SHA would work too, but the binary + checksum is the
+      # same discipline already used for gitleaks and actionlint — one pattern, not three.
+      - name: Install Trivy (pinned + checksum-verified)
+        if: hashFiles('Dockerfile') != ''
+        run: |
+          set -euo pipefail
+          v="${TRIVY_VERSION#v}"   # the tag carries the `v`, the asset name does not
+          f="trivy_${v}_Linux-64bit.tar.gz"
+          curl -sSfL -o "$f" \
+            "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/${f}"
+          echo "${TRIVY_SHA256}  ${f}" | sha256sum -c -
+          tar -xzf "$f" trivy
+      - name: Scan the image (fails on CRITICAL/HIGH)
+        if: hashFiles('Dockerfile') != ''
+        run: |
+          set -euo pipefail
+          ./trivy image --scanners vuln --severity CRITICAL,HIGH \
+            --ignore-unfixed --exit-code 1 --no-progress candidate:pr
+
+  build-push:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # QEMU: needed to build the arm64 image on an amd64 runner. Only on the PUBLISH job —
+      # `build-check` stays amd64-only, so pull requests keep their short feedback loop.
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/decantfi-collector
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          push: true
+          # The whole point of this capability is that SOMEONE ELSE deploys the image. A single
+          # amd64 manifest means a Raspberry Pi or an Apple-silicon host gets
+          # `no matching manifest for linux/arm64/v8` — a wall, with no warning, at `docker pull`.
+          # Costs 2-4 min on release builds (QEMU emulation); costs nothing on pull requests.
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
