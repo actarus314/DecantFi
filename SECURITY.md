@@ -29,9 +29,24 @@ Please include:
 - reproduction steps or a proof of concept;
 - impact assessment.
 
-We aim to acknowledge reports within a few days. Since the app signs nothing and
-custodies no keys, the main threat surface is the self-hosted web service
-(`/api/*`, transaction building) — reports there are especially welcome.
+Since the app signs nothing and custodies no keys, the main threat surface is
+the self-hosted web service (`/api/*`, transaction building) — reports there
+are especially welcome.
+
+## Scope
+
+In scope: this repo's own code.
+
+Out of scope:
+- The vendored bundles, `web/public/walletkit.js` and `web/public/sb-mediator.js` —
+  report upstream to the original project instead.
+- Any external API or infrastructure this project talks to (Horizon, RPC nodes,
+  StellarBroker, …) — report to that provider directly.
+
+## Response
+
+This is maintained solo, best-effort, no SLA — but security reports get
+priority over everything else in the backlog.
 
 ---
 
@@ -65,6 +80,21 @@ Merci d'indiquer :
 - les étapes de reproduction ou une preuve de concept ;
 - l'impact estimé.
 
-Nous visons un accusé de réception sous quelques jours. L'app ne signe rien et ne
-garde aucune clé : la principale surface d'attaque est le service web
-auto-hébergé (`/api/*`, construction de transactions).
+L'app ne signe rien et ne garde aucune clé : la principale surface d'attaque
+est le service web auto-hébergé (`/api/*`, construction de transactions) —
+les signalements sur ce périmètre sont particulièrement bienvenus.
+
+## Portée
+
+Dans le périmètre : le code de ce dépôt.
+
+Hors périmètre :
+- Les bundles vendorés, `web/public/walletkit.js` et `web/public/sb-mediator.js` —
+  remonter le signalement en amont, au projet d'origine.
+- Toute API ou infrastructure externe sollicitée par ce projet (Horizon, nœuds
+  RPC, StellarBroker, …) — contacter directement ce fournisseur.
+
+## Réponse
+
+Ce projet est maintenu en solo, au mieux, sans SLA — mais les signalements de
+sécurité passent avant le reste du backlog.

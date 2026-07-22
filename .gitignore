@@ -25,13 +25,28 @@ data/
 *.db-wal
 *.db-shm
 
+# pinned binaries check.sh downloads to keep local runs aligned with the CI
+.ci-tools/
+
+# The CI's Python tooling (semgrep, zizmor) — SUBTRACTED from the dependency scan.
+# osv-scanner honours this .gitignore: listed here, the file is NOT scanned (`scan -r .`).
+# It must nevertheless stay VERSIONED — the CI runs `pip install -r requirements-ci.txt` — so it is
+# tracked via `git add -f` (same pattern as .envrc/CLAUDE.md). Renovate indexes TRACKED files, not
+# the .gitignore: it keeps bumping the scanner (proven). NEVER `git rm --cached` this file.
+# WHY subtract it: this is dev tooling, never shipped to a runtime. Resolving its transitive graph
+# only surfaces CVEs of CI tools (their own `python-multipart`, `mcp`… deps) — noise, not the
+# product's attack surface. The real application manifests are NOT ignored, so they ARE scanned.
+/requirements-ci.txt
+
 # misc
 .DS_Store
 *.log
+*.bak
+*.bak-*
 
-# local-only docker override (Mac dev) — ne pas déployer
+# local-only docker override (Mac dev) — do not deploy
 docker-compose.override.yaml
 .playwright-mcp/
 
-# generated at build time — ne pas versionner
+# generated at build time — do not track
 web/public/version.js
