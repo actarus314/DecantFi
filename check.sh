@@ -79,7 +79,7 @@ OSV_VERSION=$(pin OSV_VERSION)
 ZIZMOR_SPEC=$(grep -m1 '^zizmor==' "$reqfile" 2>/dev/null || true)
 SEMGREP_SPEC=$(grep -m1 '^semgrep==' "$reqfile" 2>/dev/null || true)
 RENOVATE_PKG=$(grep -m1 -o 'renovate@[0-9]*' "$CI" | head -1 || true)
-[ -n "$RENOVATE_PKG" ] || RENOVATE_PKG=renovate@43
+[ -n "$RENOVATE_PKG" ] || RENOVATE_PKG=renovate@43.278.0
 
 note "Outils épinglés (auto-détectés depuis $CI)"
 [ -n "$GITLEAKS_VERSION" ]   && ensure_gitleaks "$GITLEAKS_VERSION"
