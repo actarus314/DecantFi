@@ -49,6 +49,20 @@
       "description": "The 4 pinned scanner binaries (VERSION+SHA256 in a run:): their own group — a scanner major changes its rules, hence its findings.",
       "matchManagers": ["custom.regex"],
       "groupName": "CI tooling (pinned binaries)"
+    },
+    {
+      "description": [
+        "renovate-config-validator: automerged, and out of the group above. It publishes ~6 times a",
+        "DAY — pinned exact, it would raise a mechanical pull request every week for nothing. It is",
+        "a CI LINT tool, never shipped at runtime, and its automerge is GUARDED by the very CI that",
+        "runs it: if an upstream version regresses, the config validation step goes red and the pull",
+        "request cannot merge. That is exactly the failure mode (a validator that LIES) the `>= 43`",
+        "floor was chosen for — caught BEFORE main instead of on it."
+      ],
+      "matchDepNames": ["renovate"],
+      "matchDatasources": ["npm"],
+      "groupName": null,
+      "automerge": true
     }
   ],
 
@@ -88,6 +102,24 @@
       ],
       "depNameTemplate": "aquasecurity/trivy",
       "datasourceTemplate": "github-release-attachments"
+    },
+    {
+      "description": [
+        "renovate-config-validator, pinned EXACT. It comes from npm, not from a GitHub release:",
+        "no `currentDigest` here — an npm version is IMMUTABLE, a checksum would add nothing.",
+        "The pin does matter: `renovate@43` re-resolved the newest 43.x ON EVERY RUN, so `main`",
+        "could go red without a line changing. A floating range does not only hand you the fixes,",
+        "it hands you the regressions too — with no known-good version to fall back to.",
+        "⚠ `check.sh` carries the same version, which is why it is in managerFilePatterns."
+      ],
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/",
+        "/^check\\.sh$/"
+      ],
+      "matchStrings": ["renovate@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "renovate",
+      "datasourceTemplate": "npm"
     }
   ]
 }

@@ -103,3 +103,40 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # The GitHub Release lives HERE, not in release.yml, and that is the whole point: `needs` cannot
+  # cross workflows. With the artefact capability the release ANNOUNCES an image — publishing it
+  # before `build-push` succeeds would hand out a version pointing at an image that does not exist.
+  # init-project.sh therefore ships release.yml ONLY for projects without this capability. Keeping
+  # both and relying on the idempotency guard would NOT work: they start at the same time on the
+  # tag, and whichever wins the race decides — which is exactly the bug, re-armed.
+  release:
+    needs: build-push
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the GitHub Release
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The guard stays: pushing a tag twice, or re-running the workflow, must not fail.
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists — skipping."
+            exit 0
+          fi
+          # Whoever deploys this reads the release, not the workflow: the notes carry the pinned
+          # image reference. `--generate-notes` cannot prepend anything, so the notes are fetched
+          # through the API and the image block is placed in front of them.
+          notes=$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="${GITHUB_REF_NAME}" --jq .body)
+          gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes "## Image
+
+          \`\`\`yaml
+          image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/decantfi-collector:${GITHUB_REF_NAME#v}
+          \`\`\`
+
+          ${notes}"
