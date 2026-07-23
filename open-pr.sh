@@ -53,9 +53,17 @@ for _ in $(seq 1 5); do
 done
 [ -n "$BASELINE" ] || { echo "open-pr: cannot read the run list to establish a baseline — aborting before opening the PR" >&2; exit 3; }
 
-# Push the branch (idempotent) and let GitHub register the commit before opening the
-# PR — opening too fast is the main cause of the missed dispatch.
-git push -u origin "$HEAD"
+# Push the branch, UNLESS it is already up to date with its upstream. A promotion opens
+# a PR from a long-lived branch (e.g. develop -> main) that is already pushed and whose
+# direct push the pre-push hook would refuse anyway; a fresh feature branch has no
+# upstream yet and is pushed with -u. Either way, let GitHub register the commit before
+# opening the PR — opening too fast is the main cause of the missed dispatch.
+if git rev-parse --verify --quiet "@{upstream}" >/dev/null 2>&1 &&
+   [ "$(git rev-parse HEAD)" = "$(git rev-parse '@{upstream}')" ]; then
+  echo "open-pr: '$HEAD' already up to date with its upstream — skipping push."
+else
+  git push -u origin "$HEAD"
+fi
 SHA="$(git rev-parse HEAD)"
 for _ in $(seq 1 15); do
   gh api "repos/$REPO/commits/$SHA" >/dev/null 2>&1 && break
