@@ -1,20 +1,21 @@
-// Comet : sonde directe du pool backstop Blend 80/20 (BLND<->USDC UNIQUEMENT). Cross-check de prix.
-// Simule swap_exact_amount_in via Soroban RPC (LECTURE SEULE). La sortie ne depend QUE des reserves du
-// pool, pas de l'identite du `user` ; le user ne sert qu'au transfer_from interne (controle de solde).
-// On simule avec une liste de temoins ordonnee (COMET_WITNESSES) — chacun possede du BLND + une trustline
-// USDC. On prend le 1er dont la simulation passe (solde suffisant). Si pool absent => null (source retiree).
+// Comet: direct probe of the Blend 80/20 backstop pool (BLND<->USDC ONLY). Price cross-check.
+// Simulates swap_exact_amount_in via Soroban RPC (READ ONLY). The output depends ONLY on the pool's
+// reserves, not on the `user` identity; the user only serves the internal transfer_from (balance check).
+// We simulate with an ordered list of witnesses (COMET_WITNESSES) — each holds BLND + a USDC trustline.
+// We take the first whose simulation succeeds (sufficient balance). If the pool is absent => null (source drops out).
 import type { SourceAdapter, NormalizedQuote, QuoteRequest, SourceConfig } from './types.js';
 import { DEFAULT_GAS_XLM } from '../gas.js';
 import { hops, cached } from './util.js';
 import { setReason, rpcReason } from './diag.js';
 import { bumpRpc } from '../rpc-meter.js';
 
-// Pool backstop Blend 80/20 BLND/USDC (resolu on-chain ; design tronquait en CAS3FL6T...VEAM).
+// Blend 80/20 backstop pool BLND/USDC (resolved on-chain; some UIs truncate it as CAS3FL6T...VEAM).
 export const COMET_POOL = 'CAS3FL6TLZKDGGSISDBWGGPXT3NRR4DYTZD7YOD3HMYO6LTJUVGRVEAM';
-// Témoins de cotation read-only, ORDONNÉS par headroom BLND décroissant : on prend le PREMIER dont la
-// simulation passe (solde suffisant). Tous ont une trustline USDC (reçoivent la sortie simulée). La sortie
-// ne dépend QUE des réserves du pool, pas du user → un témoin suffit, la liste n'est qu'une sécurité si le
-// 1ᵉʳ whale bougeait. Lève l'ancien plafond ~2200 BLND (ancien témoin unique épuisé → Contract #10).
+// Read-only quoting witnesses, ORDERED by decreasing BLND headroom: we take the FIRST whose
+// simulation succeeds (sufficient balance). All hold a USDC trustline (receive the simulated output). The
+// output depends ONLY on the pool's reserves, not on the user → a single witness would suffice, the list
+// is just a safety net in case the 1st whale moves. Raises the previous ~2200 BLND cap that came from
+// relying on a single witness (regression: Contract #10).
 export const COMET_WITNESSES: readonly string[] = [
   'GCSNAGYPTFJKWK4424VBMYCCBLJIYZGAT2ZN67GPGAD7FEMIXISDHXVE', // ~7.58M BLND
   'GCA34HBKNLWN3AOXWBRW5Y3HSGHCWF3UDBRJ5YHGU6HWGJZEPO2NSXI3', // ~3.66M BLND
@@ -42,16 +43,16 @@ function isBlndUsdc(req: QuoteRequest): boolean {
 
 export const comet: SourceAdapter = {
   id: 'comet',
-  available: () => true, // sonde de pool : pas besoin du wallet de l'utilisateur
-  supports: (req) => isBlndUsdc(req), // pool BLND/USDC uniquement : non listee comme "echec" ailleurs
+  available: () => true, // pool probe: no need for the user's wallet
+  supports: (req) => isBlndUsdc(req), // BLND/USDC pool only: not listed as a "failure" elsewhere
   async quote(req, cfg) {
-    if (!isBlndUsdc(req)) return null; // garde-fou (le filtre supports() exclut deja les autres paires)
-    // Mémoïsé par (sens, montant) : la jambe BLND->USDC d'une sonde EURC duplique la sonde USDC principale.
+    if (!isBlndUsdc(req)) return null; // safety net (the supports() filter already excludes other pairs)
+    // Memoized by (direction, amount): the BLND->USDC leg of an EURC probe duplicates the main USDC probe.
     return cached(cfg.rpcCache, `comet:swap:${req.sellAsset.sac}:${req.amountIn}:${req.buyAsset.sac}`, async () => {
       try {
         return await liveComet(req, cfg);
       } catch (e) {
-        setReason(rpcReason(e)); // 429 / timeout / rpc — pour l'affichage santé
+        setReason(rpcReason(e)); // 429 / timeout / rpc — for the health display
         return null;
       }
     });
@@ -63,10 +64,10 @@ async function liveComet(req: QuoteRequest, cfg: SourceConfig): Promise<Normaliz
   const { rpc, Address, TransactionBuilder, Networks, Account, Contract, scValToNative, nativeToScVal } = sdk;
 
   const server = new rpc.Server(cfg.rpcUrl || 'https://mainnet.sorobanrpc.com');
-  // Boucle sur les témoins : la sortie est indépendante du user, et le wallet de l'utilisateur ne détient
-  // souvent pas de BLND liquide (staké dans Blend) → sinon le transfer_from simulé échouerait.
-  // On prend le 1er témoin dont la simulation passe (erreur = solde insuffisant → passer au suivant).
-  // Un throw réseau/RPC se propage tel quel (géré par le try/catch amont dans quote()).
+  // Loop over the witnesses: the output is independent of the user, and the user's wallet often doesn't
+  // hold liquid BLND (staked in Blend) → otherwise the simulated transfer_from would fail.
+  // We take the first witness whose simulation succeeds (error = insufficient balance → move to the next).
+  // A network/RPC throw propagates as-is (handled by the try/catch upstream in quote()).
   for (const user of COMET_WITNESSES) {
     const args = [
       new Address(req.sellAsset.sac).toScVal(),

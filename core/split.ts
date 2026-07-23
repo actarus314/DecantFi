@@ -1,10 +1,10 @@
-// Analyse de fractionnement : recote le montant a plusieurs tailles (defaut 25/50/100 %) pour
-// montrer l'impact marginal et si decouper le swap aide. v1 = INFORMATIF (l'utilisateur execute).
+// Split analysis: requotes the amount at several sizes (default 25/50/100%) to
+// show the marginal impact and whether splitting the swap helps. v1 = INFORMATIONAL (user executes).
 import type { NormalizedQuote, Stroops } from './sources/types.js';
 import { rankQuotes } from './rank.js';
 import { toNumber } from './amount.js';
 
-/** Rend toutes les cotations disponibles pour un montant d'entree donne. */
+/** Returns all available quotes for a given input amount. */
 export type QuoteAllFn = (amountIn: Stroops) => Promise<NormalizedQuote[]>;
 
 export interface SplitPoint {
@@ -12,13 +12,13 @@ export interface SplitPoint {
   amountIn: Stroops;
   best?: NormalizedQuote;
   netOut?: Stroops;
-  /** Prix effectif net par unite vendue (cible / BLND) a cette taille. */
+  /** Effective net price per unit sold (target / BLND) at this size. */
   effectivePrice?: number;
 }
 
 export interface SplitAnalysis {
   points: SplitPoint[];
-  /** true si 2 demi-swaps rendent (approximativement) plus qu'un swap unique a 100 %. */
+  /** true if 2 half-swaps yield (approximately) more than a single 100% swap. */
   splitHelps: boolean;
   note: string;
 }
@@ -46,7 +46,7 @@ export async function analyzeSplit(
   const p50 = at(50);
   let splitHelps = false;
   if (p100?.netOut !== undefined && p50?.netOut !== undefined) {
-    // 2 swaps a 50 % vs 1 swap a 100 % (approximation : ignore le drift inter-tx).
+    // 2 swaps at 50% vs 1 swap at 100% (approximation: ignores inter-tx drift).
     splitHelps = p50.netOut * 2n > p100.netOut;
   }
 

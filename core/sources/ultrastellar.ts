@@ -1,6 +1,6 @@
-// Ultra Stellar (moteur de StellarTerm) : split SDEX + AMM classiques. GET smart-routing.
-// IMPORTANT : on OMET le param 'fee' (fee=0 est rejete ; l'omission = pas de skim = la "brute" du design).
-// Reponse: optimized_sum = somme optimisee sans skim ; extended_paths[] decrit le split. netConfidence: exact.
+// Ultra Stellar (StellarTerm's engine): splits across classic SDEX + AMM. GET smart-routing.
+// IMPORTANT: we OMIT the 'fee' param (fee=0 is rejected; omitting it = no skim = the design's "gross").
+// Response: optimized_sum = optimized sum with no skim; extended_paths[] describes the split. netConfidence: exact.
 import type { SourceAdapter, NormalizedQuote, QuoteRequest } from './types.js';
 import type { Asset } from '../assets.js';
 import { classicColon } from '../assets.js';
@@ -55,7 +55,7 @@ export const ultrastellar: SourceAdapter = {
   id: 'ultrastellar',
   available: () => true,
   async quote(req, cfg) {
-    // 'fee' volontairement omis (cf. en-tete).
+    // 'fee' intentionally omitted (see header).
     const sp = new URLSearchParams({
       source: colon(req.sellAsset),
       destination: colon(req.buyAsset),

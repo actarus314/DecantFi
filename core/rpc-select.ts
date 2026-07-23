@@ -1,5 +1,5 @@
-// Sélection du meilleur RPC au démarrage d'un tick : sonde tous les endpoints en parallèle,
-// choisit le plus rapide non-retardé, repli sur le moins mauvais, best-effort sur urls[0].
+// Selects the best RPC at the start of a tick: probes all endpoints in parallel,
+// picks the fastest non-lagging one, falls back to the least bad, best-effort on urls[0].
 import { rpc } from '@stellar/stellar-sdk';
 import { bumpRpc } from './rpc-meter.js';
 
@@ -16,9 +16,9 @@ export interface RpcSelection {
   probes: RpcProbe[];
 }
 
-// ponytail: tolérance = 2 ledgers (~10 s) ; upgrade si on sonde ≥3 RPCs avec des décalages > 2.
+// ponytail: tolerance = 2 ledgers (~10s); upgrade if probing >=3 RPCs with lags > 2.
 const LEDGER_LAG_TOLERANCE = 2;
-// ponytail: seuil lenteur = 2500 ms ; baisser si la cadence de tick est très serrée.
+// ponytail: slowness threshold = 2500ms; lower if the tick cadence is very tight.
 const SLOW_LATENCY_MS = 2500;
 
 export async function probeRpc(
@@ -62,13 +62,13 @@ export async function selectRpc(
 
   const okProbes = probes.filter((p) => p.ok);
   if (okProbes.length === 0) {
-    // Tout en échec : best-effort = urls[0]
+    // All failed: best-effort = urls[0]
     return { chosen: urls[0]!, probes };
   }
 
   const maxLedger = Math.max(...okProbes.map((p) => p.ledger!));
 
-  // Premier URL (dans l'ordre de urls) qui est ok, pas trop retardé et pas trop lent.
+  // First URL (in urls order) that is ok, not too far behind, and not too slow.
   for (const url of urls) {
     const p = probes.find((x) => x.url === url);
     if (
@@ -80,7 +80,7 @@ export async function selectRpc(
     }
   }
 
-  // Repli : ok probe avec le ledger le plus haut (tie-break: latence la plus basse)
+  // Fallback: ok probe with the highest ledger (tie-break: lowest latency)
   const best = okProbes.reduce((a, b) =>
     b.ledger! > a.ledger! || (b.ledger === a.ledger && b.latencyMs! < a.latencyMs!) ? b : a,
   );

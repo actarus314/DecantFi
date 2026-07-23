@@ -7,7 +7,7 @@ function makeProbe(url: string, ok: boolean, ledger: number | null, latencyMs: n
 }
 
 describe('selectRpc', () => {
-  it('tous sains → choisit le premier (primary)', async () => {
+  it('all healthy -> picks the first (primary)', async () => {
     const urls = ['https://primary.rpc', 'https://fallback.rpc'];
     const fakeProbe = async (url: string) => {
       if (url === urls[0]) return makeProbe(url, true, 1000, 100);
@@ -18,7 +18,7 @@ describe('selectRpc', () => {
     expect(sel.probes.length).toBe(2);
   });
 
-  it('primary down → choisit fallback', async () => {
+  it('primary down -> picks fallback', async () => {
     const urls = ['https://primary.rpc', 'https://fallback.rpc'];
     const fakeProbe = async (url: string) => {
       if (url === urls[0]) return makeProbe(url, false, null, 50);
@@ -28,7 +28,7 @@ describe('selectRpc', () => {
     expect(sel.chosen).toBe(urls[1]);
   });
 
-  it('primary retardé → choisit fallback', async () => {
+  it('primary lagging -> picks fallback', async () => {
     const urls = ['https://primary.rpc', 'https://fallback.rpc'];
     const fakeProbe = async (url: string) => {
       if (url === urls[0]) return makeProbe(url, true, 995, 100); // lag = 5 > LEDGER_LAG_TOLERANCE=2
@@ -38,7 +38,7 @@ describe('selectRpc', () => {
     expect(sel.chosen).toBe(urls[1]);
   });
 
-  it('tous en échec → best-effort sur urls[0]', async () => {
+  it('all failing -> best-effort on urls[0]', async () => {
     const urls = ['https://primary.rpc', 'https://fallback.rpc'];
     const fakeProbe = async (url: string) => makeProbe(url, false, null, 50);
     const sel = await selectRpc(urls, 5000, { probeRpc: fakeProbe });

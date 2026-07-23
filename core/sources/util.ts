@@ -1,8 +1,8 @@
-// Helpers partages par les adapters.
+// Helpers shared by the adapters.
 import type { RouteHop } from './types.js';
 import { toStroops } from '../amount.js';
 
-/** bigint depuis un entier/chaine d'entier (stroops bruts), ou null. */
+/** bigint from an integer/integer string (raw stroops), or null. */
 export function bigintOrNull(v: unknown): bigint | null {
   if (v == null) return null;
   try {
@@ -12,7 +12,7 @@ export function bigintOrNull(v: unknown): bigint | null {
   }
 }
 
-/** Stroops depuis une chaine decimale HUMAINE ("45.6531063"), ou null. */
+/** Stroops from a HUMAN decimal string ("45.6531063"), or null. */
 export function stroopsOrNull(v: unknown): bigint | null {
   if (v == null) return null;
   try {
@@ -23,9 +23,9 @@ export function stroopsOrNull(v: unknown): bigint | null {
 }
 
 /**
- * Coalesce un appel async par clé dans un cache partagé (par tick / requête).
- * Deux appelants concurrents avec la même clé partagent la MÊME promesse → une seule lecture RPC.
- * Sans cache (undefined) : exécute directement. ponytail: pas d'éviction, le cache vit le temps du tick.
+ * Coalesces an async call by key into a shared cache (per tick / request).
+ * Two concurrent callers with the same key share the SAME promise → a single RPC read.
+ * Without a cache (undefined): runs directly. ponytail: no eviction, the cache lives for the tick's duration.
  */
 export function cached<T>(
   cache: Map<string, Promise<unknown>> | undefined,
@@ -40,7 +40,7 @@ export function cached<T>(
   return p;
 }
 
-/** Construit des hops a partir d'une suite de symboles. */
+/** Builds hops from a sequence of symbols. */
 export function hops(venue: string, symbols: string[]): RouteHop[] {
   const out: RouteHop[] = [];
   for (let i = 0; i < symbols.length - 1; i++) {

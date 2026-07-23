@@ -20,7 +20,7 @@ function quoters(opts: { directEurc?: string; usdc?: string }): EurcQuoters {
 }
 
 describe('compareEurc', () => {
-  it('via-USDC gagne quand il bat le direct (cas du design ~46,7 vs ~43,6)', async () => {
+  it('via-USDC wins when it beats direct (design case ~46.7 vs ~43.6)', async () => {
     const r = await compareEurc(toStroops('1000'), quoters({ directEurc: '43.6', usdc: '50.8' }));
     expect(r.winner).toBe('via-usdc');
     // 50.8 * 0.92 = 46.736
@@ -30,8 +30,8 @@ describe('compareEurc', () => {
     expect(r.viaUsdcAdvantage).toBe(toStroops('46.736') - toStroops('43.6'));
   });
 
-  it('via-USDC = brut leg 2 (gas leg 1 NON deduit : paye en XLM, a part)', async () => {
-    // leg1 BLND->USDC : 50.8 USDC recus (gas leg1 estime 0.1 USDC mais NON deduit) ; leg2 @ 0.92.
+  it('via-USDC = gross leg 2 (leg-1 gas NOT deducted: paid in XLM, separately)', async () => {
+    // leg1 BLND->USDC: 50.8 USDC received (leg1 gas estimated at 0.1 USDC but NOT deducted); leg2 @ 0.92.
     const qs: EurcQuoters = {
       blndToEurc: async () => [quote('xbull', toStroops('43'), { buyAsset: EURC })],
       blndToUsdc: async () => [quote('xbull', toStroops('50.8'), { gasInTarget: toStroops('0.1') })],
@@ -42,23 +42,23 @@ describe('compareEurc', () => {
     };
     const r = await compareEurc(toStroops('1000'), qs);
     expect(r.winner).toBe('via-usdc');
-    // leg2 = 50.8*0.92 = 46.736 ; le gas leg1 n'est PLUS deduit → net = brut 46.736.
+    // leg2 = 50.8*0.92 = 46.736; leg1 gas is NO LONGER deducted -> net = gross 46.736.
     expect(r.bestNetEurc).toBe(toStroops('46.736'));
   });
 
-  it('direct gagne quand il est meilleur', async () => {
+  it('direct wins when it is better', async () => {
     const r = await compareEurc(toStroops('1000'), quoters({ directEurc: '60', usdc: '50.8' }));
     expect(r.winner).toBe('direct');
     expect(r.bestNetEurc).toBe(toStroops('60'));
   });
 
-  it('via-USDC seul si pas de route directe', async () => {
+  it('via-USDC alone if no direct route', async () => {
     const r = await compareEurc(toStroops('1000'), quoters({ usdc: '50.8' }));
     expect(r.winner).toBe('via-usdc');
     expect(r.direct).toBeUndefined();
   });
 
-  it('aucune route -> winner null', async () => {
+  it('no route -> winner null', async () => {
     const r = await compareEurc(toStroops('1000'), quoters({}));
     expect(r.winner).toBeNull();
     expect(r.bestNetEurc).toBeUndefined();

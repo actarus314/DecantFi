@@ -1,4 +1,4 @@
-// Conversion exacte montant humain <-> stroops (bigint). Aucun float : precision 7 decimales garantie.
+// Exact conversion human amount <-> stroops (bigint). No floats: 7-decimal precision guaranteed.
 import { DECIMALS } from './sources/types.js';
 
 function pow10(n: number): bigint {
@@ -6,8 +6,8 @@ function pow10(n: number): bigint {
 }
 
 /**
- * Parse un montant decimal ("1000", "0.0512", "50.9123456") en stroops (bigint).
- * Tronque (vers zero) au-dela de `decimals` decimales. Lance si la syntaxe est invalide.
+ * Parses a decimal amount ("1000", "0.0512", "50.9123456") into stroops (bigint).
+ * Truncates (toward zero) beyond `decimals` decimals. Throws if the syntax is invalid.
  */
 export function toStroops(human: string | number, decimals = DECIMALS): bigint {
   const s = (typeof human === 'number' ? humanFromNumber(human) : human).trim();
@@ -22,7 +22,7 @@ export function toStroops(human: string | number, decimals = DECIMALS): bigint {
   return neg ? -v : v;
 }
 
-/** Stroops (bigint) -> chaine decimale lisible, zeros de fin retires. */
+/** Stroops (bigint) -> readable decimal string, trailing zeros stripped. */
 export function fromStroops(s: bigint, decimals = DECIMALS): string {
   const neg = s < 0n;
   const v = neg ? -s : s;
@@ -32,14 +32,14 @@ export function fromStroops(s: bigint, decimals = DECIMALS): string {
   return (neg ? '-' : '') + intPart + (frac ? `.${frac}` : '');
 }
 
-/** Nombre flottant proche en stroops -> nombre JS (pour ratios / affichage non comptable). */
+/** Nearby floating-point number in stroops -> JS number (for ratios / non-accounting display). */
 export function toNumber(s: bigint, decimals = DECIMALS): number {
   return Number(s) / Number(pow10(decimals));
 }
 
 function humanFromNumber(n: number): string {
   if (!Number.isFinite(n)) throw new Error(`montant non fini: ${n}`);
-  // Evite la notation scientifique pour les magnitudes usuelles ; sinon delegue a toFixed.
+  // Avoids scientific notation for usual magnitudes; otherwise delegates to toFixed.
   if (Math.abs(n) < 1e-7 && n !== 0) return n.toFixed(DECIMALS);
   return Number.isInteger(n) ? n.toString() : n.toFixed(DECIMALS);
 }

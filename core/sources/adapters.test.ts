@@ -1,5 +1,5 @@
-// Tests des adapters sur des reponses REELLES capturees en live le 2026-06-15 (fixtures).
-// Figent le parsing/normalisation des 7 sources (contrats d'API verifies).
+// Adapter tests against real captured responses (fixtures).
+// Pins parsing/normalization for the 7 sources (verified API contracts).
 import { describe, it, expect } from 'vitest';
 import { xdr, scValToNative } from '@stellar/stellar-sdk';
 import type { QuoteRequest } from './types.js';
@@ -25,15 +25,15 @@ describe('xbull', () => {
     expect(q.netConfidence).toBe('exact');
     expect(q.feeBreakdown[0]?.amount).toBe(509187n);
   });
-  it('shape .app (fee = string ratio) : netOut exact, feeBreakdown vide', () => {
-    // Shape renvoyée par swap.apis.xbull.app (endpoint exécutable, vérité actuelle)
+  it('shape .app (fee = string ratio): netOut exact, feeBreakdown empty', () => {
+    // Shape returned by swap.apis.xbull.app (executable endpoint, current source of truth)
     const raw = { route: 'abc123', fromAmount: '300000000', fromAsset: 'C...', toAsset: 'C...', toAmount: '14493322', fee: '0.001' };
     const q = parseXbull(raw, req)!;
     expect(q.netOut).toBe(14493322n);
     expect(q.netConfidence).toBe('exact');
     expect(q.feeBreakdown).toHaveLength(0);
   });
-  it('null si toAmount absent', () => {
+  it('null if toAmount absent', () => {
     expect(parseXbull({}, req)).toBeNull();
   });
 });
@@ -50,18 +50,18 @@ describe('aquarius', () => {
     // find-path API over-quotes; confidence is promoted to 'exact' only after a successful on-chain re-sim
     expect(q.netConfidence).toBe('estimate');
   });
-  it('null si success=false', () => {
+  it('null if success=false', () => {
     expect(parseAquarius({ success: false }, req)).toBeNull();
   });
 });
 
 describe('horizon', () => {
-  it('prend le meilleur destination_amount (humain -> stroops)', () => {
+  it('picks the best destination_amount (human -> stroops)', () => {
     const q = parseHorizon(loadFixture('horizon.blnd-usdc.json'), req)!;
     expect(q.source).toBe('horizon');
     expect(q.netOut).toBe(toStroops('45.6531063'));
   });
-  it('null si aucun record', () => {
+  it('null if no record', () => {
     expect(parseHorizon({ _embedded: { records: [] } }, req)).toBeNull();
   });
 });
@@ -75,7 +75,7 @@ describe('stellarbroker', () => {
     expect(q.netRange?.high).toBe(toStroops('42.0911116'));
     expect(q.netRange!.high).toBeGreaterThan(q.netRange!.low);
   });
-  it('null si status != success', () => {
+  it('null if status != success', () => {
     expect(parseStellarbroker({ status: 'error' }, req)).toBeNull();
   });
   it('unwraps msg.quote (WS envelope)', () => {
@@ -87,7 +87,7 @@ describe('stellarbroker', () => {
 });
 
 describe('ultrastellar', () => {
-  it('optimized_sum = net (humain -> stroops)', () => {
+  it('optimized_sum = net (human -> stroops)', () => {
     const q = parseUltrastellar(loadFixture('ultrastellar.blnd-usdc.json'), req)!;
     expect(q.netOut).toBe(toStroops('48.1573592'));
     expect(q.netConfidence).toBe('exact');
@@ -95,7 +95,7 @@ describe('ultrastellar', () => {
 });
 
 describe('soroswap', () => {
-  it('quoteCurrency = sortie nette (stroops)', () => {
+  it('quoteCurrency = net output (stroops)', () => {
     const f = loadFixture('soroswap.blnd-usdc.json') as {
       quoteCurrency: { raw: string };
       trade: { path: string[] };
@@ -107,7 +107,7 @@ describe('soroswap', () => {
     expect(q.route.map((h) => h.sell)).toContain('BLND');
   });
 
-  it('multi-hop : path 3 noeuds -> 2 hops BLND->USDC->EURC', () => {
+  it('multi-hop: path with 3 nodes -> 2 hops BLND->USDC->EURC', () => {
     const route = { quoteCurrency: { quotient: '439000000' }, trade: { path: [BLND.sac, USDC.sac, EURC.sac] } };
     const reqE: QuoteRequest = { sellAsset: BLND, buyAsset: EURC, amountIn: toStroops('1000'), slippageBps: 50 };
     const q = parseSoroswapRoute(route, reqE)!;
@@ -119,10 +119,10 @@ describe('soroswap', () => {
 });
 
 describe('phoenix', () => {
-  it('decodePhoenixOut → ask_amount (déjà net de commission)', () => {
+  it('decodePhoenixOut → ask_amount (already net of commission)', () => {
     expect(decodePhoenixOut({ ask_amount: 194227186n, commission_amount: 976016n, spread_amount: 4980n, total_return: 195208182n })).toBe(194227186n);
   });
-  it('decodePhoenixOut → null si absent / ≤0 / non-objet', () => {
+  it('decodePhoenixOut → null if absent / ≤0 / not an object', () => {
     expect(decodePhoenixOut(null)).toBeNull();
     expect(decodePhoenixOut({})).toBeNull();
     expect(decodePhoenixOut({ ask_amount: 0n })).toBeNull();
@@ -131,14 +131,14 @@ describe('phoenix', () => {
 });
 
 describe('comet', () => {
-  it('decode le retval simule (vec [amount_out, prix]) -> ~50,9156 USDC', () => {
+  it('decodes the simulated retval (vec [amount_out, price]) -> ~50.9156 USDC', () => {
     const f = loadFixture('comet.blnd-usdc.json') as {
       result: { results: { xdr: string }[] };
     };
     const native = scValToNative(xdr.ScVal.fromXDR(f.result.results[0]!.xdr, 'base64'));
     expect(decodeCometOut(native)).toBe(509156322n);
   });
-  it('decode direct depuis un tableau', () => {
+  it('decodes directly from an array', () => {
     expect(decodeCometOut([509156322n, 196540873n])).toBe(509156322n);
     expect(decodeCometOut([])).toBeNull();
   });

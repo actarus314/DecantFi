@@ -1,5 +1,5 @@
-// Horizon : plancher de reference (SDEX + LP classiques). GET /paths/strict-send.
-// source_amount en unites HUMAINES ; destination_assets = CODE:ISSUER. Meilleur = max destination_amount.
+// Horizon: reference floor (classic SDEX + LP). GET /paths/strict-send.
+// source_amount in HUMAN units; destination_assets = CODE:ISSUER. Best = max destination_amount.
 import type { SourceAdapter, NormalizedQuote, QuoteRequest } from './types.js';
 import type { Asset } from '../assets.js';
 import { classicColon } from '../assets.js';
