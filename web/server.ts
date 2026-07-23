@@ -1,5 +1,5 @@
-// Serveur HTTP web — node:http (stdlib, pas d'Express).
-// Routes : GET / · GET /api/overview · GET /api/quote · GET /api/balance
+// Web HTTP server — node:http (stdlib, no Express).
+// Routes: GET / · GET /api/overview · GET /api/quote · GET /api/balance
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { clientIp, apiAllowed } from './request-ip.js';
 import { accessLine, initAccessFile, accessFileActive, writeToAccessFile } from './access-log.js';
@@ -70,7 +70,7 @@ function sendStatic(
   res.end(body);
 }
 
-// --- Assets statiques pré-compilés au boot ---
+// --- Static assets precompiled at boot ---
 
 // B10 : inline APP_REV and APP_VERSION into the HTML (removes the /version.js round-trip)
 const rev = (process.env.APP_REV || 'dev').replace(/[^\w.-]/g, '');
@@ -80,7 +80,7 @@ const htmlStr = readFileSync(htmlPath, 'utf-8')
   .replace('<!--version-meta-->', `<meta name="app-rev" content="${rev}"><meta name="app-version" content="${appVersion}">`);
 const htmlAsset = staticAsset(Buffer.from(htmlStr), 'text/html; charset=utf-8');
 
-// B8 : lire en Buffer (pas utf-8)
+// B8: read as Buffer (not utf-8)
 const walletkitPath = fileURLToPath(new URL('./public/walletkit.js', import.meta.url));
 const walletkitAsset = staticAsset(readFileSync(walletkitPath), 'text/javascript; charset=utf-8');
 
@@ -129,19 +129,19 @@ try {
   // Directory missing (fresh checkout before build:walletkit) — serve 404 for icon requests.
 }
 
-// --- Cache mémoire TTL pour /api/overview (B3) ---
+// --- In-memory TTL cache for /api/overview (B3) ---
 
 // ponytail: Map keyed by `${pair}|${offsetH}`; bounded by validated inputs
 // (2 pairs × tzoff[-14..14] ≈ 58 keys) — the clear() is a paranoia cap.
 const overviewCache = new Map<string, { at: number; data: unknown }>();
 const OVERVIEW_TTL_MS = 60_000;
 
-// --- Cache mémoire TTL pour /api/health (D3) ---
+// --- In-memory TTL cache for /api/health (D3) ---
 
 let healthCache: { key: string; at: number; data: unknown } | null = null;
 const HEALTH_TTL_MS = 30_000;
 
-// --- Réponse JSON avec compression conditionnelle (B6) ---
+// --- JSON response with conditional compression (B6) ---
 
 function json(res: ServerResponse, req: IncomingMessage, status: number, data: unknown): void {
   const body = Buffer.from(JSON.stringify(data));
@@ -165,7 +165,7 @@ function json(res: ServerResponse, req: IncomingMessage, status: number, data: u
   res.end(out);
 }
 
-// C1 — En-têtes de sécurité
+// C1 — Security headers
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
@@ -176,15 +176,15 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Permissions-Policy': 'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()',
 };
 
-// C1b — En-têtes communs pour les assets statiques (JS, SVG, PNG, texte)
+// C1b — Common headers for static assets (JS, SVG, PNG, text)
 const RESOURCE_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'Cross-Origin-Resource-Policy': 'same-origin' } as const;
 
-// C4 — Redaction de l'URL RPC (protocol+host uniquement, sans le path qui peut contenir une clé API)
+// C4 — Redact the RPC URL (protocol+host only, without the path which may contain an API key)
 function redactRpcUrl(u: string): string {
   try { const x = new URL(u); return x.protocol + '//' + x.host; } catch { return 'invalid'; }
 }
 
-// C5 — Rate-limiting en mémoire (token-bucket par IP)
+// C5 — In-memory rate limiting (token bucket per IP)
 const rlBuckets = new Map<string, { count: number; resetAt: number }>();
 
 // Purge expired buckets every 5 minutes to prevent unbounded growth under IP churn.
@@ -315,7 +315,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return;
     }
 
-    // B10 : /version.js supprimé (APP_REV inliné dans le HTML au boot)
+    // B10: /version.js removed (APP_REV inlined into the HTML at boot)
 
     if (req.method === 'GET' && path === '/favicon.svg') {
       sendStatic(req, res, faviconAsset, 'public, max-age=86400', RESOURCE_HEADERS);
@@ -370,7 +370,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const now = new Date();
       const windowStart = new Date(now.getTime() - 7 * 86_400_000).toISOString();
       const rows = readCoherenceProbesByVenue(db, venue, windowStart);
-      // Convertit les bigint en string pour la sérialisation JSON
+      // Converts bigint to string for JSON serialization
       const probes = rows.map((p) => ({
         created_at: p.created_at,
         pair: p.pair,
@@ -424,7 +424,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       let amountStroops: bigint;
 
       if (query['wallet'] === '1') {
-        // Utilise le solde wallet
+        // Uses the wallet balance
         const balance = await walletBalance(cfg);
         if (!balance.configured || balance.blnd <= 0) {
           json(res, req, 400, { error: 'wallet non configuré ou solde nul' });
@@ -449,7 +449,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const elapsed = Date.now() - quoteStart;
       const rpcCalls = readRpc();
       json(res, req, 200, result);
-      // Log de la charge en best-effort, après l'envoi de la réponse (ne retarde pas le client).
+      // Best-effort load logging, after the response is sent (does not delay the client).
       if (rpcCalls > 0) {
         const logUrl = chosenRpc ?? cfg.rpcUrl;
         try {
@@ -505,8 +505,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return;
     }
 
-    // Refresh manuel : journalise un tick (note='manual', purgé au prochain poll programmé),
-    // puis renvoie l'overview rafraîchi de la paire demandée.
+    // Manual refresh: logs a tick (note='manual', purged on the next scheduled poll),
+    // then returns the refreshed overview for the requested pair.
     if (req.method === 'POST' && path === '/api/refresh') {
       if (refreshBusy()) {
         json(res, req, 429, { error: 'refresh déjà en cours' });
@@ -521,7 +521,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const tzoffRaw = Number(query['tzoff'] ?? '0');
       const offsetH = Number.isFinite(tzoffRaw) && tzoffRaw >= -14 && tzoffRaw <= 14 ? Math.trunc(tzoffRaw) : 0;
       const refresh = await manualRefresh(cfg);
-      // B3/D3 : invalide les caches après un refresh (les données changent)
+      // B3/D3: invalidate caches after a refresh (data changed)
       overviewCache.clear();
       healthCache = null;
       json(res, req, 200, { refresh, overview: overview(db, pair, cfg, undefined, offsetH) });
@@ -538,7 +538,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       if (!isStellarPubkey(b.sender)) { json(res, req, 400, { error: 'sender invalide (adresse G… requise)' }); return; }
       const amount = parseAmountStroops(String(b.amount ?? ''));
       if (amount === null) { json(res, req, 400, { error: 'amount invalide' }); return; }
-      // slippage : entier 0..5000 (cap 50 %), défaut 50.
+      // slippage: integer 0..5000 (50% cap), default 50.
       let slippageBps = 50;
       if (b.slippageBps !== undefined) {
         const n = Number(b.slippageBps);

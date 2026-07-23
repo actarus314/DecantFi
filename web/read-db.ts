@@ -1,7 +1,7 @@
-// Ouvre la DB en lecture (RW + query_only pour robustesse WAL). Pas de migrate.
+// Opens the DB for reading (RW + query_only for WAL robustness). No migrate.
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
-/** Ouvre la DB en mode lecture robuste (RW + PRAGMA query_only + busy_timeout). */
+/** Opens the DB in robust read mode (RW + PRAGMA query_only + busy_timeout). */
 export function openReadOnly(path: string): DatabaseSync {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA busy_timeout = 5000');
@@ -9,14 +9,14 @@ export function openReadOnly(path: string): DatabaseSync {
   return db;
 }
 
-/** Prépare un statement et active setReadBigInts(true). */
+/** Prepares a statement and enables setReadBigInts(true). */
 export function prepBig(db: DatabaseSync, sql: string): StatementSync {
   const stmt = db.prepare(sql);
   stmt.setReadBigInts(true);
   return stmt;
 }
 
-/** Type d'une ligne coherence_probe telle que lue depuis la DB (lecture seule). */
+/** Type of a coherence_probe row as read from the DB (read-only). */
 export interface CoherenceProbeRow {
   id: bigint;
   created_at: string;
@@ -32,7 +32,7 @@ export interface CoherenceProbeRow {
   trace_json: string | null;
 }
 
-/** Mappe une ligne brute DB en CoherenceProbeRow. */
+/** Maps a raw DB row to a CoherenceProbeRow. */
 function mapProbeRow(r: Record<string, unknown>): CoherenceProbeRow {
   return {
     id:            r['id'] as bigint,
@@ -50,7 +50,7 @@ function mapProbeRow(r: Record<string, unknown>): CoherenceProbeRow {
   };
 }
 
-/** Lit toutes les sondes de cohérence depuis sinceIso, triées created_at DESC (web read-only). */
+/** Reads all coherence probes since sinceIso, sorted created_at DESC (web read-only). */
 export function readCoherenceProbes(db: DatabaseSync, sinceIso: string): CoherenceProbeRow[] {
   const stmt = prepBig(db, `
     SELECT id, created_at, venue, pair, amount_in, incoherent, reason,
@@ -63,9 +63,9 @@ export function readCoherenceProbes(db: DatabaseSync, sinceIso: string): Coheren
 }
 
 /**
- * Lit les duration_ms non-null des quotes par source_id sur la fenêtre,
- * jointe aux ticks ok=1. Renvoie une Map<source_id, number[]>.
- * Seuls les IDs atomiques sont retournés (les '+' sont ignorés côté requête SQL via NOT LIKE).
+ * Reads non-null duration_ms values for quotes by source_id over the window,
+ * joined to ticks with ok=1. Returns a Map<source_id, number[]>.
+ * Only atomic IDs are returned ('+' composites are filtered out in SQL via NOT LIKE).
  */
 export function readExecMsBySource(
   db: DatabaseSync,
@@ -93,7 +93,7 @@ export function readExecMsBySource(
   return result;
 }
 
-/** Lit les (started_at, finished_at) des ticks ok=1 sur la fenêtre pour le calcul du wall-clock. */
+/** Reads (started_at, finished_at) for ticks with ok=1 over the window, for wall-clock computation. */
 export function readTickWallClocks(
   db: DatabaseSync,
   sinceIso: string,
@@ -112,7 +112,7 @@ export function readTickWallClocks(
     .filter((r) => r.started_at && r.finished_at);
 }
 
-/** Lit les sondes de cohérence d'une venue donnée depuis sinceIso, triées created_at DESC. */
+/** Reads coherence probes for a given venue since sinceIso, sorted created_at DESC. */
 export function readCoherenceProbesByVenue(
   db: DatabaseSync,
   venue: string,

@@ -1,5 +1,5 @@
-// Cotation live et balance wallet pour l'UI web.
-// ponytail: Number = affichage, jamais règlement.
+// Live quoting and wallet balance for the web UI.
+// ponytail: Number = display only, never settlement.
 import { quote as engineQuote } from '../core/engine.js';
 import { isExecutableSource } from '../core/executable.js';
 import { rankQuotes } from '../core/rank.js';
@@ -16,7 +16,7 @@ import type { QuoteResult } from '../core/engine.js';
 
 export interface RibbonPart {
   asset?: string;
-  /** Montant BRUT (non formaté) — le front le formate selon la locale + trim des zéros. */
+  /** Raw amount (unformatted) — the frontend formats it per locale + trims zeros. */
   amt?: number;
   out?: boolean;
   tool?: string;
@@ -39,24 +39,24 @@ export interface LiveLadderRow {
   net: number;
   deltaVsWinner: number;
   chip: Chip;
-  /** Impact EVM/global (vs prix CoinGecko/Circle). */
+  /** EVM/global impact (vs CoinGecko/Circle price). */
   impactPct: number | null;
-  /** Impact local (vs mid SDEX Stellar). null si mid indisponible. */
+  /** Local impact (vs Stellar SDEX mid). null if mid is unavailable. */
   impactLocalPct: number | null;
   winner: boolean;
-  // click-to-select : identifiant source brut et capacité d'exécution intégrée
+  // click-to-select: raw source id and built-in execution capability
   sourceId: string;
   executable: boolean;
-  /** Legs du composite EURC via-USDC (2 transactions). Absent pour les routes atomiques. */
+  /** Legs of the EURC via-USDC composite (2 transactions). Absent for atomic routes. */
   legs?: CompositeLeg[];
   /** Floor (direct route guaranteed minimum) in target asset units. StellarBroker only; from netRange.low. */
   floor?: number;
 }
 
-/** Normalise les symboles d'actifs : 'native' → 'XLM', tout le reste inchangé. */
+/** Normalizes asset symbols: 'native' → 'XLM', everything else unchanged. */
 const sym = (s: string): string => s === 'native' ? 'XLM' : s;
 
-/** Route lisible depuis les hops d'une cotation : "BLND→XLM→USDC" (ou "BLND→<cible>" si pas de hop). */
+/** Human-readable route from a quote's hops: "BLND→XLM→USDC" (or "BLND→<target>" if no hop). */
 function routeStr(hops: RouteHop[], sell: string, buy: string): string {
   if (hops.length === 0) return `${sym(sell)} → ${sym(buy)}`;
   return [hops[0]!.sell, ...hops.map((h) => h.buy)].map(sym).join(' → ');
@@ -68,12 +68,12 @@ export interface LiveQuote {
     net: number;
     rate: number;
     chip: Chip;
-    /** Impact EVM/global (vs prix CoinGecko/Circle). */
+    /** EVM/global impact (vs CoinGecko/Circle price). */
     impactPct: number | null;
-    /** Impact local (vs mid SDEX Stellar). null si mid indisponible. */
+    /** Local impact (vs Stellar SDEX mid). null if mid is unavailable. */
     impactLocalPct: number | null;
     route: RibbonPart[];
-    /** Legs du composite EURC via-USDC (2 transactions). Absent pour les routes atomiques. */
+    /** Legs of the EURC via-USDC composite (2 transactions). Absent for atomic routes. */
     legs?: CompositeLeg[];
   };
   ladder: LiveLadderRow[];
@@ -84,16 +84,16 @@ export interface LiveQuote {
     xlmUsd: number | null;
   };
   errors: string[];
-  // axe santé, distinct des chips de confiance — ponytail: health axis
+  // health axis, distinct from confidence chips — ponytail: health axis
   downSources: Array<{ display: string; sourceId: string; reason: string }>;
 }
 
 // Per-call cap for re-simulation calls at the call site (independent of any inner SDK timeout).
 const RESIM_TIMEOUT_MS = 15000;
 
-// ─── Construction du ruban depuis la route du gagnant ────────────────────────
+// ─── Building the ribbon from the winner's route ────────────────────────
 
-// Nom d'affichage du venue (cartouche outil = info la + importante du design). Fallback : capitalise.
+// Venue display name (tool cartouche = most important info in the design). Fallback: capitalize.
 const VENUE_LABEL: Record<string, string> = {
   xbull: 'xBull', soroswap: 'Soroswap', aquarius: 'Aquarius', aqua: 'Aquarius',
   comet: 'Comet', ultrastellar: 'Ultra Stellar', stellarbroker: 'StellarBroker',
@@ -109,7 +109,7 @@ function buildRoute(hops: RouteHop[], amountIn: bigint, netOut: bigint, pairUi: 
   const net = toNumber(netOut);
 
   if (hops.length === 0) {
-    // Route simple déduite du pair
+    // Simple route inferred from the pair
     const target = pairUi;
     parts.push({ asset: 'BLND', amt });
     parts.push({ tool: 'swap' });
@@ -117,13 +117,13 @@ function buildRoute(hops: RouteHop[], amountIn: bigint, netOut: bigint, pairUi: 
     return parts;
   }
 
-  // Premier asset (BLND) avec montant
+  // First asset (BLND) with amount
   const firstSell = sym(hops[0]?.sell ?? 'BLND');
   parts.push({ asset: firstSell, amt });
 
   for (const hop of hops) {
     parts.push({ tool: prettyVenue(hop.venue) });
-    // Asset de sortie du hop — si c'est le dernier hop, marquer out (porte le net)
+    // Hop's output asset — if it's the last hop, mark out (carries the net)
     const isLast = hop === hops[hops.length - 1];
     const buySymbol = sym(hop.buy);
     parts.push({
@@ -136,15 +136,15 @@ function buildRoute(hops: RouteHop[], amountIn: bigint, netOut: bigint, pairUi: 
   return parts;
 }
 
-// ─── Re-simulation Aquarius + xBull (helper partagé web + collecteur) ────────
+// ─── Aquarius + xBull re-simulation (shared helper for web + collector) ────────
 
 /**
- * Crée un callback `reSimLeg` pour `compareEurc` : re-simule on-chain chaque cote xBull/Aquarius
- * de la liste et remplace netOut+grossOut par le vrai fill. Best-effort : un échec RPC ou l'absence
- * de données brutes → cote brute conservée, jamais d'exception.
- * Comet/Soroswap/Horizon/Ultra sont déjà fidèles → inchangés.
- * StellarBroker est re-simulé ici (capture WS + sim empty-auth), promu 'exact' seulement
- * si toutes les jambes sont des sims Soroban observées (sinon la cote estimée reste intacte).
+ * Creates a `reSimLeg` callback for `compareEurc`: re-simulates each xBull/Aquarius quote
+ * in the list on-chain and replaces netOut+grossOut with the real fill. Best-effort: an RPC
+ * failure or missing raw data → the raw quote is kept, never throws.
+ * Comet/Soroswap/Horizon/Ultra are already accurate → unchanged.
+ * StellarBroker is re-simulated here (WS capture + empty-auth sim), promoted to 'exact' only
+ * if every leg is an observed Soroban sim (otherwise the estimated quote stays untouched).
  */
 export function makeReSimLeg(
   cfg: { rpcUrl: string; stellarBrokerApiKey?: string; horizonUrl?: string },
@@ -240,10 +240,10 @@ export function makeReSimLeg(
 }
 
 /**
- * Mute `result` en place : remplace les nets sur-cotés d'Aquarius et xBull par
- * les vrais fills simulés on-chain, re-décode la route xBull, puis re-classe via
- * rankQuotes. Met également à jour result.eurc.direct / winner pour EURC direct.
- * Best-effort : un échec RPC (429, timeout) ne propage jamais d'exception.
+ * Mutates `result` in place: replaces Aquarius and xBull's over-quoted nets with
+ * the real on-chain simulated fills, re-decodes the xBull route, then re-ranks via
+ * rankQuotes. Also updates result.eurc.direct / winner for direct EURC.
+ * Best-effort: an RPC failure (429, timeout) never propagates an exception.
  */
 export async function resimAquariusXbull(
   result: QuoteResult,
@@ -283,8 +283,8 @@ export async function resimAquariusXbull(
     ? result.ranking.ranked.find((q) => q.source === 'stellarbroker')
     : undefined;
 
-  // B4 — lancer Aquarius + xBull + StellarBroker en parallèle (pools disjoints, indépendants)
-  // Wrapper de chronométrage par promesse (mesure la durée individuelle même en parallèle)
+  // B4 — run Aquarius + xBull + StellarBroker in parallel (disjoint, independent pools)
+  // Per-promise timing wrapper (measures individual duration even when run in parallel)
   const timed = <T>(p: Promise<T>): Promise<{ r: T; ms: number }> => {
     const t = Date.now();
     return p.then((r) => ({ r, ms: Date.now() - t }));
@@ -421,7 +421,7 @@ export async function resimAquariusXbull(
   }
 }
 
-// ─── Cotation live ────────────────────────────────────────────────────────────
+// ─── Live quoting ────────────────────────────────────────────────────────────
 
 export async function liveQuote(
   pairUi: string,
@@ -447,27 +447,27 @@ export async function liveQuote(
       stellarBrokerApiKey: cfg.stellarBrokerApiKey,
       walletAddress: cfg.walletAddress,
       timeoutMs: cfg.timeoutMs,
-      // Cache RPC pour cette requête : une cotation EURC relance 3 sous-cotations qui re-lisent
-      // les mêmes pools → coalesce, évite de saturer le RPC sur un seul appel /api/quote.
+      // RPC cache for this request: an EURC quote fires 3 sub-quotes that re-read
+      // the same pools → coalesce, avoids saturating the RPC on a single /api/quote call.
       rpcCache: new Map(),
-      // Re-simulation honnête des jambes EURC via-USDC (xBull/Aquarius seulement).
-      // Best-effort : un échec RPC laisse la cote brute, ne casse pas la cotation.
+      // Honest re-simulation of EURC via-USDC legs (xBull/Aquarius only).
+      // Best-effort: an RPC failure leaves the raw quote, does not break the quote.
       reSimLeg: pairUi === 'EURC' ? makeReSimLeg({ rpcUrl: cfg.rpcUrl, stellarBrokerApiKey: cfg.stellarBrokerApiKey, horizonUrl: cfg.horizonUrl }, deps) : undefined,
     },
   });
 
-  // ─── Re-simulation Aquarius + xBull : remplace les nets sur-cotés par les vrais fills simulés ───
-  // Aquarius find-path sur-cote ~0,2 % sur les routes via-XLM.
-  // xBull /swaps/quote sur-cote ~0,1 % (skim routeur non divulgué).
+  // ─── Aquarius + xBull re-simulation: replaces over-quoted nets with the real simulated fills ───
+  // Aquarius find-path over-quotes ~0.2% on via-XLM routes.
+  // xBull /swaps/quote over-quotes ~0.1% (undisclosed router skim).
   await resimAquariusXbull(result, pairUi, amountStroops, { rpcUrl: cfg.rpcUrl, stellarBrokerApiKey: cfg.stellarBrokerApiKey, horizonUrl: cfg.horizonUrl }, deps);
 
-  // Pour EURC : si le gagnant est via-usdc, utiliser result.eurc
+  // For EURC: if the winner is via-usdc, use result.eurc
   let bestQuote: import('../core/sources/types.js').NormalizedQuote | undefined = result.ranking.best;
   let bestNet: bigint | undefined = bestQuote?.netOut;
   let bestSource = bestQuote?.source ?? '';
   let eurcPath: string | null = null;
 
-  // Pour EURC via-usdc : route combinée = leg1.route ++ leg2.route (BLND→USDC→EURC)
+  // For EURC via-usdc: combined route = leg1.route ++ leg2.route (BLND→USDC→EURC)
   let extraRoute: RouteHop[] | undefined;
 
   if (pairUi === 'EURC' && result.eurc) {
@@ -476,7 +476,7 @@ export async function liveQuote(
       bestSource = `${eurc.viaUsdc.leg1.source}+${eurc.viaUsdc.leg2.source}`;
       bestNet = eurc.viaUsdc.netEurc;
       eurcPath = 'via-usdc';
-      // Ruban complet = jambe 1 (BLND→USDC) + jambe 2 (USDC→EURC)
+      // Full ribbon = leg 1 (BLND→USDC) + leg 2 (USDC→EURC)
       bestQuote = eurc.viaUsdc.leg1;
       extraRoute = eurc.viaUsdc.leg2.route;
     } else if (eurc.winner === 'direct' && eurc.direct) {
@@ -487,7 +487,7 @@ export async function liveQuote(
   }
 
   if (!bestQuote || bestNet === undefined || bestNet <= 0n) {
-    // Aucune cotation disponible
+    // No quote available
     return {
       best: {
         display: '—',
@@ -516,9 +516,9 @@ export async function liveQuote(
 
   const bestConf = eurcPath === 'via-usdc' ? 'exact' : bestQuote.netConfidence;
   const chip: Chip = chipFor(bestConf);
-  // FIX 4 : quand le gagnant est le composite via-usdc, l'impact doit porter sur le net EURC final
-  // (bestNet = netEurc) et non sur la leg1 seule (bestQuote = leg1 BLND→USDC).
-  // On utilise le même calcul que la ligne ladder composite (~ligne 416).
+  // FIX 4: when the winner is the via-usdc composite, the impact must apply to the final EURC net
+  // (bestNet = netEurc), not to leg1 alone (bestQuote = leg1 BLND→USDC).
+  // Uses the same calculation as the composite ladder row (~line 416).
   const impactPct = eurcPath === 'via-usdc'
     ? (priceImpactPct(amountStroops, bestNet, result.prices.blndUsd, targetEvmPerUnit('EURC', result.prices)) ?? null)
     : (bestQuote.priceImpactPct ?? null);
@@ -526,13 +526,13 @@ export async function liveQuote(
     ? (priceImpactPct(amountStroops, bestNet, result.prices.blndUsd, targetLocalPerUnit('EURC', result.prices)) ?? null)
     : (bestQuote.priceImpactLocalPct ?? null);
 
-  // Route complète : si via-usdc, concaténer leg1 + leg2
+  // Full route: if via-usdc, concatenate leg1 + leg2
   const combinedRoute = extraRoute ? [...bestQuote.route, ...extraRoute] : bestQuote.route;
   const route = buildRoute(combinedRoute, amountStroops, bestNet, pairUi);
 
-  // Échelle complète : ranking direct + (EURC) ligne composite via-USDC, triée par net.
-  // Le composite est TOUJOURS listé quand il existe (comme le stockage collecteur) → le tableau
-  // colle au simulateur (le gagnant peut être le composite, pas le meilleur direct).
+  // Full ladder: direct ranking + (EURC) via-USDC composite row, sorted by net.
+  // The composite is ALWAYS listed when it exists (same as collector storage) → the table
+  // matches the simulator (the winner can be the composite, not just the best direct).
   const raw: Array<{ source: string; netOut: bigint; conf: string; route: string; hops: RouteHop[] | null; eurcPath: string | null; impactPct: number | null; impactLocalPct: number | null; legs?: CompositeLeg[]; floor?: number }> =
     result.ranking.ranked.map((rq) => ({
       source: rq.source,
@@ -546,7 +546,7 @@ export async function liveQuote(
       floor: rq.netRange?.low !== undefined ? toNumber(rq.netRange.low) : undefined,
     }));
 
-  // Legs du composite EURC via-USDC (calculés une seule fois, réutilisés pour best et ladder)
+  // Legs of the EURC via-USDC composite (computed once, reused for best and ladder)
   let compositeLegs: CompositeLeg[] | undefined;
   if (pairUi === 'EURC' && result.eurc?.viaUsdc) {
     const v = result.eurc.viaUsdc;
@@ -574,8 +574,8 @@ export async function liveQuote(
       source: `${v.leg1.source}+${v.leg2.source}`,
       netOut: v.netEurc,
       conf: 'exact',
-      route: `${r1} → ${r2.split(' → ').slice(1).join(' → ')}`, // fusionne le nœud USDC partagé
-      hops: null, // composite EURC via-USDC : pas de RouteHop[] structuré unique
+      route: `${r1} → ${r2.split(' → ').slice(1).join(' → ')}`, // merges the shared USDC node
+      hops: null, // EURC via-USDC composite: no single structured RouteHop[]
       eurcPath: 'via-usdc',
       impactPct: priceImpactPct(amountStroops, v.netEurc, result.prices.blndUsd, targetEvmPerUnit('EURC', result.prices)) ?? null,
       impactLocalPct: priceImpactPct(amountStroops, v.netEurc, result.prices.blndUsd, targetLocalPerUnit('EURC', result.prices)) ?? null,
@@ -596,8 +596,8 @@ export async function liveQuote(
     impactLocalPct: r.impactLocalPct,
     winner: i === 0,
     sourceId: r.source,
-    // Les lignes composites (EURC via-USDC = "leg1+leg2") = 2 tx non atomiques → JAMAIS exécutables en 1 clic
-    // (sinon un clic exécuterait un swap direct 1-leg ≠ les 2 tx revues). Seules les venues simples le sont.
+    // Composite rows (EURC via-USDC = "leg1+leg2") = 2 non-atomic tx → NEVER executable in 1 click
+    // (otherwise a click would execute a direct 1-leg swap ≠ the 2 reviewed tx). Only simple venues are.
     executable: isExecutableSource(r.source),
     legs: r.legs,
     floor: r.floor,
@@ -626,7 +626,7 @@ export async function liveQuote(
   };
 }
 
-// ─── Balance wallet ───────────────────────────────────────────────────────────
+// ─── Wallet balance ───────────────────────────────────────────────────────────
 
 export async function walletBalance(cfg: WebConfig): Promise<{ blnd: number; configured: boolean }> {
   if (!cfg.walletAddress) {
