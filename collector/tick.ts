@@ -1,5 +1,5 @@
-// Exécute UN tick : prix 1× (injecté aux sondes pour comparabilité), quote() par sonde, assemble les lignes.
-// Aucune I/O DB. Renvoie un TickInsert + ses QuoteInsert (prêts pour db.insertTickWithQuotes).
+// Runs ONE tick: prices fetched once (injected into probes for comparability), quote() per probe, assembles the rows.
+// No DB I/O. Returns a TickInsert + its QuoteInsert rows (ready for db.insertTickWithQuotes).
 import { BLND, EURC } from '../core/assets.js';
 import { priceImpactPct, targetEvmPerUnit, type Prices } from '../core/prices.js';
 import type { QuoteResult, QuoteOptions, EngineConfig } from '../core/engine.js';
@@ -18,9 +18,9 @@ export interface TickDeps {
   now: () => Date;
   fetchPrices: (opts: { timeoutMs?: number; horizonUrl?: string }) => Promise<Prices>;
   quote: (opts: QuoteOptions) => Promise<QuoteResult>;
-  /** Injection de fakes pour les sims Aquarius/xBull (tests uniquement). */
+  /** Fake injection for Aquarius/xBull sims (tests only). */
   resimDeps?: { simulateAquariusNet?: typeof simulateAquariusNet; simulateXbullNet?: typeof simulateXbullNet };
-  /** Injection de fake pour la sélection RPC (tests uniquement). */
+  /** Fake injection for RPC selection (tests only). */
   selectRpc?: (urls: string[], timeoutMs: number) => Promise<RpcSelection>;
 }
 
@@ -30,13 +30,13 @@ export function bigIntJson(_k: string, v: unknown): unknown {
   return typeof v === 'bigint' ? v.toString() : v;
 }
 
-/** Résumé de route compact : "BLND->XLM->USDC" (ou "BLND->USDC" si pas de hops). */
+/** Compact route summary: "BLND->XLM->USDC" (or "BLND->USDC" if no hops). */
 function routeSummary(q: NormalizedQuote): string {
   if (q.route.length === 0) return `${q.sellAsset.symbol}->${q.buyAsset.symbol}`;
   return [q.route[0]!.sell, ...q.route.map((h) => h.buy)].join('->');
 }
 
-/** Somme des frais exprimés dans l'asset cible, sinon null. */
+/** Sum of fees expressed in the target asset, or null otherwise. */
 function feeTotal(q: NormalizedQuote): bigint | null {
   let sum = 0n; let any = false;
   for (const f of q.feeBreakdown) if (f.amount !== undefined && f.asset === q.buyAsset.symbol) { sum += f.amount; any = true; }
@@ -53,7 +53,7 @@ function rowFromQuote(pair: string, amountIn: bigint, q: NormalizedQuote, isWinn
   };
 }
 
-/** Construit les QuoteInsert d'une sonde à partir du QuoteResult de l'engine. */
+/** Builds the QuoteInsert rows for a probe from the engine's QuoteResult. */
 function rowsForProbe(probe: Probe, result: QuoteResult, prices: Prices): QuoteInsert[] {
   const rows: QuoteInsert[] = [];
   const isEurc = probe.buy.symbol === 'EURC';
@@ -63,10 +63,10 @@ function rowsForProbe(probe: Probe, result: QuoteResult, prices: Prices): QuoteI
     return rows;
   }
 
-  // EURC : pas de paire native → lignes "direct" (atomiques, multi-hop interne) + 1 composite via-usdc.
-  // is_winner posé POSITIONNELLEMENT : ranked[0] = meilleur direct (rankQuotes trie netOut desc).
-  // NE JAMAIS comparer q.netOut === eurc.bestNetEurc : ranking (fetch principal) et eurc (compareEurc)
-  // viennent de DEUX appels réseau distincts → l'égalité bigint échouerait presque toujours.
+  // EURC: no native pair → "direct" rows (atomic, internal multi-hop) + 1 via-usdc composite.
+  // is_winner set POSITIONALLY: ranked[0] = best direct (rankQuotes sorts netOut desc).
+  // NEVER compare q.netOut === eurc.bestNetEurc: ranking (main fetch) and eurc (compareEurc)
+  // come from TWO separate network calls → the bigint equality would fail almost every time.
   const eurc = result.eurc;
   result.ranking.ranked.forEach((q, i) => {
     const win = eurc?.winner === 'direct' && i === 0;
@@ -79,10 +79,10 @@ function rowsForProbe(probe: Probe, result: QuoteResult, prices: Prices): QuoteI
     rows.push({
       pair: probe.pair, amount_in: probe.amountIn, source_id: `${v.leg1.source}+${v.leg2.source}`,
       net_out: v.netEurc, net_confidence: 'exact', price_impact_pct: impact ?? null,
-      gas_in_target: v.leg1.gasInTarget + v.leg2.gasInTarget, fee_total: null, // composite : gas des 2 legs
+      gas_in_target: v.leg1.gasInTarget + v.leg2.gasInTarget, fee_total: null, // composite: gas of both legs
       route_summary: `${v.leg1.source}:BLND->USDC | ${v.leg2.source}:USDC->EURC`,
       is_winner: win, eurc_path: 'via-usdc', raw_json: JSON.stringify(eurc, bigIntJson),
-      duration_ms: null, // composite 2-tx : pas de durée atomique mesurable
+      duration_ms: null, // composite 2-tx: no measurable atomic duration
     });
   }
   return rows;
@@ -91,12 +91,12 @@ function rowsForProbe(probe: Probe, result: QuoteResult, prices: Prices): QuoteI
 export async function runTick(deps: TickDeps): Promise<TickAssembled> {
   const startedAt = deps.now();
 
-  // Sélection du meilleur RPC : best-effort, un échec ne casse jamais le tick.
+  // Best RPC selection: best-effort, a failure never breaks the tick.
   let sel: RpcSelection = { chosen: deps.cfg.rpcUrl, probes: [] };
   resetRpc();
   try {
     sel = await (deps.selectRpc ?? selectRpc)(deps.cfg.rpcUrls, deps.cfg.timeoutMs);
-  } catch { /* repli silencieux : rpcUrl par défaut */ }
+  } catch { /* silent fallback: default rpcUrl */ }
   const rpcUrl = sel.chosen || deps.cfg.rpcUrl;
 
   const prices = await deps.fetchPrices({ timeoutMs: deps.cfg.timeoutMs, horizonUrl: deps.cfg.horizonUrl });
@@ -105,17 +105,17 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     rpcUrl, horizonUrl: deps.cfg.horizonUrl,
     soroswapApiKey: deps.cfg.soroswapApiKey, stellarBrokerApiKey: deps.cfg.stellarBrokerApiKey,
     walletAddress: deps.cfg.walletAddress,
-    timeoutMs: deps.cfg.timeoutMs, prices, // <- prix injecté : 1 seul fetch, comparabilité préservée
-    // Cache RPC partagé par les 4 sondes du tick : coalesce les lectures de pools identiques
-    // (sondes EURC × 3 sous-cotations re-lisent les mêmes pools) → ~180 → ~30 appels RPC/tick,
-    // supprime les 429 du RPC public. Neuf à chaque tick (réserves fraîches).
+    timeoutMs: deps.cfg.timeoutMs, prices, // <- injected prices: single fetch, comparability preserved
+    // RPC cache shared across the tick's 4 probes: coalesces reads of identical pools
+    // (EURC probes × 3 sub-quotes re-read the same pools) → ~180 → ~30 RPC calls/tick,
+    // eliminates 429s from the public RPC. Fresh on every tick (up-to-date reserves).
     rpcCache: new Map(),
-    // Re-simulation honnête des jambes EURC via-USDC : idem liveQuote, best-effort.
+    // Honest re-simulation of the EURC via-USDC legs: same as liveQuote, best-effort.
     reSimLeg: makeReSimLeg({ rpcUrl }, deps.resimDeps),
   };
 
-  // Parallélisation : toutes les sondes partent en même temps (Promise.all).
-  // Chaque tâche retourne ses rows + erreurs ; la fusion est faite après (ordre déterministe = ordre deps.probes).
+  // Parallelization: all probes fire at the same time (Promise.all).
+  // Each task returns its rows + errors; the merge happens afterward (deterministic order = deps.probes order).
   type ProbeResult = { rows: QuoteInsert[]; errors: Array<[string, string]>; resimErrors: number };
 
   const probeResults = await Promise.all(deps.probes.map(async (probe): Promise<ProbeResult> => {
@@ -125,9 +125,9 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
       localErrors.push([e, result.errorReasons?.[e] ?? 'indisponible']);
     }
 
-    // Re-simulation Aquarius + xBull : remplace les nets sur-cotés et décode la route xBull,
-    // pour que la DB stocke les vrais fills simulés (pas les cotes API sur-cotées).
-    // Best-effort : un échec RPC (429, timeout) ne casse jamais le tick.
+    // Aquarius + xBull re-simulation: replaces over-quoted nets and decodes the xBull route,
+    // so the DB stores the real simulated fills (not the over-quoted API prices).
+    // Best-effort: an RPC failure (429, timeout) never breaks the tick.
     const pairUi = probe.buy.symbol === EURC.symbol ? 'EURC' : 'USDC';
     let resimErrors = 0;
     try {
@@ -142,9 +142,9 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     return { rows: rowsForProbe(probe, result, prices), errors: localErrors, resimErrors };
   }));
 
-  // Fusion dans l'ordre de deps.probes (déterministe).
+  // Merge in deps.probes order (deterministic).
   const quotes: QuoteInsert[] = [];
-  const reasons = new Map<string, string>(); // id → cause (timeout/http/indisponible)
+  const reasons = new Map<string, string>(); // id → cause (timeout/http/unavailable)
   let totalResimErrors = 0;
   for (const pr of probeResults) {
     quotes.push(...pr.rows);
@@ -166,7 +166,7 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
     note: null,
   };
 
-  // Comptage sim_errors par URL RPC (429, rate-limit, timeout, ECONNRESET).
+  // sim_errors count per RPC URL (429, rate-limit, timeout, ECONNRESET).
   // Includes both source adapter errors AND re-sim RPC errors (resimAquariusXbull catch).
   const simErrorRe = /429|rate.?limit|too many|timeout|ETIMEDOUT|ECONNRESET/i;
   const simErrorCount = [...reasons.values()].filter((r) => simErrorRe.test(r)).length + totalResimErrors;
@@ -181,7 +181,7 @@ export async function runTick(deps: TickDeps): Promise<TickAssembled> {
   return { tick, quotes, rpcProbes };
 }
 
-/** Tick d'échec (exception inattendue) : ligne ok=false avec note, zéro quote. Spec §7 — le trou reste visible. */
+/** Failure tick (unexpected exception): ok=false row with a note, zero quotes. Spec §7 — the gap stays visible. */
 export function failedTick(cfg: { cadenceSec: number }, startedAt: Date, finishedAt: Date, message: string): TickInsert {
   return {
     started_at: startedAt.toISOString(), finished_at: finishedAt.toISOString(), cadence_sec: cfg.cadenceSec,

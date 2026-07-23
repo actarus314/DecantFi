@@ -21,27 +21,27 @@ function insertAt(db: ReturnType<typeof openDb>, startedAt: string, net: string)
 }
 
 describe('runMaintenance', () => {
-  it('purge le raw au-delà de 90 j, garde le structuré', () => {
+  it('purges raw beyond 90 days, keeps the structured data', () => {
     const db = openDb(':memory:');
-    insertAt(db, daysAgo(120), '12.0'); // raw doit partir
-    insertAt(db, daysAgo(10), '12.6');  // raw doit rester
+    insertAt(db, daysAgo(120), '12.0'); // raw must go
+    insertAt(db, daysAgo(10), '12.6');  // raw must stay
     runMaintenance(db, { rawRetentionDays: 90, rollupAfterDays: 0 }, now);
     const rawCount = (db.raw().prepare('SELECT COUNT(*) AS n FROM quote_raw').get() as any).n;
     expect(Number(rawCount)).toBe(1);
     const tickCount = (db.raw().prepare('SELECT COUNT(*) AS n FROM tick').get() as any).n;
-    expect(Number(tickCount)).toBe(2); // structuré intact
+    expect(Number(tickCount)).toBe(2); // structured data intact
     db.close();
   });
 
-  it('rollup horaire au-delà de 365 j puis supprime les lignes par-tick', () => {
+  it('hourly rollup beyond 365 days then deletes per-tick rows', () => {
     const db = openDb(':memory:');
     insertAt(db, '2025-01-01T14:05:00.000Z', '12.0');
-    insertAt(db, '2025-01-01T14:35:00.000Z', '12.4'); // même bucket horaire
-    insertAt(db, daysAgo(5), '12.6');                  // récent : conservé tel quel
+    insertAt(db, '2025-01-01T14:35:00.000Z', '12.4'); // same hourly bucket
+    insertAt(db, daysAgo(5), '12.6');                  // recent: kept as-is
     runMaintenance(db, { rawRetentionDays: 90, rollupAfterDays: 365 }, now);
 
     const ticks = (db.raw().prepare('SELECT COUNT(*) AS n FROM tick').get() as any).n;
-    expect(Number(ticks)).toBe(1); // seul le récent reste en par-tick
+    expect(Number(ticks)).toBe(1); // only the recent one remains per-tick
 
     const roll = db.raw().prepare('SELECT * FROM rollup_hourly');
     roll.setReadBigInts(true);
@@ -83,7 +83,7 @@ describe('runMaintenance', () => {
     db.close();
   });
 
-  it('idempotent : deux passages ne doublent pas le rollup', () => {
+  it('idempotent: two passes do not double the rollup', () => {
     const db = openDb(':memory:');
     insertAt(db, '2025-01-01T14:05:00.000Z', '12.0');
     runMaintenance(db, { rawRetentionDays: 90, rollupAfterDays: 365 }, now);
@@ -91,7 +91,7 @@ describe('runMaintenance', () => {
     runMaintenance(db, { rawRetentionDays: 90, rollupAfterDays: 365 }, now);
     const rows = db.raw().prepare('SELECT n_ticks FROM rollup_hourly WHERE hour_utc = ?').all('2025-01-01T14:00:00Z') as any[];
     expect(rows.length).toBe(1);
-    expect(Number(rows[0].n_ticks)).toBe(2); // cumulé, pas dupliqué
+    expect(Number(rows[0].n_ticks)).toBe(2); // cumulative, not duplicated
     db.close();
   });
 });

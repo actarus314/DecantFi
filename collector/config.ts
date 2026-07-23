@@ -1,4 +1,4 @@
-// Charge + valide la config du collecteur depuis l'environnement. Lance sur valeur invalide (fail fast).
+// Loads + validates the collector config from the environment. Throws on invalid value (fail fast).
 import { toStroops } from '../core/amount.js';
 
 export interface CollectorConfig {

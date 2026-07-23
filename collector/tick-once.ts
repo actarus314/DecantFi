@@ -1,4 +1,4 @@
-// Ops : exécute UN tick réel (réseau live) et l'écrit dans la DB. Pour smoke-test manuel / cron externe.
+// Ops: runs ONE real tick (live network) and writes it to the DB. For manual smoke-test / external cron.
 import { dirname } from 'node:path';
 import { fetchPrices } from '../core/prices.js';
 import { quote } from '../core/engine.js';

@@ -1,5 +1,5 @@
-// Rétention à paliers : purge le raw > rawRetentionDays, agrège en horaire > rollupAfterDays (puis purge
-// les lignes par-tick), réclame l'espace. Idempotent (upsert cumulatif sur rollup_hourly).
+// Tiered retention: purges raw data > rawRetentionDays, aggregates hourly > rollupAfterDays (then purges
+// per-tick rows), reclaims space. Idempotent (cumulative upsert on rollup_hourly).
 import type { Db } from '../db/index.js';
 
 export interface MaintenanceConfig { rawRetentionDays: number; rollupAfterDays: number; }
@@ -20,7 +20,7 @@ function median(sorted: bigint[]): bigint {
 export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void {
   const raw = db.raw();
 
-  // (1) Purge du raw au-delà de la fenêtre chaude.
+  // (1) Purge raw data beyond the hot window.
   // rawRetentionDays=0 means "off": skip purge (cutoff=now would delete everything).
   if (cfg.rawRetentionDays > 0) {
     raw.prepare(
@@ -29,7 +29,7 @@ export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void 
     ).run(isoCutoff(now, cfg.rawRetentionDays));
   }
 
-  // (2) Rollup horaire au-delà de la fenêtre tiède, puis suppression des lignes par-tick.
+  // (2) Hourly rollup beyond the warm window, then deletion of per-tick rows.
   // rollupAfterDays=0 means "off": skip rollup AND rpc_call_log purge entirely.
   if (cfg.rollupAfterDays > 0) {
     const cutoff = isoCutoff(now, cfg.rollupAfterDays);
@@ -55,7 +55,7 @@ export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void 
       if (r.blnd_usd !== null) g.acc.blnd.push(Number(r.blnd_usd));
       const src = String(r.source_id);
       g.acc.dist[src] = (g.acc.dist[src] ?? 0) + 1;
-      // Impact local : calculé depuis eurc_stellar_mid pour EURC, ou 1 pour USDC
+      // Local impact: computed from eurc_stellar_mid for EURC, or 1 for USDC
       const netOut = r.net_out as bigint;
       const amountIn = r.amount_in as bigint;
       const blndUsd = r.blnd_usd != null ? Number(r.blnd_usd) : null;
@@ -69,9 +69,9 @@ export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void 
       }
     }
 
-    // NB: en prod un bucket horaire ancien n'est upserté qu'UNE fois (ses ticks sont ensuite supprimés et
-    // aucun nouveau tick ne retombe dans une heure passée). La fusion DO UPDATE de net_med est donc une
-    // approximation (moyenne pondérée de médianes, tronquée en INTEGER), quasi jamais empruntée — acceptable.
+    // NB: in prod an old hourly bucket is only upserted ONCE (its ticks are then deleted and
+    // no new tick ever falls back into a past hour). The DO UPDATE merge of net_med is therefore an
+    // approximation (weighted average of medians, truncated to INTEGER), almost never exercised — acceptable.
     const selectWinnerDist = raw.prepare(
       'SELECT winner_dist FROM rollup_hourly WHERE hour_utc=? AND pair=? AND amount_in=?',
     );
@@ -97,7 +97,7 @@ export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void 
         const blnds = g.acc.blnd;
         const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
-        // Fusion de winner_dist avec l'existant (pour l'idempotence cumulative).
+        // Merge winner_dist with the existing value (for cumulative idempotence).
         const existing = selectWinnerDist
           .get(g.hour, g.pair, g.amount) as { winner_dist?: string } | undefined;
         const merged: Record<string, number> = existing?.winner_dist ? JSON.parse(existing.winner_dist) : {};
@@ -115,7 +115,7 @@ export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void 
       }
       // Purge rpc_call_log beyond the same retention window (same cutoff as ticks).
       raw.prepare('DELETE FROM rpc_call_log WHERE at < ?').run(cutoff);
-      // Supprime les ticks agrégés (CASCADE purge quote + quote_raw).
+      // Delete aggregated ticks (CASCADE purges quote + quote_raw).
       raw.prepare('DELETE FROM tick WHERE started_at < ?').run(cutoff);
       raw.exec('COMMIT');
     } catch (e) {
@@ -124,6 +124,6 @@ export function runMaintenance(db: Db, cfg: MaintenanceConfig, now: Date): void 
     }
   }
 
-  // (3) Réclame l'espace libéré.
+  // (3) Reclaim freed space.
   raw.exec('PRAGMA incremental_vacuum');
 }
