@@ -1,4 +1,4 @@
-// Schéma SQLite du collecteur (4 tables) + PRAGMA. Stockage UTC ; montants en stroops INTEGER.
+// Collector SQLite schema (4 tables) + PRAGMA. UTC storage; amounts as stroops INTEGER.
 import type { DatabaseSync } from 'node:sqlite';
 
 export const DDL = `
@@ -89,8 +89,8 @@ CREATE INDEX IF NOT EXISTS idx_coherence_venue   ON coherence_probe(venue);
 CREATE INDEX IF NOT EXISTS idx_coherence_created ON coherence_probe(created_at);
 `;
 
-/** Ajoute une colonne si elle manque (CREATE TABLE IF NOT EXISTS n'altère PAS une table existante :
- *  une colonne ajoutée au DDL après coup ne s'applique jamais à une DB déjà créée → "no column named X"). */
+/** Adds a column if missing (CREATE TABLE IF NOT EXISTS does NOT alter an existing table:
+ *  a column added to the DDL afterward never applies to an already-created DB → "no column named X"). */
 function ensureColumn(db: DatabaseSync, table: string, column: string, decl: string): void {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (!cols.some((c) => c.name === column)) {
@@ -98,7 +98,7 @@ function ensureColumn(db: DatabaseSync, table: string, column: string, decl: str
   }
 }
 
-/** Renomme une colonne si oldCol existe et newCol est absent (SQLite ≥3.25). Idempotent. */
+/** Renames a column if oldCol exists and newCol is absent (SQLite ≥3.25). Idempotent. */
 function ensureRename(db: DatabaseSync, table: string, oldCol: string, newCol: string): void {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   const hasOld = cols.some((c) => c.name === oldCol);
@@ -108,17 +108,17 @@ function ensureRename(db: DatabaseSync, table: string, oldCol: string, newCol: s
   }
 }
 
-/** Applique PRAGMA (avant création des tables pour auto_vacuum) puis crée le schéma. Idempotent. */
+/** Applies PRAGMA (before table creation, for auto_vacuum) then creates the schema. Idempotent. */
 export function migrate(db: DatabaseSync): void {
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA busy_timeout = 5000');
   db.exec('PRAGMA foreign_keys = ON');
-  db.exec('PRAGMA auto_vacuum = INCREMENTAL'); // effectif sur DB neuve (avant toute table)
-  db.exec('PRAGMA temp_store = MEMORY');       // aucun fichier temp hors volume (read_only)
+  db.exec('PRAGMA auto_vacuum = INCREMENTAL'); // effective on a new DB (before any table)
+  db.exec('PRAGMA temp_store = MEMORY');       // no temp file outside the volume (read_only)
   db.exec(DDL);
 
-  // Migrations additives idempotentes (pour les DB créées avant l'ajout d'une colonne).
-  // Renommage eur_usd → eurc_usd (avant ensureColumn pour éviter collision).
+  // Idempotent additive migrations (for DBs created before a column was added).
+  // Rename eur_usd → eurc_usd (before ensureColumn to avoid collision).
   ensureRename(db, 'tick', 'eur_usd', 'eurc_usd');
   ensureColumn(db, 'tick', 'eurc_stellar_mid', 'REAL');
   ensureColumn(db, 'rollup_hourly', 'impact_avg_local', 'REAL');

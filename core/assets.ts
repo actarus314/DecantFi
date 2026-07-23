@@ -1,23 +1,23 @@
-// Table des actifs. Emetteurs G... verifies on-chain le 2026-06-15 :
-// chaque issuer recalcule via Asset(code, issuer).contractId(PUBLIC) == le SAC connu (cf. assets.test.ts).
+// Asset table. G... issuers verified on-chain:
+// each issuer recomputes via Asset(code, issuer).contractId(PUBLIC) == the known SAC (see assets.test.ts).
 //
-// Formats attendus selon la source :
+// Expected formats by source:
 //   - xBull, Aquarius, Soroswap, Comet  -> SAC (C...)
-//   - StellarBroker                     -> CODE-ISSUER  (tiret) ou 'native' (XLM)
-//   - Horizon strict-send               -> asset_type + code/issuer (ou 'native')
+//   - StellarBroker                     -> CODE-ISSUER  (dash) or 'native' (XLM)
+//   - Horizon strict-send               -> asset_type + code/issuer (or 'native')
 
 export interface Asset {
-  /** Symbole affiche. */
+  /** Display symbol. */
   symbol: string;
-  /** Code classique Stellar ('XLM' pour le natif). */
+  /** Classic Stellar code ('XLM' for native). */
   code: string;
-  /** Emetteur G... ; null pour XLM natif. */
+  /** G... issuer; null for native XLM. */
   issuer: string | null;
   /** Soroban Asset Contract (C...). */
   sac: string;
-  /** Decimales (7 sur Stellar). */
+  /** Decimals (7 on Stellar). */
   decimals: number;
-  /** true pour l'actif natif XLM. */
+  /** true for the native XLM asset. */
   native?: boolean;
 }
 
@@ -45,7 +45,7 @@ export const EURC: Asset = {
   decimals: 7,
 };
 
-/** XLM natif : utilise pour la conversion du gas. */
+/** Native XLM: used for gas conversion. */
 export const XLM: Asset = {
   symbol: 'XLM',
   code: 'XLM',
@@ -55,7 +55,7 @@ export const XLM: Asset = {
   native: true,
 };
 
-/** AQUA (Aquarius) — intermediaire de routage xBull ; resolution d'affichage uniquement, pas une cible de swap. */
+/** AQUA (Aquarius) — xBull routing intermediary; display resolution only, not a swap target. */
 export const AQUA: Asset = {
   symbol: 'AQUA',
   code: 'AQUA',
@@ -66,24 +66,24 @@ export const AQUA: Asset = {
 
 export const ASSETS: Asset[] = [BLND, USDC, EURC, XLM, AQUA];
 
-/** Cibles de swap de premier rang (USDC et EURC). */
+/** First-rank swap targets (USDC and EURC). */
 export const TARGETS: Record<'USDC' | 'EURC', Asset> = { USDC, EURC };
 
 export function bySymbol(symbol: string): Asset | undefined {
   return ASSETS.find((a) => a.symbol.toUpperCase() === symbol.toUpperCase());
 }
 
-/** Retrouve un actif connu par son SAC (C...). */
+/** Looks up a known asset by its SAC (C...). */
 export function bySac(sac: string): Asset | undefined {
   return ASSETS.find((a) => a.sac === sac);
 }
 
-/** 'CODE:ISSUER' (Horizon, StellarBroker variante deux-points) ; 'native' pour XLM. */
+/** 'CODE:ISSUER' (Horizon, StellarBroker colon variant); 'native' for XLM. */
 export function classicColon(a: Asset): string {
   return a.native ? 'native' : `${a.code}:${a.issuer}`;
 }
 
-/** 'CODE-ISSUER' (StellarBroker) ; 'native' pour XLM. */
+/** 'CODE-ISSUER' (StellarBroker); 'native' for XLM. */
 export function classicDash(a: Asset): string {
   return a.native ? 'native' : `${a.code}-${a.issuer}`;
 }

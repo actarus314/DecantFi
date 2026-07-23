@@ -1,4 +1,4 @@
-// Config du serveur web : réutilise loadCollectorConfig + ajoute WEB_PORT.
+// Web server config: reuses loadCollectorConfig + adds WEB_PORT.
 import { loadCollectorConfig, type CollectorConfig } from '../collector/config.js';
 
 export interface WebConfig extends CollectorConfig {

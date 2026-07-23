@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Régénère web/public/walletkit.js + web/public/walletkit.js.sha256
- * Usage : npm run build:walletkit
+ * Regenerates web/public/walletkit.js + web/public/walletkit.js.sha256
+ * Usage: npm run build:walletkit
  *
- * ⚠ Après exécution : committer walletkit.js + walletkit.js.sha256 + web/public/wallet-icons/,
- *   puis re-tester le wallet au navigateur (connexion + signature).
+ * ⚠ After running: commit walletkit.js + walletkit.js.sha256 + web/public/wallet-icons/,
+ *   then re-test the wallet in the browser (connect + sign).
  *
  * Auto-vendor: any https://stellar.creit.tech/wallet-icons/<name>.png URL found in the
  * bundle is downloaded to web/public/wallet-icons/<name>.png and the URL is rewritten to
@@ -23,7 +23,7 @@ const outfile = path.join(repoRoot, 'web', 'public', 'walletkit.js');
 const sha256file = outfile + '.sha256';
 const iconsDir = path.join(repoRoot, 'web', 'public', 'wallet-icons');
 
-// Lire la version installée dynamiquement
+// Read the installed version dynamically
 const require = createRequire(import.meta.url);
 // package.json may not be in "exports" — fall back to readFileSync
 let version;
@@ -85,7 +85,7 @@ if (uniqueUrls.length > 0) {
   console.log('  (no stellar.creit.tech icon URLs found in bundle)');
 }
 
-// Régénère le checksum over the final (rewritten) file (format compatible sha256sum -c)
+// Regenerate the checksum over the final (rewritten) file (format compatible sha256sum -c)
 const content = readFileSync(outfile);
 const hash = createHash('sha256').update(content).digest('hex');
 writeFileSync(sha256file, `${hash}  web/public/walletkit.js\n`);

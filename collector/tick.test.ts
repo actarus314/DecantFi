@@ -11,7 +11,7 @@ const cfg = (over: Partial<CollectorConfig> = {}): CollectorConfig => ({
   dbPath: ':memory:', timeoutMs: 1000, rawRetentionDays: 90, rollupAfterDays: 365,
   rpcUrl: 'r', rpcUrls: ['r'], horizonUrl: 'h', ...over,
 });
-// Fake selectRpc : évite toute connexion réseau dans les tests.
+// Fake selectRpc: avoids any network connection in tests.
 const fakeSelectRpc = async (urls: string[]) => ({ chosen: urls[0] ?? 'r', probes: [] });
 const prices = { blndUsd: 0.05, xlmUsd: 0.11, eurcUsd: 1.08, eurcStellarMid: null };
 const now = () => new Date('2026-06-16T10:00:00.000Z');
@@ -28,7 +28,7 @@ function usdcResult(amountIn: bigint): QuoteResult {
 }
 
 describe('runTick (USDC)', () => {
-  it('assemble 1 ligne tick + 1 quote par source, gagnant flaggé', async () => {
+  it('assembles 1 tick row + 1 quote per source, winner flagged', async () => {
     const fakeQuote = async (o: any) => usdcResult(o.amountIn);
     const { tick, quotes } = await runTick({
       probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
@@ -42,7 +42,7 @@ describe('runTick (USDC)', () => {
     expect(quotes[0]!.eurc_path).toBeNull();
   });
 
-  it('prix KO (blndUsd null) → tick enregistré avec prix null, ok=true si quotes présentes', async () => {
+  it('prices KO (blndUsd null) → tick recorded with null prices, ok=true if quotes present', async () => {
     const noPrices = { blndUsd: null, xlmUsd: null, eurcUsd: null, eurcStellarMid: null };
     const { tick } = await runTick({
       probes: [{ pair: 'BLND->USDC', buy: USDC, amountIn: toStroops('250') }],
@@ -64,7 +64,7 @@ describe('runTick (USDC)', () => {
 });
 
 describe('runTick (EURC)', () => {
-  it('émet les lignes direct + 1 composite via-usdc, gagnant = meilleur net', async () => {
+  it('emits direct rows + 1 via-usdc composite, winner = best net', async () => {
     const directBest = mk('xbull', toStroops('11.0'), { sellAsset: BLND, buyAsset: EURC });
     const leg1 = mk('xbull', toStroops('12.6'), { sellAsset: BLND, buyAsset: USDC });
     const leg2 = mk('horizon', toStroops('11.6'), { sellAsset: USDC, buyAsset: EURC });
@@ -87,10 +87,10 @@ describe('runTick (EURC)', () => {
     expect(winner.source_id).toBe('xbull+horizon');
   });
 
-  it('winner=direct → flag positionnel sur ranked[0] (jamais de comparaison par valeur inter-fetch)', async () => {
+  it('winner=direct → positional flag on ranked[0] (never a cross-fetch value comparison)', async () => {
     const d1 = mk('xbull', toStroops('11.4'), { sellAsset: BLND, buyAsset: EURC });
     const d2 = mk('aquarius', toStroops('11.0'), { sellAsset: BLND, buyAsset: EURC });
-    // bestNetEurc d'un AUTRE fetch : valeur ≠ d1.netOut (simule les 2 fetchs distincts de l'engine).
+    // bestNetEurc from ANOTHER fetch: value ≠ d1.netOut (simulates the engine's 2 separate fetches).
     const directBest = mk('xbull', toStroops('11.39'), { sellAsset: BLND, buyAsset: EURC });
     const result: QuoteResult = {
       request: { sell: 'BLND', buy: 'EURC', amountIn: toStroops('250'), slippageBps: 50 }, prices,
@@ -104,12 +104,12 @@ describe('runTick (EURC)', () => {
     });
     const winners = quotes.filter((q) => q.is_winner);
     expect(winners.length).toBe(1);
-    expect(winners[0]!.source_id).toBe('xbull'); // ranked[0], malgré bestNetEurc ≠ d1.netOut
+    expect(winners[0]!.source_id).toBe('xbull'); // ranked[0], despite bestNetEurc ≠ d1.netOut
   });
 });
 
 describe('runTick (EURC resim leg exclusion)', () => {
-  it('leg1=Aquarius avec simulateAquariusNet→null : pas de composite via-usdc dans les quotes', async () => {
+  it('leg1=Aquarius with simulateAquariusNet→null: no via-usdc composite in the quotes', async () => {
     // When makeReSimLeg/compareEurc excludes the Aquarius leg (sim → null = non-executable route),
     // the engine returns eurc.viaUsdc = undefined. rowsForProbe must not emit a via-usdc row.
     // We simulate this by injecting a result where viaUsdc is absent (engine already ran reSimLeg).
@@ -148,8 +148,8 @@ describe('runTick (EURC resim leg exclusion)', () => {
 });
 
 describe('runTick (resim Aquarius + xBull)', () => {
-  it('stocke le net re-simulé d\'Aquarius quand la sim retourne une valeur différente', async () => {
-    // Aquarius sur-cote 12.6 → sim retourne 12.4 → la row DB doit stocker 12.4
+  it('stores Aquarius\'s re-simulated net when the sim returns a different value', async () => {
+    // Aquarius over-quotes 12.6 → sim returns 12.4 → the DB row must store 12.4
     const aqQ = mk('aquarius', toStroops('12.6'), {
       sellAsset: BLND, buyAsset: USDC, amountIn: toStroops('250'),
       raw: { swap_chain_xdr: 'FAKE_XDR' },
@@ -174,8 +174,8 @@ describe('runTick (resim Aquarius + xBull)', () => {
     expect(quotes[0]!.is_winner).toBe(true);
   });
 
-  it('stocke le net re-simulé de xBull et est_winner si meilleur après re-rank', async () => {
-    // xBull sur-cote 12.6 → sim retourne 11.8 < Aquarius 12.0 → Aquarius doit être winner
+  it('stores xBull\'s re-simulated net and is_winner if better after re-rank', async () => {
+    // xBull over-quotes 12.6 → sim returns 11.8 < Aquarius 12.0 → Aquarius must be winner
     const xbQ = mk('xbull', toStroops('12.6'), {
       sellAsset: BLND, buyAsset: USDC, amountIn: toStroops('250'),
       raw: { route: 'BLND:GBLD,XLM:native,USDC:GUSDC' },
@@ -202,14 +202,14 @@ describe('runTick (resim Aquarius + xBull)', () => {
     expect(quotes.length).toBe(2);
     const xbRow = quotes.find((q) => q.source_id === 'xbull')!;
     const aqRow = quotes.find((q) => q.source_id === 'aquarius')!;
-    // net re-simulé stocké
+    // re-simulated net stored
     expect(xbRow.net_out).toBe(toStroops('11.8'));
-    // après re-rank, Aquarius (12.0) > xBull (11.8) → Aquarius est winner
+    // after re-rank, Aquarius (12.0) > xBull (11.8) → Aquarius is winner
     expect(aqRow.is_winner).toBe(true);
     expect(xbRow.is_winner).toBe(false);
   });
 
-  it('repli silencieux : une exception dans resim ne casse pas le tick (cote API conservée)', async () => {
+  it('silent fallback: an exception in resim does not break the tick (API quote kept)', async () => {
     const xbQ = mk('xbull', toStroops('12.6'), {
       sellAsset: BLND, buyAsset: USDC, amountIn: toStroops('250'),
       raw: { route: 'FAKE' },
@@ -228,7 +228,7 @@ describe('runTick (resim Aquarius + xBull)', () => {
       resimDeps: { simulateXbullNet: throwingSim as any }, selectRpc: fakeSelectRpc,
     });
 
-    // tick ne doit pas exploser, cote API conservée
+    // tick must not blow up, API quote kept
     expect(tick.ok).toBe(true);
     expect(quotes.length).toBe(1);
     expect(quotes[0]!.net_out).toBe(toStroops('12.6'));
@@ -236,7 +236,7 @@ describe('runTick (resim Aquarius + xBull)', () => {
 });
 
 describe('failedTick', () => {
-  it('produit une ligne ok=false avec note exception', () => {
+  it('produces an ok=false row with an exception note', () => {
     const d = new Date('2026-06-16T10:00:00.000Z');
     const t = failedTick({ cadenceSec: 900 }, d, d, 'boom');
     expect(t.ok).toBe(false);
@@ -246,7 +246,7 @@ describe('failedTick', () => {
 });
 
 describe('runTick (tout-KO)', () => {
-  it('aucune cotation → tick ok=false quand même retourné, 0 quote', async () => {
+  it('no quotes → tick ok=false still returned, 0 quotes', async () => {
     const empty: QuoteResult = {
       request: { sell: 'BLND', buy: 'USDC', amountIn: toStroops('250'), slippageBps: 50 }, prices,
       ranking: { ranked: [] }, errors: ['xbull', 'horizon'],

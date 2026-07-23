@@ -5,14 +5,14 @@ import { tmpdir } from 'node:os';
 import { ensureDirWritable } from './fsguard.js';
 
 describe('ensureDirWritable', () => {
-  it('réussit sur un dossier inscriptible', () => {
+  it('succeeds on a writable directory', () => {
     const dir = mkdtempSync(join(tmpdir(), 'collector-'));
     expect(() => ensureDirWritable(dir)).not.toThrow();
   });
-  it('lance quand le parent est un fichier (chemin non inscriptible)', () => {
+  it('throws when the parent is a file (non-writable path)', () => {
     const base = mkdtempSync(join(tmpdir(), 'collector-'));
     const file = join(base, 'afile');
     writeFileSync(file, 'x');
-    expect(() => ensureDirWritable(join(file, 'sub'))).toThrow(); // mkdir sous un fichier → ENOTDIR
+    expect(() => ensureDirWritable(join(file, 'sub'))).toThrow(); // mkdir under a file → ENOTDIR
   });
 });

@@ -1,9 +1,9 @@
-// Helpers HTTP tolerants aux pannes : rendent null (jamais d'exception) sur timeout / !ok / erreur reseau,
-// pour qu'une source indisponible ne bloque jamais le classement.
+// Fault-tolerant HTTP helpers: return null (never throw) on timeout / !ok / network error,
+// so an unavailable source never blocks ranking.
 import { diag } from './diag.js';
 
 const DEFAULT_TIMEOUT = 8000;
-// Certains endpoints (xBull) bloquent l'UA Node par defaut : on se presente comme un client navigateur.
+// Some endpoints (xBull) block the default Node UA: we present as a browser client.
 const UA = 'Mozilla/5.0 (compatible; DecantFi/0.1; +read-only-quote)';
 
 export async function getJson(
@@ -53,7 +53,7 @@ export async function postJson(
   }
 }
 
-/** Acces sur par chemin pointe ("a.b.0.c") dans un objet inconnu. */
+/** Safe access by dotted path ("a.b.0.c") into an unknown object. */
 export function pick(obj: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((acc, key) => {
     if (acc == null) return undefined;

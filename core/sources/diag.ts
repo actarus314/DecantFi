@@ -1,10 +1,10 @@
-// Contexte de diagnostic par source (AsyncLocalStorage) : http.ts y écrit la cause d'un échec
-// sans changer la signature des adaptateurs. ponytail: ALS = le moyen idiomatique Node.
+// Per-source diagnostic context (AsyncLocalStorage): http.ts writes the failure cause here
+// without changing the adapters' signature. ponytail: ALS is the idiomatic Node way.
 import { AsyncLocalStorage } from 'node:async_hooks';
 export interface Diag { reason?: string; }
 export const diag = new AsyncLocalStorage<Diag>();
 
-/** Classe une erreur réseau/RPC en cause courte pour l'UI : rate-limit (429) / timeout / rpc. */
+/** Classifies a network/RPC error into a short cause for the UI: rate-limit (429) / timeout / rpc. */
 export function rpcReason(e: unknown): string {
   const msg = String((e as Error)?.message ?? e ?? '');
   if (/\b429\b|too many requests|rate.?limit/i.test(msg)) return 'rate-limit';
@@ -13,7 +13,7 @@ export function rpcReason(e: unknown): string {
   return 'rpc';
 }
 
-/** Pose la cause dans le contexte ALS courant si pas déjà posée (premier échec gagne). No-op hors run. */
+/** Sets the cause in the current ALS context if not already set (first failure wins). No-op outside a run. */
 export function setReason(reason: string): void {
   const st = diag.getStore();
   if (st) st.reason ??= reason;

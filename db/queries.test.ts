@@ -23,18 +23,18 @@ function seed() {
 }
 
 describe('history', () => {
-  it('renvoie les gagnants par tick (1 ligne par sonde)', () => {
+  it('returns winners per tick (1 row per probe)', () => {
     const db = seed();
     const rows = history(db, { limit: 10 });
     expect(rows.length).toBe(1);
     expect(rows[0]!.source_id).toBe('xbull');
-    expect(rows[0]!.net_out).toBe('50.5'); // formaté humain
+    expect(rows[0]!.net_out).toBe('50.5'); // human-formatted
     db.close();
   });
 });
 
 describe('exportRows', () => {
-  it('CSV : en-tête + 1 ligne par gagnant', () => {
+  it('CSV: header + 1 row per winner', () => {
     const db = seed();
     const csv = exportRows(db, 'csv');
     const lines = csv.trim().split('\n');
@@ -42,7 +42,7 @@ describe('exportRows', () => {
     expect(lines.length).toBe(2);
     db.close();
   });
-  it('JSON : tableau parseable', () => {
+  it('JSON: parseable array', () => {
     const db = seed();
     const arr = JSON.parse(exportRows(db, 'json'));
     expect(Array.isArray(arr)).toBe(true);

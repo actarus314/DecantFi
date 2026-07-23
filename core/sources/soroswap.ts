@@ -1,9 +1,9 @@
-// Soroswap : agregateur Soroban. v1 KEYLESS = routage local (soroswap-router-sdk) sur les reserves
-// du pool BLND/USDC lues en live via Soroban RPC (simulateTransaction, lecture seule). La math de frais
-// de pool 0,3 % tourne dans le SDK => amountOut NET. Pas de pool direct => null (la source se retire).
-// Multi-hop : le routeur recoit TOUS les pools existants entre {vendu, achete, USDC, XLM} (hubs profonds)
-// et choisit le meilleur chemin (<= 2 hops). Sans pools intermediaires il ne route que le pool direct
-// (souvent minuscule, ex. BLND/EURC) ; via USDC/XLM il trouve BLND->USDC->EURC, etc. 1 tx atomique.
+// Soroswap: Soroban aggregator. v1 KEYLESS = local routing (soroswap-router-sdk) over the
+// BLND/USDC pool reserves read live via Soroban RPC (simulateTransaction, read-only). The 0.3%
+// pool fee math runs in the SDK => amountOut is NET. No direct pool => null (source drops out).
+// Multi-hop: the router receives ALL existing pools between {sell, buy, USDC, XLM} (deep hubs)
+// and picks the best path (<= 2 hops). Without intermediate pools it only routes the direct pool
+// (often tiny, e.g. BLND/EURC); via USDC/XLM it finds BLND->USDC->EURC, etc. 1 atomic tx.
 import type { SourceAdapter, NormalizedQuote, QuoteRequest, SourceConfig } from './types.js';
 import { DEFAULT_GAS_XLM } from '../gas.js';
 import { USDC, XLM, bySac } from '../assets.js';
@@ -54,7 +54,7 @@ export function parseSoroswapRoute(route: any, req: QuoteRequest): NormalizedQuo
 
 export const soroswap: SourceAdapter = {
   id: 'soroswap',
-  available: () => true, // keyless (SDK local) ; si indisponible -> quote() rend null
+  available: () => true, // keyless (local SDK); if unavailable -> quote() returns null
   async quote(req, cfg) {
     try {
       return await liveRoute(req, cfg);
@@ -85,17 +85,17 @@ async function liveRoute(req: QuoteRequest, cfg: SourceConfig): Promise<Normaliz
     return scValToNative(sim.result!.retval);
   };
 
-  // Univers d'actifs : vendu + achete + hubs Stellar profonds (USDC, XLM). Deduplique.
+  // Asset universe: sell + buy + deep Stellar hubs (USDC, XLM). Deduplicated.
   const universe = Array.from(new Set([req.sellAsset.sac, req.buyAsset.sac, USDC.sac, XLM.sac]));
   const candidates: Array<[string, string]> = [];
   for (let i = 0; i < universe.length; i++) {
     for (let j = i + 1; j < universe.length; j++) candidates.push([universe[i]!, universe[j]!]);
   }
 
-  // Lit chaque pool — MÉMOÏSÉ par paire {a,b} sur cfg.rpcCache (partagé par tout le tick) : les sondes
-  // EURC relancent 3 sous-cotations qui re-lisent les mêmes pools → sans cache, rafale qui sature le RPC
-  // public (429). Le résultat (token_0 + réserves) est indépendant de l'ordre/sens/taille → clé triée.
-  // ponytail: drop silencieux d'un pool = Soroswap sous-cote (il perd, jamais de faux gagnant).
+  // Reads each pool — MEMOIZED by pair {a,b} on cfg.rpcCache (shared across the whole tick): EURC
+  // probes re-trigger 3 sub-quotes that re-read the same pools → without caching, a burst that saturates
+  // the public RPC (429). The result (token_0 + reserves) is independent of order/direction/size → sorted key.
+  // ponytail: silently dropping a pool = Soroswap under-quotes (it loses, never a false winner).
   const readPair = ([a, b]: [string, string]) =>
     cached(cfg.rpcCache, `soroswap:pool:${[a, b].slice().sort().join('|')}`, async () => {
       try {
@@ -104,7 +104,7 @@ async function liveRoute(req: QuoteRequest, cfg: SourceConfig): Promise<Normaliz
         const t0 = String(token0);
         return { tokenA: t0, tokenB: t0 === a ? b : a, reserveA: reserves[0].toString(), reserveB: reserves[1].toString(), protocol: Protocol.SOROSWAP, fee: '30' };
       } catch (e) {
-        setReason(rpcReason(e)); // 429 / timeout / rpc — pour l'affichage santé
+        setReason(rpcReason(e)); // 429 / timeout / rpc — for the health display
         return null;
       }
     });
@@ -117,7 +117,7 @@ async function liveRoute(req: QuoteRequest, cfg: SourceConfig): Promise<Normaliz
   const tOut = new Token(Networks.PUBLIC, req.buyAsset.sac, req.buyAsset.decimals, req.buyAsset.code, req.buyAsset.symbol);
   const amountIn = CurrencyAmount.fromRawAmount(tIn, req.amountIn.toString());
 
-  // Le SDK ecrit des logs de debug sur stdout : on les neutralise le temps du routage.
+  // The SDK writes debug logs to stdout: we silence them for the duration of routing.
   const origLog = console.log;
   const origDebug = console.debug;
   const origInfo = console.info;

@@ -11,13 +11,13 @@
   --bg:#f1f5f9; --card-bg:#ffffff; --card-border:#e2e8f0; --section-bg:#f8fafc;
   --val:#0f172a; --caption:#64748b; --sub:#94a3b8; --heading:#475569;
   --accent:#2563eb; --amber:#d97706; --green:#16a34a; --red:#dc2626; --tool:#ea580c; --select:#7c3aed; --teal:#0d9488;
-  --zone-wash:30,41,59; /* slate-800 : assombrit le fond clair (texture de zone) */
+  --zone-wash:30,41,59; /* slate-800: darkens the light background (zone texture) */
 }
 :root.dark{
   --bg:#0f172a; --card-bg:#1e293b; --card-border:#334155; --section-bg:#0f172a;
   --val:#f1f5f9; --caption:#94a3b8; --sub:#64748b; --heading:#cbd5e1;
   --accent:#3b82f6; --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --tool:#f97316; --select:#8b5cf6; --teal:#14b8a6;
-  --zone-wash:148,163,184; /* slate-400 : éclaircit le fond sombre (texture de zone) */
+  --zone-wash:148,163,184; /* slate-400: lightens the dark background (zone texture) */
 }
 *{box-sizing:border-box;}
 body{margin:0; background:var(--bg); color:var(--val);
@@ -50,14 +50,14 @@ body{margin:0; background:var(--bg); color:var(--val);
 .topbar-right{margin-left:auto; display:inline-flex; align-items:center; gap:.45rem;}
 .ctrl-btn{background:transparent; border:1px solid var(--card-border); color:var(--caption); border-radius:6px; padding:3px 8px; cursor:pointer; font-size:12px; font-weight:600;}
 .ctrl-btn:hover{background:var(--section-bg);}
-/* .ctrl-btn.active-lang — supprimé (un seul bouton drapeau) */
+/* .ctrl-btn.active-lang — removed (single flag button) */
 
 /* Refresh controls */
 .refresh-wrap{display:inline-flex; align-items:center; gap:.45rem; flex-wrap:wrap;}
 .refresh-note{font-size:12px; color:var(--caption);}
 
 .zone{margin-bottom:2.2rem;}
-/* Regroupement en 3 sur-blocs : base gris dégradé + GRAIN désaturé, dense en haut, estompé vers le bas (sans bordure ni titre) */
+/* Grouping into 3 super-blocks: gradient gray base + desaturated GRAIN, dense at the top, fading toward the bottom (no border, no title) */
 .zone-group{position:relative; margin-bottom:2.6rem; padding:1.5rem 1.2rem 1.8rem; border-radius:1.2rem;
   background:linear-gradient(180deg, rgba(var(--zone-wash),.10), rgba(var(--zone-wash),.05) 50%, rgba(var(--zone-wash),.015) 80%, transparent 100%);}
 .zone-group::before{content:""; position:absolute; inset:0; border-radius:inherit; z-index:0; pointer-events:none;
@@ -68,7 +68,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 .zone-group > *{position:relative; z-index:1;}
 .zone-group > .zone{margin-bottom:1.2rem;}
 .zone-group > .zone:last-child{margin-bottom:0;}
-/* cartes opaques par-dessus la texture */
+/* opaque cards on top of the texture */
 .zone-group .card, .zone-group .sim, .zone-group .ladder-wrap{box-shadow:0 1px 3px rgba(15,23,42,.05);}
 .zone-h{font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--heading);
   margin:0 0 .55rem; display:flex; align-items:center; gap:.5rem;}
@@ -111,11 +111,11 @@ body{margin:0; background:var(--bg); color:var(--val);
 .chip.est{border-color:#c4b5fd; color:#6d28d9;} .dark .chip.est{border-color:#6d28d9; color:#c4b5fd;}
 /* ponytail: health axis, distinct from confidence chips */
 .chip.down{border-color:var(--tool); color:var(--tool);}
-/* Santé des sources : points journaliers */
+/* Source health: daily dots */
 .days{display:inline-flex; gap:4px; align-items:center;}
 .days i{width:11px; height:11px; border-radius:50%; display:inline-block; background:var(--green);}
 .days i.w{background:var(--amber);} .days i.b{background:var(--tool);} .days i.g{background:var(--card-border);}
-/* Ligne de bas de page ② */
+/* Footer line ② */
 .page-footer{margin-top:2rem; padding-top:1rem; border-top:1px solid var(--card-border); font-size:12px; color:var(--sub); line-height:1.6;}
 .page-footer button{background:none; border:none; font-size:12px; color:var(--sub); cursor:pointer; padding:0; text-decoration:underline; text-underline-offset:2px;}
 .page-footer button:hover{color:var(--caption);}
@@ -125,9 +125,9 @@ body{margin:0; background:var(--bg); color:var(--val);
 .pos{color:var(--green);} .neg{color:var(--red);}
 
 .routeline{display:flex; align-items:flex-start; gap:.45rem; flex-wrap:wrap;}
-/* flèche autonome entre actif et cartouche d'outil (alignée sur la rangée des pastilles) */
+/* standalone arrow between asset and tool badge (aligned on the pill row) */
 .routeline .ar2{color:var(--sub); font-size:13px; line-height:1; padding-top:7px;}
-/* composite : TOUJOURS empilé (2 lignes), encadré ; le marqueur « Tx N » ouvre chaque ligne. */
+/* composite: ALWAYS stacked (2 lines), boxed; the "Tx N" marker opens each line. */
 .complegs{display:flex; flex-direction:column;}
 .complegs .legblock{display:flex; align-items:flex-start; gap:.55rem; overflow-x:auto; overflow-y:hidden; padding:8px 0;}
 .complegs .legblock + .legblock{border-top:1px dashed var(--card-border);}
@@ -142,7 +142,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 .leg{display:inline-flex; flex-direction:column; align-items:center; gap:2px; padding-top:4px;}
 .leg .ar{font-size:13px; line-height:1; color:var(--sub);}
 .tool{display:inline-block; font-size:13px; font-weight:700; padding:2px 9px; border-radius:7px; background:var(--tool); color:#fff; letter-spacing:-.01em; white-space:nowrap;}
-/* cartouche d'outil 2 niveaux (multi-hop) : niveau 1 = nom de l'outil, niveau 2 = jetons traversés (gris muet) */
+/* 2-level tool badge (multi-hop): level 1 = tool name, level 2 = tokens traversed (muted gray) */
 .cart2{display:inline-flex; flex-direction:column; border-radius:8px; overflow:hidden; border:1px solid color-mix(in srgb, var(--tool) 35%, var(--card-border)); align-self:flex-start;}
 .cart2 .lvl1{background:var(--tool); color:#fff; font-weight:700; font-size:13px; padding:3px 11px; text-align:center; letter-spacing:-.01em; white-space:nowrap;}
 .cart2 .lvl2{background:var(--section-bg); color:var(--sub); font-size:11px; font-weight:600; padding:2px 10px; text-align:center; white-space:nowrap;}
@@ -156,7 +156,7 @@ body{margin:0; background:var(--bg); color:var(--val);
 
 .card{border:1px solid var(--card-border); background:var(--card-bg); border-radius:.7rem; padding:.9rem 1rem;}
 
-/* Tooltip CSS — positionné en dessous pour éviter le clipping overflow de la table */
+/* Tooltip CSS — positioned below to avoid the table's overflow clipping */
 .tip-wrap{position:relative; display:inline-block; cursor:default;}
 .tip-wrap .tip-icon{font-size:12px; color:var(--sub); margin-left:3px; vertical-align:middle; cursor:help;}
 .tip-wrap .tip-box{
@@ -164,8 +164,8 @@ body{margin:0; background:var(--bg); color:var(--val);
   background:var(--val); color:var(--bg); font-size:12px; font-weight:400; line-height:1.45;
   text-transform:none; letter-spacing:0; border-radius:6px; padding:.45rem .65rem;
   white-space:normal; width:260px; z-index:100; pointer-events:none; box-shadow:0 3px 10px rgba(0,0,0,.18);}
-/* Tooltips rendus via #tipPortal (position:fixed) pour échapper au clipping overflow des tables
-   et passer AU-DESSUS de toute l'UI (topbar sticky incluse). .tip-box ne sert que de source de contenu. */
+/* Tooltips rendered via #tipPortal (position:fixed) to escape the tables' overflow clipping
+   and sit ABOVE all UI (including the sticky topbar). .tip-box is only a content source. */
 #tipPortal{position:fixed; z-index:99999; display:none; width:max-content; max-width:280px;
   background:var(--val); color:var(--bg); font-size:12px; font-weight:400; line-height:1.45;
   text-transform:none; letter-spacing:0; border-radius:6px; padding:.45rem .65rem;
@@ -174,11 +174,11 @@ body{margin:0; background:var(--bg); color:var(--val);
 .tip-wrap .tip-box::before{
   content:''; position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
   border:5px solid transparent; border-bottom-color:var(--val);}
-/* Variante « vers le haut, alignée à gauche » — pour les lignes en bas de tableau (tfoot) où
-   un tooltip vers le bas serait masqué par overflow:hidden. Monte dans le tableau, s'étend à droite. */
+/* "Upward, left-aligned" variant — for rows at the bottom of a table (tfoot) where
+   a downward tooltip would be hidden by overflow:hidden. Opens upward into the table, extends right. */
 .tip-wrap .tip-box.up{top:auto; bottom:calc(100% + 4px); left:0; transform:none;}
 .tip-wrap .tip-box.up::before{top:100%; bottom:auto; left:16px; transform:none; border-bottom-color:transparent; border-top-color:var(--val);}
-/* Cartes d'identité de venue */
+/* Venue identity cards */
 .tip-wrap.vname{display:inline; cursor:help;}
 .tip-wrap.vname .srcname{text-decoration:underline dotted; text-decoration-color:var(--sub);}
 .vcard{width:300px; max-width:300px;}
@@ -204,7 +204,7 @@ table.flt tr.sel td{background:color-mix(in srgb, var(--heading) 9%, transparent
 .refresh-overlay{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:.45rem; font-size:12px; font-weight:600; color:var(--caption);}
 .refresh-spinner{width:15px; height:15px; border:2px solid var(--card-border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-/* Section temporelle : encart / hebdo / zoom */
+/* Time section: inset / weekly / zoom */
 .enc{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;}
 @media(max-width:760px){.enc{grid-template-columns:1fr;}}
 .enck{border:1px solid var(--card-border);border-radius:.55rem;padding:.55rem .75rem;background:var(--section-bg);}
@@ -246,7 +246,7 @@ table.flt tr.sel td{background:color-mix(in srgb, var(--heading) 9%, transparent
 .dist .dbar > span{display:block; height:100%; background:var(--accent); border-radius:9999px;}
 .dist .dpct{text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600;}
 
-/* Meilleures routes (7 j) */
+/* Best routes (7 d) */
 .rk{display:grid; grid-template-columns:max-content 1fr max-content; gap:.55rem .65rem; align-items:center; font-size:12px;}
 .rk .rrow{display:contents;}
 .rk .rlabel{white-space:nowrap;}
@@ -260,16 +260,16 @@ table.flt tr.sel td{background:color-mix(in srgb, var(--heading) 9%, transparent
 .rk .rpct{text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; color:var(--caption); font-weight:600;}
 
 
-/* P2 : classes textuelles passées à --caption */
+/* P2: text classes switched to --caption */
 .limited-note{font-size:12px; color:var(--caption); margin:.4rem 0 0; padding:.3rem .6rem; border-left:2px solid var(--card-border);}
-/* P3 : textes d'aide lisibles */
+/* P3: readable help text */
 .help{font-size:13px; color:var(--caption); line-height:1.45; font-style:normal;}
 
 /* Modal overlay / card */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}
 .modal-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:.7rem;padding:1.2rem 1.3rem;max-width:440px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)}
 
-/* ─── Easter egg : scam-coin GeoCities (konami code) — palette garish, indépendante du thème ─── */
+/* ─── Easter egg: scam-coin GeoCities (konami code) — garish palette, independent of the theme ─── */
 #scam-egg{position:fixed; inset:0; z-index:99999; overflow:auto; padding:0 .6rem 3rem;
   font-family:"Comic Sans MS","Comic Sans","Chalkboard SE",cursive,sans-serif;
   color:#39ff14; text-align:center; line-height:1.5; background:#05010a;
@@ -301,11 +301,11 @@ table.flt tr.sel td{background:color-mix(in srgb, var(--heading) 9%, transparent
 @keyframes se-wobble{0%,100%{transform:rotate(-2deg) scale(1)}50%{transform:rotate(2deg) scale(1.04)}}
 @keyframes se-shake{0%,100%{transform:translate(0,0) rotate(-3deg)}25%{transform:translate(-4px,2px) rotate(3deg)}50%{transform:translate(4px,-2px) rotate(-2deg)}75%{transform:translate(-3px,-3px) rotate(2deg)}}
 @media(prefers-reduced-motion:reduce){#scam-egg *{animation:none!important}}
-/* Flèche état des jambes composite (FIX 3) */
+/* Composite leg state arrow (FIX 3) */
 .hops-arrow::before{content:'▾'}
 details[open] .hops-arrow::before{content:'▴'}
 
-/* ── Sankey des routes (phase 1 du portage) ── */
+/* ── Route Sankey diagram ── */
 @keyframes skFlow{to{stroke-dashoffset:-36}}
 .sk-flow{animation:skFlow 2.6s linear infinite}
 @media(prefers-reduced-motion:reduce){.sk-flow{animation:none}}

@@ -1,6 +1,6 @@
-// Point d'entrée bundlé pour le client (self-host). esm.sh/jsdelivr cassent les sous-chemins
-// /modules/* de stellar-wallets-kit 2.3.0 (résolution tweetnacl) → on bundle localement.
-// Régénérer : npm run build:walletkit  (génère web/public/walletkit.js, versionné).
+// Bundled entry point for the client (self-host). esm.sh/jsdelivr break the /modules/*
+// sub-paths of stellar-wallets-kit 2.3.0 (tweetnacl resolution) → bundle locally instead.
+// Regenerate: npm run build:walletkit  (generates web/public/walletkit.js, versioned).
 export { StellarWalletsKit, Networks } from '@creit.tech/stellar-wallets-kit';
 export { xBullModule } from '@creit.tech/stellar-wallets-kit/modules/xbull';
 export { FreighterModule } from '@creit.tech/stellar-wallets-kit/modules/freighter';

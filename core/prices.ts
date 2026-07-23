@@ -1,20 +1,20 @@
-// Prix spot pour l'impact de prix et la conversion du gas. Best-effort, tolerant aux pannes :
-// chaque champ peut etre null ; l'impact n'est affiche que si le prix est disponible.
+// Spot prices for price impact and gas conversion. Best-effort, tolerant of failures:
+// each field can be null; impact is only shown if the price is available.
 import type { Stroops } from './sources/types.js';
 import { toNumber } from './amount.js';
 
 export interface Prices {
   blndUsd: number | null;
   xlmUsd: number | null;
-  /** USD par EURC (euro-coin, token Stellar/Base) — distinct du fiat EUR/USD. */
+  /** USD per EURC (euro-coin, Stellar/Base token) — distinct from fiat EUR/USD. */
   eurcUsd: number | null;
-  /** Mid du carnet EURC/USDC sur le SDEX Stellar (USDC par EURC). Best-effort, null si carnet vide/à sens unique/anomalie. */
+  /** Mid of the EURC/USDC order book on the Stellar SDEX (USDC per EURC). Best-effort, null if book is empty/one-sided/anomalous. */
   eurcStellarMid: number | null;
 }
 
 export type Fetcher = typeof fetch;
 
-// DefiLlama agrege les prix CoinGecko en un appel keyless. eurcUsd = prix USD de l'EURC (euro-coin).
+// DefiLlama aggregates CoinGecko prices in a single keyless call. eurcUsd = EURC's USD price (euro-coin).
 const LLAMA = 'https://coins.llama.fi/prices/current/coingecko:blend,coingecko:stellar,coingecko:euro-coin';
 
 // Default Horizon base URL. Overridable via horizonUrl parameter (respects STELLAR_HORIZON_URL).
@@ -43,7 +43,7 @@ interface OrderBookResponse {
   asks?: Array<{ price: string }>;
 }
 
-/** Fetch le mid EURC/USDC du carnet SDEX Stellar. Best-effort : null si échec ou données invalides. */
+/** Fetches the EURC/USDC mid from the Stellar SDEX order book. Best-effort: null on failure or invalid data. */
 export async function fetchEurcStellarMid(
   fetcher: Fetcher,
   timeoutMs: number,
@@ -61,7 +61,7 @@ export async function fetchEurcStellarMid(
     const ask = Number(askPrice);
     if (!Number.isFinite(bid) || !Number.isFinite(ask) || bid <= 0 || ask <= 0) return null;
     const mid = (bid + ask) / 2;
-    // Anomalie : mid hors [0.5, 2.0] → suspect, on rejette
+    // Anomaly: mid outside [0.5, 2.0] -> suspect, rejected
     if (mid < 0.5 || mid > 2.0) return null;
     return mid;
   } catch {
@@ -69,7 +69,7 @@ export async function fetchEurcStellarMid(
   }
 }
 
-/** Recupere blndUsd, xlmUsd et eurcUsd en un appel DefiLlama + mid carnet Stellar. Best-effort, chaque champ peut etre null. */
+/** Fetches blndUsd, xlmUsd and eurcUsd in one DefiLlama call + Stellar order-book mid. Best-effort, each field can be null. */
 export async function fetchPrices(opts: { fetcher?: Fetcher; timeoutMs?: number; horizonUrl?: string } = {}): Promise<Prices> {
   const fetcher = opts.fetcher ?? fetch;
   const timeoutMs = opts.timeoutMs ?? 8000;
@@ -83,7 +83,7 @@ export async function fetchPrices(opts: { fetcher?: Fetcher; timeoutMs?: number;
       xlmUsd: num(c['coingecko:stellar']?.price),
       eurcUsd: num(c['coingecko:euro-coin']?.price),
     };
-    // Fetch mid carnet Stellar en parallèle (best-effort, try/catch séparé)
+    // Fetch the Stellar order-book mid in parallel (best-effort, separate try/catch)
     const eurcStellarMid = await fetchEurcStellarMid(fetcher, timeoutMs, opts.horizonUrl).catch(() => null);
     return { ...llamaPrices, eurcStellarMid };
   } catch {
@@ -95,14 +95,14 @@ function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
 }
 
-/** Prix EVM/global d'une unite de l'asset cible : USDC -> 1 ; EURC -> eurcUsd (prix CoinGecko/Circle). */
+/** EVM/global price of one unit of the target asset: USDC -> 1; EURC -> eurcUsd (CoinGecko/Circle price). */
 export function targetEvmPerUnit(targetSymbol: string, prices: Prices): number | null {
   if (targetSymbol === 'USDC') return 1;
   if (targetSymbol === 'EURC') return prices.eurcUsd;
   return null;
 }
 
-/** Prix local (SDEX Stellar) d'une unite de l'asset cible : USDC -> 1 ; EURC -> eurcStellarMid. */
+/** Local price (Stellar SDEX) of one unit of the target asset: USDC -> 1; EURC -> eurcStellarMid. */
 export function targetLocalPerUnit(targetSymbol: string, prices: Prices): number | null {
   if (targetSymbol === 'USDC') return 1;
   if (targetSymbol === 'EURC') return prices.eurcStellarMid;
@@ -110,8 +110,8 @@ export function targetLocalPerUnit(targetSymbol: string, prices: Prices): number
 }
 
 /**
- * Impact de prix en % : part de la valeur (USD) perdue vs spot.
- * positif = on recoit moins que la valeur spot du BLND vendu.
+ * Price impact in %: share of the value (USD) lost vs spot.
+ * positive = receiving less than the spot value of the sold BLND.
  */
 export function priceImpactPct(
   amountInBlnd: Stroops,
