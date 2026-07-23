@@ -1,5 +1,5 @@
-// Sonde de cohérence : vérifie qu'une venue exécute bien la route annoncée.
-// Money-path : bigint stroops partout.
+// Coherence probe: checks that a venue actually executes the route it quoted.
+// Money-path: bigint stroops throughout.
 import {
   quoteXbull,
   quoteAquarius,
@@ -27,11 +27,11 @@ import { type CoherenceProbeInsert } from '../db/index.js';
 import { bigIntJson } from './tick.js';
 import { TransactionBuilder, Networks } from '@stellar/stellar-sdk';
 
-// ─── Constante de seuil ──────────────────────────────────────────────────────
+// ─── Threshold constant ──────────────────────────────────────────────────────
 
-const DELTA_BPS_SUSPECT = 50; // 0,5 %
+const DELTA_BPS_SUSPECT = 50; // 0.5%
 
-// ─── Type exporté ────────────────────────────────────────────────────────────
+// ─── Exported type ────────────────────────────────────────────────────────────
 
 export interface CoherenceResult {
   venue: Venue;
@@ -40,13 +40,13 @@ export interface CoherenceResult {
   netQuoted: bigint | null;
   netSimulated: bigint | null;
   deltaBps: number | null;
-  route: string[];       // route décodée (Soroban) ou path du XDR (classique)
-  transfers: Transfer[]; // vide pour les venues classiques
+  route: string[];       // decoded route (Soroban) or XDR path (classic)
+  transfers: Transfer[]; // empty for classic venues
 }
 
-// ─── Helper pur exporté — calcul net depuis les transfers ────────────────────
+// ─── Pure exported helper — net calculation from transfers ────────────────────
 
-/** Somme des crédits reçus par `sender` pour l'actif `buySymbol` dans la chaîne de transferts. */
+/** Sum of credits received by `sender` for the `buySymbol` asset across the transfer chain. */
 export function netFromTransfers(transfers: Transfer[], buySymbol: string, sender: string): bigint {
   let sum = 0n;
   for (const t of transfers) {
@@ -55,10 +55,10 @@ export function netFromTransfers(transfers: Transfer[], buySymbol: string, sende
   return sum;
 }
 
-// ─── Helper pur exporté — évaluation Soroban ─────────────────────────────────
+// ─── Pure exported helper — Soroban evaluation ─────────────────────────────────
 
-/** Calcul commun pour les venues Soroban (xbull/aquarius/soroswap/comet).
- *  Exporté pour les tests unitaires (pur, sans réseau). */
+/** Shared calculation for Soroban venues (xbull/aquarius/soroswap/comet).
+ *  Exported for unit tests (pure, no network). */
 export function evaluateSoroban(
   transfers: Transfer[],
   netQuoted: bigint,
@@ -86,14 +86,14 @@ export function evaluateSoroban(
   return { incoherent, reason, netSimulated, deltaBps, route };
 }
 
-// ─── Helper interne — décode le path d'un XDR Stellar classique ──────────────
+// ─── Internal helper — decodes a classic Stellar XDR path ──────────────
 
-/** Construit la route en symboles depuis un XDR de tx classique (PathPaymentStrictSend).
- *  Supporte les tx multi-op (Ultra Stellar). Déduplique les symboles consécutifs. */
+/** Builds the route as symbols from a classic tx XDR (PathPaymentStrictSend).
+ *  Supports multi-op tx (Ultra Stellar). Deduplicates consecutive symbols. */
 async function routeFromClassicXdr(xdrStr: string): Promise<string[]> {
   const { bySac, ASSETS } = await import('../core/assets.js');
 
-  // Résout un SdkAsset en symbole lisible : natif → 'XLM', sinon cherche dans ASSETS par code+issuer.
+  // Resolves an SdkAsset to a readable symbol: native → 'XLM', otherwise looks up ASSETS by code+issuer.
   function resolveSymbol(a: { asset_type?: string; asset_code?: string; asset_issuer?: string } | { getAssetType(): string; getCode?(): string; getIssuer?(): string }): string {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const aa = a as any;
@@ -127,7 +127,7 @@ async function routeFromClassicXdr(xdrStr: string): Promise<string[]> {
     rawSymbols.push(resolveSymbol(destAsset));
   }
 
-  // Déduplication consécutive (même logique que routeFromTransfers)
+  // Consecutive deduplication (same logic as routeFromTransfers)
   const route: string[] = [];
   for (const s of rawSymbols) {
     if (route[route.length - 1] !== s) route.push(s);
@@ -135,7 +135,7 @@ async function routeFromClassicXdr(xdrStr: string): Promise<string[]> {
   return route;
 }
 
-// ─── Fonction principale ──────────────────────────────────────────────────────
+// ─── Main function ──────────────────────────────────────────────────────
 
 export async function probeVenueCoherence(
   venue: Venue,
@@ -184,7 +184,7 @@ export async function probeVenueCoherence(
       return { venue, netQuoted, netSimulated: ev.netSimulated, deltaBps: ev.deltaBps, route: ev.route, transfers, incoherent: ev.incoherent, reason: ev.reason };
     }
 
-    // ── Comet (BLND→USDC uniquement) ─────────────────────────────────────────
+    // ── Comet (BLND→USDC only) ─────────────────────────────────────────
     if (venue === 'comet') {
       if (buy.symbol !== 'USDC') return null;
       const q = await quoteComet(deps, BLND.sac, buy.sac, amountIn, cfg.rpcUrl);
@@ -196,7 +196,7 @@ export async function probeVenueCoherence(
       return { venue, netQuoted, netSimulated: ev.netSimulated, deltaBps: ev.deltaBps, route: ev.route, transfers, incoherent: ev.incoherent, reason: ev.reason };
     }
 
-    // ── Horizon (classique) ───────────────────────────────────────────────────
+    // ── Horizon (classic) ───────────────────────────────────────────────────
     if (venue === 'horizon') {
       const q = await quoteHorizon(BLND, buy, amountIn, deps, cfg.horizonUrl);
       if (!q) return null;
@@ -208,7 +208,7 @@ export async function probeVenueCoherence(
       return { venue, netQuoted, netSimulated: null, deltaBps: null, route, transfers: [], incoherent, reason };
     }
 
-    // ── Ultra Stellar (classique multi-op) ────────────────────────────────────
+    // ── Ultra Stellar (classic multi-op) ────────────────────────────────────
     if (venue === 'ultrastellar') {
       const q = await quoteUltra(BLND, buy, amountIn, deps);
       if (!q) return null;
@@ -222,20 +222,20 @@ export async function probeVenueCoherence(
 
     return null;
   } catch {
-    // Best-effort : tout échec réseau/sim → null (jamais throw)
+    // Best-effort: any network/sim failure → null (never throws)
     return null;
   }
 }
 
-// ─── Orchestration quotidienne des sondes ────────────────────────────────────
+// ─── Daily probe orchestration ────────────────────────────────────
 
-/** Venues à sonder (toutes les venues connues). */
+/** Venues to probe (all known venues). */
 const PROBE_VENUES: Venue[] = ['xbull', 'aquarius', 'soroswap', 'comet', 'horizon', 'ultrastellar'];
 
 /**
- * Lance une sonde de cohérence par venue, une fois par jour UTC,
- * étalée aléatoirement sur la journée (probabilité croissante → 1 avant minuit).
- * Best-effort : un échec de venue n'interrompt pas les autres ni le daemon.
+ * Runs one coherence probe per venue, once per UTC day,
+ * spread randomly across the day (increasing probability → 1 right before midnight).
+ * Best-effort: a venue failure never interrupts the others or the daemon.
  */
 export async function runCoherenceProbes(
   db: {
@@ -257,37 +257,37 @@ export async function runCoherenceProbes(
   const random = deps.random ?? Math.random;
   const probe  = deps.probe  ?? probeVenueCoherence;
 
-  // Début du jour UTC courant (ex: "2026-06-19T00:00:00.000Z")
+  // Start of the current UTC day (e.g. "2026-06-19T00:00:00.000Z")
   const startOfDay = now.toISOString().slice(0, 10) + 'T00:00:00.000Z';
 
-  // Calcul du nombre de ticks restants jusqu'à minuit UTC
+  // Calculate the number of ticks remaining until UTC midnight
   const nextMidnight = new Date(now.toISOString().slice(0, 10));
-  nextMidnight.setUTCDate(nextMidnight.getUTCDate() + 1); // minuit UTC du lendemain
+  nextMidnight.setUTCDate(nextMidnight.getUTCDate() + 1); // next day's UTC midnight
   const msToMidnight = nextMidnight.getTime() - now.getTime();
   const ticksRemaining = Math.max(1, Math.floor(msToMidnight / (cfg.cadenceSec * 1000)));
 
   for (const venue of PROBE_VENUES) {
     try {
-      // Déjà sondée aujourd'hui → skip
+      // Already probed today → skip
       if (db.hasCoherenceProbeSince(venue, startOfDay)) continue;
 
-      // Étalement : p = 1/ticksRemaining → augmente à chaque tick, = 1 sur le dernier tick
+      // Spread: p = 1/ticksRemaining → increases each tick, = 1 on the last tick
       if (random() >= 1 / ticksRemaining) continue;
 
-      // Comet ne supporte que USDC
+      // Comet only supports USDC
       const pair: 'USDC' | 'EURC' = venue === 'comet'
         ? 'USDC'
         : cfg.pairs[Math.floor(random() * cfg.pairs.length)] ?? 'USDC';
 
       const buy: Asset = pair === 'EURC' ? EURC : USDC;
 
-      // Taille aléatoire parmi les tailles configurées
+      // Random size among the configured sizes
       if (cfg.sizesBlnd.length === 0) continue;
       const amountIn = cfg.sizesBlnd[Math.floor(random() * cfg.sizesBlnd.length)] ?? cfg.sizesBlnd[0];
 
       const res = await probe(venue, buy, amountIn!, AQUARIUS_WITNESSES[0]!, cfg);
 
-      // null = non mesurable ce tick (on ne pollue pas le décompte, on réessaiera)
+      // null = not measurable this tick (doesn't pollute the count, will retry)
       if (res === null) continue;
 
       db.insertCoherenceProbe({
@@ -309,7 +309,7 @@ export async function runCoherenceProbes(
           : null,
       });
     } catch {
-      // Erreur isolée par venue — le daemon continue
+      // Error isolated per venue — the daemon keeps going
     }
   }
 }

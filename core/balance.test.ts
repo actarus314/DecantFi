@@ -6,24 +6,24 @@ import { USDC, EURC } from './assets.js';
 const account = (balances: unknown[]) => ({ balances });
 
 describe('parseBlndBalance', () => {
-  it('extrait la balance BLND classique en stroops', () => {
+  it('extracts the classic BLND balance in stroops', () => {
     const raw = account([
       { balance: '123.4500000', asset_code: 'BLND', asset_issuer: 'GDJEHTBE6ZHUXSWFI642DCGLUOECLHPF3KSXHPXTSTJ7E3JF6MQ5EZYY' },
       { balance: '5.0000000', asset_type: 'native' },
     ]);
     expect(parseBlndBalance(raw)).toBe(toStroops('123.45'));
   });
-  it('trustline BLND absente → 0', () => {
+  it('absent BLND trustline -> 0', () => {
     expect(parseBlndBalance(account([{ balance: '5.0', asset_type: 'native' }]))).toBe(0n);
   });
-  it('réponse inattendue / compte inexistant → 0', () => {
+  it('unexpected response / nonexistent account -> 0', () => {
     expect(parseBlndBalance(null)).toBe(0n);
     expect(parseBlndBalance({})).toBe(0n);
   });
 });
 
 describe('parseAssetBalance', () => {
-  it('extrait la balance USDC en unités (number, pas stroops)', () => {
+  it('extracts the USDC balance in units (number, not stroops)', () => {
     const raw = {
       balances: [
         { balance: '123.4500000', asset_code: 'USDC', asset_issuer: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN' },
@@ -32,15 +32,15 @@ describe('parseAssetBalance', () => {
     };
     expect(parseAssetBalance(raw, USDC)).toBe(123.45);
   });
-  it('trustline absente → 0', () => {
+  it('absent trustline -> 0', () => {
     const raw = { balances: [{ balance: '5.0', asset_type: 'native' }] };
     expect(parseAssetBalance(raw, USDC)).toBe(0);
   });
-  it('réponse inattendue → 0', () => {
+  it('unexpected response -> 0', () => {
     expect(parseAssetBalance(null, USDC)).toBe(0);
     expect(parseAssetBalance({}, EURC)).toBe(0);
   });
-  it('discriminant unités : 123.45 ≠ 1234500000 (pas des stroops)', () => {
+  it('units discriminant: 123.45 != 1234500000 (not stroops)', () => {
     const raw = { balances: [{ balance: '123.45', asset_code: 'USDC', asset_issuer: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN' }] };
     const result = parseAssetBalance(raw, USDC);
     expect(result).toBe(123.45);
@@ -49,7 +49,7 @@ describe('parseAssetBalance', () => {
 });
 
 describe('readAssetBalance', () => {
-  it('appelle Horizon /accounts/{addr} et retourne le solde USDC en unités', async () => {
+  it('calls Horizon /accounts/{addr} and returns the USDC balance in units', async () => {
     const getJson = async () => ({
       balances: [
         { balance: '42.0000000', asset_code: 'USDC', asset_issuer: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN' },
@@ -60,15 +60,15 @@ describe('readAssetBalance', () => {
     });
     expect(bal).toBe(42);
   });
-  it('Horizon indisponible (null) → null (≠ 0 = trustline absente : pas de delta faux post-swap)', async () => {
+  it('Horizon unavailable (null) -> null (!= 0 = absent trustline: no false post-swap delta)', async () => {
     const bal = await readAssetBalance('GC43...', USDC, { horizonUrl: 'h', getJson: async () => null });
     expect(bal).toBeNull();
   });
 });
 
 describe('readBlndBalance', () => {
-  it('appelle Horizon /accounts/{addr} via le fetcher injecté', async () => {
-    const fetcher = async () => parseBlndBalance; // sentinelle non utilisée
+  it('calls Horizon /accounts/{addr} via the injected fetcher', async () => {
+    const fetcher = async () => parseBlndBalance; // unused sentinel
     const getJson = async () =>
       account([{ balance: '10.0000000', asset_code: 'BLND', asset_issuer: 'GDJEHTBE6ZHUXSWFI642DCGLUOECLHPF3KSXHPXTSTJ7E3JF6MQ5EZYY' }]);
     const bal = await readBlndBalance('GC43VW7DGJREUMJWMHJZOAWWWQ374ZKCFS2GKGRMNAIXSNV53WIBY5AA', {
@@ -77,7 +77,7 @@ describe('readBlndBalance', () => {
     expect(bal).toBe(toStroops('10'));
     void fetcher;
   });
-  it('Horizon indisponible (null) → 0', async () => {
+  it('Horizon unavailable (null) -> 0', async () => {
     const bal = await readBlndBalance('GC43...', { horizonUrl: 'h', getJson: async () => null });
     expect(bal).toBe(0n);
   });

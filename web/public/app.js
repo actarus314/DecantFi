@@ -13,7 +13,7 @@ const STRINGS = {
     route_detail: 'Détail des routes',
     net_fee_label: 'Frais réseau (réel / max)',
 
-    // Fraîcheur / countdown
+    // Freshness / countdown
     fresh_none: 'aucun tick',
     countdown_label: (m, s) => `prochain relevé dans ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'imminent',
@@ -25,7 +25,7 @@ const STRINGS = {
     refresh_429: 'Relevé déjà en cours, veuillez patienter.',
     refresh_note: 'Rafraîchissement manuel provisoire — remplacé au prochain relevé programmé.',
 
-    // Paire / nav
+    // Pair / nav
     pair_usdc: 'USDC',
     pair_eurc: 'EURC',
 
@@ -41,7 +41,7 @@ const STRINGS = {
     routes_wins: 'victoires',
     routes_empty: 'Historique limité — le classement se remplira avec les ticks.',
 
-    // Simulateur
+    // Simulator
     sim_placeholder: 'montant BLND',
     sim_wallet_ok: (n) => `Solde wallet (${n} BLND)`,
     sim_wallet_ko: 'Solde wallet (non configuré)',
@@ -54,7 +54,7 @@ const STRINGS = {
     sb_floor_label: (u) => `Reçu réel - route directe (${u})`,
     sb_floor_note: 'L\'estimate est atteignable uniquement via l\'exécution StellarBroker. En routant vous-même : ≈ ce plancher.',
 
-    // Tableau ladder
+    // Ladder table
     ladder_col_tool: 'Outil de swap',
     ladder_col_net: (u) => `${u}`,
     ladder_col_delta: 'Δ gagnant',
@@ -79,12 +79,12 @@ const STRINGS = {
     chip_down: 'indispo',
     hops_hidden: 'Chemin non communiqué par xBull',
 
-    // Heatmap / profil
+    // Heatmap / profile
     hmap_insufficient: 'Données insuffisantes',
     days: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
     hour_now_suffix: ' · maintenant',
 
-    // Callout meilleurs créneaux
+    // Callout best slots
     slot_best: 'Meilleur créneau',
     slot_gain: 'Gain vs moyenne',
     slot_avoid: 'À éviter',
@@ -107,24 +107,24 @@ const STRINGS = {
     dist_note_usdc: '<b>xBull</b> domine habituellement ; <b>Comet</b> ne concourt que sur USDC (pool backstop). <b>Diversité = robustesse aux pannes.</b>',
     dist_note_eurc: '<b>Pas de pool BLND/EURC profond</b> : les lignes « BLND → EURC » sont des <b>swaps atomiques routés en interne</b> via USDC/XLM (Soroswap affiche BLND → USDC → EURC, Aquarius via sUSD, Ultra Stellar via XLM ; <b>seul xBull masque son chemin</b>). La route <b>via-USDC explicite (2 swaps) les bat souvent</b>.',
 
-    // Divers
+    // Misc
     loading: 'Chargement…',
     no_data: 'Aucune donnée',
     last_tick_ago: (n) => `il y a ${n} min`,
 
-    // Carte dernier relevé
+    // Last reading card
     last_release_ago: (n) => `il y a ${n} min`,
 
     // Wallet connect
     connect_wallet: 'Connecter le wallet',
     wallet_disconnect: 'Déconnecter',
 
-    // Exécution swap
+    // Swap execution
     exec_btn: 'Exécuter le swap',
     exec_connect_first: 'Connecte ton wallet pour exécuter',
     slippage_label: 'Slippage',
 
-    // Revue avant signature
+    // Review before signing
     review_title: 'Vérifier avant signature',
     review_send: 'Tu envoies',
     review_receive_min: 'Tu reçois au minimum',
@@ -139,10 +139,10 @@ const STRINGS = {
     review_confirm: 'Confirmer & signer',
     review_cancel: 'Annuler',
 
-    // Revue sim-delta
+    // Review sim-delta
     review_sim_was: 'sim',
 
-    // États d'exécution
+    // Execution states
     exec_signing_wallet: 'Signature dans le wallet…',
     exec_submitting: 'Soumission…',
     exec_confirming: 'Confirmation on-chain…',
@@ -159,7 +159,7 @@ const STRINGS = {
     exec_reading: 'lecture en cours…',
     exec_delta: 'écart',
 
-    // Erreurs exec
+    // Exec errors
     err_trustline: (tgt, issuer) => `Trustline ${tgt} absente. Pour la recevoir : dans ton wallet, ajoute l'actif ${tgt} (émetteur ${issuer}) — opération changeTrust, ~0,5 XLM de réserve. Puis relance.`,
     err_funds: 'Solde BLND liquide insuffisant (ton BLND est peut-être staké dans Blend — retire-le d\'abord).',
     err_slippage: 'Le prix a bougé au-delà de ta tolérance — réessaie ou augmente le slippage.',
@@ -193,7 +193,7 @@ const STRINGS = {
       `${n} relevés (${nOk} valides) · 1 toutes les ${cadenceHuman} ≈ ${perDay}/j · ~${coverH} h de couverture`,
     footer_health_link: 'Stabilité des sources →',
 
-    // Page santé ④
+    // Health page ④
     health_title: 'Stabilité des sources — 7 derniers jours',
     health_col_source: 'Source',
     health_col_uptime: 'Disponibilité',
@@ -214,7 +214,7 @@ const STRINGS = {
     health_ago_min: (n) => `il y a ${n} min`,
     health_ago_h: (n) => `il y a ${n} h`,
     health_ago_j: (n) => `il y a ${n} j`,
-    // Causes d'échec ③-bis
+    // Failure causes ③-bis
     chip_health_fail: 'échec',
     reason_timeout: 'timeout',
     reason_http: 'erreur HTTP',
@@ -222,7 +222,7 @@ const STRINGS = {
     'reason_rate-limit': 'RPC saturé (429)',
     reason_rpc: 'erreur RPC',
     reason_simulation: 'simulation',
-    // Colonnes Cohérence / Exécution + modal trace
+    // Coherence / Execution columns + trace modal
     health_col_coherence: 'Cohérence',
     health_coh_col_tip: 'Sondes de cohérence : la cote affichée est comparée à un fill re-simulé on-chain. ✓ = toutes cohérentes ; ⚠ = cotes suspectes (écart anormal coté/simulé), cliquer pour le détail.',
     health_col_exec: 'Exécution',
@@ -294,7 +294,7 @@ const STRINGS = {
     route_detail: 'Route detail',
     net_fee_label: 'Network fee (real / max)',
 
-    // Fraîcheur / countdown
+    // Freshness / countdown
     fresh_none: 'no tick yet',
     countdown_label: (m, s) => `next update in ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'imminent',
@@ -306,7 +306,7 @@ const STRINGS = {
     refresh_429: 'Fetch already in progress, please wait.',
     refresh_note: 'Manual refresh is provisional — replaced at next scheduled tick.',
 
-    // Paire / nav
+    // Pair / nav
     pair_usdc: 'USDC',
     pair_eurc: 'EURC',
 
@@ -322,7 +322,7 @@ const STRINGS = {
     routes_wins: 'wins',
     routes_empty: 'Limited history — ranking fills up as ticks accumulate.',
 
-    // Simulateur
+    // Simulator
     sim_placeholder: 'BLND amount',
     sim_wallet_ok: (n) => `Wallet balance (${n} BLND)`,
     sim_wallet_ko: 'Wallet balance (not configured)',
@@ -335,7 +335,7 @@ const STRINGS = {
     sb_floor_label: (u) => `Actual received - direct route (${u})`,
     sb_floor_note: 'Estimate reachable only via StellarBroker\'s own execution. Routing yourself: ≈ this floor.',
 
-    // Tableau ladder
+    // Ladder table
     ladder_col_tool: 'Swap tool',
     ladder_col_net: (u) => `${u}`,
     ladder_col_delta: 'Δ winner',
@@ -360,12 +360,12 @@ const STRINGS = {
     chip_down: 'unavailable',
     hops_hidden: 'Path not disclosed by xBull',
 
-    // Heatmap / profil
+    // Heatmap / profile
     hmap_insufficient: 'Insufficient data',
     days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
     hour_now_suffix: ' · now',
 
-    // Callout meilleurs créneaux
+    // Callout best slots
     slot_best: 'Best slot',
     slot_gain: 'Gain vs avg',
     slot_avoid: 'Avoid',
@@ -388,12 +388,12 @@ const STRINGS = {
     dist_note_usdc: '<b>xBull</b> usually dominates; <b>Comet</b> only competes on USDC (backstop pool). <b>Diversity = resilience to failures.</b>',
     dist_note_eurc: '<b>No deep BLND/EURC pool</b>: the "BLND → EURC" rows are <b>atomic swaps routed internally</b> via USDC/XLM (Soroswap shows BLND → USDC → EURC, Aquarius via sUSD, Ultra Stellar via XLM; <b>only xBull hides its path</b>). The explicit <b>via-USDC route (2 swaps) often beats them</b>.',
 
-    // Divers
+    // Misc
     loading: 'Loading…',
     no_data: 'No data',
     last_tick_ago: (n) => `${n} min ago`,
 
-    // Carte dernier relevé
+    // Last reading card
     last_release_ago: (n) => `${n} min ago`,
 
     // Wallet connect
@@ -575,7 +575,7 @@ const STRINGS = {
     route_detail: 'Detalle de ruta',
     net_fee_label: 'Comisión de red (real / máx)',
 
-    // Fraîcheur / countdown
+    // Freshness / countdown
     fresh_none: 'sin datos aún',
     countdown_label: (m, s) => `próxima actualización en ${m}:${String(s).padStart(2,'0')}`,
     countdown_imminent: 'inminente',
@@ -587,7 +587,7 @@ const STRINGS = {
     refresh_429: 'Actualización ya en curso, por favor espere.',
     refresh_note: 'La actualización manual es provisional — se reemplaza en el próximo ciclo programado.',
 
-    // Paire / nav
+    // Pair / nav
     pair_usdc: 'USDC',
     pair_eurc: 'EURC',
 
@@ -603,7 +603,7 @@ const STRINGS = {
     routes_wins: 'victorias',
     routes_empty: 'Historial limitado — el ranking se completa a medida que se acumulan los ciclos.',
 
-    // Simulateur
+    // Simulator
     sim_placeholder: 'Cantidad BLND',
     sim_wallet_ok: (n) => `Saldo del wallet (${n} BLND)`,
     sim_wallet_ko: 'Saldo del wallet (no configurado)',
@@ -616,7 +616,7 @@ const STRINGS = {
     sb_floor_label: (u) => `Recibido real - ruta directa (${u})`,
     sb_floor_note: 'La estimación es alcanzable solo mediante la ejecución de StellarBroker. Enrutando tú mismo: ≈ este mínimo.',
 
-    // Tableau ladder
+    // Ladder table
     ladder_col_tool: 'Herramienta de swap',
     ladder_col_net: (u) => `${u}`,
     ladder_col_delta: 'Δ ganador',
@@ -641,12 +641,12 @@ const STRINGS = {
     chip_down: 'no disponible',
     hops_hidden: 'Ruta no revelada por xBull',
 
-    // Heatmap / profil
+    // Heatmap / profile
     hmap_insufficient: 'Datos insuficientes',
     days: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
     hour_now_suffix: ' · ahora',
 
-    // Callout meilleurs créneaux
+    // Callout best slots
     slot_best: 'Mejor franja',
     slot_gain: 'Ganancia vs promedio',
     slot_avoid: 'Evitar',
@@ -669,12 +669,12 @@ const STRINGS = {
     dist_note_usdc: '<b>xBull</b> suele dominar; <b>Comet</b> solo compite en USDC (pool de respaldo). <b>Diversidad = resiliencia ante fallos.</b>',
     dist_note_eurc: '<b>Sin pool profunda BLND/EURC</b>: las filas "BLND → EURC" son <b>swaps atómicos enrutados internamente</b> vía USDC/XLM (Soroswap muestra BLND → USDC → EURC, Aquarius vía sUSD, Ultra Stellar vía XLM; <b>solo xBull oculta su ruta</b>). La <b>ruta explícita via-USDC (2 swaps) suele superarlos</b>.',
 
-    // Divers
+    // Misc
     loading: 'Cargando…',
     no_data: 'Sin datos',
     last_tick_ago: (n) => `hace ${n} min`,
 
-    // Carte dernier relevé
+    // Last reading card
     last_release_ago: (n) => `hace ${n} min`,
 
     // Wallet connect
@@ -1082,7 +1082,7 @@ let SWK = null, KIT_NET = null;
 
 async function ensureKit() {
   if (!kitReady) kitReady = (async () => {
-    // Bundle self-hosté servi par le serveur (cf. web/walletkit.entry.js).
+    // Self-hosted bundle served by our server (cf. web/walletkit.entry.js).
     const m = await import('/walletkit.js');
     m.StellarWalletsKit.init({
       network: m.Networks.PUBLIC,
@@ -1093,11 +1093,11 @@ async function ensureKit() {
   await kitReady;
 }
 
-// ─── État global ──────────────────────────────────────────────────────────────
+// ─── Global state ────────────────────────────────────────────────────────────
 let view = 'dashboard'; // 'dashboard' | 'health'
-let health = null;      // données de /api/health
+let health = null;      // data from /api/health
 let target = 'USDC';
-// Langue par défaut = navigateur (FR si la préférence commence par "fr", sinon EN) ; un choix explicite reste persisté
+// Default language = browser (FR if the preference starts with "fr", else EN); an explicit choice is persisted
 const LOCALE = { fr: 'fr-FR', en: 'en-US', es: 'es-ES', pt: 'pt-BR' };
 
 // Threshold for the high-gas warning (XLM). Only applies to real on-chain XDR gas (xBull/Aquarius).
@@ -1114,58 +1114,58 @@ let lang = (() => {
   return 'en';
 })();
 let ladderSonde = 250;
-let selDay = -1;       // jour affiché dans le zoom (init = aujourd'hui au 1er rendu)
-let zoomDev = [];      // écarts horaires du jour affiché (pour le survol)
+let selDay = -1;       // day shown in the zoom view (init = today on first render)
+let zoomDev = [];      // hourly deviations for the displayed day (for hover)
 let simAmt = 0;
 let simActive = false;
 let simLoading = false;
 let walletBlnd = 0;
 let walletConfigured = false;
-let overview = null; // données de /api/overview
-let simResult = null; // données de /api/quote (live)
+let overview = null; // data from /api/overview
+let simResult = null; // data from /api/quote (live)
 let refreshing = false;
 let refreshMsg = '';
 
 // Wallet
 let walletAddress = localStorage.getItem('walletAddress') || null;
 let walletId = localStorage.getItem('walletId') || null; // wallet-kit productId, e.g. 'freighter' (gates Freighter-only notices)
-// Exécution swap
+// Swap execution
 let execState = null; // null | { phase:'review'|'signing'|'submitting'|'done'|'error', build?, hash?, venue?, errorMsg? }
 let execSlippagePct = (() => { const s = parseFloat(localStorage.getItem('slippagePct')); return (!isNaN(s) && s >= 0 && s <= 50) ? s : 0.5; })(); // UI %, → bps = Math.round(execSlippagePct*100)
-// click-to-select : sourceId sélectionné (null = auto)
+// click-to-select: selected sourceId (null = auto)
 let selectedSource = null;
-// Modal cohérence : null = fermée, sinon { venue, loading, data }
+// Coherence modal: null = closed, otherwise { venue, loading, data }
 let coherenceModal = null;
-// Mode d'affichage de l'impact : 'local' (défaut) | 'evm'
+// Impact display mode: 'local' (default) | 'evm'
 let impactMode = (() => { const v = localStorage.getItem('impactMode'); return v === 'evm' ? 'evm' : 'local'; })();
-// Modal avertissement passage en EVM : null = fermée, sinon 'pending'
+// EVM-switch warning modal: null = closed, otherwise 'pending'
 let impactEvmModalOpen = false;
 // Orphaned StellarBroker mediator accounts (localStorage msb_*) detected for current wallet
 let sbOrphanNotice = false;
 
 function selectSource(id) {
-  selectedSource = (selectedSource === id) ? null : id; // re-clic = désélection
+  selectedSource = (selectedSource === id) ? null : id; // re-click = deselect
   renderApp();
 }
 
-// Compte à rebours : nextTickAt en ms depuis epoch (null = inconnu)
+// Countdown: nextTickAt in ms since epoch (null = unknown)
 let nextTickAt = null;
 let countdownInterval = null;
 let lastImminentPollAt = 0;
 
-// Cooldown bouton Rafraîchir (10 s après une sim réussie)
-let refreshCooldown = 0;   // secondes restantes ; 0 = bouton actif
+// Refresh button cooldown (10s after a successful sim)
+let refreshCooldown = 0;   // seconds remaining; 0 = button active
 let refreshTimer = null;   // setInterval handle
 
 function t(key, ...args) {
   const s = STRINGS[lang] || STRINGS.en;
   let v = s ? s[key] : undefined;
-  if (v === undefined) v = STRINGS.en[key];   // fallback EN si la clé manque (es/pt incomplets)
+  if (v === undefined) v = STRINGS.en[key];   // fallback to EN when the key is missing (es/pt incomplete)
   if (typeof v === 'function') return v(...args);
   return v !== undefined ? v : key;
 }
 
-// ─── Cartes d'identité de venue ───────────────────────────────────────────────
+// ─── Venue identity cards ──────────────────────────────────────────────────────
 const VENUE_META = {
   xbull: {
     feePct: 0.1, feeKind: 'agg', sim: 'resimulated',
@@ -1220,7 +1220,7 @@ const VENUE_META = {
 
 function venueCard(id, name) {
   const meta = VENUE_META[id];
-  if (!meta) return escapeHtml(name); // composite / inconnu → pas de carte
+  if (!meta) return escapeHtml(name); // composite / unknown → no card
   const m = meta[lang] || meta.en;
   const L = t('venue_cols'); // [Type, Layer, Liquidity, Fee, Simulation, Note]
   const eName = escapeHtml(name);
@@ -1261,16 +1261,16 @@ function noteLabel(note) {
   return note.split(' · ').map((f) => map[f] || f).join(' · ');
 }
 
-// Route lisible : rend le glyphe nuage ☁ (hops xBull inaccessibles) en pastille avec infobulle.
+// Readable route: renders the cloud glyph ☁ (inaccessible xBull hops) as a badge with a tooltip.
 function renderRoute(s) {
   if (!s) return '—';
   return s.split('☁').map(f => escapeHtml(f)).join(`<span class="hops-hidden" title="${t('hops_hidden')}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span>`);
 }
 
-// ─── Timezone client ──────────────────────────────────────────────────────────
+// ─── Client timezone ────────────────────────────────────────────────────────
 function localOffset(){ return -Math.round(new Date().getTimezoneOffset()/60); }
 function nowLocalHour(){ return new Date().getHours(); }
-function todayLocalDow(){ return (new Date().getDay()+6)%7; } // 0=Lun..6=Dim
+function todayLocalDow(){ return (new Date().getDay()+6)%7; } // 0=Mon..6=Sun
 
 function rotateUtc(arr, offsetH) {
   if (!arr || arr.length !== 24) return arr;
@@ -1283,19 +1283,19 @@ function rotateHeatUtc(heat, offsetH) {
   return heat.map(row => rotateUtc(row, offsetH));
 }
 
-// ─── Formatage ────────────────────────────────────────────────────────────────
+// ─── Formatting ─────────────────────────────────────────────────────────────
 const fmt = n => n.toLocaleString(LOCALE[lang], { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt3 = n => n.toLocaleString(LOCALE[lang], { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-// Montants de route : jusqu'à 3 décimales, zéros inutiles supprimés, séparateur localisé.
+// Route amounts: up to 3 decimals, trailing zeros stripped, localized separator.
 const fmtRoute = n => n.toLocaleString(LOCALE[lang], { maximumFractionDigits: 3 });
-// Taux : jusqu'à 6 décimales, séparateur localisé (cohérent avec le reste du simulateur).
+// Rates: up to 6 decimals, localized separator (consistent with the rest of the simulator).
 const fmtRate = n => n.toLocaleString(LOCALE[lang], { maximumFractionDigits: 6 });
-// Parse un nombre saisi selon la LANGUE de l'app (déterministe via le toggle FR/EN, pas la locale OS).
-// FR : ',' = décimale, espaces (y c. fines insécables) = milliers. EN : '.' = décimale, ',' = milliers → retirées.
-// Corrige le bug « 12,000 » saisi en EN qui devenait 12 (virgule traitée à tort comme décimale).
+// Parses a number entered per the app's LANGUAGE (deterministic via the FR/EN toggle, not the OS locale).
+// FR: ',' = decimal, spaces (incl. thin non-breaking) = thousands. EN: '.' = decimal, ',' = thousands → stripped.
+// Guards against '12,000' typed in EN being read as 12 (comma wrongly treated as a decimal separator).
 function parseAmount(v) {
   let s = String(v).replace(/\s/g, '');
-  s = lang === 'en' ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.'); // en : virgule=millier ; fr/es/pt : point=millier (retiré) + virgule=décimale
+  s = lang === 'en' ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.'); // en: comma=thousands; fr/es/pt: dot=thousands (stripped) + comma=decimal
   return parseFloat(s);
 }
 const fmt0 = n => n.toLocaleString(LOCALE[lang], { maximumFractionDigits: 0 });
@@ -1314,9 +1314,9 @@ function computeNextTickAt(meta) {
   const last = meta.lastTickAt ? new Date(meta.lastTickAt).getTime() : 0;
   if (meta.nextTickAt) {
     const t = new Date(meta.nextTickAt).getTime();
-    if (!isNaN(t) && t > last) return t; // prévision daemon (jitter + durée connus) — préférée
+    if (!isNaN(t) && t > last) return t; // daemon forecast (jitter + known duration) — preferred
   }
-  if (last && meta.cadenceSec) return last + meta.cadenceSec * 1000; // fallback : estimation nominale
+  if (last && meta.cadenceSec) return last + meta.cadenceSec * 1000; // fallback: nominal estimate
   return null;
 }
 
@@ -1347,7 +1347,7 @@ function agoLabel(lastTickAt) {
 
 function tool(name) { return `<span class="tool">${name}</span>`; }
 
-// ─── Ruban de route ───────────────────────────────────────────────────────────
+// ─── Route ribbon ───────────────────────────────────────────────────────────
 function routeFromParts(parts, big) {
   if (!parts || parts.length === 0) return '';
   const assetSpan = (p) => {
@@ -1355,10 +1355,10 @@ function routeFromParts(parts, big) {
     const qtyStr = p.amt != null ? `${fmtRoute(p.amt)} ${p.asset}` : '';
     return `<span class="rasset"><span class="asset${p.out ? ' out' : ''}">${p.asset}</span>${qtyStr ? `<span class="${qtyClass}">${qtyStr}</span>` : ''}</span>`;
   };
-  // Cartouche d'outil UNIQUE entre l'entrée et la sortie. Les jetons traversés ne sont
-  // jamais répétés : groupés dans le niveau 2 d'un cartouche 2 niveaux si multi-hop.
-  // Une seule venue par appel (best / ligne sélectionnée / leg composite). Repli sur le
-  // rendu plat si plusieurs outils distincts (cas non attendu).
+  // SINGLE tool cartouche between the input and the output. Traversed tokens are
+  // never repeated: grouped into level 2 of a two-level cartouche when multi-hop.
+  // One venue per call (best / selected row / composite leg). Falls back to the
+  // flat rendering when several distinct tools appear (unexpected case).
   const assets = parts.filter(p => p.asset !== undefined);
   const tools = parts.filter(p => p.tool !== undefined).map(p => p.tool);
   const uniform = tools.length > 0 && tools.every(tn => tn === tools[0]);
@@ -1382,13 +1382,13 @@ function routeSimple(amtIn, netVal, src, pairUi, big) {
   return routeFromParts(hops, big);
 }
 
-// ─── Cadence lisible (② footer) ──────────────────────────────────────────────
+// ─── Human-readable cadence (② footer) ───────────────────────────────────────
 function cadenceHuman(sec) {
   if (sec < 3600) return `${sec / 60} min`;
   return `${sec / 3600} h`;
 }
 
-// ─── Temps relatif pour la page santé ④ ──────────────────────────────────────
+// ─── Relative time for the health page ④ ─────────────────────────────────────
 function healthAgo(isoStr) {
   if (!isoStr) return t('health_never');
   const diffMs = Date.now() - new Date(isoStr).getTime();
@@ -1399,19 +1399,19 @@ function healthAgo(isoStr) {
   return t('health_ago_j', Math.round(diffH / 24));
 }
 
-// ─── Libellé d'une cause d'échec ③-bis (timeout/http/indisponible) ────────────
+// ─── Failure-cause label ③-bis (timeout/http/unavailable) ────────────────────
 function reasonLabel(code) {
   if (!code) return '';
   const lab = t('reason_' + code);
-  return lab === 'reason_' + code ? code : lab; // fallback : code brut si non mappé
+  return lab === 'reason_' + code ? code : lab; // fallback: raw code when unmapped
 }
 
-// ─── Échelle de sources ───────────────────────────────────────────────────────
+// ─── Source ladder ──────────────────────────────────────────────────────────
 function ladderHead(u) {
   const isEurc = (typeof target !== 'undefined' && target === 'EURC');
   const impactLabel = impactMode === 'evm' ? t('ladder_col_impact_evm') : t('ladder_col_impact');
   const impactStyle = 'cursor:pointer;user-select:none;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;';
-  // Le toggle local/EVM ne concerne que l'EURC (USDC : identique). Hors EURC : en-tête simple, non cliquable, sans tooltip.
+  // The local/EVM toggle only applies to EURC (USDC: identical). Outside EURC: plain header, not clickable, no tooltip.
   const impactTh = isEurc
     ? `<th data-act="toggleImpactMode" style="${impactStyle}">
       <div class="tip-wrap" style="display:inline-flex;align-items:center;">
@@ -1437,7 +1437,7 @@ function ladderHead(u) {
 
 function getImpactVal(row) {
   if (impactMode === 'evm') return row.impactPct != null ? row.impactPct : null;
-  // mode local : préfère impactLocalPct, repli sur impactPct si indisponible (ex. USDC = identique)
+  // local mode: prefers impactLocalPct, falls back to impactPct when unavailable (e.g. USDC = identical)
   if (row.impactLocalPct !== undefined) return row.impactLocalPct != null ? row.impactLocalPct : null;
   return row.impactPct != null ? row.impactPct : null;
 }
@@ -1450,12 +1450,12 @@ function impactStr(row) {
 function toggleImpactMode() {
   const tp = document.getElementById('tipPortal'); if (tp) { tp.style.display = 'none'; tp.innerHTML = ''; }
   if (impactMode === 'evm') {
-    // evm → local : silencieux
+    // evm → local: silent
     impactMode = 'local';
     localStorage.setItem('impactMode', 'local');
     renderApp();
   } else {
-    // local → evm : popup si jamais vu
+    // local → evm: popup on first-ever switch
     const dismissed = localStorage.getItem('impactEvmNoticeDismissed');
     if (dismissed) {
       impactMode = 'evm';
@@ -1514,7 +1514,7 @@ function ladderRows(rows, u, down) {
       <td>${impact}</td>
       <td class="left">${routeText}</td></tr>`;
   }).join('');
-  // Lignes de sources en échec (axe santé, distinct des chips confiance) — ponytail: health axis
+  // Failed-source rows (health axis, distinct from confidence chips) — ponytail: health axis
   if (down && down.length > 0) {
     html += down.map(d =>
       `<tr><td><span class="muted">${venueCard(d.sourceId, d.display)}</span></td>
@@ -1532,7 +1532,7 @@ function ladderTable(rows, u, down) {
   return `<div style="overflow-x:auto"><table class="flt">${ladderHead(u)}<tbody>${ladderRows(rows, u, down)}</tbody></table></div>`;
 }
 
-// ─── Carte "Meilleures routes (7 j)" ──────────────────────────────────────────
+// ─── "Best routes (7 d)" card ─────────────────────────────────────────────────
 function bestRoutesCard(sk) {
   const routes = overview && overview.bestRoutes ? (overview.bestRoutes[sk] || []) : [];
   if (routes.length === 0) {
@@ -1549,7 +1549,7 @@ function bestRoutesCard(sk) {
   </div>`;
 }
 
-// ─── Simulateur ───────────────────────────────────────────────────────────────
+// ─── Simulator ──────────────────────────────────────────────────────────────
 function simCard() {
   const walletLabel = walletConfigured
     ? t('sim_wallet_ok', fmtRoute(walletBlnd))
@@ -1561,16 +1561,16 @@ function simCard() {
     resultHtml = `<p class="help" style="margin:.7rem 0 0">${t('sim_loading')}</p>`;
   } else if (simResult && simActive) {
     const b = simResult.best;
-    // #5 — sélection dans le ladder : si une ligne non-gagnante est sélectionnée,
-    // afficher le détail de CETTE source (route + net + impact) et non ceux du gagnant.
+    // #5 — ladder selection: when a non-winning row is selected,
+    // show the detail for THAT source (route + net + impact), not the winner's.
     const selRow = selectedSource
       ? (simResult.ladder || []).find(r => r.sourceId === selectedSource)
       : null;
-    const displayRow = selRow && !selRow.winner ? selRow : null; // non-gagnant sélectionné → détail spécifique
+    const displayRow = selRow && !selRow.winner ? selRow : null; // non-winning selection → source-specific detail
     const winRow = (simResult.ladder || []).find(r => r.winner);
     let route, rateStr, impactMeta, minReceived;
     if (displayRow) {
-      // #7 — harmonise le rendu de la ligne non-gagnante avec le gagnant
+      // #7 — aligns the non-winning row's rendering with the winner's
       route = displayRow.routeParts && displayRow.routeParts.length > 0
         ? routeFromParts(displayRow.routeParts, true)
         : renderRoute(displayRow.route);
@@ -1593,7 +1593,7 @@ function simCard() {
     const minStr = sbFloor != null
       ? `<span style="color:var(--caption)">${t('sb_floor_label', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(sbFloor)} ${target}</span><br><span style="color:var(--caption);font-size:.78em">${t('sb_floor_note')}</span>`
       : `<span style="color:var(--caption)">${t('sim_min', target)}</span> <span style="font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${fmt3(minReceived)} ${target}</span>`;
-    // Nom de l'outil retiré ici : il est désormais porté par le bouton « Exécuter via [outil] ».
+    // Tool name removed here: now carried by the "Execute via [tool]" button.
     // Same decision as doExecute (choose-exec.js): the button shown and the route
     // preview are driven by the row that will actually execute, so "Execute via X"
     // can never open a different flow than X.
@@ -1611,7 +1611,7 @@ function simCard() {
     </div>`;
     // Exec row
     if (legsData) {
-      // Composite EURC affiché (best ou ligne sélectionnée) → exécution 2-tx guidée.
+      // Displayed EURC composite (best or selected row) → guided 2-tx execution.
       resultHtml += `<div style="flex:1 1 100%;margin-top:.7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
         <button class="btn primary" data-act="doExecuteComposite">${t('exec_composite')}</button>
       </div>`;
@@ -1637,7 +1637,7 @@ function simCard() {
     }
   }
 
-  // Bouton Simuler / Rafraîchir selon l'état
+  // Simulate / Refresh button based on state
   const { label: simBtnLabel, disabled: simBtnDisabled } = simBtnState();
 
   return `<div class="sim">
@@ -1663,7 +1663,7 @@ function simCard() {
     <div id="simOut">${resultHtml}</div></div>`;
 }
 
-// ─── Distribution gagnants ────────────────────────────────────────────────────
+// ─── Winner distribution ────────────────────────────────────────────────────
 function distBars(winnerDist) {
   if (!winnerDist || winnerDist.length === 0) return `<p class="help">${t('no_data')}</p>`;
   const max = Math.max(...winnerDist.map(d => d.pct));
@@ -1674,7 +1674,7 @@ function distBars(winnerDist) {
   ).join('')}</div>`;
 }
 
-// ─── Section temporelle : modèle + rendu (encart / hebdo / zoom) ────────────────
+// ─── Time section: model + render (callout / weekly / zoom) ─────────────────────
 const hh2 = x => String(x).padStart(2, '0') + (lang === 'fr' || lang === 'pt' ? ' h' : ':00');
 const pctTxt = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)} %`;
 
@@ -1753,9 +1753,9 @@ function zoomHtml(m, series, sel, today, nowSlot, u) {
   const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
   const area = `M${pts[0][0].toFixed(1)},${baseY.toFixed(1)} ` + pts.map(p => 'L' + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + ` L${pts[pts.length - 1][0].toFixed(1)},${baseY.toFixed(1)} Z`;
   const wkY = wk != null ? yOf(wk) : null;
-  // Point pulsant ancré sur le DERNIER relevé du jour ≤ créneau courant (et non le créneau courant
-  // EXACT, vide entre deux relevés de 15 min → le point disparaissait par intermittence). present est
-  // trié ascendant : le dernier p.i ≤ nowSlot est le relevé le plus récent à ne pas dépasser maintenant.
+  // Pulsing dot anchored on the LAST reading of the day ≤ the current slot (not the exact current
+  // slot, which is empty between two 15-min readings → the dot would flicker on and off). `present`
+  // is sorted ascending: the last p.i ≤ nowSlot is the most recent reading not past now.
   const nowIdx = sel === today ? present.reduce((acc, p) => (p.i <= nowSlot ? p.i : acc), -1) : -1;
   const showNow = nowIdx >= 0;
   const nowX = showNow ? (nowIdx / (n - 1) * 100).toFixed(2) : 0;
@@ -1787,20 +1787,20 @@ function zoomMove(e, el) {
 }
 function zoomLeave() { const c = document.getElementById('zcur'), p = document.getElementById('ztip'); if (c) c.style.display = 'none'; if (p) p.style.display = 'none'; }
 
-// ─── Page santé ④ ─────────────────────────────────────────────────────────────
+// ─── Health page ④ ────────────────────────────────────────────────────────────
 function buildHealthPage(topbarHtml) {
   if (!health) {
     return `${topbarHtml}<p class="help" style="margin:1rem 0">${t('loading')}</p>`;
   }
   const rows = health.sources || [];
-  // KPI repris du pied de page du tableau de bord (mêmes chiffres, depuis meta)
+  // KPIs mirrored from the dashboard footer (same figures, from meta)
   const meta = overview ? overview.meta : null;
   const kpiHtml = meta ? (() => {
     const perDay = Math.round(86400 / meta.cadenceSec);
     const coverH = Math.round(meta.nTicks * meta.cadenceSec / 3600);
     const cadH = cadenceHuman(meta.cadenceSec);
     const pct = meta.nTicks ? Math.round(meta.nTicksOk / meta.nTicks * 100) : 0;
-    // mêmes seuils que les barres de dispo : ≥98 % vert, ≥90 % ambre, sinon rouge
+    // same thresholds as the availability bars: ≥98% green, ≥90% amber, else red
     const okCls = pct >= 98 ? 'green' : pct >= 90 ? 'warn' : 'bad';
     const coverVal = coverH >= 24
       ? `${Math.floor(coverH / 24)}<span class="u same">j</span> ${coverH % 24}<span class="u same">h</span>`
@@ -1811,13 +1811,13 @@ function buildHealthPage(topbarHtml) {
       <div class="kpi"><span class="c">${t('health_kpi_coverage')}</span><span class="v">${coverVal}</span></div>
     </div>`;
   })() : '';
-  // cause de panne (timeout/http/indisponible) capturée côté backend (③-bis) ; legacy = horodatage seul
+  // failure cause (timeout/http/unavailable) captured backend-side (③-bis); legacy = timestamp only
   const tableRows = rows.map(s => {
     const elH = (health && health.todayElapsedH) || 0;
-    // Vue semaine Lun→Dim : passé (disques pleins) | aujourd'hui (pie) | futur (gris)
-    // todayLocalDow() = 0=Lun … 6=Dim ; s.days[0]=aujourd'hui, s.days[1]=hier, etc.
+    // Mon→Sun week view: past (filled circles) | today (pie) | future (gray)
+    // todayLocalDow() = 0=Mon … 6=Sun; s.days[0]=today, s.days[1]=yesterday, etc.
     const todayDow = todayLocalDow();
-    // Secteurs pie SVG 11×11, r=5.5 → diamètre=11px = même taille que <i> (cx=cy=5.5)
+    // Pie sectors: SVG 11×11, r=5.5 → diameter=11px, same size as <i> (cx=cy=5.5)
     const PIE = [
       '',
       'M 5.5 5.5 L 5.5 0 A 5.5 5.5 0 0 1 11 5.5 Z',
@@ -1840,9 +1840,9 @@ function buildHealthPage(topbarHtml) {
         return `<i class="${cls.trim()}" title="${pastStatus ?? t('health_legend_null')}"></i>`;
       }
       if (d === todayDow) return todayDot;
-      return `<i class="g" title="${t('health_legend_null')}"></i>`;  // futur
+      return `<i class="g" title="${t('health_legend_null')}"></i>`;  // future
     }).join('');
-    // Colonne Cohérence
+    // Coherence column
     const coh = s.coherence || { tests: 0, suspects: 0, lastSuspectAt: null };
     let cohCell;
     if (coh.tests === 0) {
@@ -1850,13 +1850,13 @@ function buildHealthPage(topbarHtml) {
     } else if (coh.suspects === 0) {
       cohCell = `<span style="color:var(--green)" title="${t('health_coh_ok', coh.tests)}">✓ ${coh.tests}</span>`;
     } else {
-      // Rouge si > 25 % de suspectes, sinon ambre
+      // Red if > 25% suspect, else amber
       const ratio = coh.suspects / coh.tests;
       const col = ratio > 0.25 ? 'var(--red)' : 'var(--amber)';
       cohCell = `<span style="color:${col};cursor:pointer" title="${t('health_coh_suspect', coh.suspects, coh.tests)}" data-act="openCoherence" data-args='${JSON.stringify([s.id])}'>⚠ ${coh.suspects}/${coh.tests}</span>`;
     }
 
-    // Colonne Exécution (durée médiane)
+    // Execution column (median duration)
     const execMs = s.execMs;
     let execCell;
     if (execMs == null) {
@@ -1867,7 +1867,7 @@ function buildHealthPage(topbarHtml) {
       execCell = `${(execMs / 1000).toFixed(1)} s`;
     }
 
-    // Flèche de tendance pour la colonne 7 jours
+    // Trend arrow for the 7-day column
     const trend = s.uptimeTrend || 'flat';
     let trendArrow;
     if (trend === 'up') trendArrow = `<span style="color:var(--green);font-weight:700">↗</span>`;
@@ -1968,7 +1968,7 @@ function buildHealthPage(topbarHtml) {
   ${coherenceModalHtml()}`;
 }
 
-// ─── Page principale ──────────────────────────────────────────────────────────
+// ─── Main page ──────────────────────────────────────────────────────────────
 function buildPage() {
   const u = target;
   const meta = overview ? overview.meta : null;
@@ -1980,21 +1980,21 @@ function buildPage() {
     ? `<p class="help" style="margin:.6rem 0">${t('no_data_waiting')}</p>`
     : null;
 
-  // Met à jour nextTickAt depuis le meta (fait une fois par render)
+  // Updates nextTickAt from meta (done once per render)
   const computedNext = computeNextTickAt(meta);
   if (computedNext !== null) nextTickAt = computedNext;
 
-  // Timezone locale
+  // Local timezone
   const offsetH = localOffset();
   const NOW_HOUR = nowLocalHour();
   const TODAY = todayLocalDow();
 
   if (selDay < 0 || selDay > 6) selDay = TODAY;
 
-  // Sondes dynamiques depuis meta (fallback [250,750] si pas encore chargé)
+  // Dynamic probes from meta (fallback [250,750] if not yet loaded)
   const sondes = meta && meta.sondes && meta.sondes.length > 0 ? meta.sondes : [250, 750];
 
-  // Réconcilier ladderSonde avec les sondes disponibles
+  // Reconcile ladderSonde with the available probes
   if (!sondes.includes(ladderSonde)) ladderSonde = sondes[0];
 
   const NOW_SLOT = nowLocalHour() * 4 + Math.floor(new Date().getMinutes() / 15);
@@ -2014,7 +2014,7 @@ function buildPage() {
     : (overview && overview.effWeekAvg ? overview.effWeekAvg[sondeKey] : null);
   const tm = timeModel(heatEffLocal, weekAvg);
 
-  // Échelle courante
+  // Current ladder
   let ladderZoneTitle = t('section_ladder');
   let ladderZoneRight = '';
   let ladderContent = '';
@@ -2029,10 +2029,10 @@ function buildPage() {
 
   const dist = overview && overview.winnerDist ? (overview.winnerDist[sondeKey] || []) : [];
 
-  // Fraîcheur + compte à rebours
+  // Freshness + countdown
   const freshHtml = meta ? freshLabel(meta.lastTickAt) : `<span class="fresh">${t('loading')}</span>`;
 
-  // Glyphe thème : reflète l'action (clic vers l'autre thème)
+  // Theme glyph: reflects the action (click toggles to the other theme)
   const isDark = document.documentElement.classList.contains('dark');
   const themeGlyph = isDark ? t('theme_light') : t('theme_dark');
 
@@ -2113,42 +2113,42 @@ function buildPage() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// Sankey des routes — moteur de layout MAISON (zéro-dépendance) + rendu SVG vanilla.
-// Alimenté par la VRAIE BDD : overview.bestRoutes[sonde] (RouteRank) mappé en routes
-// du moteur (cf. mapRank/routesFor). marge-au-2ᵉ absente du backend → colonne retirée ;
-// traîne < 2 % agrégée en « autres ». ⚠ stats 7j polluées jusqu'à ~2026-06-27.
-// Reste phase 2 : réutiliser #tipPortal au lieu du #sk-tip dédié. Module ISOLÉ (IIFE) →
-// un seul global, aucune collision. ribbonPath pinné ≡ d3.curveBumpX.
+// Routes Sankey — in-house layout engine (zero-dependency) + vanilla SVG rendering.
+// Fed by the REAL DB: overview.bestRoutes[probe] (RouteRank) mapped into engine
+// routes (cf. mapRank/routesFor). Margin-to-2nd absent from the backend → column removed;
+// tail < 2% rolled into "other". ⚠ 7-day stats can be skewed for older data predating this metric.
+// Remaining for phase 2: reuse #tipPortal instead of the dedicated #sk-tip. ISOLATED module (IIFE) →
+// a single global, no collisions. ribbonPath pinned ≡ d3.curveBumpX.
 // ────────────────────────────────────────────────────────────────────────────
-// ⚠ MÉTHODE POUR MODIFIER CE GRAPHE (leçon dure 2026-06-26 — ~5 tours perdus sur le sous-fil) :
-//  1. RAISONNER DANS LE CODE du moteur (buildGraph → layout → ribbonPath → draw/drawSubSlice),
-//     PAS à l'œil sur des captures. Les bugs sont GÉOMÉTRIQUES, ~invisibles au screenshot ;
-//     une mauvaise lecture visuelle a envoyé droit dans 3 fausses pistes (réduire le gap,
-//     épaissir les bandes mères, « non-proportionnalité » du rognage) — toutes RÉFUTÉES.
-//  2. COMPARAISON CONTRÔLÉE avant toute hypothèse : si une route va bien et une autre non,
-//     isoler ce qui DIFFÈRE structurellement. Décisif ici : good (Comet+SB) & bad (Aquarius+SB,
-//     Soroswap+SB) sont enfants de la MÊME bande ⇒ largeur/fusion de bande HORS DE CAUSE,
-//     seul l'OFFSET du fil diffère. Cette seule déduction tranchait le bug — la faire EN PREMIER.
-//  3. INVARIANTS à ne jamais violer : largeur tracée ∝ flux (= Σ winPct enfants · lscale ; AUCUNE
-//     sur-pondération, ne pas épaissir/rétrécir une bande pour « réparer » un fil) ; tout fil ou
-//     sous-tranche se place à l'échelle de la bande RENDUE (lscale = swFull/L.value, post-gap),
-//     PERPENDICULAIREMENT à la tangente locale (offsetAlongRibbon) — jamais échelle globale ni Δy vertical.
-//  4. ASYMÉTRIE clé : USDC→EURC enjambe col1→col3 → ruban COUDÉ via relais col2 (≥3 pts) ; BLND→USDC
-//     est DIRECTE (2 pts, ~plate). Tester TOUT changement de tracé sur une bande coudée ET une directe.
-//  Détail + fausses pistes : mémoire [[sankey-graph-design-model]].
+// ⚠ METHOD FOR MODIFYING THIS GRAPH:
+//  1. REASON IN THE ENGINE CODE (buildGraph → layout → ribbonPath → draw/drawSubSlice),
+//     NOT by eyeballing screenshots. The bugs are GEOMETRIC, ~invisible in screenshots;
+//     a bad visual read sent us straight into three false leads (shrinking the gap,
+//     thickening parent bands, blaming "non-proportional" trimming) — all of them REFUTED.
+//  2. CONTROLLED COMPARISON before any hypothesis: if one route renders fine and another
+//     doesn't, isolate what structurally DIFFERS. Decisive here: good (Comet+SB) & bad (Aquarius+SB,
+//     Soroswap+SB) are children of the SAME band ⇒ band width/merging is RULED OUT,
+//     only the thread OFFSET differs. That one deduction settles the bug — do it FIRST.
+//  3. INVARIANTS never to violate: rendered width ∝ flow (= Σ child winPct · lscale; NO
+//     over-weighting, never thicken/shrink a band to "fix" a thread); every thread or
+//     sub-slice sits at the scale of the RENDERED band (lscale = swFull/L.value, post-gap),
+//     PERPENDICULAR to the local tangent (offsetAlongRibbon) — never a global scale or vertical Δy.
+//  4. Key ASYMMETRY: USDC→EURC spans col1→col3 → BENT ribbon via relay col2 (≥3 pts); BLND→USDC
+//     is DIRECT (2 pts, ~flat). Test ANY path-drawing change on both a bent band AND a direct one.
+//  Details + false leads: see memory [[sankey-graph-design-model]].
 // ════════════════════════════════════════════════════════════════════════════
 const Sankey = (function () {
   const NS = 'http://www.w3.org/2000/svg';
-  const W = 960, H = 620, LINK_GAP = 16; // viewBox ; le SVG est responsive (CSS width:100% + height:auto → remplit la box sans letterbox)
+  const W = 960, H = 620, LINK_GAP = 16; // viewBox; the SVG is responsive (CSS width:100% + height:auto → fills the box without letterboxing)
   const LY = { VM: 24, GAP: 14, MIN_H: 10, PAD: 24, NODE_W: 50 };
 
-  const TAIL_PCT = 2; // traîne < ce % agrégée en « autres » — SAUF si la route n'emprunte que des bandes déjà tracées (cf. routesFor)
-  const TREND_STRONG = 0.10; // |Δ part-de-victoires| ≥ ce seuil → mouvement « fort » (grand triangle ▲/▼) ; sinon « léger » (petit triangle ▴/▾)
+  const TAIL_PCT = 2; // tail below this % rolled into "other" — UNLESS the route only uses bands already drawn (cf. routesFor)
+  const TREND_STRONG = 0.10; // |Δ win-share| ≥ this threshold → "strong" move (large triangle ▲/▼); otherwise "slight" (small triangle ▴/▾)
 
-  // Décisions FIGÉES (Romain) : fond = thème de la page (blanc en clair) · départ BLND = ARDOISE.
-  // Les sélecteurs de test (fond gris / ambre-ardoise) ont été retirés.
+  // FIXED decisions (Romain): background = page theme (white in light mode) · BLND start = SLATE.
+  // The test selectors (gray / amber-slate background) have been removed.
 
-  // Strings i18n locales au module (aucun ajout au gros STRINGS de la prod).
+  // Module-local i18n strings (nothing added to the main production STRINGS).
   const STR = {
     fr: { sub:'<b>Largeur</b> = fréquence de victoire · <b>Tracé</b> = route et étapes · <b>Couleur</b> = outil de swap',
           tail:`Routes &lt; ${TAIL_PCT} % des relevés regroupées en « Autres » — sauf si elles n'empruntent que des bandes déjà tracées.`,
@@ -2176,9 +2176,9 @@ const Sankey = (function () {
           through:n=>`${n} rotas passam por esta etapa` }
   };
   const tr = lang => STR[lang] || STR.en;
-  let tableSort = { col:'freq', dir:'desc' }; // tri du tableau : Fréquence (défaut) ou Marge
-  const selKeys = new Set();                  // routes sélectionnées durablement (MULTI ; clés stables tools|chemin)
-  let tailOpen = false;                       // drawer « Autres » déplié ? (persiste au re-rendu)
+  let tableSort = { col:'freq', dir:'desc' }; // table sort: Frequency (default) or Margin
+  const selKeys = new Set();                  // durably selected routes (MULTI; stable tools|path keys)
+  let tailOpen = false;                       // "Other" drawer expanded? (persists across re-renders)
   const keyOf = r => r.tools + '|' + r.steps.join('>');
 
   function interpolateHex(a, b, t) {
@@ -2214,7 +2214,7 @@ const Sankey = (function () {
     : "+" + m.toLocaleString(LOCALE_MAP[lang] || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " %";
   const fmtPct = p => { const r = p.toFixed(0); return (r === '0' && p > 0) ? "<1 %" : r + " %"; };
 
-  // ── buildGraph : fusion (from|to|tool) + rang complexité-first (copie verbatim maquette) ──
+  // ── buildGraph: merge (from|to|tool) + complexity-first ranking (verbatim copy from mockup) ──
   function buildGraph(routes) {
     const nodeSet = new Set();
     routes.forEach(r => r.steps.forEach(s => nodeSet.add(s)));
@@ -2241,7 +2241,7 @@ const Sankey = (function () {
     return { rawNodes, rawLinks: [...linkMap.values()] };
   }
 
-  // ── layout : moteur en couches MAISON, fonction PURE (copie verbatim maquette, self-check Node vert) ──
+  // ── layout: in-house layered engine, PURE function (verbatim copy from mockup, Node self-check passing) ──
   function layout(routes, W, H) {
     const { rawNodes, rawLinks } = buildGraph(routes);
     const names = rawNodes.map(n => n.name);
@@ -2268,8 +2268,8 @@ const Sankey = (function () {
     const flowOf = it => it.isReal ? Math.max(inSum.get(it.name) || 0, outSum.get(it.name) || 0) : it.value;
     let scale = Infinity;
     itemsByCol.forEach(items => { const flowSum = items.reduce((s, it) => s + flowOf(it), 0); const r = (innerH - (items.length - 1) * GAP) / flowSum; if (r < scale) scale = r; });
-    // Garde-fou MIN_H (vrais nœuds faible-trafic seulement ; les relais, invisibles, prennent leur épaisseur exacte).
-    // Réduit scale jusqu'à ce qu'aucune colonne ne déborde (data réelle = tailles imprévues). Converge (masse MIN_H fixe).
+    // MIN_H guard (real low-traffic nodes only; relays, invisible, take their exact thickness).
+    // Shrinks scale until no column overflows (real data = unpredictable sizes). Converges (fixed MIN_H mass).
     const colTotal = sc => { let mx = 0; itemsByCol.forEach(items => { const t = items.reduce((s, it) => s + (it.isReal ? Math.max(flowOf(it) * sc, MIN_H) : flowOf(it) * sc), 0) + (items.length - 1) * GAP; if (t > mx) mx = t; }); return mx; };
     for (let p = 0; p < 24 && colTotal(scale) > innerH + 0.01; p++) scale *= innerH / colTotal(scale);
     const linksOf = new Map(names.map(n => [n, []]));
@@ -2335,17 +2335,17 @@ const Sankey = (function () {
     return { nodes: names.map(n => node.get(n)), links: rawLinks };
   }
 
-  // ribbonPath — courbe lisse à tangentes horizontales (≡ d3.line().curve(d3.curveBumpX), pinné numériquement)
+  // ribbonPath — smooth curve with horizontal tangents (≡ d3.line().curve(d3.curveBumpX), numerically pinned)
   function ribbonPath(pts) {
     let d = 'M' + pts[0][0] + ',' + pts[0][1];
     for (let i = 1; i < pts.length; i++) { const x0 = pts[i-1][0], y0 = pts[i-1][1], x1 = pts[i][0], y1 = pts[i][1], xm = (x0 + x1) / 2; d += 'C' + xm + ',' + y0 + ' ' + xm + ',' + y1 + ' ' + x1 + ',' + y1; }
     return d;
   }
-  // Échantillonne la MÊME cubique que ribbonPath (curveBumpX : C1=(xm,y0), C2=(xm,y1)) et décale chaque
-  // point de `pd` PERPENDICULAIREMENT à la tangente locale (normale unitaire), au lieu d'un décalage
-  // vertical constant. Indispensable sur les bandes COUDÉES (relais) : aux extrémités la tangente est
-  // horizontale → normale verticale → identique à l'ancien +pd ; dans les arcs raides la normale s'incline
-  // → le fil reste DANS sa bande mère au lieu de se tasser vers l'axe et d'en sortir.
+  // Samples the SAME cubic as ribbonPath (curveBumpX: C1=(xm,y0), C2=(xm,y1)) and offsets each
+  // point by `pd` PERPENDICULAR to the local tangent (unit normal), instead of a constant
+  // vertical offset. Essential on BENT bands (relays): at the endpoints the tangent is
+  // horizontal → vertical normal → identical to the old +pd; on steep arcs the normal tilts
+  // → the thread stays INSIDE its parent band instead of drifting toward the axis and out of it.
   function offsetAlongRibbon(pts, pd, STEP) {
     const out = [];
     for (let i = 1; i < pts.length; i++) {
@@ -2363,9 +2363,9 @@ const Sankey = (function () {
     return out;
   }
   const E = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
-  // ── Données RÉELLES : overview.bestRoutes[sonde] (RouteRank {path,tools,winPct}) → routes du moteur.
-  // path 'BLND → USDC → EURC' → steps ; tools 'Comet + Aquarius' → legs ; hopTools dérivé (1 outil =
-  // tous les hops ; composite 2-tx = split au pivot USDC). marginPct absent du backend (colonne retirée).
+  // ── REAL data: overview.bestRoutes[probe] (RouteRank {path,tools,winPct}) → engine routes.
+  // path 'BLND → USDC → EURC' → steps; tools 'Comet + Aquarius' → legs; hopTools derived (1 tool =
+  // all hops; composite 2-tx = split at the USDC pivot). marginPct absent from the backend (column removed).
   function mapRank(r) {
     const steps = String(r.path || '').split(/\s*→\s*/).map(s => s.trim()).filter(Boolean);
     const legs = String(r.tools || '').split(' + ').map(s => s.trim()).filter(Boolean);
@@ -2377,11 +2377,11 @@ const Sankey = (function () {
     const trendMag = (typeof r.trendMag === 'number') ? r.trendMag : null;
     return { tools: r.tools, winPct: r.winPct, marginPct: (typeof r.marginPct === 'number' ? r.marginPct : null), trend, trendMag, composite: legs.length > 1, steps, hopTools };
   }
-  // Lit l'overview courant (déjà spécifique à la paire) ; agrège la traîne < TAIL_PCT en bande « autres ».
+  // Reads the current overview (already pair-specific); aggregates the tail < TAIL_PCT into an "other" band.
   function routesFor(sonde) {
     const ov = (typeof overview !== 'undefined') ? overview : null;
     const raw = (ov && ov.bestRoutes && ov.bestRoutes[String(sonde)]) || [];
-    // DAG only : path valide, ≥2 nœuds, aucun nœud répété (sinon non layoutable proprement).
+    // DAG only: valid path, ≥2 nodes, no repeated node (otherwise it can't be laid out cleanly).
     const valid = raw.filter(r => {
       if (!r || !r.path || !String(r.path).includes('→')) return false;
       const st = String(r.path).split(/\s*→\s*/).map(s => s.trim()).filter(Boolean);
@@ -2389,9 +2389,9 @@ const Sankey = (function () {
     });
     if (valid.length === 0) return [];
     const mapped = valid.map(mapRank);
-    // Règle « Autres » affinée : on ne regroupe une route < TAIL_PCT QUE si elle introduit une arête
-    // (de|vers|outil) non déjà tracée par les routes ≥ TAIL_PCT. Si elle n'emprunte que des bandes
-    // déjà tracées, on la garde (elle épaissit une bande via la fusion, sans surcharger le graphe).
+    // Refined "Other" rule: a route < TAIL_PCT is only grouped in if it introduces an edge
+    // (from|to|tool) not already drawn by routes ≥ TAIL_PCT. If it only uses bands
+    // already drawn, it's kept as-is (it thickens a band via merging, without cluttering the graph).
     const edgesOf = r => { const k = []; for (let i = 0; i < r.steps.length - 1; i++) k.push(r.steps[i] + '|' + r.steps[i + 1] + '|' + r.hopTools[i]); return k; };
     const bigEdges = new Set();
     mapped.forEach(r => { if (r.winPct >= TAIL_PCT) edgesOf(r).forEach(k => bigEdges.add(k)); });
@@ -2408,7 +2408,7 @@ const Sankey = (function () {
     return keep;
   }
 
-  // ── HTML émis par buildPage (string) ──
+  // ── HTML emitted by buildPage (string) ──
   function graphHTML(lang) {
     const s = tr(lang);
     return `<p class="sk-sub">${s.sub}<br>${s.tail}</p>`
@@ -2444,7 +2444,7 @@ const Sankey = (function () {
       + `<th class="sk-sortable" data-sk-sort="freq">${s.freq}<span class="sk-ind">${ind('freq')}</span></th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
-  // ── tooltip (div #sk-tip dédié en phase 1 ; #tipPortal réservé à la phase 2) ──
+  // ── tooltip (dedicated #sk-tip div in phase 1; #tipPortal reserved for phase 2) ──
   function showTip(event, lk, routes, s) {
     const tt = document.getElementById('sk-tip'); if (!tt) return;
     const through = lk.idxs.map(i => routes[i]).sort((a, b) => b.winPct - a.winPct);
@@ -2458,11 +2458,11 @@ const Sankey = (function () {
   function hideTip() { const tt = document.getElementById('sk-tip'); if (tt) tt.style.display = 'none'; }
   const hlRows = (idxs, on) => idxs.forEach(i => document.querySelectorAll('.sk-table tr[data-rk="' + i + '"]').forEach(tr => tr.classList.toggle('sk-hl', on)));
 
-  // ── DRAW : peuple le SVG (vanilla) + wire survol/tooltip/cross-hover/tri ──
+  // ── DRAW: populates the SVG (vanilla) + wires hover/tooltip/cross-hover/sort ──
   function draw(pair, sonde, dark, lang) {
     const svg = document.getElementById('route-sankey'); if (!svg) return;
     while (svg.firstChild) svg.removeChild(svg.firstChild);
-    const s = tr(lang), routes = routesFor(sonde); // fond = thème de la page (blanc en clair)
+    const s = tr(lang), routes = routesFor(sonde); // background = page theme (white in light mode)
     if (routes.length === 0) {
       const txt = E('text', { x:W/2, y:H/2, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':14, fill: dark ? '#94a3b8' : '#64748b' });
       txt.textContent = s.nodata; svg.appendChild(txt); return;
@@ -2471,18 +2471,18 @@ const Sankey = (function () {
     const sourceNode = routes[0].steps[0];
     const targetSet = new Set(routes.map(r => r.steps[r.steps.length - 1]));
     const textFill = dark ? '#e2e8f0' : '#0f172a', labelFill = dark ? '#f8fafc' : '#0f172a';
-    // Couleurs par RÔLE : départ (BLND) = ardoise · arrivée (cible) = vert sarcelle (= sortie simulateur)
-    // · pivot USDC au milieu = bleu · intermédiaires = gris. EURC n'est jamais qu'une arrivée → vert.
+    // Colors by ROLE: start (BLND) = slate · arrival (target) = teal green (= simulator output)
+    // · USDC mid-pivot = blue · intermediates = gray. EURC is always an arrival → green.
     const C = {
       depart:  dark ? { fill:'#334155', stroke:'#94a3b8' } : { fill:'#cbd5e1', stroke:'#475569' },
       arrival: dark ? { fill:'#0f3b38', stroke:'#14b8a6' } : { fill:'#ccfbf1', stroke:'#0d9488' },
-      pivot:   dark ? { fill:'#1e3a5f', stroke:'#60a5fa' } : { fill:'#dbeafe', stroke:'#3b82f6' }, // USDC sombre éclairci (contraste)
+      pivot:   dark ? { fill:'#1e3a5f', stroke:'#60a5fa' } : { fill:'#dbeafe', stroke:'#3b82f6' }, // USDC lightened in dark mode (contrast)
       inter:   dark ? { fill:'#1e293b', stroke:'#4b5e72' } : { fill:'#f1f5f9', stroke:'#94a3b8' },
     };
     const nodeColors = name => {
-      if (name === sourceNode) return C.depart;       // BLND = ardoise
-      if (targetSet.has(name)) return C.arrival;      // cible finale (USDC ou EURC) = vert sarcelle
-      if (name === 'USDC') return C.pivot;            // USDC pivot au milieu d'un composite = bleu
+      if (name === sourceNode) return C.depart;       // BLND = slate
+      if (targetSet.has(name)) return C.arrival;      // final target (USDC or EURC) = teal green
+      if (name === 'USDC') return C.pivot;            // USDC pivot in the middle of a composite = blue
       return C.inter;
     };
     const linkG = E('g', {}); svg.appendChild(linkG);
@@ -2506,20 +2506,20 @@ const Sankey = (function () {
     const topG = E('g', { 'pointer-events':'none' }); svg.appendChild(topG);
     function setActive(idxSet, on, sub) {
       while (topG.firstChild) topG.removeChild(topG.firstChild);
-      const subMode = on && (sub || idxSet.size === 1); // sélection MULTI, ou 1 route → sous-tranche(s) honnête(s)
+      const subMode = on && (sub || idxSet.size === 1); // MULTI selection, or 1 route → honest sub-slice(s)
       linkEls.forEach(({ path, lk, baseOp }) => {
         const linked = lk.idxs && lk.idxs.some(i => idxSet.has(i));
-        // mode sous-tranche : tout estompé (les fils fins ressortent) ; sinon : matching gardés, autres estompés
+        // sub-slice mode: everything dimmed (fine threads stand out); otherwise: matches kept, others dimmed
         path.setAttribute('stroke-opacity', on ? (subMode ? baseOp * 0.45 : (linked ? baseOp : baseOp * 0.5)) : baseOp);
       });
       if (subMode) { const solo = idxSet.size === 1; idxSet.forEach(i => drawSubSlice(i, solo)); }
       else if (on) linkEls.forEach(({ lk, color, sw, d }) => { if (lk.idxs && lk.idxs.some(i => idxSet.has(i))) topG.appendChild(E('path', { d, fill:'none', stroke:color, 'stroke-width':sw, 'stroke-opacity':0.95, 'pointer-events':'none' })); });
     }
-    // Éclairage PARTIEL d'UNE route : ruban posé à son OFFSET empilé DANS CHAQUE bande fusionnée, à
-    // l'échelle LOCALE de la bande TRACÉE (lscale, rognée par le gap). ⚠ l'offset est PERPENDICULAIRE à
-    // la tangente locale (pas vertical, cf. offsetAlongRibbon) : sinon, sur une bande COUDÉE (routée via
-    // relais, ex. USDC→EURC), un fil en bord de bande se tasse vers l'axe et SORT de sa mère
-    // (« rapprochement », pas fusion). Ainsi chaque route occupe sa juste tranche nichée ; largeurs intactes.
+    // PARTIAL highlight of ONE route: ribbon placed at its stacked OFFSET WITHIN EACH merged band, at
+    // the LOCAL scale of the DRAWN band (lscale, trimmed by the gap). ⚠ the offset is PERPENDICULAR to
+    // the local tangent (not vertical, cf. offsetAlongRibbon): otherwise, on a BENT band (routed via
+    // a relay, e.g. USDC→EURC), an edge thread drifts toward the axis and LEAVES its parent
+    // ("drift", not merging). So each route occupies its exact nested slice; widths stay intact.
     function drawSubSlice(ri, solo) {
       const r = routes[ri]; if (!r) return;
       const w = r.winPct;
@@ -2529,32 +2529,32 @@ const Sankey = (function () {
         if (!L) continue;
         const members = L.idxs.slice().sort((a, b) => (routes[b].winPct - routes[a].winPct) || (a - b));
         let off = 0; for (const m of members) { if (m === ri) break; off += routes[m].winPct; }
-        // Solo OU multi : on répartit DANS la largeur TRACÉE de la bande (swFull, rognée par le gap), PAS
-        // dans son étendue pleine (L.value*scale global) — sinon un fil en bord de bande tombe HORS de la
-        // bande mère rendue (blanc entre la mère et le fil). lscale = échelle locale de la bande tracée →
-        // chaque route occupe sa tranche proportionnelle EXACTE, nichée dans sa mère, aucune sur-pondérée.
+        // Solo OR multi: distributed WITHIN the DRAWN width of the band (swFull, trimmed by the gap), NOT
+        // its full extent (L.value*scale global) — otherwise an edge thread falls OUTSIDE the
+        // rendered parent band (white gap between parent and thread). lscale = local scale of the drawn band →
+        // each route occupies its EXACT proportional slice, nested in its parent, none over-weighted.
         const swFull = Math.max(2.5, L.width - Math.min(LINK_GAP, L.width * 0.45)), lscale = swFull / L.value;
         const pd = (off + w / 2 - L.value / 2) * lscale;
         const sw = Math.max(2, w * lscale);
         const d = 'M' + offsetAlongRibbon(L.points, pd, 16).map(p => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join('L');
         const col = L.tool === '—' ? '#9ca3af' : venueColor(L.tool);
-        if (solo) topG.appendChild(E('path', { d, fill:'none', stroke: dark ? 'rgba(248,250,252,0.6)' : 'rgba(15,23,42,0.45)', 'stroke-width': sw + 3, 'pointer-events':'none' })); // halo = pop d'un fil isolé
+        if (solo) topG.appendChild(E('path', { d, fill:'none', stroke: dark ? 'rgba(248,250,252,0.6)' : 'rgba(15,23,42,0.45)', 'stroke-width': sw + 3, 'pointer-events':'none' })); // halo = pop for an isolated thread
         topG.appendChild(E('path', { d, fill:'none', stroke: col, 'stroke-width': sw, 'stroke-opacity': 0.98, 'pointer-events':'none' }));
       }
     }
-    // Sélection DURABLE (comme l'échelle des sources) : route sélectionnée → sous-tranche persistante.
+    // DURABLE selection (like the source ladder): selected route → persistent sub-slice.
     const selIdxs = new Set(); routes.forEach((r, i) => { if (selKeys.has(keyOf(r))) selIdxs.add(i); });
     const applyActive = () => { if (selIdxs.size) setActive(selIdxs, true, true); else setActive(new Set(), false); };
-    // badges = nom d'outil (ancré après le nœud source ; anti-collision en X)
+    // badges = tool name (anchored after the source node; X-axis anti-collision)
     const labG = E('g', { 'pointer-events':'none' }); svg.appendChild(labG);
     const labs = [];
-    // Tous les outils sont étiquetés (même quand le nom dépasse la largeur de bande) ; anti-collision en Y.
+    // All tools are labeled (even when the name exceeds the band width); Y-axis anti-collision.
     graph.links.forEach(lk => { const nx = (lk.points && lk.points[1]) ? lk.points[1][0] : lk.target.x0; const off = Math.min(40, (nx - lk.source.x1) * 0.42); labs.push({ x:lk.source.x1 + off, adj:lk.y0, text:lk.tool === '—' ? s.others : toolDisplay(lk.tool) }); });
     labs.sort((a, b) => a.adj - b.adj);
     const MIN_LH = 14, XCLOSE = 96;
     for (let i = 0; i < labs.length; i++) for (let j = 0; j < i; j++) if (Math.abs(labs[i].x - labs[j].x) < XCLOSE && Math.abs(labs[i].adj - labs[j].adj) < MIN_LH) labs[i].adj = labs[j].adj + MIN_LH;
     labs.forEach(({ x, adj, text }) => { const t = E('text', { x, y:adj, 'text-anchor':'start', 'dominant-baseline':'middle', 'font-size':12, 'font-weight':'600', fill:labelFill, opacity:0.95 }); t.textContent = text; labG.appendChild(t); });
-    // cross-hover lignes → rubans (survol éclaire, mouseleave revient à la sélection) + CLIC = sélection durable
+    // cross-hover rows → ribbons (hover highlights, mouseleave reverts to selection) + CLICK = durable selection
     document.querySelectorAll('.sk-table tr[data-rk]').forEach(tr => {
       const idx = +tr.getAttribute('data-rk');
       tr.addEventListener('mouseenter', () => setActive(new Set([idx]), true));
@@ -2562,7 +2562,7 @@ const Sankey = (function () {
       tr.addEventListener('click', () => { if (tr.hasAttribute('data-sk-tail')) { tailOpen = !tailOpen; renderApp(); return; } const k = tr.getAttribute('data-sk-key'); if (selKeys.has(k)) selKeys.delete(k); else selKeys.add(k); renderApp(); });
     });
     document.querySelectorAll('.sk-table th[data-sk-sort]').forEach(th => { th.style.cursor = 'pointer'; th.addEventListener('click', () => { const c = th.getAttribute('data-sk-sort'); if (tableSort.col === c) tableSort.dir = tableSort.dir === 'desc' ? 'asc' : 'desc'; else tableSort = { col: c, dir: 'desc' }; renderApp(); }); });
-    applyActive(); // applique la sélection durable au (re)rendu
+    applyActive(); // applies the durable selection on (re)render
   }
 
   return { graphHTML, tableHTML, draw };
@@ -2572,22 +2572,22 @@ function renderApp() {
   document.documentElement.lang = lang;
   document.title = 'decant.fi — ' + t('brand_dim');
   document.getElementById('app').innerHTML = buildPage();
-  // Graphe Sankey des routes (peuplé en DOM vanilla après l'innerHTML ; phase 1 = données de test)
+  // Routes Sankey graph (populated in vanilla DOM after the innerHTML; phase 1 = test data)
   if (view === 'dashboard' && document.getElementById('route-sankey'))
     Sankey.draw(target, ladderSonde, document.documentElement.classList.contains('dark'), lang);
 }
 
-// ─── Navigation vue ───────────────────────────────────────────────────────────
+// ─── View navigation ────────────────────────────────────────────────────────
 function setView(v) {
   view = v;
-  // URL propre & partageable : ?view=health pour le status, ?pair=… pour le dashboard
+  // Clean & shareable URL: ?view=health for status, ?pair=… for the dashboard
   history.replaceState(null, '', v === 'health' ? '?view=health' : '?pair=' + target);
   if (v === 'health' && !health) void loadHealth();
   else renderApp();
 }
 
 async function loadHealth() {
-  renderApp(); // affiche "Chargement…" immédiatement
+  renderApp(); // shows "Loading…" immediately
   try {
     const r = await fetch('/api/health');
     if (r.ok) health = await r.json();
@@ -2595,7 +2595,7 @@ async function loadHealth() {
   renderApp();
 }
 
-// ─── Chargement des données ───────────────────────────────────────────────────
+// ─── Data loading ───────────────────────────────────────────────────────────
 async function loadOverview() {
   try {
     const r = await fetch(`/api/overview?pair=${target}&tzoff=${localOffset()}`);
@@ -2604,9 +2604,9 @@ async function loadOverview() {
   renderApp();
 }
 
-// Poll pendant la fenêtre « imminent » : silencieux tant que le collecteur n'a pas tické.
-// Quand lastTickAt AVANCE (= vrai relevé), flash grisé unique pour signaler l'auto-refresh,
-// puis bascule les nouvelles données. Ne grise PAS à chaque poll (sinon la table clignote).
+// Poll during the "imminent" window: silent until the collector has ticked.
+// When lastTickAt ADVANCES (= real reading), a single gray flash signals the auto-refresh,
+// then the new data is swapped in. Doesn't flash on every poll (otherwise the table would flicker).
 async function pollForTick() {
   const tgt = target;
   let data;
@@ -2615,15 +2615,15 @@ async function pollForTick() {
     if (!r.ok) return;
     data = await r.json();
   } catch { return; }
-  if (target !== tgt) return; // paire changée pendant le fetch
+  if (target !== tgt) return; // pair changed during the fetch
   const prevTick = overview && overview.meta ? overview.meta.lastTickAt : null;
   const newTick = data && data.meta ? data.meta.lastTickAt : null;
-  if (!newTick || newTick === prevTick) return; // pas de nouveau relevé : reste silencieux
-  // Nouveau relevé détecté : flash grisé puis swap des données.
+  if (!newTick || newTick === prevTick) return; // no new reading: stays silent
+  // New reading detected: gray flash then swap the data.
   refreshing = true;
   renderApp();
   await new Promise((res) => setTimeout(res, 400));
-  if (target !== tgt) { refreshing = false; return; } // paire changée pendant le hold
+  if (target !== tgt) { refreshing = false; return; } // pair changed during the hold
   overview = data;
   refreshing = false;
   renderApp();
@@ -2638,14 +2638,14 @@ async function loadBalance() {
   renderApp();
 }
 
-// ─── Compte à rebours (setInterval unique) ───────────────────────────────────
+// ─── Countdown (single setInterval) ──────────────────────────────────────────
 function startCountdownTick() {
-  if (countdownInterval) return; // déjà actif
+  if (countdownInterval) return; // already active
   countdownInterval = setInterval(() => {
     const el = document.getElementById('countdown');
     if (el) el.textContent = computeCountdownText();
-    // Échéance dépassée : re-fetch périodique jusqu'à ce que le collecteur ait tické,
-    // sinon le compte à rebours reste figé sur « imminent ».
+    // Deadline passed: periodic re-fetch until the collector has ticked,
+    // otherwise the countdown stays frozen on "imminent".
     if (nextTickAt !== null && Date.now() >= nextTickAt && Date.now() - lastImminentPollAt > 10000) {
       lastImminentPollAt = Date.now();
       void pollForTick();
@@ -2653,10 +2653,10 @@ function startCountdownTick() {
   }, 1000);
 }
 
-// ─── Actions utilisateur ──────────────────────────────────────────────────────
+// ─── User actions ───────────────────────────────────────────────────────────
 function setTarget(t2) {
   if (t2 === target) return;
-  const y = window.scrollY; // rester au même endroit (cf. thème/langue) : on garde overview pour ne pas réduire la page
+  const y = window.scrollY; // stay at the same spot (cf. theme/language): overview is kept so the page doesn't shrink
   target = t2;
   simResult = null;
   selectedSource = null;
@@ -2696,7 +2696,7 @@ function useWallet() {
 
 async function doSim() {
   if (!simActive || simAmt <= 0) return;
-  if (simActive && refreshCooldown > 0) return; // cooldown actif (Enter ou clic parasite)
+  if (simActive && refreshCooldown > 0) return; // cooldown active (Enter or stray click)
   selectedSource = null;
   simLoading = true;
   simResult = null;
@@ -2707,7 +2707,7 @@ async function doSim() {
   } catch {}
   simLoading = false;
   renderApp();
-  // Démarrer le cooldown bouton si la sim a réussi
+  // Start the button cooldown if the sim succeeded
   if (simActive && simResult) {
     startRefreshCooldown();
   }
@@ -2726,7 +2726,7 @@ async function doRefresh() {
       const data = await r.json();
       if (data.overview) {
         overview = data.overview;
-        // Réinitialise nextTickAt depuis le nouveau overview
+        // Resets nextTickAt from the new overview
         const computedNext = computeNextTickAt(overview.meta);
         if (computedNext !== null) nextTickAt = computedNext;
       }
@@ -2737,12 +2737,12 @@ async function doRefresh() {
   renderApp();
 }
 
-// ─── Wallet helpers ───────────────────────────────────────────────────────────
+// ─── Wallet helpers ─────────────────────────────────────────────────────────
 function shortAddr(a) {
   return a.slice(0, 4) + '…' + a.slice(-4);
 }
 
-// Échappe le HTML : tout texte d'origine serveur (errorMsg) passe par là avant innerHTML.
+// Escapes HTML: any server-originated text (errorMsg) goes through this before innerHTML.
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -2762,7 +2762,7 @@ const SB_ASSET_STRS = {
 
 function mapExecError(code, fallback) {
   if (code === 'trustline') return t('err_trustline', target, TRUSTLINE_ISSUERS[target] || target);
-  const key = 'err_' + String(code).replace('-', ''); // 'no-route' → clé 'err_noroute'
+  const key = 'err_' + String(code).replace('-', ''); // 'no-route' → key 'err_noroute'
   const s = STRINGS[lang];
   if (s && s[key] !== undefined) return t(key);
   return fallback || code;
@@ -2796,7 +2796,7 @@ async function disconnectWallet() {
   renderApp();
 }
 
-// ─── Exécution swap ───────────────────────────────────────────────────────────
+// ─── Swap execution ─────────────────────────────────────────────────────────
 async function doExecute() {
   if (!simResult || !simActive || simAmt <= 0) return;
   if (!walletAddress) {
@@ -2810,7 +2810,7 @@ async function doExecute() {
   // 2-tx flow. Gating on winRow here was the bug: for EURC the winner IS the
   // composite, so every selection short-circuited into startCompositeLeg1.
   const { row: chosenRow, selRow, winRow, isComposite } = chooseExec(selectedSource, simResult);
-  // Composite EURC → flux guidé 2 jambes, sur la ligne composite choisie.
+  // EURC composite → guided 2-leg flow, on the chosen composite row.
   if (isComposite) {
     await startCompositeLeg1(chosenRow);
     return;
@@ -2821,9 +2821,9 @@ async function doExecute() {
     await doExecuteSbMediator();
     return;
   }
-  // Venue à forcer : la ligne sélectionnée si exécutable, sinon le GAGNANT affiché s'il est exécutable.
-  // Fini la bascule silencieuse vers une autre venue : le bouton dit « via [gagnant] », on exécute [gagnant]
-  // (l'alerte au quote prévient en amont s'il sur-cote). Gagnant non-exécutable → repli serveur.
+  // Venue to force: the selected row if executable, otherwise the displayed WINNER if executable.
+  // No more silent fallback to another venue: the button says "via [winner]", so we execute [winner]
+  // (the quote-time alert warns upfront if it over-quotes). Non-executable winner → server fallback.
   const forceRow = (selRow && selRow.executable) ? selRow
     : (winRow && winRow.executable ? winRow : null);
   const body = {
@@ -2967,10 +2967,10 @@ async function recoverSbMediators() {
   renderApp();
 }
 
-// Lance le flux composite 2-tx. Cible explicitement la ligne dont le sourceId contient
-// '+' (la composite EURC via-USDC), sans dépendre du flag `winner` : pour EURC c'est
-// justement la composite qui est en tête (raw[0], donc winner), mais ce bouton n'est
-// rendu que quand la composite est la cible d'exécution effective (cf. chooseExec).
+// Starts the composite 2-tx flow. Explicitly targets the row whose sourceId contains
+// '+' (the EURC via-USDC composite), without relying on the `winner` flag: for EURC it's
+// precisely the composite that's in the lead (raw[0], hence winner), but this button is
+// only rendered when the composite is the actual execution target (cf. chooseExec).
 async function doExecuteComposite() {
   if (!simResult || !simActive || simAmt <= 0) return;
   if (!walletAddress) { execState = { phase: 'error', errorMsg: t('exec_connect_first') }; renderApp(); return; }
@@ -2983,30 +2983,30 @@ async function startCompositeLeg1(compRow) {
   const leg1Source = (compRow.legs && compRow.legs[0] && compRow.legs[0].sourceId)
     || compRow.sourceId.split('+')[0].trim();
   const leg2Source = (compRow.legs && compRow.legs[1] && compRow.legs[1].sourceId) || null;
-  // Lire le solde USDC avant (non bloquant)
+  // Read the USDC balance beforehand (non-blocking)
   let usdcBefore = null;
   if (walletAddress) {
     try {
       const br = await fetch(`/api/asset-balance?address=${walletAddress}&asset=USDC`);
       if (br.ok) { const bj = await br.json(); usdcBefore = typeof bj.balance === 'number' ? bj.balance : null; }
-    } catch (_) { /* non bloquant */ }
+    } catch (_) { /* non-blocking */ }
   }
-  // Build leg1 : BLND→USDC, venue forcée
+  // Build leg1: BLND→USDC, forced venue
   try {
     const r = await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pair: 'USDC', amount: simAmt, sender: walletAddress, slippageBps: Math.round(execSlippagePct * 100), venue: leg1Source }) });
     const j = await r.json();
     const comp1 = { leg: 1, leg1Source, leg2Source, usdcBefore, usdcReceived: null, hash1: null };
-    // Erreur leg1 (typiquement trustline USDC manquante) : préserve comp{leg:1} + l'actif manquant
-    // (j.asset = USDC ici) → le front ajoute/relance la BONNE trustline, pas le target global (EURC).
+    // Leg1 error (typically missing USDC trustline): preserves comp{leg:1} + the missing asset
+    // (j.asset = USDC here) → the frontend adds/retries the RIGHT trustline, not the global target (EURC).
     if (!r.ok) { execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, asset: j.asset, comp: comp1 }; }
     else { execState = { phase: 'review', build: j, comp: comp1 }; }
   } catch (e) { execState = { phase: 'error', errorMsg: t('err_down') }; }
   renderApp();
 }
 
-// Fire-and-poll : confirme une tx Soroban via /api/tx-status. → 'success' | 'failed' | 'pending' | 'aborted'.
-// 'pending' = encore en vol après le cap (PAS un échec : la tx peut encore se poser). 'aborted' = modal fermé.
+// Fire-and-poll: confirms a Soroban tx via /api/tx-status. → 'success' | 'failed' | 'pending' | 'aborted'.
+// 'pending' = still in flight past the cap (NOT a failure: the tx may still land). 'aborted' = modal closed.
 async function pollTxStatus(venue, hash, alive, tries = 20, intervalMs = 1500) {
   for (let i = 0; i < tries; i++) {
     if (alive && !alive()) return 'aborted';
@@ -3028,14 +3028,14 @@ async function confirmExecute() {
   const comp = execState.comp || null;
   execState = { phase: 'signing', build, ...(comp ? { comp } : {}) }; renderApp();
   try {
-    // Lire le solde cible AVANT signature pour comparer après exécution (#3)
+    // Read the target balance BEFORE signing to compare after execution (#3)
     const asset = (build.review && build.review.target) || target;
     let destBefore = null;
     if (walletAddress) {
       try {
         const br = await fetch(`/api/asset-balance?address=${walletAddress}&asset=${asset}`);
         if (br.ok) { const bj = await br.json(); destBefore = typeof bj.balance === 'number' ? bj.balance : null; }
-      } catch (_) { /* non bloquant */ }
+      } catch (_) { /* non-blocking */ }
     }
     await ensureKit();
     const { signedTxXdr } = await SWK.signTransaction(build.xdr, { address: walletAddress, networkPassphrase: KIT_NET });
@@ -3047,39 +3047,39 @@ async function confirmExecute() {
       execState = { phase: 'error', errorMsg: mapExecError(j.code, j.error), code: j.code, asset: j.asset, ...(comp ? { comp } : {}) };
       renderApp(); return;
     }
-    // ─── Fire-and-poll : venues Soroban (aquarius/comet) ──────────────────────
-    // /api/submit a FIRÉ la tx (status:'pending') sans attendre la confirmation. On
-    // confirme ICI, avant tout consommateur (restore, leg1→leg2, done) : sinon on agirait
-    // sur une tx non posée (re-restore en boucle, montant leg2 fabriqué). Cf. audit fire-and-poll.
+    // ─── Fire-and-poll: Soroban venues (aquarius/comet) ────────────────────────
+    // /api/submit FIRED the tx (status:'pending') without waiting for confirmation. We
+    // confirm HERE, before any consumer (restore, leg1→leg2, done): otherwise we'd act
+    // on a tx that hasn't landed (looping re-restore, fabricated leg2 amount). Cf. fire-and-poll audit.
     if (j.status === 'pending') {
       execState = { phase: 'confirming', build, hash: j.hash, ...(comp ? { comp } : {}) }; renderApp();
       const st = await pollTxStatus(build.venue, j.hash,
         () => !!execState && execState.phase === 'confirming' && execState.hash === j.hash);
-      if (st === 'aborted') return;                        // modal fermé / phase changée
+      if (st === 'aborted') return;                        // modal closed / phase changed
       if (st === 'failed') {
         execState = { phase: 'error', errorMsg: t('exec_failed'), ...(comp ? { comp } : {}) }; renderApp(); return;
       }
-      if (st === 'pending') {                              // encore en vol après le cap → pas un échec
+      if (st === 'pending') {                              // still in flight past the cap → not a failure
         execState = { phase: 'pending', hash: j.hash, venue: build.venue, build, ...(comp ? { comp } : {}) }; renderApp(); return;
       }
-      // st === 'success' → poursuite du flux normal ci-dessous (restore / leg1 / done).
+      // st === 'success' → normal flow continues below (restore / leg1 / done).
     }
     if (build.type === 'restore') {
-      // la tx restore est soumise ; reconstruire le vrai swap puis revenir à la revue.
-      // ponytail: branche restore best-effort, non testée en live (nécessite un contrat archivé).
+      // the restore tx is submitted; rebuild the actual swap then return to review.
+      // ponytail: best-effort restore branch, not tested live (requires an archived contract).
       await doExecute(); return;
     }
-    // ─── Composite leg1 terminé : poll USDC puis enchaîner leg2 ─────────────
+    // ─── Composite leg1 done: poll USDC then chain into leg2 ─────────────────
     if (comp && comp.leg === 1) {
       const hash1 = j.hash;
       const usdcBefore = comp.usdcBefore;
       execState = { phase: 'leg1_confirming', comp: { ...comp, hash1 } }; renderApp();
-      // Poll solde USDC jusqu'à réception (10 essais × 1,5 s)
+      // Poll the USDC balance until received (10 attempts × 1.5s)
       let usdcReceived = null;
       let initialBal = null;
       for (let i = 0; i < 10; i++) {
         await new Promise(res => setTimeout(res, 1500));
-        if (!execState || execState.phase !== 'leg1_confirming') return; // modal fermé
+        if (!execState || execState.phase !== 'leg1_confirming') return; // modal closed
         try {
           const pr = await fetch(`/api/asset-balance?address=${walletAddress}&asset=USDC`);
           if (!pr.ok) continue;
@@ -3092,9 +3092,9 @@ async function confirmExecute() {
             usdcReceived = bal - (usdcBefore != null ? usdcBefore : initialBal);
             break;
           }
-        } catch (_) { /* continuer */ }
+        } catch (_) { /* keep polling */ }
       }
-      // Si on n'a pas détecté l'arrivée, best-effort : prendre la dernière balance connue - before
+      // If arrival wasn't detected, best-effort: use the last known balance minus before
       if (usdcReceived == null && initialBal != null && usdcBefore != null) {
         usdcReceived = Math.max(0, initialBal - usdcBefore);
       }
@@ -3103,15 +3103,15 @@ async function confirmExecute() {
       await buildCompositeLeg2(newComp);
       return;
     }
-    // ─── Mono ou composite leg2 : comportement done normal ───────────────────
+    // ─── Mono or composite leg2: normal done behavior ─────────────────────────
     const doneHash = j.hash;
     execState = { phase: 'done', hash: doneHash, venue: build.venue, build, ...(comp ? { comp } : {}) }; renderApp();
-    // Poll du solde cible pour afficher le reçu on-chain (#3)
+    // Poll the target balance to display the on-chain received amount (#3)
     if (destBefore != null && walletAddress) {
       (async () => {
         for (let i = 0; i < 10; i++) {
           await new Promise(res => setTimeout(res, 1500));
-          // Abandon si le modal a été fermé ou la phase a changé
+          // Abort if the modal was closed or the phase changed
           if (!execState || execState.phase !== 'done' || execState.hash !== doneHash) return;
           try {
             const pr = await fetch(`/api/asset-balance?address=${walletAddress}&asset=${asset}`);
@@ -3125,7 +3125,7 @@ async function confirmExecute() {
               }
               return;
             }
-          } catch (_) { /* continuer */ }
+          } catch (_) { /* keep polling */ }
         }
       })();
     }
@@ -3161,16 +3161,16 @@ async function retryCompositeLeg2() {
   await buildCompositeLeg2(comp);
 }
 
-// Ajout de la trustline de sortie DEPUIS l'app : build changeTrust → signature wallet → submit Horizon.
-// Pas d'auto-retry du swap (read-after-write Horizon) : on revient à un clic d'exécution → quelques
-// secondes passent (lecture du succès + clic) = buffer de propagation, pas de faux « trustline absente ».
-// assetCode = l'actif RÉELLEMENT manquant (USDC au leg1, EURC au leg2/mono) ; défaut = target global.
+// Adding the output trustline FROM the app: build changeTrust → wallet signature → submit to Horizon.
+// No auto-retry of the swap (Horizon read-after-write): we return to a one-click execution → a few
+// seconds pass (reading success + clicking) = propagation buffer, avoiding a false "trustline missing".
+// assetCode = the ACTUALLY missing asset (USDC at leg1, EURC at leg2/mono); default = global target.
 async function addTrustline(assetCode) {
   if (!walletAddress) { execState = { phase: 'error', errorMsg: t('exec_connect_first') }; renderApp(); return; }
-  // Préserver le contexte composite : si la trustline manque au leg2 (leg1 déjà exécuté, USDC en main),
-  // après l'ajout on relance le LEG2 — JAMAIS doExecute() qui re-swapperait du BLND (double swap).
+  // Preserve the composite context: if the trustline is missing at leg2 (leg1 already executed, USDC in hand),
+  // after adding it we retry LEG2 — NEVER doExecute(), which would re-swap BLND (double swap).
   const comp = (execState && execState.comp) || null;
-  const asset = assetCode || (execState && execState.asset) || target; // pair à truster (USDC/EURC)
+  const asset = assetCode || (execState && execState.asset) || target; // asset to trust (USDC/EURC)
   const keep = { ...(comp ? { comp } : {}), asset };
   try {
     execState = { phase: 'trustline_adding', ...keep }; renderApp();
@@ -3203,7 +3203,7 @@ function onModalBackdrop() {
   }
 }
 
-// ─── Cooldown bouton Rafraîchir ───────────────────────────────────────────────
+// ─── Refresh button cooldown ──────────────────────────────────────────────────
 function simBtnState() {
   if (!simActive) return { label: t('sim_btn_simulate'), disabled: false };
   if (refreshCooldown > 0) return { label: t('sim_btn_refresh_wait', refreshCooldown), disabled: true };
@@ -3240,21 +3240,21 @@ function onExecSlippage(v) {
   renderApp();
 }
 
-// Flèches +/− du champ slippage (pas de 0,1 %, borné 0–50, arrondi pour éviter la dérive flottante).
+// +/− arrows for the slippage field (0.1% step, bounded 0–50, rounded to avoid float drift).
 function nudgeSlippage(d) {
   execSlippagePct = Math.max(0, Math.min(50, Math.round((execSlippagePct + d) * 10) / 10));
   localStorage.setItem('slippagePct', execSlippagePct);
   renderApp();
 }
 
-// ─── Helper : table de revue (partagée review / signing / submitting) ─────────
+// ─── Helper: review table (shared review / signing / submitting) ──────────────
 function venueDisplay(id) {
   return id === 'xbull' ? 'xBull' : id === 'soroswap' ? 'Soroswap' : id === 'horizon' ? 'Horizon' : id === 'aquarius' ? 'Aquarius' : id === 'comet' ? 'Comet' : id === 'ultrastellar' ? 'Ultra Stellar' : id;
 }
 
 function reviewTableHtml(rv, tgt, showSimDelta, sendAsset = 'BLND') {
   const vl = venueDisplay(rv.venue);
-  // #3 — indicateur sim→build : compare le build (re-coté) au simulateur de la même venue
+  // #3 — sim→build indicator: compares the build (re-quoted) to the simulator for the same venue
   let simDeltaHtml = '';
   if (showSimDelta) {
     const simRow = (simResult && simResult.ladder) ? simResult.ladder.find(r => r.sourceId === rv.venue) : null;
@@ -3300,7 +3300,7 @@ function reviewTableHtml(rv, tgt, showSimDelta, sendAsset = 'BLND') {
   </div>`;
 }
 
-// ─── Modal cohérence (sondes suspectes) ──────────────────────────────────────
+// ─── Coherence modal (suspect probes) ─────────────────────────────────────────
 async function openCoherence(venue) {
   coherenceModal = { venue, loading: true, data: null };
   renderApp();
@@ -3322,7 +3322,7 @@ function closeCoherence() {
 function coherenceModalHtml() {
   if (!coherenceModal) return '';
   const { venue, loading, data } = coherenceModal;
-  // Nom d'affichage de la venue
+  // Venue display name
   const dName = venue === 'xbull' ? 'xBull' : venue === 'soroswap' ? 'Soroswap' : venue === 'horizon' ? 'Horizon' : venue === 'aquarius' ? 'Aquarius' : venue === 'comet' ? 'Comet' : venue === 'ultrastellar' ? 'Ultra Stellar' : venue;
 
   let body;
@@ -3336,7 +3336,7 @@ function coherenceModalHtml() {
       body += `<p class="help">${t('health_coh_modal_none')}</p>`;
     } else {
       const suspectRows = suspects.map(p => {
-        // Montant : amount_in est en stroops (entier), /1e7 → BLND
+        // Amount: amount_in is in stroops (integer), /1e7 → BLND
         const amtBlnd = p.amount_in != null ? (Number(p.amount_in) / 1e7).toFixed(0) + ' BLND' : '—';
         const dateStr = p.created_at ? p.created_at.replace('T', ' ').slice(0, 16) : '—';
         const route = (p.route && p.route.length > 0) ? p.route.join(' → ') : '—';
@@ -3380,28 +3380,28 @@ function coherenceModalHtml() {
   </div></div>`;
 }
 
-// ─── Modal d'exécution ────────────────────────────────────────────────────────
+// ─── Execution modal ──────────────────────────────────────────────────────────
 function execModal() {
   if (!execState) return '';
   const { phase, build, hash, errorMsg, executed } = execState;
   const safeHash = /^[0-9a-fA-F]{64}$/.test(hash) ? hash : '';
   const comp = execState.comp || null;
 
-  // Badge d'étape composite (affiché dans review / signing / submitting)
+  // Composite step badge (shown in review / signing / submitting)
   const stepBadge = (comp && (phase === 'review' || phase === 'signing' || phase === 'submitting'))
     ? `<div style="display:inline-block;background:var(--teal);color:#fff;border-radius:999px;padding:.15rem .65rem;font-size:11px;font-weight:700;margin-bottom:.65rem">${t('comp_step', comp.leg)}</div>`
     : '';
 
-  // Actif courant de la jambe (USDC au leg1, EURC au leg2 / mono)
+  // Current leg asset (USDC at leg1, EURC at leg2 / mono)
   const legTarget = (build && build.review && build.review.target) || target;
-  // Actif envoyé : USDC au leg2 du composite (on ne (re)vend pas du BLND), BLND sinon.
+  // Asset sent: USDC at composite leg2 (we don't (re)sell BLND), BLND otherwise.
   const sendAsset = (comp && comp.leg === 2) ? 'USDC' : 'BLND';
 
   let content = '';
   if (phase === 'review') {
     const rv = build.review;
     const fidelityNote = '';
-    // Disclosure restore AVANT signature : la 1re signature restaure l'état du contrat, le swap est rebuild + re-revu ensuite.
+    // Restore disclosure BEFORE signing: the 1st signature restores the contract state, the swap is then rebuilt + re-reviewed.
     const restoreNote = build.type === 'restore'
       ? `<p class="help" style="margin:.6rem 0 0;color:var(--amber)">${t('exec_restore')}</p>`
       : '';
@@ -3509,11 +3509,11 @@ function execModal() {
     const doneTarget = (rv && rv.target) || target;
     let compBlock = '';
     if (rv) {
-      // Ligne "Reçu" : pulse si lecture en cours, valeur colorée si reçu
+      // "Received" row: pulses while reading, colored value once received
       const execVal = executed != null
         ? `<span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;color:${executed >= rv.netOut ? 'var(--green)' : 'var(--red)'}">${fmt3(executed)} ${doneTarget}</span>`
         : `<span class="pulse" style="color:var(--caption);font-size:13px">${t('exec_reading')}</span>`;
-      // Chip d'écart proéminent (seulement quand reçu connu)
+      // Prominent delta chip (only once the received amount is known)
       let deltaChip = '';
       if (executed != null) {
         const d = executed - rv.netOut;
@@ -3547,8 +3547,8 @@ function execModal() {
   } else if (phase === 'trustline_adding') {
     content = `<p style="font-size:14px;font-weight:700;color:var(--teal);margin:0">${t('trustline_adding')}</p>`;
   } else if (phase === 'trustline_added') {
-    // Reprise après ajout : leg2 → retryCompositeLeg2 (USDC en main) ; leg1 → doExecuteComposite
-    // (relance la jambe 1, JAMAIS doExecute() qui pourrait exécuter une venue atomique) ; mono → doExecute.
+    // Resume after adding: leg2 → retryCompositeLeg2 (USDC in hand); leg1 → doExecuteComposite
+    // (retries leg 1, NEVER doExecute() which could execute an atomic venue); mono → doExecute.
     const resumeBtn = (comp && comp.leg === 2 && comp.usdcReceived != null)
       ? `<button class="btn primary" data-act="retryCompositeLeg2">${t('comp_retry_leg2')}</button>`
       : (comp && comp.leg === 1)
@@ -3565,22 +3565,22 @@ function execModal() {
         ${resumeBtn}
       </div>`;
   } else if (phase === 'error') {
-    // Cas trustline absente : message clair + bouton d'ajout in-app (≠ « échec » dur).
+    // Missing-trustline case: clear message + in-app add button (not a hard "failure").
     const isTrust = execState.code === 'trustline';
-    // Cas composite leg2 récupérable : leg1 ok, USDC en main, leg2 échoué
+    // Recoverable composite leg2 case: leg1 ok, USDC in hand, leg2 failed
     const isLeg2Fail = comp && comp.leg === 2 && comp.usdcReceived != null;
-    // Actif réellement manquant (USDC au leg1, EURC au leg2/mono) — fourni par le backend, PAS le target global.
+    // Actually missing asset (USDC at leg1, EURC at leg2/mono) — provided by the backend, NOT the global target.
     const missAsset = execState.asset || target;
     const title = isTrust ? t('trustline_title') : t('exec_failed');
     const titleColor = isTrust ? 'var(--amber)' : 'var(--red)';
-    // leg2 récupérable → message « leg1 ok, USDC en main » (prioritaire sur le générique trustline) ;
-    // si la trustline EURC manque, on garde le bouton d'ajout (l'ajout enchaîne sur retryCompositeLeg2).
+    // recoverable leg2 → "leg1 ok, USDC in hand" message (takes priority over the generic trustline one);
+    // if the EURC trustline is missing, the add button stays (adding chains into retryCompositeLeg2).
     const msg = isLeg2Fail ? t('comp_leg2_failed', fmt3(comp.usdcReceived))
       : isTrust ? t('trustline_need', missAsset)
       : escapeHtml(errorMsg);
     const safeMissAsset = missAsset.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const trustBtn = isTrust ? `<button class="btn primary" data-act="addTrustline" data-args='${JSON.stringify([safeMissAsset])}'>${t('trustline_add_btn', missAsset)}</button>` : '';
-    // Relance directe seulement si ce n'est PAS un manque de trustline (sinon il faut d'abord l'ajouter).
+    // Direct retry only if it's NOT a missing trustline (otherwise it must be added first).
     const retryLeg2Btn = (isLeg2Fail && !isTrust) ? `<button class="btn primary" data-act="retryCompositeLeg2">${t('comp_retry_leg2')}</button>` : '';
     content = `
       <p style="font-size:14px;font-weight:700;color:${titleColor};margin:0 0 .5rem">${title}</p>
@@ -3596,9 +3596,9 @@ function execModal() {
 }
 
 function toggleTheme() {
-  // DEEP-2 : cibler au lieu de tout reconstruire. Les couleurs sont pilotées par CSS via la
-  // classe .dark → le navigateur re-style seul (état UI préservé : scroll, focus, montant tapé).
-  // Restent 2 bouts pilotés en JS à rafraîchir à la main : l'icône du bouton et le graphe Sankey.
+  // DEEP-2: target instead of rebuilding everything. Colors are driven by CSS via the
+  // .dark class → the browser re-styles on its own (UI state preserved: scroll, focus, typed amount).
+  // Two bits still driven manually in JS: the button icon and the Sankey graph.
   const isDark = document.documentElement.classList.toggle('dark');
   localStorage.setItem('theme', isDark ? 'dark' : 'light');
   const btn = document.querySelector('[data-act="toggleTheme"]');
@@ -3613,20 +3613,20 @@ function setLang(l) {
   renderApp();
 }
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
-// Restitue le thème persisté (ou préférence système)
+// ─── Boot ───────────────────────────────────────────────────────────────────
+// Restores the persisted theme (or system preference)
 const savedTheme = localStorage.getItem('theme');
 if (savedTheme === 'dark' || (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
   document.documentElement.classList.add('dark');
 }
 
-// P1 : lire la paire depuis l'URL (?pair=EURC)
+// P1: read the pair from the URL (?pair=EURC)
 (function() {
   const p = new URLSearchParams(location.search).get('pair');
   if (p === 'EURC' || p === 'USDC') target = p;
 })();
 
-// Deep-link vers la page status (?view=health)
+// Deep-link to the status page (?view=health)
 (function() {
   if (new URLSearchParams(location.search).get('view') === 'health') view = 'health';
 })();
@@ -3636,10 +3636,10 @@ startCountdownTick();
 void Promise.all([loadOverview(), loadBalance()]);
 if (view === 'health') void loadHealth();
 
-// ─── Easter egg : scam-coin GeoCities derrière le konami code (↑↑↓↓←→←→ B A) ───
+// ─── Easter egg: GeoCities scam-coin behind the konami code (↑↑↓↓←→←→ B A) ───
 function openScamEgg() {
   if (document.getElementById('scam-egg')) return;
-  // Contenu suivant la langue sélectionnée (références culturelles adaptées : Kevin→Brayden, BCE→the Fed, etc.)
+  // Content follows the selected language (culturally adapted references: Kevin→Brayden, ECB→the Fed, etc.)
   const L = (lang === 'fr') ? {
     blink: `⚠️ DERNIÈRE CHANCE AVANT LE MOON ⚠️`,
     marquee: `🚀🚀 CE QUE LES BANQUES, LA BCE ET LES REPTILIENS NE VEULENT PAS QUE VOUS SACHIEZ — ACHETEZ AVANT QU'IL NE SOIT TROP TARD — 🚀🚀`,
@@ -3718,8 +3718,8 @@ function toggleScamEgg() { document.getElementById('scam-egg') ? closeScamEgg() 
   });
 })();
 
-/* Tooltip portal : rend le contenu de .tip-box dans un noeud position:fixed au-dessus de tout,
-   flip bas→haut si pas la place. Immunise tous les tooltips contre le clipping overflow des tables. */
+/* Tooltip portal: renders .tip-box content into a position:fixed node above everything,
+   flipping bottom→top when there's no room. Immunizes all tooltips against table overflow clipping. */
 (function () {
   const portal = document.getElementById('tipPortal');
   if (!portal) return;

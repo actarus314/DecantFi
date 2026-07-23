@@ -1,5 +1,5 @@
-// Couche d'accès SQLite (node:sqlite). Écrit tick + quotes + raw en une transaction.
-// Montants stroops en INTEGER (< 2^53, exacts) ; lecture bigint via setReadBigInts.
+// SQLite access layer (node:sqlite). Writes tick + quotes + raw in one transaction.
+// Stroop amounts as INTEGER (< 2^53, exact); read as bigint via setReadBigInts.
 import { DatabaseSync } from 'node:sqlite';
 import { migrate } from './schema.js';
 
@@ -13,7 +13,7 @@ export interface QuoteInsert {
   net_out: bigint | null; net_confidence: string | null; price_impact_pct: number | null;
   gas_in_target: bigint | null; fee_total: bigint | null; route_summary: string | null;
   is_winner: boolean; eurc_path: string | null; raw_json: string | null;
-  /** Durée totale de cotation pour cette source (fetch + re-sim), en ms. null = non mesuré. */
+  /** Total quoting duration for this source (fetch + re-sim), in ms. null = not measured. */
   duration_ms: number | null;
 }
 
@@ -27,7 +27,7 @@ export interface CoherenceProbeInsert {
   venue: string;
   pair: string;
   amount_in: bigint;
-  incoherent: boolean;       // converti en 0/1 à l'insert
+  incoherent: boolean;       // converted to 0/1 on insert
   reason: string | null;
   net_quoted: bigint | null;
   net_simulated: bigint | null;
@@ -78,7 +78,7 @@ export class Db {
     );
   }
 
-  /** Insère un tick et ses quotes (+ raw) et les sondes RPC atomiquement. Renvoie l'id du tick. */
+  /** Inserts a tick and its quotes (+ raw) and the RPC probes atomically. Returns the tick id. */
   insertTickWithQuotes(tick: TickInsert, quotes: QuoteInsert[], rpcProbes: RpcProbeInsert[] = []): number {
     this.db.exec('BEGIN');
     try {
@@ -96,7 +96,7 @@ export class Db {
       }
       for (const p of rpcProbes) {
         this._insRpc.run(tickId, p.url, p.ok ? 1 : 0, p.latency_ms, p.ledger, p.chosen ? 1 : 0, p.sim_errors, p.rpc_calls, p.error);
-        // Logge la charge dans rpc_call_log si c'est la sonde choisie.
+        // Logs the load into rpc_call_log if this is the chosen probe.
         if (p.chosen && p.rpc_calls > 0) {
           const kind = tick.note === 'manual' ? 'refresh' : 'auto';
           const durMs = (tick.finished_at != null)
@@ -113,21 +113,21 @@ export class Db {
     }
   }
 
-  /** Supprime les ticks manuels (note='manual'). Appelé par le poll programmé : la donnée
-   *  canonique reste la cadence régulière ; les refresh manuels ne sont que provisoires.
-   *  Les quotes/raw partent en cascade (FK ON DELETE CASCADE). Renvoie le nb de ticks supprimés. */
+  /** Deletes manual ticks (note='manual'). Called by the scheduled poll: the canonical
+   *  data stays the regular cadence; manual refreshes are only provisional.
+   *  Quotes/raw cascade (FK ON DELETE CASCADE). Returns the number of ticks deleted. */
   purgeManualTicks(): number {
     const r = this._delManual.run();
     return Number(r.changes);
   }
 
-  /** Vérifie qu'au moins une sonde de cohérence existe pour `venue` depuis `sinceIso`. */
+  /** Checks that at least one coherence probe exists for `venue` since `sinceIso`. */
   hasCoherenceProbeSince(venue: string, sinceIso: string): boolean {
     const row = this._hasCoherence.get(venue, sinceIso);
     return row !== undefined;
   }
 
-  /** Insère une sonde de cohérence (quote vs sim). Hors transaction — best-effort. */
+  /** Inserts a coherence probe (quote vs sim). Outside the transaction — best-effort. */
   insertCoherenceProbe(row: CoherenceProbeInsert): void {
     this._insCoherence.run(
       row.created_at, row.venue, row.pair, row.amount_in,
@@ -137,7 +137,7 @@ export class Db {
     );
   }
 
-  /** Accès brut (queries, maintenance, tests). */
+  /** Raw access (queries, maintenance, tests). */
   raw(): DatabaseSync {
     return this.db;
   }
@@ -147,14 +147,14 @@ export class Db {
   }
 }
 
-/** Ouvre (ou crée) la base au chemin donné, applique PRAGMA + migration. */
+/** Opens (or creates) the database at the given path, applies PRAGMA + migration. */
 export function openDb(path: string): Db {
   const db = new DatabaseSync(path);
   migrate(db);
   return new Db(db);
 }
 
-/** Interface d'une ligne de charge RPC (devis manuel). */
+/** Interface for an RPC load-log row (manual quote). */
 export interface RpcCallLogRow {
   at: string;
   url: string;
@@ -163,8 +163,8 @@ export interface RpcCallLogRow {
   dur_ms: number;
 }
 
-// Connexion d'écriture singleton pour appendRpcCallLog (évite open/close à chaque appel).
-// Keyée par chemin : si le chemin change (tests multi-DB) une nouvelle connexion est ouverte.
+// Singleton write connection for appendRpcCallLog (avoids open/close on every call).
+// Keyed by path: if the path changes (multi-DB tests) a new connection is opened.
 let _rpcLogDb: DatabaseSync | null = null;
 let _rpcLogDbPath = '';
 let _rpcLogStmt: ReturnType<DatabaseSync['prepare']> | null = null;
@@ -190,13 +190,13 @@ function rpcLogConn(dbPath: string): { db: DatabaseSync; stmt: ReturnType<Databa
 }
 
 /**
- * Insère une ligne dans rpc_call_log en best-effort (fire-and-forget).
- * Réutilise une connexion singleton pour éviter l'overhead open/close WAL à chaque appel.
- * Un échec est sans gravité (perdre une ligne de log acceptable).
+ * Inserts a row into rpc_call_log best-effort (fire-and-forget).
+ * Reuses a singleton connection to avoid open/close WAL overhead on every call.
+ * A failure is harmless (losing a log row is acceptable).
  */
 export function appendRpcCallLog(dbPath: string, row: RpcCallLogRow): void {
   try {
     const { stmt } = rpcLogConn(dbPath);
     stmt.run(row.at, row.url, row.kind, row.calls, row.dur_ms);
-  } catch { /* best-effort : perdre une ligne de log est sans gravité */ }
+  } catch { /* best-effort: losing a log row is harmless */ }
 }

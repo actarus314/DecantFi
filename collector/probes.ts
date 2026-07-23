@@ -1,4 +1,4 @@
-// Construit la liste des sondes : produit cartésien {tailles} × {paires cibles}.
+// Builds the list of probes: cartesian product of {sizes} × {target pairs}.
 import { USDC, EURC, type Asset } from '../core/assets.js';
 import type { CollectorConfig } from './config.js';
 

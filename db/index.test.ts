@@ -20,7 +20,7 @@ const quotes: QuoteInsert[] = [
 ];
 
 describe('openDb + insertTickWithQuotes', () => {
-  it('persiste un tick + ses quotes et préserve les stroops bigint', () => {
+  it('persists a tick + its quotes and preserves bigint stroops', () => {
     const db = openDb(':memory:');
     const tickId = db.insertTickWithQuotes(tick, quotes);
     expect(tickId).toBeGreaterThan(0);
@@ -29,18 +29,18 @@ describe('openDb + insertTickWithQuotes', () => {
     expect(rows.length).toBe(2);
     expect((rows[0] as any).source_id).toBe('xbull');
 
-    // bigint exact via setReadBigInts
+    // exact bigint via setReadBigInts
     const stmt = db.raw().prepare('SELECT net_out FROM quote WHERE source_id = ?');
     stmt.setReadBigInts(true);
     expect((stmt.get('xbull') as any).net_out).toBe(505_000_000n);
 
-    // raw stocké seulement quand présent
+    // raw stored only when present
     const raws = db.raw().prepare('SELECT COUNT(*) AS n FROM quote_raw').get() as any;
     expect(Number(raws.n)).toBe(1);
     db.close();
   });
 
-  it('ON DELETE CASCADE : supprimer un tick purge ses quotes et raw', () => {
+  it('ON DELETE CASCADE: deleting a tick purges its quotes and raw', () => {
     const db = openDb(':memory:');
     const tickId = db.insertTickWithQuotes(tick, quotes);
     db.raw().prepare('DELETE FROM tick WHERE id = ?').run(tickId);
@@ -49,16 +49,16 @@ describe('openDb + insertTickWithQuotes', () => {
     db.close();
   });
 
-  it('purgeManualTicks : ne supprime que les ticks note=manual (+ cascade), garde le reste', () => {
+  it('purgeManualTicks: only deletes note=manual ticks (+ cascade), keeps the rest', () => {
     const db = openDb(':memory:');
     const scheduled = db.insertTickWithQuotes(tick, quotes);
     db.insertTickWithQuotes({ ...tick, started_at: '2026-06-16T10:05:00.000Z', note: 'manual' }, quotes);
     db.insertTickWithQuotes({ ...tick, started_at: '2026-06-16T10:06:00.000Z', note: 'exception: boom', ok: false }, []);
 
-    expect(db.purgeManualTicks()).toBe(1); // 1 seul tick manuel
+    expect(db.purgeManualTicks()).toBe(1); // only 1 manual tick
     const ids = db.raw().prepare('SELECT id, note FROM tick ORDER BY id').all() as any[];
-    expect(ids.map((r) => r.note)).toEqual([null, 'exception: boom']); // manuel parti, programmé + exception restent
-    // quotes du tick manuel partis en cascade ; ceux du programmé restent
+    expect(ids.map((r) => r.note)).toEqual([null, 'exception: boom']); // manual gone, scheduled + exception remain
+    // quotes from the manual tick cascade away; the scheduled tick's remain
     const qn = db.raw().prepare('SELECT COUNT(*) AS n FROM quote WHERE tick_id = ?').get(scheduled) as any;
     expect(Number(qn.n)).toBe(2);
     db.close();
@@ -72,7 +72,7 @@ describe('insertTickWithQuotes — rpc_call_log', () => {
     chosen: true, sim_errors: 0, rpc_calls: 42, error: null,
   };
 
-  it('écrit une ligne rpc_call_log kind=auto quand note=null et chosen probe a rpc_calls>0', () => {
+  it('writes an rpc_call_log row kind=auto when note=null and chosen probe has rpc_calls>0', () => {
     const db = openDb(':memory:');
     const t: TickInsert = {
       started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:05.000Z',
@@ -89,7 +89,7 @@ describe('insertTickWithQuotes — rpc_call_log', () => {
     db.close();
   });
 
-  it('écrit kind=refresh quand note=manual', () => {
+  it('writes kind=refresh when note=manual', () => {
     const db = openDb(':memory:');
     const t: TickInsert = {
       started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:03.000Z',
@@ -103,7 +103,7 @@ describe('insertTickWithQuotes — rpc_call_log', () => {
     db.close();
   });
 
-  it('n\'écrit aucune ligne si rpc_calls=0 (sonde non-chosen ou pas d\'appels)', () => {
+  it('writes no row when rpc_calls=0 (non-chosen probe or no calls)', () => {
     const db = openDb(':memory:');
     const t: TickInsert = {
       started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:01.000Z',
@@ -117,7 +117,7 @@ describe('insertTickWithQuotes — rpc_call_log', () => {
     db.close();
   });
 
-  it('n\'écrit pas de ligne pour une sonde non-chosen', () => {
+  it('writes no row for a non-chosen probe', () => {
     const db = openDb(':memory:');
     const t: TickInsert = {
       started_at: '2026-06-19T10:00:00.000Z', finished_at: '2026-06-19T10:00:01.000Z',
@@ -132,10 +132,10 @@ describe('insertTickWithQuotes — rpc_call_log', () => {
   });
 });
 
-describe('migrate : migration additive idempotente', () => {
-  it('ajoute rpc_calls à une rpc_probe pré-existante sans la colonne (régression incident 429/no-column)', () => {
+describe('migrate: idempotent additive migration', () => {
+  it('adds rpc_calls to a pre-existing rpc_probe missing the column (regression: 429/no-column)', () => {
     const db = new DatabaseSync(':memory:');
-    // Simule une DB créée AVANT l'ajout de rpc_calls (schéma déployé en 5011b0d)
+    // Simulates a DB created before rpc_calls was added
     db.exec('CREATE TABLE tick (id INTEGER PRIMARY KEY, started_at TEXT)');
     db.exec(`CREATE TABLE rpc_probe (
       id INTEGER PRIMARY KEY, tick_id INTEGER, url TEXT, ok INTEGER, latency_ms INTEGER,
@@ -144,11 +144,11 @@ describe('migrate : migration additive idempotente', () => {
     const before = db.prepare('PRAGMA table_info(rpc_probe)').all() as Array<{ name: string }>;
     expect(before.some((c) => c.name === 'rpc_calls')).toBe(false);
 
-    migrate(db); // doit ALTER TABLE ADD COLUMN rpc_calls
+    migrate(db); // should ALTER TABLE ADD COLUMN rpc_calls
 
     const after = db.prepare('PRAGMA table_info(rpc_probe)').all() as Array<{ name: string }>;
     expect(after.some((c) => c.name === 'rpc_calls')).toBe(true);
-    // l'INSERT nommant rpc_calls (celui qui crashait le collecteur) fonctionne désormais
+    // the INSERT naming rpc_calls now succeeds
     db.exec("INSERT INTO tick (started_at) VALUES ('2026-06-19T00:00:00Z')");
     db.exec('INSERT INTO rpc_probe (tick_id, url, ok, chosen, rpc_calls) VALUES (1, \'u\', 1, 1, 7)');
     const row = db.prepare('SELECT rpc_calls FROM rpc_probe').get() as { rpc_calls: number };
@@ -156,8 +156,8 @@ describe('migrate : migration additive idempotente', () => {
     db.close();
   });
 
-  it('idempotent : re-migrer une DB déjà à jour ne change rien', () => {
-    const db = openDb(':memory:'); // crée le schéma complet (rpc_calls inclus)
+  it('idempotent: re-running migrate on an up-to-date DB changes nothing', () => {
+    const db = openDb(':memory:'); // creates the full schema (rpc_calls included)
     expect(() => migrate(db.raw())).not.toThrow();
     const cols = db.raw().prepare('PRAGMA table_info(rpc_probe)').all() as Array<{ name: string }>;
     expect(cols.filter((c) => c.name === 'rpc_calls').length).toBe(1);

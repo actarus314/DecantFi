@@ -1,5 +1,5 @@
-// Inscriptibilité d'un dossier : crée le dossier + y écrit un témoin ; lance si impossible.
-// Isolé du daemon (qui auto-exécute main()) pour rester testable.
+// Directory writability: creates the directory + writes a probe file to it; throws if it fails.
+// Isolated from the daemon (which auto-runs main()) to stay testable.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 

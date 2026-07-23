@@ -25,17 +25,17 @@ function fakeAdapter(id: string, net: bigint, available = true): SourceAdapter {
 const cfg = (adapters: SourceAdapter[]): EngineConfig => ({ rpcUrl: '', horizonUrl: '', prices, adapters });
 
 describe('finalize', () => {
-  it('net = brut (gas NON deduit, juste estime) + impact vs spot', () => {
+  it('net = gross (gas NOT deducted, just estimated) + impact vs spot', () => {
     const q = mk('x', toStroops('50.9'), { grossOut: toStroops('50.9'), gasXlm: 450_000n }) as NormalizedQuote;
     const f = finalize(q, prices);
-    expect(f.gasInTarget).toBeGreaterThan(0n);        // gas toujours estime (informatif)
-    expect(f.netOut).toBe(toStroops('50.9'));          // mais net == brut (plus deduit)
+    expect(f.gasInTarget).toBeGreaterThan(0n);        // gas always estimated (informational)
+    expect(f.netOut).toBe(toStroops('50.9'));          // but net == gross (no longer deducted)
     expect(f.priceImpactPct).toBeDefined();
   });
 });
 
-describe('quote vers USDC', () => {
-  it('classe les sources, remonte le meilleur net + le plancher Horizon', async () => {
+describe('quote to USDC', () => {
+  it('ranks the sources, surfaces the best net + the Horizon floor', async () => {
     const adapters = [
       fakeAdapter('a', toStroops('50.5')),
       fakeAdapter('b', toStroops('50.9')),
@@ -47,7 +47,7 @@ describe('quote vers USDC', () => {
     expect(r.errors).toEqual([]);
   });
 
-  it('tolere une source qui jette (non bloquant)', async () => {
+  it('tolerates a source that throws (non-blocking)', async () => {
     const boom: SourceAdapter = {
       id: 'boom',
       available: () => true,
@@ -65,7 +65,7 @@ describe('quote vers USDC', () => {
     expect(r.errors).toContain('boom');
   });
 
-  it('exclut une source qui ne supporte pas la paire (pas listee comme echec)', async () => {
+  it('excludes a source that does not support the pair (not listed as a failure)', async () => {
     const na: SourceAdapter = {
       id: 'na',
       available: () => true,
@@ -84,7 +84,7 @@ describe('quote vers USDC', () => {
     expect(r.ranking.ranked.map((q) => q.source)).toEqual(['a']);
   });
 
-  it('ignore les sources non disponibles', async () => {
+  it('ignores unavailable sources', async () => {
     const r = await quote({
       sell: BLND,
       buy: USDC,
@@ -95,8 +95,8 @@ describe('quote vers USDC', () => {
   });
 });
 
-describe('quote vers EURC', () => {
-  it('compare direct vs via-USDC et choisit le meilleur net EURC', async () => {
+describe('quote to EURC', () => {
+  it('compares direct vs via-USDC and picks the best EURC net', async () => {
     // Use an executable source id so the composite legs pass the isExecutableSource filter.
     const dynamic: SourceAdapter = {
       id: 'xbull',
@@ -120,8 +120,8 @@ describe('quote vers EURC', () => {
   });
 });
 
-describe('quote EURC sans BLND en vente (composite doit être ignoré)', () => {
-  it('ne déclenche pas compareEurc quand sell != BLND', async () => {
+describe('quote EURC without BLND as sell asset (composite must be skipped)', () => {
+  it('does not trigger compareEurc when sell != BLND', async () => {
     const dynamic: SourceAdapter = {
       id: 'dyn',
       available: () => true,
@@ -138,14 +138,14 @@ describe('quote EURC sans BLND en vente (composite doit être ignoré)', () => {
       },
     };
     const r = await quote({ sell: USDC, buy: EURC, amountIn: toStroops('50'), cfg: cfg([dynamic]) });
-    // eurc doit être undefined : pas de vente BLND, composite non pertinent
+    // eurc must be undefined: no BLND sell, composite not relevant
     expect(r.eurc).toBeUndefined();
     expect(r.ranking.best?.source).toBe('dyn');
   });
 });
 
 describe('errorReasons (③-bis)', () => {
-  it('null → indisponible, throw TimeoutError → timeout', async () => {
+  it('null -> unavailable, throw TimeoutError -> timeout', async () => {
     const empty: SourceAdapter = { id: 'empty', available: () => true, async quote() { return null; } };
     const slow: SourceAdapter = {
       id: 'slow', available: () => true,
@@ -157,6 +157,6 @@ describe('errorReasons (③-bis)', () => {
     });
     expect(r.errorReasons!['empty']).toBe('indisponible');
     expect(r.errorReasons!['slow']).toBe('timeout');
-    expect(r.errorReasons!['a']).toBeUndefined(); // succès → pas de cause
+    expect(r.errorReasons!['a']).toBeUndefined(); // success -> no cause
   });
 });

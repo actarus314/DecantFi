@@ -1,7 +1,7 @@
-// Phoenix : AMM Soroban, sonde directe read-only via `simulate_swap` sur le contrat pool.
-// Pas de pool BLND mainnet → inerte pour les paires BLND ; sert de cross-check de prix /
-// préparation multi-jetons. simulate_swap = pure view (pas de transfer) → aucun témoin financé
-// nécessaire, n'importe quelle adresse G... valide suffit comme source de la tx builder.
+// Phoenix: Soroban AMM, direct read-only probe via `simulate_swap` on the pool contract.
+// No BLND pool on mainnet → inert for BLND pairs; serves as a price cross-check /
+// multi-asset preparation. simulate_swap = pure view (no transfer) → no funded witness
+// needed, any valid G... address works as the tx builder source.
 import type { SourceAdapter, NormalizedQuote, QuoteRequest, SourceConfig } from './types.js';
 import { DEFAULT_GAS_XLM } from '../gas.js';
 import { hops, cached } from './util.js';
@@ -9,16 +9,16 @@ import { setReason, rpcReason } from './diag.js';
 import { bumpRpc } from '../rpc-meter.js';
 import { XLM, USDC, EURC } from '../assets.js';
 
-// Compte source neutre pour la simulation read-only (simulate_swap = pure view, pas de transfer).
+// Neutral source account for the read-only simulation (simulate_swap = pure view, no transfer).
 const PHOENIX_PROBE_SRC = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN';
 
-/** Clé canonique de paire (ordre trié) : pairKey(A, B) == pairKey(B, A). */
+/** Canonical pair key (sorted order): pairKey(A, B) == pairKey(B, A). */
 const pairKey = (a: string, b: string) => [a, b].sort().join('|');
 
-// Pools Phoenix confirmés on-chain. Clés = pairKey des deux SAC.
-// BLND intentionnellement absent : aucun pool Phoenix BLND n'existe sur mainnet → adaptateur inerte
-// pour les paires BLND. Des pools supplémentaires (PHO, EURx…) peuvent être ajoutés quand DecantFi
-// couvrira ces actifs.
+// Phoenix pools confirmed on-chain. Keys = pairKey of the two SACs.
+// BLND intentionally absent: no Phoenix BLND pool exists on mainnet → adapter is inert
+// for BLND pairs. Additional pools (PHO, EURx…) can be added once DecantFi
+// covers those assets.
 const POOLS: Record<string, { address: string; feeBps: number }> = {
   [pairKey(XLM.sac, USDC.sac)]: {
     address: 'CBHCRSVX3ZZ7EGTSYMKPEFGZNWRVCSESQR3UABET4MIW52N4EVU6BIZX',
@@ -34,7 +34,7 @@ function poolFor(req: QuoteRequest): { address: string; feeBps: number } | undef
   return POOLS[pairKey(req.sellAsset.sac, req.buyAsset.sac)];
 }
 
-/** SimulateSwapResponse.ask_amount = net reçu (déjà net de commission). null si absent/≤0. */
+/** SimulateSwapResponse.ask_amount = net received (already net of commission). null if absent/≤0. */
 export function decodePhoenixOut(native: unknown): bigint | null {
   if (native == null || typeof native !== 'object') return null;
   const ask = (native as Record<string, unknown>)['ask_amount'];
@@ -58,7 +58,7 @@ export const phoenix: SourceAdapter = {
       try {
         return await livePhoenix(req, cfg, pool);
       } catch (e) {
-        setReason(rpcReason(e)); // 429 / timeout / rpc — pour l'affichage santé
+        setReason(rpcReason(e)); // 429 / timeout / rpc — for the health display
         return null;
       }
     });

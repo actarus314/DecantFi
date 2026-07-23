@@ -1,5 +1,5 @@
-// Orchestrateur d'exécution : BLND → USDC/EURC via xBull, Soroswap, Horizon ou Aquarius.
-// Money-path : bigint stroops partout, jamais de float pour les calculs.
+// Execution orchestrator: BLND → USDC/EURC via xBull, Soroswap, Horizon, or Aquarius.
+// Money-path: bigint stroops throughout, never float for calculations.
 import { BLND, USDC, EURC, XLM, ASSETS, bySac, classicColon, type Asset } from '../core/assets.js';
 import { decodeTransfers, routeFromTransfers, type Transfer } from '../core/soroban-route.js';
 import { bumpRpc } from '../core/rpc-meter.js';
@@ -11,10 +11,10 @@ import { SB_FEE_ACCOUNT } from '../core/sources/stellarbroker.js';
 import { parseBlndBalance } from '../core/balance.js';
 import { SoroswapSDK, SupportedNetworks, SupportedProtocols, TradeType } from '@soroswap/sdk';
 
-/** Venues d'exécution branchées. Ajouter une venue = étendre cette union (et son cas de build/submit). */
+/** Wired execution venues. Adding a venue = extending this union (and its build/submit case). */
 export type Venue = 'xbull' | 'soroswap' | 'horizon' | 'aquarius' | 'comet' | 'ultrastellar';
 
-// ─── User-Agent commun (xBull bloque l'UA Node par défaut) ──────────────────
+// ─── Shared User-Agent (xBull blocks the default Node UA) ───────────────────
 const XBULL_UA = 'Mozilla/5.0 (compatible; DecantFi/0.1; +exec)';
 const XBULL_BASE = 'https://swap.apis.xbull.app';
 const HORIZON_BASE_DEFAULT = 'https://horizon.stellar.org';
@@ -25,14 +25,14 @@ const I128_MAX = 170141183460469231731687303715884105727n;
 // RPC connection hangs the caller forever — and a hung re-sim freezes the whole collector tick loop.
 const SIM_TIMEOUT_MS = 15000;
 
-// ─── Erreur typée ────────────────────────────────────────────────────────────
+// ─── Typed error ──────────────────────────────────────────────────────────────
 
 export class ExecError extends Error {
   constructor(
     public code: 'trustline' | 'funds' | 'slippage' | 'down' | 'no-route' | 'bad_request',
     message: string,
-    /** Pour les erreurs trustline : le CODE de l'actif réellement manquant (USDC au leg1, EURC au leg2…).
-     *  Indispensable au front pour ajouter/relancer la BONNE trustline (le `target` global ≠ l'actif de la jambe). */
+    /** For trustline errors: the CODE of the actually missing asset (USDC on leg1, EURC on leg2…).
+     *  Needed by the frontend to add/retry the RIGHT trustline (the global `target` ≠ the leg's asset). */
     public asset?: string,
   ) {
     super(message);
@@ -40,8 +40,8 @@ export class ExecError extends Error {
   }
 }
 
-/** Message d'erreur trustline actionnable : indique comment ajouter la trustline dans le wallet.
- *  Utiliser à la place de `new ExecError('trustline', ...)` partout où la trustline de sortie est absente. */
+/** Actionable trustline error message: explains how to add the trustline in the wallet.
+ *  Use instead of `new ExecError('trustline', ...)` everywhere the output trustline is missing. */
 function trustlineMissingError(buy: Asset, sender: string): ExecError {
   return new ExecError(
     'trustline',
@@ -52,7 +52,7 @@ function trustlineMissingError(buy: Asset, sender: string): ExecError {
   );
 }
 
-// ─── Helpers purs exportés ───────────────────────────────────────────────────
+// ─── Pure exported helpers ────────────────────────────────────────────────────
 
 /** Converts a Stellar SDK Asset object (decoded from XDR) to a core Asset,
  *  or null if the asset is not in the known registry (unknown → cannot route). */
@@ -63,7 +63,7 @@ function sdkAssetToCore(a: { isNative(): boolean; getCode(): string; getIssuer()
   return ASSETS.find((x) => x.code === code && x.issuer === issuer) ?? null;
 }
 
-/** Floor-division : net * (10000-bps) / 10000. Lance si bps invalide. */
+/** Floor-division: net * (10000-bps) / 10000. Throws if bps is invalid. */
 export function minReceivedStroops(net: bigint, slippageBps: number): bigint {
   if (slippageBps < 0 || slippageBps >= 10000) {
     throw new RangeError(`slippageBps invalide : ${slippageBps}`);
@@ -71,7 +71,7 @@ export function minReceivedStroops(net: bigint, slippageBps: number): bigint {
   return (net * BigInt(10000 - slippageBps)) / 10000n;
 }
 
-/** Gagnant par netOut max (stable : à égalité, le premier l'emporte). */
+/** Winner by max netOut (stable: on a tie, the first one wins). */
 export function pickBest<T extends { netOut: bigint }>(quotes: Array<T | null>): T | null {
   let best: T | null = null;
   for (const q of quotes) {
@@ -81,7 +81,7 @@ export function pickBest<T extends { netOut: bigint }>(quotes: Array<T | null>):
   return best;
 }
 
-/** Valide la réponse accept-quote xBull ; null si mal formée. */
+/** Validates the xBull accept-quote response; null if malformed. */
 export function parseXbullAcceptQuote(raw: unknown): { id: string; xdr: string; type: 'full' | 'restore' } | null {
   if (raw === null || typeof raw !== 'object') return null;
   const obj = raw as Record<string, unknown>;
@@ -104,7 +104,7 @@ export function feeExceedsSpendable(
   return { exceeds: maxFeeStroops > spendable, spendableStroops: Math.max(0, spendable) };
 }
 
-/** Classification des erreurs d'exécution. Insensible à la casse. */
+/** Execution error classification. Case-insensitive. */
 export function classifyExecError(message: string): 'trustline' | 'funds' | 'slippage' | 'down' {
   const m = message.toLowerCase();
   if (m.includes('trust')) return 'trustline';
@@ -126,9 +126,9 @@ function safeExecMessage(code: ExecError['code']): string {
   }
 }
 
-/** Label de route lisible pour l'UI.
- *  Soroswap : chaque SAC → symbole via bySac (fallback C1234…7890).
- *  xBull : route décodée depuis la sim (simulateXbullNet) — plus de masque ☁. */
+/** Human-readable route label for the UI.
+ *  Soroswap: each SAC → symbol via bySac (fallback C1234…7890).
+ *  xBull: route decoded from the sim (simulateXbullNet) — no more ☁ mask. */
 export function routeLabel(
   venue: 'xbull' | 'soroswap',
   target: 'USDC' | 'EURC',
@@ -156,15 +156,15 @@ export interface ReviewData {
   minReceived: number;
   slippageBps: number;
   route: string;
-  /** Frais réseau max (fee du XDR en XLM). Plafond autorisé par le wallet. */
+  /** Max network fee (XDR fee, in XLM). Cap authorized by the wallet. */
   gasFeeXlm: number;
-  /** Frais réseau réels estimés (resource fee Soroban de la simulation ; == gasFeeXlm pour une tx classique). */
+  /** Estimated real network fee (Soroban resource fee from the simulation; == gasFeeXlm for a classic tx). */
   gasRealXlm?: number;
-  /** Présent seulement si le net affiché au meta-agrégateur était supérieur à ce qu'on exécute. */
+  /** Present only when the net shown by the meta-aggregator was higher than what we actually execute. */
   fidelity?: { displayedWinner: string; displayedWinnerNet: number };
 }
 
-/** {max: fee totale autorisée, real: resource fee Soroban (coût réel estimé depuis la sim)}. Pour tx classique real==max. */
+/** {max: total authorized fee, real: Soroban resource fee (estimated real cost from the sim)}. For a classic tx real==max. */
 export async function xdrGasBreakdown(xdr: string): Promise<{ real: number; max: number }> {
   try {
     const { TransactionBuilder, Networks } = await import('@stellar/stellar-sdk');
@@ -178,7 +178,7 @@ export async function xdrGasBreakdown(xdr: string): Promise<{ real: number; max:
         const resourceFee = extVal?.sorobanData?.()?.resourceFee?.();
         if (resourceFee != null) return { real: Number(resourceFee) / 1e7, max };
       }
-    } catch { /* tx classique sans sorobanData */ }
+    } catch { /* classic tx without sorobanData */ }
     return { real: max, max };
   } catch {
     return { real: 0, max: 0 };
@@ -211,7 +211,7 @@ export function reviewData(args: {
     gasRealXlm: args.gasRealXlm,
   };
 
-  // Fidelity : écart entre ce qui était affiché et ce qu'on exécute réellement.
+  // Fidelity: gap between what was displayed and what we actually execute.
   const dw = args.displayed?.winner;
   const dn = args.displayed?.net;
   if (dw && dn != null && dn - toNumber(args.netStroops) > 1e-6) {
@@ -221,7 +221,7 @@ export function reviewData(args: {
   return r;
 }
 
-// ─── IO injectable ───────────────────────────────────────────────────────────
+// ─── Injectable IO ────────────────────────────────────────────────────────────
 
 export interface FetchResult {
   status: number;
@@ -239,28 +239,28 @@ export interface SoroswapClient {
 
 export type SendStatus = 'PENDING' | 'DUPLICATE' | 'TRY_AGAIN_LATER' | 'ERROR';
 
-/** Client RPC Soroban minimal pour le fire-and-poll. Injectable → tests hermétiques. */
+/** Minimal Soroban RPC client for fire-and-poll. Injectable → hermetic tests. */
 export interface SorobanRpcClient {
-  /** FIRE : envoie le XDR signé ; rend le statut d'admission mempool + le hash. */
+  /** FIRE: sends the signed XDR; returns the mempool admission status + hash. */
   send(signedXdr: string): Promise<{ status: SendStatus; hash: string; errorResult?: unknown }>;
-  /** POLL : statut on-chain d'une tx par hash. */
+  /** POLL: on-chain status of a tx by hash. */
   status(hash: string): Promise<{ status: 'SUCCESS' | 'NOT_FOUND' | 'FAILED' }>;
 }
 
 export interface ExecDeps {
   fetchJson: (url: string, init?: { method?: string; body?: unknown }) => Promise<FetchResult>;
   makeSoroswap: (apiKey: string) => SoroswapClient;
-  /** Cotation Comet : simulation read-only de swap_exact_amount_in (sortie indépendante du user). Injectable → tests hermétiques. */
+  /** Comet quote: read-only simulation of swap_exact_amount_in (output independent of the user). Injectable → hermetic tests. */
   simulateComet: (a: { sellSac: string; buySac: string; amountIn: bigint; rpcUrl: string }) => Promise<bigint | null>;
   /** xBull net simulation via accept-quote + simulateTransaction. Injectable → hermetic tests. */
   simulateXbullNet: (a: { route: string; amountIn: bigint; rpcUrl: string }) => Promise<{ net: bigint; route: string[]; transfers: Transfer[] } | null>;
-  /** Client RPC Soroban (fire-and-poll : sendTransaction + getTransaction). Injectable → tests hermétiques. */
+  /** Soroban RPC client (fire-and-poll: sendTransaction + getTransaction). Injectable → hermetic tests. */
   makeRpc: (rpcUrl: string) => SorobanRpcClient;
 }
 
-/** Dépendances réelles avec fetch réseau.
- * ponytail: contrairement à core/sources/http.ts qui retourne null sur erreur (silencieux),
- * fetchJson remonte les détails d'erreur dans body pour permettre des ExecError claires côté appelant. */
+/** Real dependencies backed by network fetch.
+ * ponytail: unlike core/sources/http.ts which returns null on error (silent),
+ * fetchJson surfaces error details in body so callers can build clear ExecErrors. */
 export function defaultDeps(timeoutMs?: number): ExecDeps {
   return {
     async fetchJson(url, init) {
@@ -300,7 +300,7 @@ export function defaultDeps(timeoutMs?: number): ExecDeps {
   };
 }
 
-/** Implémentation réelle du client RPC Soroban (fire-and-poll). Import SDK paresseux + timeout par appel. */
+/** Real implementation of the Soroban RPC client (fire-and-poll). Lazy SDK import + per-call timeout. */
 function makeRpcReal(rpcUrl: string): SorobanRpcClient {
   const base = rpcUrl.replace(/\/$/, '');
   return {
@@ -320,9 +320,9 @@ function makeRpcReal(rpcUrl: string): SorobanRpcClient {
   };
 }
 
-/** Cotation Comet read-only : simule swap_exact_amount_in avec la liste de témoins COMET_WITNESSES
- *  (la sortie ne dépend QUE des réserves du pool, pas du user). Prend le 1er témoin dont la sim passe.
- *  null si tous les témoins échouent ou si le pool est absent. Calque core/sources/comet.ts. */
+/** Read-only Comet quote: simulates swap_exact_amount_in using the COMET_WITNESSES list
+ *  (the output depends ONLY on the pool reserves, not the user). Takes the 1st witness whose sim succeeds.
+ *  null if all witnesses fail or the pool is missing. Mirrors core/sources/comet.ts. */
 async function simulateCometReal(a: { sellSac: string; buySac: string; amountIn: bigint; rpcUrl: string }): Promise<bigint | null> {
   const sdk = await import('@stellar/stellar-sdk');
   const { rpc, Address, TransactionBuilder, Networks, Account, Contract, scValToNative, nativeToScVal } = sdk;
@@ -350,15 +350,15 @@ async function simulateCometReal(a: { sellSac: string; buySac: string; amountIn:
 
 // ─── Simulation Aquarius read-only ───────────────────────────────────────────
 
-/** Témoins BLND ayant assez de liquidité pour simuler swap_chained (le solde n'est pas touché). */
+/** BLND witnesses with enough liquidity to simulate swap_chained (their balance is never touched). */
 export const AQUARIUS_WITNESSES = [
   'GCA34HBKNLWN3AOXWBRW5Y3HSGHCWF3UDBRJ5YHGU6HWGJZEPO2NSXI3',
   'GBBF7X4FQ3HGRIDSNQ2HOPS6BP7ZERJN22Y54O5WAOAK4CAA4FV3K3G2',
   'GC7IUIQ7R6NOIFNB4PYFNVYVNHSLJIULSWQTXG7UK33UTIC6NSZIW2BC',
 ];
 
-/** Simule swap_chained Aquarius avec out_min=0 pour obtenir le net réel (sans revert de slippage).
- *  null si tous les témoins échouent ou si le XDR n'est pas décodable. */
+/** Simulates Aquarius swap_chained with out_min=0 to get the real net (without a slippage revert).
+ *  null if all witnesses fail or the XDR isn't decodable. */
 export async function simulateAquariusNet(
   swapChainXdr: string,
   amountIn: bigint,
@@ -397,10 +397,10 @@ export async function simulateAquariusNet(
   return null;
 }
 
-/** Simule xBull via accept-quote (minToGet='0') pour obtenir le vrai fill net (sans le skim de 0,1 %).
- *  Réutilise AQUARIUS_WITNESSES : comptes témoins communs (BLND + USDC + EURC trustlines, grands soldes).
- *  Extrait également la route réelle depuis la chaîne de transferts SAC des events de simulation.
- *  null si tous les témoins échouent ou si le XDR n'est pas simulable. */
+/** Simulates xBull via accept-quote (minToGet='0') to get the real net fill (without the 0.1% skim).
+ *  Reuses AQUARIUS_WITNESSES: shared witness accounts (BLND + USDC + EURC trustlines, large balances).
+ *  Also extracts the real route from the SAC transfer chain in the simulation events.
+ *  null if all witnesses fail or the XDR isn't simulable. */
 export async function simulateXbullNet(
   route: string,
   amountIn: bigint,
@@ -436,7 +436,7 @@ export async function simulateXbullNet(
       const rv = scValToNative(sim.result.retval);
       if (!Array.isArray(rv) || rv.length < 2) continue;
       const net = BigInt(rv[1]);
-      // Extraction de la route réelle depuis la chaîne de transferts SAC
+      // Extract the real route from the SAC transfer chain
       const transfers = await decodeTransfers((sim as any).events ?? []);
       const decodedRoute = routeFromTransfers(transfers);
       return { net, route: decodedRoute.length >= 2 ? decodedRoute : [], transfers };
@@ -689,9 +689,9 @@ export async function simulateStellarBrokerNet(opts: {
   return { net: totalNet, route, exact: !classicContributed };
 }
 
-/** Simule swap_chained Aquarius et retourne les Transfer[] bruts (pour la sonde de cohérence).
- *  Même logique que simulateAquariusNet mais retourne les events décodés au lieu du retval.
- *  null si tous les témoins échouent ou si le XDR n'est pas décodable. */
+/** Simulates Aquarius swap_chained and returns the raw Transfer[] (for the consistency probe).
+ *  Same logic as simulateAquariusNet but returns the decoded events instead of the retval.
+ *  null if all witnesses fail or the XDR isn't decodable. */
 export async function simulateAquariusTransfers(
   swapChainXdr: string,
   amountIn: bigint,
@@ -728,9 +728,9 @@ export async function simulateAquariusTransfers(
   return null;
 }
 
-/** Simule un swap Soroswap et retourne les Transfer[] bruts (pour la sonde de cohérence).
- *  Construit le XDR via buildSoroswap puis simule sans préparer (simulateTransaction).
- *  null si le build échoue ou si la simulation échoue. */
+/** Simulates a Soroswap swap and returns the raw Transfer[] (for the consistency probe).
+ *  Builds the XDR via buildSoroswap then simulates without preparing (simulateTransaction).
+ *  null if the build fails or the simulation fails. */
 export async function simulateSoroswapTransfers(
   client: SoroswapClient,
   quote: unknown,
@@ -752,9 +752,9 @@ export async function simulateSoroswapTransfers(
   }
 }
 
-/** Simule swap_exact_amount_in Comet et retourne les Transfer[] bruts (pour la sonde de cohérence).
- *  Calque simulateCometReal mais retourne les events décodés au lieu du net.
- *  null si tous les témoins échouent. */
+/** Simulates Comet swap_exact_amount_in and returns the raw Transfer[] (for the consistency probe).
+ *  Mirrors simulateCometReal but returns the decoded events instead of the net.
+ *  null if all witnesses fail. */
 export async function simulateCometTransfers(a: {
   sellSac: string;
   buySac: string;
@@ -857,11 +857,11 @@ export async function quoteSoroswap(
   slippageBps: number,
 ): Promise<{ venue: 'soroswap'; netOut: bigint; minOut: bigint; soroPath?: string[]; quote: unknown } | null> {
   try {
-    // SOROSWAP uniquement — vérifié empiriquement 2026-06-24 (cote vs vrai fill simulé, la méthode qui a
-    // démystifié xBull) : protocols multi (PHOENIX/AQUA/SDEX) renvoie des routes Aqua aux cotes absurdes
-    // (USDC→EURC +2261 %, BLND→EURC +124 %) qui ÉCHOUENT au build ('Invalid poolHashes', bug @soroswap/sdk
-    // 0.4.0). Bug du SDK off-chain, pas du contrat on-chain ; et la liquidité Aqua est déjà captée honnêtement
-    // par l'adaptateur Aquarius keyless (find-path, 100 % fill). Ne PAS réactiver multi sans re-vérifier.
+    // SOROSWAP only — verified empirically (quote vs. real simulated fill, the same method used to
+    // debunk xBull's quotes): multi-protocol (PHOENIX/AQUA/SDEX) returns Aqua routes with absurd quotes
+    // (USDC→EURC +2261%, BLND→EURC +124%) that FAIL at build time ('Invalid poolHashes', @soroswap/sdk
+    // 0.4.0 bug). Off-chain SDK bug, not an on-chain contract bug; and Aqua liquidity is already captured
+    // honestly by the keyless Aquarius adapter (find-path, 100% fill). Do NOT re-enable multi without re-verifying.
     const q = await client.quote({
       assetIn: sellSac,
       assetOut: buySac,
@@ -869,18 +869,18 @@ export async function quoteSoroswap(
       tradeType: TradeType.EXACT_IN,
       protocols: [SupportedProtocols.SOROSWAP],
       slippageBps,
-      // ponytail: parité avec le collecteur (core/sources/soroswap.ts maxHops:2). No-op aujourd'hui
-      // (l'API route déjà BLND→USDC→EURC) mais épingle le multi-hop : empêche une dégradation
-      // silencieuse vers le pool direct BLND/EURC minuscule si le défaut de l'API changeait.
+      // ponytail: parity with the collector (core/sources/soroswap.ts maxHops:2). No-op today
+      // (the API already routes BLND→USDC→EURC) but pins the multi-hop: prevents a silent
+      // degradation to the tiny direct BLND/EURC pool if the API's default were to change.
       maxHops: 2,
     });
-    // Le SDK type ces champs en bigint mais renvoie des NUMBER au runtime (pas de transformResponse)
-    // → coercition explicite. BigInt() accepte number entier ET bigint, et lance sur un float (fail fast).
+    // The SDK types these fields as bigint but returns NUMBERs at runtime (no transformResponse)
+    // → explicit coercion. BigInt() accepts an integer number AND a bigint, and throws on a float (fail fast).
     const amountOut: bigint = BigInt(q?.amountOut ?? 0);
     if (amountOut <= 0n) return null;
 
-    // amountOutMin : champ canonique du SDK (rawTrade pour EXACT_IN), = seuil min enforced dans le XDR.
-    // Fallback sur minReceivedStroops si absent.
+    // amountOutMin: canonical SDK field (rawTrade for EXACT_IN), = the min threshold enforced in the XDR.
+    // Fallback to minReceivedStroops if absent.
     const rawTradeMin: bigint | undefined =
       q?.rawTrade?.amountOutMin != null ? BigInt(q.rawTrade.amountOutMin) : undefined;
     const minOut: bigint =
@@ -909,15 +909,15 @@ export async function buildSoroswap(
   }
 }
 
-// ─── Quote / build / submit — Horizon (op native PathPaymentStrictSend) ──────
-// Pas d'API d'agrégation : on construit le XDR nous-mêmes avec stellar-sdk depuis le
-// chemin renvoyé par /paths/strict-send. Une tx classique ne se simule pas (≠ Soroban),
-// donc le garde-fou pré-signature = vérif trustline de sortie sur le compte chargé.
+// ─── Quote / build / submit — Horizon (native PathPaymentStrictSend op) ──────
+// No aggregation API: we build the XDR ourselves with stellar-sdk from the
+// path returned by /paths/strict-send. A classic tx can't be simulated (≠ Soroban),
+// so the pre-signature guard is checking the output trustline on the loaded account.
 
 interface HorizonPathRecord { asset_type?: string; asset_code?: string; asset_issuer?: string }
 interface HorizonRecord { destination_amount?: string; path?: HorizonPathRecord[] }
 
-/** Symboles lisibles des actifs intermédiaires d'un chemin Horizon (native → XLM). */
+/** Human-readable symbols for the intermediate assets of a Horizon path (native → XLM). */
 export function horizonPathSymbols(records: HorizonPathRecord[]): string[] {
   return records.map((r) => (r.asset_type === 'native' ? 'XLM' : r.asset_code ?? '?'));
 }
@@ -931,7 +931,7 @@ function horizonSourceParams(a: Asset): Record<string, string> {
   };
 }
 
-/** Re-cote live via Horizon strict-send : meilleur destination_amount + chemin structuré (pour le build). */
+/** Live re-quote via Horizon strict-send: best destination_amount + structured path (for the build). */
 export async function quoteHorizon(
   sell: Asset,
   buy: Asset,
@@ -960,7 +960,7 @@ export async function quoteHorizon(
   return { venue: 'horizon', netOut, path: best?.path ?? [] };
 }
 
-/** Construit le XDR PathPaymentStrictSend (non signé). Pré-flight trustline → ExecError clair. */
+/** Builds the (unsigned) PathPaymentStrictSend XDR. Pre-flight trustline check → clear ExecError. */
 export async function buildHorizon(
   sender: string,
   sell: Asset,
@@ -981,7 +981,7 @@ export async function buildHorizon(
     throw new ExecError('funds', `compte ${sender} introuvable ou non financé`);
   }
 
-  // Trustline de sortie présente ? (USDC/EURC ne sont jamais natifs)
+  // Output trustline present? (USDC/EURC are never native)
   if (!buy.native && !account.balances.some(
     (b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer,
   )) {
@@ -1008,7 +1008,7 @@ export async function buildHorizon(
   return { xdr: tx.toXDR() };
 }
 
-/** Codes d'erreur Horizon (extras.result_codes) → message lisible. */
+/** Horizon error codes (extras.result_codes) → readable message. */
 function horizonResultCodes(e: unknown): string[] {
   const rc = (e as { response?: { data?: { extras?: { result_codes?: { transaction?: string; operations?: string[] } } } } })
     ?.response?.data?.extras?.result_codes;
@@ -1019,24 +1019,24 @@ function horizonResultCodes(e: unknown): string[] {
 
 export function classifyHorizonSubmit(e: unknown): ExecError['code'] {
   const codes = horizonResultCodes(e).join(' ').toLowerCase();
-  // Route consommée / prix bougé depuis la cote → re-coter (slippage, HTTP 400) et pas « indisponible » (502).
+  // Route consumed / price moved since the quote → re-quote (slippage, HTTP 400), not "unavailable" (502).
   if (codes.includes('under_dest_min') || codes.includes('too_few_offers') || codes.includes('cross_self')) return 'slippage';
   if (codes.includes('no_trust') || codes.includes('no_destination') || codes.includes('not_authorized')) return 'trustline';
   if (codes.includes('underfunded') || codes.includes('insufficient') || codes.includes('line_full')) return 'funds';
   return classifyExecError(codes || (e instanceof Error ? e.message : String(e)));
 }
 
-// ─── Quote / build / submit — Aquarius (contrat Soroban swap_chained) ────────
-// find-path API rend swap_chain_xdr (= arg swaps_chain sérialisé, à décoder tel quel) +
-// amount_with_fee (net stroops bruts) + tokens (route). Build via stellar-sdk + prepareTransaction
-// (Soroban EST simulable, ≠ Horizon). Pré-flight trustline = message clair (la sim l'attraperait aussi).
+// ─── Quote / build / submit — Aquarius (Soroban swap_chained contract) ──────
+// find-path API returns swap_chain_xdr (= serialized swaps_chain arg, decode as-is) +
+// amount_with_fee (raw net stroops) + tokens (route). Build via stellar-sdk + prepareTransaction
+// (Soroban IS simulable, ≠ Horizon). Pre-flight trustline check = clear message (the sim would also catch it).
 
-/** Symboles lisibles d'une route Aquarius. tokens find-path : 'native' (→XLM) ou 'CODE:ISSUER'. */
+/** Human-readable symbols for an Aquarius route. find-path tokens: 'native' (→XLM) or 'CODE:ISSUER'. */
 export function aquariusPathSymbols(tokens: string[]): string[] {
   return tokens.map((t) => (t === 'native' ? 'XLM' : t.split(':')[0] ?? t));
 }
 
-/** Re-cote live via Aquarius find-path : net (amount_with_fee) + swap_chain_xdr + route. */
+/** Live re-quote via Aquarius find-path: net (amount_with_fee) + swap_chain_xdr + route. */
 export async function quoteAquarius(
   sellSac: string,
   buySac: string,
@@ -1058,8 +1058,8 @@ export async function quoteAquarius(
   return { venue: 'aquarius', netOut, swapChainXdr: b.swap_chain_xdr, tokens: b.tokens ?? [] };
 }
 
-/** Construit + simule (prepareTransaction) l'appel swap_chained → XDR prêt à signer.
- *  user == sender == source : l'auth Soroban du compte source est couverte par la signature de la tx. */
+/** Builds + simulates (prepareTransaction) the swap_chained call → XDR ready to sign.
+ *  user == sender == source: the source account's Soroban auth is covered by the tx signature. */
 export async function buildAquarius(
   sender: string,
   buy: Asset,
@@ -1111,20 +1111,20 @@ export async function buildAquarius(
   } catch (e) {
     const raw = e instanceof Error ? e.message : String(e);
     process.stderr.write(`ExecError raw: ${raw}\n`);
-    // #2006 = revert du routeur Aquarius quand la sortie simulée < out_min : la route find-path a
-    // sur-coté, elle ne tient pas au slippage demandé (≠ panne, ≠ fonds). Classer en slippage → message actionnable.
+    // #2006 = Aquarius router revert when the simulated output < out_min: the find-path route
+    // over-quoted and doesn't hold at the requested slippage (≠ outage, ≠ funds). Classify as slippage → actionable message.
     if (raw.includes('#2006')) throw new ExecError('slippage', safeExecMessage('slippage'));
     const code = classifyExecError(raw);
     throw new ExecError(code, safeExecMessage(code));
   }
 }
 
-// ─── Quote / build — Comet (contrat pool backstop swap_exact_amount_in) ──────
-// Pool Soroban BLND/USDC UNIQUEMENT (CAS3FL6T…). Cotation = simulation read-only avec COMET_WITNESSES
-// (sortie indépendante du user). Build avec le vrai sender : prepareTransaction enforce le
-// CAVEAT DUR = le sender doit détenir du BLND LIQUIDE (souvent staké dans le backstop → message clair).
+// ─── Quote / build — Comet (backstop pool swap_exact_amount_in contract) ────
+// Soroban pool BLND/USDC ONLY (CAS3FL6T…). Quote = read-only simulation with COMET_WITNESSES
+// (output independent of the user). Build with the real sender: prepareTransaction enforces the
+// HARD CAVEAT = the sender must hold LIQUID BLND (often staked in the backstop → clear message).
 
-/** Re-cote Comet via simulation (deps.simulateComet, injectable). null si pool absent / sim KO. */
+/** Re-quotes Comet via simulation (deps.simulateComet, injectable). null if pool missing / sim fails. */
 export async function quoteComet(
   deps: ExecDeps,
   sellSac: string,
@@ -1137,9 +1137,9 @@ export async function quoteComet(
   return { venue: 'comet', netOut: out };
 }
 
-/** Construit + simule (prepareTransaction) l'appel swap_exact_amount_in → XDR prêt à signer.
- *  Pré-flight trustline USDC + BLND liquide (caveat backstop) pour des messages clairs.
- *  user == sender == source : l'auth Soroban du transfer BLND est couverte par la signature de la tx. */
+/** Builds + simulates (prepareTransaction) the swap_exact_amount_in call → XDR ready to sign.
+ *  Pre-flight checks USDC trustline + liquid BLND (backstop caveat) for clear messages.
+ *  user == sender == source: the BLND transfer's Soroban auth is covered by the tx signature. */
 export async function buildComet(
   sender: string,
   amountIn: bigint,
@@ -1156,7 +1156,7 @@ export async function buildComet(
   } catch {
     throw new ExecError('funds', `compte ${sender} introuvable ou non financé`);
   }
-  // Trustline USDC de sortie (Comet = BLND→USDC uniquement).
+  // Output USDC trustline (Comet = BLND→USDC only).
   if (!account.balances.some(
     (b) => 'asset_code' in b && b.asset_code === USDC.code && b.asset_issuer === USDC.issuer,
   )) {
@@ -1187,26 +1187,26 @@ export async function buildComet(
   }
 }
 
-// ─── Quote / build / submit — Ultra Stellar (split SDEX multi-op classique) ──
-// Ultra ne rend PAS de build : on construit nous-mêmes N PathPaymentStrictSend (1 par jambe du split
-// extended_paths[]) dans UNE tx classique atomique (1 signature). SDEX only (pas de liquidité Soroban)
-// → perd quasi toujours la sélection compétitive ; venue de complétude (click-to-select). Les actifs
-// intermédiaires (AQUA/yXLM/…) n'exigent PAS de trustline (path payment) ; seule la sortie en exige une.
-// Submit = identique à Horizon (tx classique).
+// ─── Quote / build / submit — Ultra Stellar (classic multi-op SDEX split) ───
+// Ultra does NOT return a build: we build N PathPaymentStrictSend ourselves (1 per leg of the
+// extended_paths[] split) in ONE atomic classic tx (1 signature). SDEX only (no Soroban liquidity)
+// → almost always loses the competitive selection; a completeness venue (click-to-select). The
+// intermediate assets (AQUA/yXLM/…) do NOT require a trustline (path payment); only the output does.
+// Submit = identical to Horizon (classic tx).
 
 const ULTRA_ROUTING = 'https://routing.ultrastellar.com/.netlify/functions/v1/smart-routing';
 
 export interface UltraLeg {
-  sendStroops: bigint;       // sourceAmount (BLND) en stroops
-  destStroops: bigint;       // destinationAmount (cible) en stroops
-  path: HorizonPathRecord[]; // intermédiaires (réutilise le type Horizon)
+  sendStroops: bigint;       // sourceAmount (BLND) in stroops
+  destStroops: bigint;       // destinationAmount (target) in stroops
+  path: HorizonPathRecord[]; // intermediates (reuses the Horizon type)
 }
 
 function ultraAssetParam(a: Asset): string {
   return a.native ? 'native' : classicColon(a);
 }
 
-/** Parse la réponse smart-routing → jambes + net. null si aucune jambe valide. */
+/** Parses the smart-routing response → legs + net. null if no valid leg. */
 export function parseUltraQuote(raw: unknown): { netOut: bigint; legs: UltraLeg[] } | null {
   const j = raw as { optimized_sum?: string | number; extended_paths?: Array<{ sourceAmount?: string | number; destinationAmount?: string | number; path?: HorizonPathRecord[] }> } | null;
   const legs: UltraLeg[] = [];
@@ -1217,17 +1217,17 @@ export function parseUltraQuote(raw: unknown): { netOut: bigint; legs: UltraLeg[
       if (sendStroops > 0n && destStroops > 0n) {
         legs.push({ sendStroops, destStroops, path: Array.isArray(p?.path) ? p.path : [] });
       }
-    } catch { /* jambe malformée → ignorée */ }
+    } catch { /* malformed leg → skipped */ }
   }
   if (legs.length === 0) return null;
-  // net = Σ des sorties par jambe RETENUE (≡ optimized_sum quand rien n'est droppé, vérifié live).
-  // On ne lit PAS optimized_sum : si une jambe est ignorée (malformée / arrondie à 0), le net affiché
-  // doit refléter ce qu'on construit réellement — sinon net inflaté vs exécuté = « mensonge » non signalé.
+  // net = Σ of the outputs per RETAINED leg (≡ optimized_sum when nothing is dropped, verified live).
+  // We do NOT read optimized_sum: if a leg is dropped (malformed / rounds to 0), the displayed net
+  // must reflect what we actually build — otherwise the net would be inflated vs. what's executed, silently misleading.
   const netOut = legs.reduce((s, l) => s + l.destStroops, 0n);
   return { netOut, legs };
 }
 
-/** Re-cote live via Ultra smart-routing (param 'fee' OMIS volontairement : fee=0 rejeté = la brute). */
+/** Live re-quote via Ultra smart-routing (param 'fee' deliberately OMITTED: fee=0 rejected = the raw quote). */
 export async function quoteUltra(
   sell: Asset,
   buy: Asset,
@@ -1247,8 +1247,8 @@ export async function quoteUltra(
   return { venue: 'ultrastellar', netOut: parsed.netOut, legs: parsed.legs };
 }
 
-/** Ajuste les jambes pour que Σ sendStroops == total exact (résidu → plus grande jambe).
- *  Garde-fou money-path : la conversion float→stroops peut dériver ; on n'envoie jamais un total ≠ l'input. */
+/** Adjusts the legs so Σ sendStroops == the exact total (residual → largest leg).
+ *  Money-path guard: the float→stroops conversion can drift; we never send a total ≠ the input. */
 export function reconcileLegSends(sends: bigint[], total: bigint): bigint[] {
   if (sends.length === 0) return sends;
   const sum = sends.reduce((a, b) => a + b, 0n);
@@ -1262,8 +1262,8 @@ export function reconcileLegSends(sends: bigint[], total: bigint): bigint[] {
   return out;
 }
 
-/** Construit la tx classique multi-op (N PathPaymentStrictSend). Pré-flight trustline de sortie
- *  (tx classique non simulable, comme Horizon). destMin par jambe = floor slippage de leg.destStroops. */
+/** Builds the classic multi-op tx (N PathPaymentStrictSend). Pre-flight checks the output trustline
+ *  (classic tx not simulable, like Horizon). destMin per leg = slippage floor of leg.destStroops. */
 export async function buildUltra(
   sender: string,
   sell: Asset,
@@ -1309,12 +1309,12 @@ export async function buildUltra(
   return { xdr: tx.toXDR() };
 }
 
-// ─── Trustline (pré-flight + ajout in-app) ───────────────────────────────────
+// ─── Trustline (pre-flight + in-app add) ─────────────────────────────────────
 
-/** Pré-flight : charge le compte une seule fois pour vérifier la trustline ET le solde liquide de sellAsset.
- *  trustline : true/false ou null si lecture impossible (compte introuvable / Horizon en panne).
- *  liquid    : solde liquide de sellAsset en stroops, ou null si lecture impossible.
- *  → null = on laisse les builds gérer, pas de faux-positif. */
+/** Pre-flight: loads the account once to check the trustline AND the liquid balance of sellAsset.
+ *  trustline: true/false, or null if the read fails (account not found / Horizon down).
+ *  liquid   : liquid balance of sellAsset in stroops, or null if the read fails.
+ *  → null = let the builds handle it, no false positive. */
 async function senderPreflight(
   sender: string,
   sellAsset: Asset,
@@ -1329,7 +1329,7 @@ async function senderPreflight(
     const trustline = buy.native
       ? true
       : account.balances.some((b) => 'asset_code' in b && b.asset_code === buy.code && b.asset_issuer === buy.issuer);
-    // Solde liquide de l'actif vendu (pas forcément BLND)
+    // Liquid balance of the sold asset (not necessarily BLND)
     const sellBal = account.balances.find(
       (b) => 'asset_code' in b && b.asset_code === sellAsset.code && b.asset_issuer === sellAsset.issuer,
     );
@@ -1344,8 +1344,8 @@ async function senderPreflight(
   }
 }
 
-/** Construit le XDR changeTrust (non signé) pour ajouter la trustline de l'actif d'achat.
- *  Limite par défaut = max (réception illimitée). Soumis ensuite via la voie classique Horizon (submit horizon). */
+/** Builds the (unsigned) changeTrust XDR to add the trustline for the bought asset.
+ *  Default limit = max (unlimited receiving). Submitted afterwards via the classic Horizon path (submit horizon). */
 export async function buildChangeTrust(sender: string, buy: Asset, horizonUrl?: string): Promise<{ xdr: string }> {
   if (buy.native) throw new ExecError('no-route', 'actif natif : aucune trustline requise');
   const sdk = await import('@stellar/stellar-sdk');
@@ -1364,7 +1364,7 @@ export async function buildChangeTrust(sender: string, buy: Asset, horizonUrl?: 
   return { xdr: tx.toXDR() };
 }
 
-// ─── Orchestrateur principal ─────────────────────────────────────────────────
+// ─── Main orchestrator ────────────────────────────────────────────────────────
 
 export async function pickExecutableVenue(
   target: 'USDC' | 'EURC',
@@ -1382,7 +1382,7 @@ export async function pickExecutableVenue(
   const sellSac = sellAsset.sac;
   const buySac = buyAsset.sac;
 
-  // 1. Re-quote live en parallèle (tolérant : échec → null) + pré-flight trustline (parallèle → zéro latence ajoutée).
+  // 1. Live re-quote in parallel (tolerant: failure → null) + trustline pre-flight (parallel → zero added latency).
   const soroClient = cfg.soroswapApiKey ? deps.makeSoroswap(cfg.soroswapApiKey) : null;
   const [preflight, xbullQ, soroQ, horizonQ, aquariusQ, cometQ, ultraQ] = await Promise.all([
     senderPreflight(sender, sellAsset, buyAsset, cfg.horizonUrl),
@@ -1392,21 +1392,21 @@ export async function pickExecutableVenue(
       : Promise.resolve(null),
     quoteHorizon(sellAsset, buyAsset, amountStroops, deps, cfg.horizonUrl),
     quoteAquarius(sellSac, buySac, amountStroops, deps),
-    // Comet = pool BLND/USDC uniquement : pas de cotation si sellAsset ≠ BLND ou target ≠ USDC.
+    // Comet = BLND/USDC pool only: no quote if sellAsset ≠ BLND or target ≠ USDC.
     sellAsset === BLND && target === 'USDC' ? quoteComet(deps, sellSac, buySac, amountStroops, cfg.rpcUrl) : Promise.resolve(null),
     quoteUltra(sellAsset, buyAsset, amountStroops, deps),
   ]);
 
   const { trustline, liquid } = preflight;
 
-  // Pré-flight trustline UNIVERSEL : si le sender n'a pas la trustline de l'actif d'achat, échouer
-  // clairement ICI (avant tout build) → couvre AUSSI les venues turnkey xBull/Soroswap dont l'erreur
-  // trustline ne remontait pas classée (« source indisponible » trompeur). null = lecture KO → builds gèrent.
+  // UNIVERSAL trustline pre-flight: if the sender lacks the trustline for the bought asset, fail
+  // clearly HERE (before any build) → this ALSO covers the turnkey xBull/Soroswap venues whose
+  // trustline error wasn't surfaced classified (a misleading "source unavailable"). null = read failed → builds handle it.
   if (trustline === false) throw trustlineMissingError(buyAsset, sender);
 
-  // Pré-flight solde UNIVERSEL : si le BLND liquide est insuffisant, échouer ICI (avant tout build/popup)
-  // → comportement uniforme pour toutes les venues (les classiques Horizon/Ultra n'atteignent plus Freighter
-  //   pour échouer ensuite à la soumission). liquid null = lecture KO → on laisse les builds gérer.
+  // UNIVERSAL balance pre-flight: if liquid BLND is insufficient, fail HERE (before any build/popup)
+  // → uniform behavior across all venues (the classic Horizon/Ultra ones no longer reach Freighter
+  //   just to fail later at submission). liquid null = read failed → let the builds handle it.
   if (liquid !== null && liquid < amountStroops) {
     if (sellAsset.code === 'BLND') {
       throw new ExecError('funds',
@@ -1418,7 +1418,7 @@ export async function pickExecutableVenue(
     }
   }
 
-  // 2. Trier les candidats non-null par netOut décroissant.
+  // 2. Sort the non-null candidates by descending netOut.
   type Candidate =
     | { venue: 'xbull'; netOut: bigint; route: string }
     | { venue: 'soroswap'; netOut: bigint; minOut: bigint; soroPath?: string[]; quote: unknown }
@@ -1440,7 +1440,7 @@ export async function pickExecutableVenue(
     throw new ExecError('no-route', 'aucune route exécutable');
   }
 
-  // Forçage d'un venue précis (click-to-select depuis l'UI)
+  // Forcing a specific venue (click-to-select from the UI)
   if (forceVenue !== undefined) {
     candidates = candidates.filter((c) => c.venue === forceVenue);
     if (candidates.length === 0) {
@@ -1448,14 +1448,14 @@ export async function pickExecutableVenue(
     }
   }
 
-  // 3. Essayer de BUILD par ordre de netOut décroissant ; premier succès = gagnant.
+  // 3. Try to BUILD in descending netOut order; first success wins.
   const errors: ExecError[] = [];
 
   for (const cand of candidates) {
     if (cand.venue === 'xbull') {
       try {
-        // Utilise le vrai fill simulé pour le plancher (skim xBull ~0,1 % non divulgué).
-        // Si la sim échoue → fallback sur cand.netOut (plancher conservateur).
+        // Use the real simulated fill for the floor (undisclosed ~0.1% xBull skim).
+        // If the sim fails → fall back to cand.netOut (conservative floor).
         const xbSim = await deps.simulateXbullNet({ route: cand.route, amountIn: amountStroops, rpcUrl: cfg.rpcUrl });
         const realNet = xbSim?.net ?? cand.netOut;
         const minToGet = minReceivedStroops(realNet, slippageBps);
@@ -1593,7 +1593,7 @@ export async function pickExecutableVenue(
     }
   }
 
-  // 4. Tous les builds ont échoué → priorité trustline > funds > slippage > down.
+  // 4. All builds failed → priority trustline > funds > slippage > down.
   const priority: ExecError['code'][] = ['trustline', 'funds', 'slippage', 'down'];
   for (const code of priority) {
     const found = errors.find((e) => e.code === code);
@@ -1602,19 +1602,19 @@ export async function pickExecutableVenue(
   throw new ExecError('down', 'aucune route buildable');
 }
 
-// ─── Garde d'opérations autorisées ───────────────────────────────────────────
+// ─── Allowed-operations guard ─────────────────────────────────────────────────
 
-/** Types d'opérations que l'app émet : PathPaymentStrictSend (SDEX/Ultra), InvokeHostFunction
- *  (contrats Soroban : Comet / Aquarius / Soroswap), ChangeTrust (trustline EURC).
- *  Toute autre opération est rejetée avant d'atteindre le réseau. */
+/** Operation types the app emits: PathPaymentStrictSend (SDEX/Ultra), InvokeHostFunction
+ *  (Soroban contracts: Comet / Aquarius / Soroswap), ChangeTrust (EURC trustline).
+ *  Any other operation is rejected before reaching the network. */
 const ALLOWED_OP_TYPES = new Set<string>([
   'pathPaymentStrictSend',
   'invokeHostFunction',
   'changeTrust',
 ]);
 
-/** Vérifie que toutes les opérations du XDR signé appartiennent à l'allowlist.
- *  Déballe les FeeBumpTransaction. Lance ExecError 'bad_request' en cas de violation. */
+/** Checks that every operation in the signed XDR belongs to the allowlist.
+ *  Unwraps FeeBumpTransaction. Throws ExecError 'bad_request' on violation. */
 async function assertAllowedOps(signedXdr: string): Promise<void> {
   const sdk = await import('@stellar/stellar-sdk');
   const { TransactionBuilder, Networks, FeeBumpTransaction } = sdk;
@@ -1626,7 +1626,7 @@ async function assertAllowedOps(signedXdr: string): Promise<void> {
     throw new ExecError('bad_request', 'XDR illisible');
   }
 
-  // Déballe le fee-bump si nécessaire
+  // Unwrap the fee-bump if needed
   const inner = tx instanceof FeeBumpTransaction ? tx.innerTransaction : tx;
   const ops = (inner as { operations: Array<{ type: string }> }).operations;
 
@@ -1651,7 +1651,7 @@ export async function submit(
 ): Promise<{ hash: string; status?: 'pending' }> {
   const deps: ExecDeps = { ...defaultDeps(cfg.timeoutMs), ...depsOverride };
 
-  // Garde defense-in-depth : vérifie le type d'opération AVANT tout appel réseau.
+  // Defense-in-depth guard: checks the operation type BEFORE any network call.
   await assertAllowedOps(payload.signedXdr);
 
   if (venue === 'xbull') {
@@ -1673,7 +1673,7 @@ export async function submit(
     }
     return { hash: body['hash'] };
   } else if (venue === 'horizon' || venue === 'ultrastellar') {
-    // tx classique → soumission Horizon (gère l'encodage form + extraction d'erreur).
+    // classic tx → Horizon submission (handles form encoding + error extraction).
     const sdk = await import('@stellar/stellar-sdk');
     const { Horizon, TransactionBuilder, Networks } = sdk;
     const server = new Horizon.Server((cfg.horizonUrl || HORIZON_BASE_DEFAULT).replace(/\/$/, ''));
@@ -1693,9 +1693,9 @@ export async function submit(
       throw new ExecError(classifyHorizonSubmit(e), safeExecMessage(classifyHorizonSubmit(e)));
     }
   } else if (venue === 'aquarius' || venue === 'comet') {
-    // Fire-and-poll : on FIRE la tx (sendTransaction) et on rend le hash immédiatement.
-    // La CONFIRMATION (getTransaction) est polled par le client via /api/tx-status — une
-    // tx lente n'est donc plus un faux échec post-signature. Cf. txStatus + /api/tx-status.
+    // Fire-and-poll: we FIRE the tx (sendTransaction) and return the hash immediately.
+    // The CONFIRMATION (getTransaction) is polled by the client via /api/tx-status — a
+    // slow tx is therefore no longer a false failure post-signature. See txStatus + /api/tx-status.
     const client = deps.makeRpc(cfg.rpcUrl);
     let sent: { status: SendStatus; hash: string; errorResult?: unknown };
     try {
@@ -1707,12 +1707,12 @@ export async function submit(
       const code = classifyExecError(raw);
       throw new ExecError(code, safeExecMessage(code));
     }
-    // ERROR | TRY_AGAIN_LATER = PAS entrée mempool → vrai échec d'admission.
+    // ERROR | TRY_AGAIN_LATER = did NOT enter the mempool → real admission failure.
     if (sent.status === 'ERROR' || sent.status === 'TRY_AGAIN_LATER') {
       process.stderr.write(`ExecError raw: Soroban a rejeté la tx (${sent.status}) : ${JSON.stringify(sent.errorResult ?? sent.status)}\n`);
       throw new ExecError('down', safeExecMessage('down'));
     }
-    // PENDING | DUPLICATE → fired ; la confirmation est déléguée au client.
+    // PENDING | DUPLICATE → fired; confirmation is delegated to the client.
     return { hash: sent.hash, status: 'pending' };
   } else {
     const client = deps.makeSoroswap(cfg.soroswapApiKey!);
@@ -1721,7 +1721,7 @@ export async function submit(
       if (!r.success) throw new ExecError('down', `soroswap submit failed : txHash=${r.txHash}`);
       return { hash: r.txHash };
     } catch (e) {
-      // Symétrie avec buildSoroswap : toute erreur SDK ressort en ExecError classée (jamais un 500 opaque post-signature).
+      // Symmetric with buildSoroswap: any SDK error surfaces as a classified ExecError (never an opaque 500 post-signature).
       if (e instanceof ExecError) throw e;
       const raw = e instanceof Error ? e.message : String(e);
       process.stderr.write(`ExecError raw: ${raw}\n`);
@@ -1731,8 +1731,8 @@ export async function submit(
   }
 }
 
-/** Confirmation on-chain d'une tx Soroban (fire-and-poll, polled par le client).
- *  SUCCESS → confirmée · FAILED → échec on-chain · NOT_FOUND/RPC KO → encore en vol ('pending', pas une erreur). */
+/** On-chain confirmation of a Soroban tx (fire-and-poll, polled by the client).
+ *  SUCCESS → confirmed · FAILED → on-chain failure · NOT_FOUND/RPC down → still in flight ('pending', not an error). */
 export async function txStatus(
   hash: string,
   cfg: { rpcUrl: string; timeoutMs?: number },
@@ -1745,7 +1745,7 @@ export async function txStatus(
     if (got.status === 'FAILED') return { status: 'failed' };
     return { status: 'pending' }; // NOT_FOUND
   } catch {
-    // RPC indispo ≠ tx échouée : le client re-pollera.
+    // RPC unavailable ≠ failed tx: the client will poll again.
     return { status: 'pending' };
   }
 }

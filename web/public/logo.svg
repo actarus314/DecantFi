@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <!-- decant — alambic : ballon vert BLND #36b04a + essence jaune Stellar #FDDA24.
-       Fond TRANSPARENT (logo du header) ; le fond sombre n'apparaît qu'au survol via CSS .brand-link:hover. -->
+  <!-- decant — still: green BLND flask #36b04a + yellow Stellar essence #FDDA24.
+       TRANSPARENT background (header logo); the dark background only appears on hover via CSS .brand-link:hover. -->
   <g transform="translate(16 16) scale(1.30) translate(-16 -16) translate(0 -1.05)">
     <g fill="none" stroke="#36b04a" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
       <circle cx="16" cy="20.5" r="6.6"/>

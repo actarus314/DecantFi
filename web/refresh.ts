@@ -1,7 +1,7 @@
-// Refresh manuel : exécute UN tick réel (réseau live) et le journalise avec note='manual'.
-// Provisoire — le prochain poll programmé du collecteur le purge (db.purgeManualTicks).
-// Connexion d'écriture éphémère (ouvre/insère/ferme) : la lecture stats garde sa connexion query_only.
-// ponytail: garde in-flight = 1 refresh à la fois ; spam-clics rejetés (429) plutôt que de marteler le réseau.
+// Manual refresh: runs ONE real tick (live network) and logs it with note='manual'.
+// Temporary — the next scheduled collector poll purges it (db.purgeManualTicks).
+// Ephemeral write connection (open/insert/close): the stats read path keeps its query_only connection.
+// ponytail: in-flight guard = 1 refresh at a time; spam-clicks rejected (429) rather than hammering the network.
 import { fetchPrices } from '../core/prices.js';
 import { quote } from '../core/engine.js';
 import { buildProbes } from '../collector/probes.js';
@@ -18,7 +18,7 @@ export interface RefreshResult {
   startedAt: string;
 }
 
-/** true si un refresh est déjà en cours (le serveur répond 429). */
+/** true if a refresh is already in progress (the server responds 429). */
 export function refreshBusy(): boolean {
   return inFlight;
 }
@@ -30,8 +30,8 @@ export async function manualRefresh(cfg: WebConfig): Promise<RefreshResult> {
     const { tick, quotes, rpcProbes } = await runTick({
       probes, cfg, now: () => new Date(), fetchPrices, quote,
     });
-    tick.note = 'manual'; // marqueur de purge par le poll programmé
-    const db = openDb(cfg.dbPath); // connexion d'écriture (volume RW) ; refermée aussitôt
+    tick.note = 'manual'; // marker for purge by the scheduled poll
+    const db = openDb(cfg.dbPath); // write connection (RW volume); closed immediately
     try {
       const tickId = db.insertTickWithQuotes(tick, quotes, rpcProbes);
       return { tickId, ok: tick.ok, quotes: quotes.length, startedAt: tick.started_at };

@@ -1,4 +1,4 @@
-// Lecture du journal (gagnants par tick). Base des futures stats. Montants formatés humain à la sortie.
+// Journal reads (winners per tick). Basis for future stats. Amounts formatted human-readable on output.
 import type { Db } from './index.js';
 import { fromStroops } from '../core/amount.js';
 
@@ -10,7 +10,7 @@ export interface HistoryRow {
 const WINNERS_COLS = `t.started_at, q.pair, q.amount_in, q.source_id, q.net_out, q.price_impact_pct, q.eurc_path`;
 const ORDER = `ORDER BY t.started_at DESC, q.pair, q.amount_in`;
 
-// history : borné par TICK (limit = nombre de ticks) → ne coupe jamais un tick en deux.
+// history: bounded by TICK (limit = number of ticks) → never splits a tick in two.
 const WINNERS_RECENT_SQL = `
   SELECT ${WINNERS_COLS} FROM quote q JOIN tick t ON t.id = q.tick_id
   WHERE q.is_winner = 1 AND q.tick_id IN (SELECT id FROM tick ORDER BY started_at DESC LIMIT ?)
@@ -21,7 +21,7 @@ const WINNERS_ALL_SQL = `
   WHERE q.is_winner = 1 ${ORDER}
 `;
 
-/** Gagnants des N derniers TICKS (limit = nombre de ticks, défaut 50), du plus récent au plus ancien. */
+/** Winners from the last N TICKS (limit = number of ticks, default 50), most recent first. */
 export function history(db: Db, opts: { limit?: number } = {}): HistoryRow[] {
   const stmt = db.raw().prepare(WINNERS_RECENT_SQL);
   stmt.setReadBigInts(true);
@@ -29,7 +29,7 @@ export function history(db: Db, opts: { limit?: number } = {}): HistoryRow[] {
   return rows.map(fmt);
 }
 
-/** Export complet des gagnants en CSV ou JSON. */
+/** Full export of winners as CSV or JSON. */
 export function exportRows(db: Db, format: 'csv' | 'json'): string {
   const stmt = db.raw().prepare(WINNERS_ALL_SQL);
   stmt.setReadBigInts(true);

@@ -1,12 +1,12 @@
-// EURC traite comme cible de premier rang : on evalue TOUJOURS deux familles et on garde le meilleur net EURC.
-//   1. Direct   : BLND -> EURC (chaque source fait son multi-hop interne atomique).
-//   2. Via-USDC : meilleur BLND -> USDC (leg 1), puis USDC -> EURC recote sur l'USDC REELLEMENT recu (leg 2).
-// Verifie au design : via-USDC bat souvent le direct (pas de marche BLND/EURC profond).
+// EURC treated as a first-rank target: ALWAYS evaluate both families and keep the best EURC net.
+//   1. Direct   : BLND -> EURC (each source does its own atomic internal multi-hop).
+//   2. Via-USDC : best BLND -> USDC (leg 1), then USDC -> EURC requoted on the USDC ACTUALLY received (leg 2).
+// Verified by design: via-USDC often beats direct (no deep BLND/EURC market).
 import type { NormalizedQuote, Stroops } from './sources/types.js';
 import { rankQuotes } from './rank.js';
 import { fromStroops } from './amount.js';
 
-/** true si a et b sont a moins de ~0,1 % l'un de l'autre (memes pools sous-jacents). */
+/** true if a and b are within ~0.1% of each other (same underlying pools). */
 function closeEnough(a: Stroops, b: Stroops): boolean {
   if (b <= 0n) return a === b;
   const diff = a > b ? a - b : b - a;
@@ -14,19 +14,19 @@ function closeEnough(a: Stroops, b: Stroops): boolean {
 }
 
 export interface ViaUsdcResult {
-  leg1: NormalizedQuote; // meilleur BLND -> USDC
-  leg2: NormalizedQuote; // meilleur USDC -> EURC sur l'USDC recu au leg 1
-  usdcMid: Stroops; // USDC recu entre les deux legs
+  leg1: NormalizedQuote; // best BLND -> USDC
+  leg2: NormalizedQuote; // best USDC -> EURC on the USDC received at leg 1
+  usdcMid: Stroops; // USDC received between the two legs
   netEurc: Stroops;
   txCount: 2;
 }
 
 export interface EurcComparison {
-  direct?: NormalizedQuote; // meilleur BLND -> EURC direct
+  direct?: NormalizedQuote; // best direct BLND -> EURC
   viaUsdc?: ViaUsdcResult;
   winner: 'direct' | 'via-usdc' | null;
   bestNetEurc?: Stroops;
-  /** Surcout/avantage du via-USDC vs direct, en stroops EURC (peut etre negatif). */
+  /** Cost/advantage of via-USDC vs direct, in EURC stroops (can be negative). */
   viaUsdcAdvantage?: Stroops;
   note: string;
 }
@@ -55,15 +55,15 @@ export async function compareEurc(
   const leg1Candidates = isExecutable ? leg1Honest.filter((q) => isExecutable(q.source)) : leg1Honest;
   const leg1 = rankQuotes(leg1Candidates).best;
   if (leg1 && leg1.grossOut > 0n) {
-    // Recote sur l'USDC REELLEMENT recu = grossOut (le gas est paye en XLM, pas preleve sur l'USDC).
+    // Requote on the USDC ACTUALLY received = grossOut (gas is paid in XLM, not taken from the USDC).
     const usdcReceived = leg1.grossOut;
     const leg2List = await q.usdcToEurc(usdcReceived);
     const leg2Honest = reSimLeg ? await reSimLeg(leg2List, usdcReceived) : leg2List;
     const leg2Candidates = isExecutable ? leg2Honest.filter((q) => isExecutable(q.source)) : leg2Honest;
     const leg2 = rankQuotes(leg2Candidates).best;
     if (leg2 && leg2.netOut > 0n) {
-      // net = BRUT partout (le gas Soroban se paie en XLM, à part — variable par tx, affiché par le
-      // wallet/explorer). On ne déduit plus le gas du leg 1 du résultat EURC.
+      // net = GROSS everywhere (Soroban gas is paid in XLM, separately — variable per tx, displayed by the
+      // wallet/explorer). Leg-1 gas is no longer deducted from the EURC result.
       const netEurc = leg2.netOut;
       if (netEurc > 0n) viaUsdc = { leg1, leg2, usdcMid: usdcReceived, netEurc, txCount: 2 };
     }

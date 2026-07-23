@@ -1,4 +1,4 @@
-// Registre des sources de cotation (meta-agregateur). Interrogees en parallele, tolerantes aux pannes.
+// Registry of quote sources (meta-aggregator). Queried in parallel, fault-tolerant.
 import type { SourceAdapter } from './types.js';
 import { xbull } from './xbull.js';
 import { soroswap } from './soroswap.js';

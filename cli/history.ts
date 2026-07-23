@@ -1,5 +1,5 @@
 #!/usr/bin/env -S npx tsx
-// Journal du collecteur. `npm run history [-- --limit 20]` (table) ; `npm run export [-- json|csv]`.
+// Collector journal. `npm run history [-- --limit 20]` (table); `npm run export [-- json|csv]`.
 import { openDb } from '../db/index.js';
 import { history, exportRows } from '../db/queries.js';
 import { loadCollectorConfig } from '../collector/config.js';

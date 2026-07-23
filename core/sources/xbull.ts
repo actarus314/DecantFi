@@ -1,24 +1,24 @@
-// xBull : routeur Soroban. Cotation via l'endpoint exécutable (vérité actuelle).
+// xBull: Soroban router. Quoted via the executable endpoint (current source of truth).
 //
-// Migration d'endpoint en cours :
+// Endpoint migration in progress:
 //   .app = https://swap.apis.xbull.app/swaps/quote  → param fromAmount= + maxSteps=3
-//          ↑ VÉRITÉ ACTUELLE (net exécutable, corroboré par 5 autres venues)
-//          Utilisé en DÉFAUT.
-//   .io  = https://swap-api.xbull.io/swaps/quote    → param amount= (sans maxSteps)
-//          ↑ FUTUR endpoint canonique xBull (migration en cours) MAIS renvoie
-//          actuellement un net gonflé ~8-9 % NON-EXÉCUTABLE (mesuré live 2026-06-18).
-//          Réactiver quand le monitoring externe confirme la parité avec .app.
+//          ↑ CURRENT SOURCE OF TRUTH (executable net, corroborated by 5 other venues)
+//          Used by DEFAULT.
+//   .io  = https://swap-api.xbull.io/swaps/quote    → param amount= (no maxSteps)
+//          ↑ FUTURE canonical xBull endpoint (migration in progress) BUT currently
+//          returns an inflated net ~8-9% NON-EXECUTABLE.
+//          Re-enable once external monitoring confirms parity with .app.
 //
-// Flip = changer XBULL_QUOTE = XBULL_QUOTE_VARIANTS.app → ...io (+ amountParam + extra suivent).
+// Flip = change XBULL_QUOTE = XBULL_QUOTE_VARIANTS.app → ...io (+ amountParam + extra follow).
 //
-// Shape de réponse .app (vérifiée) :
-//   { route, fromAmount, fromAsset, toAsset, toAmount, fee }  — fee = string ratio ("0.001" = 0,1%)
-// Shape de réponse .io (ancienne, fixture capturée) :
+// .app response shape (verified):
+//   { route, fromAmount, fromAsset, toAsset, toAmount, fee }  — fee = string ratio ("0.001" = 0.1%)
+// .io response shape (old, captured fixture):
 //   { route, fromAmount, toAmount, fromAsset, toAsset, fee: { platformFee, referralsFee } }
 //
-// parseXbull est tolérant aux deux shapes.
-// netOut/grossOut = toAmount dans tous les cas. netConfidence = 'exact'.
-// Le détail du fee est cosmétique : si non dérivable, feeBreakdown vide (ne plante pas).
+// parseXbull tolerates both shapes.
+// netOut/grossOut = toAmount in all cases. netConfidence = 'exact'.
+// Fee detail is cosmetic: if not derivable, feeBreakdown is empty (doesn't fail).
 import type { SourceAdapter, NormalizedQuote, QuoteRequest, FeeItem } from './types.js';
 import { DEFAULT_GAS_XLM } from '../gas.js';
 import { getJson } from './http.js';
@@ -26,14 +26,14 @@ import { getJson } from './http.js';
 // ─── Config endpoint (deux variantes) ────────────────────────────────────────
 
 const XBULL_QUOTE_VARIANTS = {
-  /** Endpoint d'exécution xBull — vérité actuelle (net exécutable). Défaut. */
+  /** xBull execution endpoint — current source of truth (executable net). Default. */
   app: {
     base: 'https://swap.apis.xbull.app/swaps/quote',
     amountParam: 'fromAmount',
     extra: '&maxSteps=3',
   },
-  /** Futur endpoint canonique xBull — actuellement gonflé ~8-9 % (NON-EXÉCUTABLE).
-   *  Réactiver ici quand monitoring externe confirme parité avec .app. */
+  /** Future canonical xBull endpoint — currently inflated ~8-9% (NON-EXECUTABLE).
+   *  Re-enable here once external monitoring confirms parity with .app. */
   io: {
     base: 'https://swap-api.xbull.io/swaps/quote',
     amountParam: 'amount',
@@ -41,7 +41,7 @@ const XBULL_QUOTE_VARIANTS = {
   },
 } as const;
 
-/** Endpoint actif pour la cotation xBull. Flip = changer .app → .io. */
+/** Active endpoint for xBull quoting. Flip = change .app → .io. */
 const XBULL_QUOTE = XBULL_QUOTE_VARIANTS.app;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ const XBULL_QUOTE = XBULL_QUOTE_VARIANTS.app;
 interface XbullRaw {
   toAmount?: string | number;
   route?: string;
-  /** .io shape : objet fee */
+  /** .io shape: fee object */
   fee?: { platformFee?: string | number; referralsFee?: string | number } | string;
 }
 
@@ -62,7 +62,7 @@ function bigintOrNull(v: unknown): bigint | null {
   }
 }
 
-// ─── Parser (tolérant aux deux shapes fee) ────────────────────────────────────
+// ─── Parser (tolerant to both fee shapes) ─────────────────────────────────────
 
 export function parseXbull(raw: unknown, req: QuoteRequest): NormalizedQuote | null {
   const j = raw as XbullRaw | null;
@@ -72,13 +72,13 @@ export function parseXbull(raw: unknown, req: QuoteRequest): NormalizedQuote | n
   const feeBreakdown: FeeItem[] = [];
   const feeField = j?.fee;
   if (feeField != null && typeof feeField === 'object') {
-    // Shape .io : fee = { platformFee, referralsFee }
+    // .io shape: fee = { platformFee, referralsFee }
     const platformFee = bigintOrNull(feeField.platformFee);
     if (platformFee !== null && platformFee > 0n) {
       feeBreakdown.push({ kind: 'aggregator', amount: platformFee, asset: req.buyAsset.symbol, note: 'platformFee' });
     }
   }
-  // Shape .app : fee = string ratio ("0.001") → cosmétique, non dérivable en stroops sans float → skip.
+  // .app shape: fee = string ratio ("0.001") → cosmetic, not derivable in stroops without float → skip.
 
   return {
     source: 'xbull',

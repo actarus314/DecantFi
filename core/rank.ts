@@ -1,23 +1,23 @@
-// Classement des cotations par netOut = BRUT (montant cible recu, net des frais de swap + impact ;
-// le gas XLM n'est PAS deduit, paye a part). Strictement comparable entre sources. StellarBroker est
-// classe sur son estimate WS (son adapter met netOut = estimate), donc un simple tri descendant suffit.
+// Ranks quotes by netOut = GROSS (target amount received, net of swap fees + impact;
+// XLM gas is NOT deducted, paid separately). Strictly comparable across sources. StellarBroker is
+// ranked on its WS estimate (its adapter sets netOut = estimate), so a plain descending sort is enough.
 import type { NormalizedQuote } from './sources/types.js';
 import { toNumber } from './amount.js';
 
 export interface RankedQuote extends NormalizedQuote {
   rank: number;
-  /** Ecart vs le meilleur net, en % (0 pour le meilleur, negatif pour les autres). */
+  /** Gap vs the best net, in % (0 for the best, negative for the others). */
   deltaVsBestPct: number;
 }
 
 export interface Ranking {
   ranked: RankedQuote[];
   best?: RankedQuote;
-  /** Cotation Horizon, exposee comme plancher de reference si presente. */
+  /** Horizon quote, exposed as a reference floor if present. */
   floor?: NormalizedQuote;
 }
 
-/** Trie par netOut decroissant, attribue rang + ecart vs meilleur. Ignore les netOut <= 0. */
+/** Sorts by descending netOut, assigns rank + gap vs best. Ignores netOut <= 0. */
 export function rankQuotes(quotes: NormalizedQuote[]): Ranking {
   const valid = quotes.filter((q) => q.netOut > 0n);
   const sorted = [...valid].sort((a, b) => (a.netOut < b.netOut ? 1 : a.netOut > b.netOut ? -1 : 0));

@@ -1,6 +1,6 @@
-// Orchestrateur : interroge toutes les sources disponibles EN PARALLELE (tolerant aux pannes),
-// finalise chaque cotation (gas converti + impact vs spot, calcule uniformement pour comparabilite),
-// classe par net, et pour EURC compare direct vs via-USDC. Cœur pur reutilisable (CLI puis app).
+// Orchestrator: queries all available sources IN PARALLEL (tolerant of failures),
+// finalizes each quote (converted gas + impact vs spot, computed uniformly for comparability),
+// ranks by net, and for EURC compares direct vs via-USDC. Pure core reusable (CLI then app).
 import type { NormalizedQuote, QuoteRequest, SourceConfig, SourceAdapter, Stroops } from './sources/types.js';
 import type { Asset } from './assets.js';
 import { BLND, USDC, EURC } from './assets.js';
@@ -17,12 +17,12 @@ export interface EngineConfig extends SourceConfig {
   slippageBps?: number;
   fractionsPct?: number[];
   withSplit?: boolean;
-  /** Prix injectables (tests / cache). Si absent : fetch live. */
+  /** Injectable prices (tests / cache). If absent: live fetch. */
   prices?: Prices;
-  /** Sources injectables (tests). Defaut : ADAPTERS. */
+  /** Injectable sources (tests). Default: ADAPTERS. */
   adapters?: SourceAdapter[];
-  /** Re-simulation honnête des jambes xBull/Aquarius pour le composite EURC via-USDC.
-   *  Fourni par la couche web/collecteur. Sans ce callback, les cotes brutes sont utilisées. */
+  /** Honest re-simulation of the xBull/Aquarius legs for the EURC via-USDC composite.
+   *  Provided by the web/collector layer. Without this callback, raw quotes are used. */
   reSimLeg?: (quotes: NormalizedQuote[], amountIn: Stroops) => Promise<NormalizedQuote[]>;
 }
 
@@ -32,16 +32,16 @@ export interface QuoteResult {
   ranking: Ranking;
   eurc?: EurcComparison;
   split?: SplitAnalysis;
-  /** Ids des sources disponibles n'ayant pas rendu de cotation (info, non bloquant). */
+  /** Ids of available sources that returned no quote (informational, non-blocking). */
   errors: string[];
-  /** Cause de l'échec par source id, si capturée (timeout / http / indisponible). */
+  /** Failure cause per source id, if captured (timeout / http / unavailable). */
   errorReasons?: Record<string, string>;
 }
 
-/** net = BRUT (montant cible reçu). Le gas Soroban se paie en XLM, à PART — variable par tx,
- *  affiché séparément par le wallet/explorer → on ne le déduit PLUS du net cible (alignement
- *  wallet/explorer). gasInTarget reste calculé à titre INFORMATIF (estimation, non déduite ;
- *  le CLI l'affiche en colonne séparée). L'impact vs spot est calculé sur le brut. */
+/** net = GROSS (target amount received). Soroban gas is paid in XLM, SEPARATELY — variable per tx,
+ *  displayed separately by the wallet/explorer -> it is NO LONGER deducted from the target net (alignment
+ *  with wallet/explorer). gasInTarget remains computed for INFO only (estimate, not deducted;
+ *  the CLI displays it in a separate column). Impact vs spot is computed on the gross amount. */
 export function finalize(q: NormalizedQuote, prices: Prices): NormalizedQuote {
   const tEvm = targetEvmPerUnit(q.buyAsset.symbol, prices);
   const tLoc = targetLocalPerUnit(q.buyAsset.symbol, prices);
@@ -67,9 +67,9 @@ export async function quoteAll(
   const adapters = (cfg.adapters ?? ADAPTERS).filter(
     (a) => a.available(cfg) && (a.supports ? a.supports(req) : true),
   );
-  // ponytail: un store ALS par adaptateur — diag.run() injecte le contexte sans changer la signature.
+  // ponytail: one ALS store per adapter — diag.run() injects context without changing the signature.
   const stores: Diag[] = adapters.map(() => ({}));
-  // Chronomètre indépendant par adaptateur (Date.now() : précision ms suffisante en prod).
+  // Independent timer per adapter (Date.now(): ms precision is enough in prod).
   const startTimes = adapters.map(() => Date.now());
   const settled = await Promise.allSettled(
     adapters.map((a, i) => diag.run(stores[i]!, () => a.quote(req, cfg))),
@@ -81,7 +81,7 @@ export async function quoteAll(
     const id = adapters[i]!.id;
     if (s.status === 'fulfilled' && s.value) {
       const q = s.value;
-      // Affecte la durée du fetch API (la re-sim sera cumulée dans quote-api / tick).
+      // Sets the API fetch duration (the re-sim will be accumulated in quote-api / tick).
       q.durationMs = Date.now() - startTimes[i]!;
       quotes.push(finalize(q, prices));
     } else {

@@ -1,7 +1,7 @@
-// Décodage et vérification des routes Soroban à partir des événements de simulation.
-// Deux topologies observées empiriquement :
-//   - Hub-and-spoke (xBull, Aquarius) : routeur central, chaque hop = 2 transferts identiques.
-//   - Linéaire (Soroswap) : pool→pool direct, chaque actif intermédiaire apparaît une seule fois.
+// Decoding and verification of Soroban routes from simulation events.
+// Two topologies observed empirically:
+//   - Hub-and-spoke (xBull, Aquarius): central router, each hop = 2 identical transfers.
+//   - Linear (Soroswap): direct pool-to-pool, each intermediate asset appears only once.
 import { bySac } from './assets.js';
 
 export interface Transfer {
@@ -11,9 +11,9 @@ export interface Transfer {
   amount: bigint;
 }
 
-/** Décode la chaîne de transferts SAC depuis les événements de simulation Soroban.
- *  Accepte des events base64 (string) ou des objets DiagnosticEvent déjà parsés.
- *  Les events illisibles sont ignorés silencieusement. */
+/** Decodes the SAC transfer chain from Soroban simulation events.
+ *  Accepts base64 events (string) or already-parsed DiagnosticEvent objects.
+ *  Unreadable events are silently ignored. */
 export async function decodeTransfers(events: unknown[]): Promise<Transfer[]> {
   const { scValToNative, StrKey, xdr } = await import('@stellar/stellar-sdk');
   const transfers: Transfer[] = [];
@@ -37,18 +37,18 @@ export async function decodeTransfers(events: unknown[]): Promise<Transfer[]> {
       let amount = 0n;
       try {
         amount = BigInt(scValToNative(ce.body().v0().data()));
-      } catch { /* montant illisible → 0n */ }
+      } catch { /* unreadable amount -> 0n */ }
 
       transfers.push({ asset, from, to, amount });
-    } catch { /* event illisible ignoré */ }
+    } catch { /* unreadable event ignored */ }
   }
 
   return transfers;
 }
 
-/** Construit la route dédupliquée (consécutive) depuis la liste de transferts.
- *  Hub-spoke [BLND,BLND,USDC,USDC,XLM,XLM,EURC,EURC] → [BLND,USDC,XLM,EURC].
- *  Linéaire [BLND,USDC,EURC] → [BLND,USDC,EURC]. */
+/** Builds the deduplicated (consecutive) route from the transfer list.
+ *  Hub-spoke [BLND,BLND,USDC,USDC,XLM,XLM,EURC,EURC] -> [BLND,USDC,XLM,EURC].
+ *  Linear [BLND,USDC,EURC] -> [BLND,USDC,EURC]. */
 export function routeFromTransfers(transfers: Transfer[]): string[] {
   const route: string[] = [];
   for (const t of transfers) {
@@ -57,12 +57,12 @@ export function routeFromTransfers(transfers: Transfer[]): string[] {
   return route;
 }
 
-/** Vérifie que la chaîne de transferts est cohérente du point de vue du signataire.
- *  Le compte signataire (= transfers[0].from) ne doit netter QUE −sellSymbol et +buySymbol,
- *  rien d'autre. Un actif intermédiaire capté par le signataire trahit une route incohérente.
+/** Verifies that the transfer chain is coherent from the signer's point of view.
+ *  The signer account (= transfers[0].from) must net ONLY -sellSymbol and +buySymbol,
+ *  nothing else. An intermediate asset captured by the signer betrays an inconsistent route.
  *
- *  Note : la conservation des actifs intermédiaires chez les contrats est garantie par
- *  construction (chaque transfert crédite ET débite), donc l'assertion sur le signataire seul suffit. */
+ *  Note: conservation of intermediate assets across contracts is guaranteed by
+ *  construction (each transfer credits AND debits), so asserting on the signer alone is enough. */
 export function verifyChain(
   transfers: Transfer[],
   sellSymbol: string,
@@ -73,7 +73,7 @@ export function verifyChain(
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const sender = transfers[0]!.from;
 
-  // Calcul du net par actif du point de vue du signataire.
+  // Computes the net per asset from the signer's point of view.
   const net = new Map<string, bigint>();
   for (const t of transfers) {
     if (t.to === sender) {

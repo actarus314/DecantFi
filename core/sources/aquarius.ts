@@ -1,5 +1,5 @@
-// Aquarius : pools Soroban natifs. POST amm-api.aqua.network find-path (SAC C..., montant en stroops).
-// Reponse: amount_with_fee = NET du pool (fallback amount) ; tokens[] decrit la route (souvent via sUSD).
+// Aquarius: native Soroban pools. POST amm-api.aqua.network find-path (SAC C..., amount in stroops).
+// Response: amount_with_fee = pool NET (fallback amount); tokens[] describes the route (often via sUSD).
 import type { SourceAdapter, NormalizedQuote, QuoteRequest } from './types.js';
 import { DEFAULT_GAS_XLM } from '../gas.js';
 import { postJson } from './http.js';
