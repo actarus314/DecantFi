@@ -105,6 +105,10 @@ red pull request. The safety net is local, and partly human.
 
 - **Never push straight to `main` or `develop`.** The `pre-push` hook refuses it; that hook is
   the stand-in for the ruleset that does not exist yet. Work through a pull request, always.
+- **Open PRs with `./open-pr.sh <base> <title> <body-file>`** — it pushes, opens the PR, and confirms
+  a `pull_request` run actually starts. GitHub intermittently fails to dispatch the run; a PR with
+  **0 runs** reads as a pass but was never checked. If none appears it close/reopens to re-fire the
+  event (the only re-trigger that reproduces the REQUIRED `pull_request` checks). **"0 runs" ≠ green.**
 - These constraints **disappear on their own** when the repository goes public: the rulesets
   then require the checks, and the server enforces what discipline alone was holding.
 
@@ -118,6 +122,7 @@ red pull request. The safety net is local, and partly human.
 - **pre-push hook** — refuses a direct push to `main` / `develop` (the missing ruleset).
   Both hooks: a fresh clone must re-arm them once: `git config core.hooksPath .githooks`.
 - **`./check.sh`** — replays the CI's security checks locally at the pinned versions, so `local == github`.
+- **`./open-pr.sh`** — opens a PR and makes sure CI starts on it (GitHub sometimes drops the dispatch).
 - **CI** (`ci.yml`, job `checks`, on every pull request and required before merge) — a dependency
   review (blocks on a high-severity advisory; PR-only, and dormant while the repo is private, same
   as CodeQL below), `npm test` (Vitest) and `npm run typecheck`, a checksum check on the vendored
