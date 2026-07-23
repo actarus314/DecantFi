@@ -98,7 +98,7 @@ After upgrading that dependency:
 2. Commit **both** files together.
 3. **Re-test the wallet in a browser** (connect + sign a transaction) before opening the PR.
 
-The CI `security` job verifies the committed bundle matches its recorded checksum (`sha256sum -c web/public/walletkit.js.sha256`). Any mismatch will block the build.
+The CI `checks` job verifies the committed bundle matches its recorded checksum (`sha256sum -c web/public/walletkit.js.sha256`). Any mismatch will block the build.
 
 ## Zero-secret rule
 
@@ -213,7 +213,7 @@ Après une mise à jour de cette dépendance :
 2. Committer **les deux fichiers** ensemble.
 3. **Re-tester le wallet au navigateur** (connexion + signature d'une transaction) avant d'ouvrir la PR.
 
-Le job CI `security` vérifie que le bundle commité correspond à son checksum enregistré (`sha256sum -c web/public/walletkit.js.sha256`). Tout écart bloque le build.
+Le job CI `checks` vérifie que le bundle commité correspond à son checksum enregistré (`sha256sum -c web/public/walletkit.js.sha256`). Tout écart bloque le build.
 
 ## Règle zéro-secret
 

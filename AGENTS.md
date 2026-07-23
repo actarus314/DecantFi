@@ -128,9 +128,11 @@ red pull request. The safety net is local, and partly human.
   the Docker image and scans it with **Trivy** (pinned + checksum-verified), failing on any
   CRITICAL/HIGH vulnerability with a known fix. Job `build-push` (on a `v*` tag push): builds and
   pushes the multi-arch (`amd64` + `arm64`) image to `ghcr.io/actarus314/decantfi-collector`,
-  tagged with the semver version (plus `latest` for a non-prerelease tag).
-- **`release.yml`** — on a `v*` tag push, creates the GitHub Release with auto-generated notes
-  (idempotent: re-pushing the same tag or re-running the workflow does not fail).
+  tagged with the semver version (plus `latest` for a non-prerelease tag). Job `release`
+  (`needs: build-push`, on the same tag push): creates the GitHub Release with auto-generated
+  notes (idempotent: re-pushing the same tag or re-running does not fail). It lives here, not in
+  a separate `release.yml`, precisely because `needs` cannot cross workflows — the Release must
+  wait for the image push.
 - **CodeQL** — security analysis; a finding blocks the merge.
 
 ## Do not touch
