@@ -1,5 +1,5 @@
 #!/usr/bin/env -S npx tsx
-// CLI v1 : recommande la meilleure route nette BLND -> USDC/EURC. Ne signe ni ne soumet RIEN.
+// CLI v1: recommends the best net route BLND -> USDC/EURC. Signs and submits NOTHING.
 //   npm run quote -- 1000 USDC
 //   npm run quote -- 1000 EURC --split
 //   npm run quote -- 500 USDC --slippage 30 --json
@@ -18,7 +18,7 @@ interface Args {
   split: boolean;
   help: boolean;
   balance: boolean;
-  balanceAddr: string; // adresse fournie après --balance, ou ''
+  balanceAddr: string; // address supplied after --balance, or ''
 }
 
 function parseArgs(argv: string[]): Args {
@@ -35,16 +35,16 @@ function parseArgs(argv: string[]): Args {
     else pos.push(t);
   }
   if (a.balance) {
-    // --balance [G…] <USDC|EURC> ou --balance <USDC|EURC>
+    // --balance [G…] <USDC|EURC> or --balance <USDC|EURC>
     if (pos.length >= 2) {
-      a.balanceAddr = pos[0] ?? '';     // premier positionnel = adresse G…
+      a.balanceAddr = pos[0] ?? '';     // first positional = G… address
       a.target = pos[1] ?? '';
     } else if (pos.length === 1 && (pos[0] ?? '').startsWith('G')) {
       // Address provided but target asset forgotten — fail loudly instead of misinterpreting addr as target
       a.balanceAddr = pos[0] ?? '';
       a.target = '';                    // will trigger the missing-target error in main()
     } else {
-      a.target = pos[0] ?? '';          // rétrocompat : adresse via WALLET_ADDRESS
+      a.target = pos[0] ?? '';          // backcompat: address via WALLET_ADDRESS
     }
   } else {
     a.amount = pos[0] ?? '';
@@ -77,13 +77,13 @@ function routeStr(q: NormalizedQuote): string {
 }
 
 function deltaStr(q: NormalizedQuote): string {
-  // Affiche l'impact LOCAL par défaut (SDEX Stellar) ; si EURC et EVM diffère, append discret.
+  // Displays LOCAL impact by default (SDEX Stellar); if EURC and EVM differ, appends discreetly.
   const localPct = q.priceImpactLocalPct;
   const evmPct = q.priceImpactPct;
   const fmt = (v: number) => `${v > 0 ? '-' : '+'}${Math.abs(v).toFixed(2)}%`;
   if (localPct !== undefined) {
     const base = fmt(localPct);
-    // Pour EURC : si EVM disponible et diffère du local de plus de 0.01%, append "(evm ±x%)"
+    // For EURC: if EVM available and differs from local by more than 0.01%, appends "(evm ±x%)"
     if (evmPct !== undefined && q.buyAsset.symbol === 'EURC' && Math.abs(evmPct - localPct) >= 0.01) {
       const diff = evmPct - localPct;
       const sign = diff > 0 ? '+' : '';
@@ -135,7 +135,7 @@ export function renderText(result: QuoteResult): string {
       out.push('');
     }
 
-    // Recommandation autoritaire : pour EURC, le meilleur entre direct et via-USDC (design §4).
+    // Authoritative recommendation: for EURC, the best between direct and via-USDC (design §4).
     let headlineNet: bigint | undefined;
     if (eurc) {
       if (eurc.winner === 'via-usdc' && eurc.viaUsdc) {
