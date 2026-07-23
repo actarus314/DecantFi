@@ -1,4 +1,4 @@
-// Fabrique de NormalizedQuote synthetiques pour les tests des modules purs (rank/split/eurc).
+// Synthetic NormalizedQuote factory for the pure-module tests (rank/split/eurc).
 import type { NormalizedQuote, Stroops } from '../core/sources/types.js';
 import type { Asset } from '../core/assets.js';
 import { BLND, USDC } from '../core/assets.js';
