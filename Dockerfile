@@ -30,7 +30,8 @@ RUN npm run build
 #     Unfixable in place: every version below brace-expansion 5.0.8 is affected, and forcing 5.0.8
 #     breaks minimatch@3 (v5 exports `{ expand }`, v3 expects the function itself).
 # Pruning is therefore the real remediation; osv-scanner.toml records what stays in the lockfile,
-# and why. Verified: bunyan still loads and logs with the entire chain removed.
+# and why. Verified on the built image: none of that chain ships in it, and the collector daemon
+# runs there (4 probes, 24 quotes, maintenance ok).
 RUN npm prune --omit=dev --omit=optional
 
 FROM node:26-alpine@sha256:e88a35be04478413b7c71c455cd9865de9b9360e1f43456be5951032d7ac1a66 AS runtime
