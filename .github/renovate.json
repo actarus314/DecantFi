@@ -45,7 +45,23 @@
 
   "vulnerabilityAlerts": {
     "labels": ["dependencies", "security"],
-    "automerge": true
+    "automerge": true,
+    "packageRules": [
+      {
+        "description": [
+          "⏳ TEMPORARY — REMOVE WITH #104. @stellar-broker/client is frozen: bumping it forces a",
+          "regeneration of the vendored web/public/sb-mediator.js bundle and a re-validation of",
+          "validateStreamedTx, the only thing standing between a hostile SB server and funds in",
+          "flight. Auto-merging a security bump would ship a stale bundle against a new client —",
+          "the exact failure this repository already knows (lockfile updated, bundle not).",
+          "The pull request still OPENS: nothing is blocked, it just waits for a human.",
+          "🔴 Delete this rule when #104 is resolved, or the package silently loses its security",
+          "automerge forever."
+        ],
+        "matchPackageNames": ["@stellar-broker/client"],
+        "automerge": false
+      }
+    ]
   },
 
   "packageRules": [
@@ -53,6 +69,18 @@
       "description": "Minor/patch grouped so the reviewer is not drowned. MAJORS stay isolated: a major gets looked at on its own.",
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "deps (minor + patch)"
+    },
+    {
+      "description": [
+        "⏳ TEMPORARY — REMOVE WITH #104. Keeps @stellar-broker/client OUT of the group above, so it",
+        "can never ride along inside a 'deps (minor + patch)' pull request whose title does not name",
+        "it. This package is frozen pending #104 (undisclosed drain vulnerability; bumping it forces",
+        "regenerating the vendored sb-mediator.js bundle and re-validating validateStreamedTx).",
+        "Isolating it does NOT block it — its own pull request opens, visible, and gets reviewed.",
+        "🔴 Delete this rule when #104 is resolved, or the package stays needlessly ungrouped."
+      ],
+      "matchPackageNames": ["@stellar-broker/client"],
+      "groupName": null
     },
     {
       "description": "The 4 pinned scanner binaries (VERSION+SHA256 in a run:): their own group — a scanner major changes its rules, hence its findings.",
