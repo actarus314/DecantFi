@@ -17,6 +17,13 @@
     "  BYPASS `minimumReleaseAge` (Renovate docs: \"security updates bypass any minimumReleaseAge",
     "  checks\"). The 3-day poisoned-release delay therefore applies to routine, NEVER to a CVE fix.",
     "",
+    "⚠ ON A THREE-STAGE PROJECT (`--staging`), `init-project.sh` injects `baseBranchPatterns`",
+    "pointing at `develop`. Without it Renovate targets the DEFAULT branch — so every bot pull",
+    "request, security ones included, lands straight in PRODUCTION and skips the staging host that",
+    "is the third stage's only reason to exist. A two-stage project has no such key: `main` IS the",
+    "target there. (The key used to be spelled `baseBranches`; that name still validates but is",
+    "migrated on sight — `baseBranchPatterns` is the current one.)",
+    "",
     "⚠ THIS KEY IS CALLED `description` — the ONLY one meant for comments. An UNKNOWN key makes",
     "Renovate REJECT the whole config and STOP EVERY pull request, silently (the `_comment_role` bug,",
     "test003, 2026-07-14). Validate every edit: `renovate-config-validator` (already run in CI).",
@@ -28,6 +35,8 @@
     "matches the one already in place (via the release's checksums.txt). SAFETY NET: a wrong digest",
     "makes `sha256sum -c` FAIL in CI."
   ],
+
+  "baseBranchPatterns": ["develop"],
 
   "schedule": ["before 6am on monday"],
   "minimumReleaseAge": "3 days",
