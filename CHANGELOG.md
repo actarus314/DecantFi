@@ -15,6 +15,28 @@ humain : il décrit ce qui a changé pour un utilisateur du projet, pas ce qui a
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-28
+
+### Added
+- **The published image can now be verified by whoever deploys it.** Every image pushed to ghcr
+  carries an SBOM and SLSA provenance attached to its manifest, and is signed with cosign —
+  keyless, so the signing identity is this workflow's OIDC token recorded in Sigstore's
+  transparency log, not a key someone holds. A signature therefore proves *which workflow of
+  which repository* built the image. Verify before deploying:
+
+  ```
+  cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+    --certificate-identity-regexp 'https://github.com/actarus314/DecantFi/' \
+    ghcr.io/actarus314/decantfi-collector:0.3.1
+  ```
+
+  The image is signed **by digest**, never by tag: a tag can be re-pointed at another image
+  afterwards, and the host verifies what it actually pulled.
+
+### Changed
+- Optional dependencies are pruned from the runtime image — a slightly smaller image, and the
+  dependency scanner no longer trips on a fossilised transitive chain that never shipped in it.
+
 ## [0.3.0] - 2026-07-02
 
 ### Added
@@ -267,6 +289,7 @@ Initial public release.
   Spanish, Brazilian Portuguese).
 
 [Unreleased]: https://github.com/actarus314/DecantFi/compare/v0.3.0...HEAD
+[0.3.1]: https://github.com/actarus314/DecantFi/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/actarus314/DecantFi/compare/v0.2.10...v0.3.0
 [0.2.10]: https://github.com/actarus314/DecantFi/compare/v0.2.9...v0.2.10
 [0.2.9]: https://github.com/actarus314/DecantFi/compare/v0.2.8...v0.2.9
