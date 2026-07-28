@@ -108,6 +108,21 @@ not know about reports nothing, and its silence reads exactly like a pass.
   > be granted (github/community#129512). The command above needs only `Actions: read`, which the
   > repository token already has.
 
+- **After the merge, check the `push` run on `main` too.** It is a *different event*, so it is a
+  different run: the pull request being green says nothing about it. `main` is what ships.
+
+  > 🔴 **`--commit` does NOT find that run — filter by branch.** Measured on five merge SHAs
+  > (three squashes, two merge commits): `gh run list --commit <sha>` returns **0 runs**, while
+  > `--branch main` returns the `CI [push]` run carrying **exactly that `headSha`**, green. The
+  > `--commit` filter works on `pull_request` runs, which is why the command above is correct
+  > where it stands. Read as-is after a merge, it yields "0 runs" — the very pattern this file
+  > teaches to treat as a failed dispatch. It would report a hole where everything passed.
+  >
+  > ```bash
+  > gh run list --branch main --limit 5 --json headSha,workflowName,event,status,conclusion \
+  >   --jq "[.[]|select(.headSha|startswith(\"$sha\"))]"
+  > ```
+
 - **Never push straight to `main` or `develop`.** The ruleset refuses it server-side, and the
   `pre-push` hook refuses it before the push even leaves the machine. Work through a pull request,
   always.
