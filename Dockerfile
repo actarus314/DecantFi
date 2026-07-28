@@ -18,7 +18,21 @@ RUN npm run build
 # Drop devDeps (incl. the native usb chain). Prod deps are effectively pure-JS under musl:
 # the optional sodium-native addon ships no musl prebuild, so stellar-base falls back to
 # tweetnacl — fine here, signing happens wallet-side, never server-side.
-RUN npm prune --omit=dev
+#
+# `--omit=optional` as well, and that one is a SECURITY measure rather than a size one. Every
+# optional package left in the prod tree is either already unusable in this image or purely
+# decorative, while one chain carries a live advisory whose fix cannot be reached:
+#   · sodium-native — no musl prebuild (see above), so it never loads here anyway;
+#   · bunyan's mv / moment / dtrace-provider / safe-json-stringify — bunyan `require()`s each one
+#     inside a try/catch and degrades gracefully (mv powers only its rotating-file stream, which
+#     nothing here uses; moment is used by its CLI, not its library);
+#   · mv drags rimraf@2.4 -> glob@6 -> minimatch@3 -> brace-expansion@1, i.e. GHSA-mh99-v99m-4gvg.
+#     Unfixable in place: every version below brace-expansion 5.0.8 is affected, and forcing 5.0.8
+#     breaks minimatch@3 (v5 exports `{ expand }`, v3 expects the function itself).
+# Pruning is therefore the real remediation; osv-scanner.toml records what stays in the lockfile,
+# and why. Verified on the built image: none of that chain ships in it, and the collector daemon
+# runs there (4 probes, 24 quotes, maintenance ok).
+RUN npm prune --omit=dev --omit=optional
 
 FROM node:26-alpine@sha256:e88a35be04478413b7c71c455cd9865de9b9360e1f43456be5951032d7ac1a66 AS runtime
 ARG REV

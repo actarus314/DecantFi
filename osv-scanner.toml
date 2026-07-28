@@ -1,8 +1,18 @@
 # Vulnerabilities acknowledged and deliberately not failing CI.
 # Auto-discovered by osv-scanner because it sits next to package-lock.json.
 #
-# This file is ONLY for advisories with no published fix. Anything fixable is bumped —
-# through `overrides` in package.json when the vulnerable package is a transitive dep.
+# This file is ONLY for advisories that cannot be fixed here. Two cases qualify, and nothing else:
+#   1. no published fix at all;
+#   2. a fix exists but is UNREACHABLE — the chain pins an older major, and forcing the fixed
+#      version breaks it. That claim must be MEASURED in the entry, never assumed.
+# Anything actually fixable is bumped — through `overrides` in package.json when the vulnerable
+# package is a transitive dep. An entry here is also expected to say why the advisory does not
+# reach a deliverable; if it does reach one, it is not a candidate for this file.
+
+[[IgnoredVulns]]
+id = "GHSA-mh99-v99m-4gvg"
+ignoreUntil = 2026-10-26
+reason = "brace-expansion 1.1.16: case 2 — the fix (5.0.8) exists but is unreachable. The advisory ranges EVERY version below 5.0.8, and the chain is frozen at its 2015 state: soroswap-router-sdk -> bunyan -> mv (optional) -> rimraf@~2.4.0 -> glob@6 -> minimatch@3, which pins brace-expansion@^1.1.7. Overriding to 5.0.8 breaks minimatch: measured, `TypeError: expand is not a function` — v5 exports { expand }, v3 expects module.exports = expand. Waiting is not a route either: the fix adds expansion caps (a behaviour change), so a 1.x/2.x backport is unlikely, and upstream minimatch already moved to ^5.0.5 — only this fossilised chain is left behind. It reaches no deliverable, MEASURED on the built image and not inferred: every package in the chain is optional=true, the runtime stage runs `npm prune --omit=dev --omit=optional`, and none of mv / rimraf / glob / minimatch / brace-expansion ships in the resulting image — while the collector daemon starts and works there (4 probes, 24 quotes fetched, maintenance pass ok). bunyan require()s mv in a try/catch and merely loses its rotating-file stream, which nothing here uses. Re-evaluate when soroswap-router-sdk drops bunyan."
 
 [[IgnoredVulns]]
 id = "GHSA-848j-6mx2-7j84"

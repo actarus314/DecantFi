@@ -68,25 +68,30 @@ cannot silently change under the host.
 - **Architecture decisions**: a non-trivial decision (stack, schema, boundary) gets a short
   record in `docs/adr/`. The point is to preserve the *why*, which the code cannot express.
 
-## While the repository is PRIVATE — the rules are NOT enforced by the server
+## Merge discipline — the server enforces it
 
-A private repository on a Free plan has **no rulesets**: every check below still runs, but
-**none of them is required** — GitHub would accept a direct push to `main`, or the merge of a
-red pull request. The safety net is local, and partly human.
+This repository is **public**, so rulesets protect `main`, `develop` and the `v*` tags: a pull
+request is required, the required checks must be green, and the server refuses a direct push or
+the merge of a red pull request.
 
-- **Never merge a pull request whose CI is not green.** Nothing on the server prevents it.
-  Check first, every time:
+Verify anyway. **The server only enforces the checks it was told to require** — a workflow it does
+not know about reports nothing, and its silence reads exactly like a pass.
+
+- **Never merge a pull request whose CI is not green.** Check first, every time:
 
   ```bash
   sha=$(gh pr view <n> --json headRefOid --jq .headRefOid)
   gh run list --commit "$sha"
   ```
 
-  **Green means: every EXPECTED workflow is `completed / success`** — `CI`, plus `Publish image`
-  when `docker-publish.yml` exists, plus **`CodeQL` once the repository is public** (it does not
-  run while private: Advanced Security is unavailable there). **A workflow MISSING from that list
-  is not a green**: it has simply not reported yet. "Nothing is red" and "everything is green" are
-  not the same claim, and the gap between them is exactly where a broken change slips into `main`.
+  **Green means: every EXPECTED workflow is `completed / success`** — `CI`, `Publish image`
+  (`docker-publish.yml`), and `CodeQL`. **A workflow MISSING from that list is not a green**: it has
+  simply not reported yet. "Nothing is red" and "everything is green" are not the same claim, and
+  the gap between them is exactly where a broken change slips into `main`.
+
+  > **On a pull request targeting `develop`, do not wait for `CodeQL` — it will never come.**
+  > CodeQL analyses `main` only, so the `develop` ruleset deliberately does not require it. Its
+  > absence there is the expected state, not a check still pending.
 
   > ⚠️ **Match on `workflowName`, never on `name`.** CodeQL runs through GitHub's *default setup*,
   > so it has no workflow file in the repository: its run is `dynamic`, and its `name` field reads
@@ -103,14 +108,16 @@ red pull request. The safety net is local, and partly human.
   > be granted (github/community#129512). The command above needs only `Actions: read`, which the
   > repository token already has.
 
-- **Never push straight to `main` or `develop`.** The `pre-push` hook refuses it; that hook is
-  the stand-in for the ruleset that does not exist yet. Work through a pull request, always.
+- **Never push straight to `main` or `develop`.** The ruleset refuses it server-side, and the
+  `pre-push` hook refuses it before the push even leaves the machine. Work through a pull request,
+  always.
 - **Open PRs with `./open-pr.sh <base> <title> <body-file>`** — it pushes, opens the PR, and confirms
   a `pull_request` run actually starts. GitHub intermittently fails to dispatch the run; a PR with
   **0 runs** reads as a pass but was never checked. If none appears it close/reopens to re-fire the
   event (the only re-trigger that reproduces the REQUIRED `pull_request` checks). **"0 runs" ≠ green.**
-- These constraints **disappear on their own** when the repository goes public: the rulesets
-  then require the checks, and the server enforces what discipline alone was holding.
+- **A local hook is not a substitute for the server, and the server is not a substitute for
+  reading.** The rulesets hold the line; the hooks catch the mistake earlier and cheaper; the
+  verification above catches what neither can see — a check that never reported.
 
 > This is the failure mode these rules close: a config regression no build step catches reaches
 > `main`, ships as `:latest`, and a host pulls it before anyone notices.
@@ -119,13 +126,14 @@ red pull request. The safety net is local, and partly human.
 
 - **pre-commit hook** — `gitleaks` on staged files (a commit carrying a secret is rejected), then a
   throttled, CONSULTATIVE replay of `./check.sh` (≤ once / 24 h) — it surfaces drift, never blocks.
-- **pre-push hook** — refuses a direct push to `main` / `develop` (the missing ruleset).
+- **pre-push hook** — refuses a direct push to `main` / `develop`, before the round trip to the
+  server that would refuse it too.
   Both hooks: a fresh clone must re-arm them once: `git config core.hooksPath .githooks`.
 - **`./check.sh`** — replays the CI's security checks locally at the pinned versions, so `local == github`.
 - **`./open-pr.sh`** — opens a PR and makes sure CI starts on it (GitHub sometimes drops the dispatch).
 - **CI** (`ci.yml`, job `checks`, on every pull request and required before merge) — a dependency
-  review (blocks on a high-severity advisory; PR-only, and dormant while the repo is private, same
-  as CodeQL below), `npm test` (Vitest) and `npm run typecheck`, a checksum check on the vendored
+  review (blocks on a high-severity advisory; PR-only), `npm test` (Vitest) and `npm run
+  typecheck`, a checksum check on the vendored
   `web/public/walletkit.js` bundle, `gitleaks` over the *full* history, `actionlint` + `zizmor` on
   the workflows, `semgrep` static analysis, `osv-scanner` on every manifest it discovers (`-r .`;
   CI-only tooling is out of scope via `.gitignore`).
