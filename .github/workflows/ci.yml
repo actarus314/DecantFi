@@ -1,5 +1,9 @@
 # Installed as .github/workflows/ci.yml by `init-project.sh --type node`. Job name MUST stay
 # `checks` (the ruleset requires it).
+# ⚠ That also rules out a `strategy.matrix` on this job: a matrix renames the check to
+# `checks (backend)`, `checks (frontend)`… so the name the ruleset waits for NEVER reports, and
+# every pull request sits forever on "Expected — waiting for status". To cover several
+# workspaces, LOOP inside the single job — never fan it out into a matrix.
 name: CI
 
 on:
@@ -54,6 +58,23 @@ jobs:
         if: hashFiles('package.json') != ''
       - run: npm run typecheck
         if: hashFiles('package.json') != ''
+      # The guards above are ROOT-ONLY, and that is a trap on any repo whose manifests live in
+      # subdirectories (a monorepo, or just backend/ + frontend/). There, `hashFiles('package.json')`
+      # is empty, all three steps are SKIPPED — and the job goes GREEN having installed, tested and
+      # compiled nothing. A CI that reports success without running is worse than no CI: it is read
+      # as a pass. So the scaffold guard stays (a fresh repo must not go red), but the SILENCE does
+      # not: this step turns it into a red that says what to do. Delete it once the steps above are
+      # replaced by the workspaces this repo actually has — see dEURO-dashboard for a worked example.
+      - name: Refuse to pass silently when the npm steps were skipped
+        run: |
+          set -euo pipefail
+          if [ -z "$(find . -name package.json -not -path '*/node_modules/*' -print -quit)" ]; then
+            echo "No package.json anywhere — fresh scaffold, nothing to build."
+          elif [ ! -f package.json ]; then
+            echo "::error::package.json exists, but NOT at the repository root: every npm step above was SKIPPED."
+            echo "::error::Replace them with the workspaces this repo has, e.g. 'for w in backend frontend; do npm ci --prefix \$w; npm run build --prefix \$w; done'."
+            exit 1
+          fi
       # Project-specific gate: `web/public/walletkit.js` is a VENDORED bundle, pre-built from
       # @creit.tech/stellar-wallets-kit and committed. Renovate bumps the lockfile but never
       # regenerates a committed bundle, so the checksum is the only thing that catches a

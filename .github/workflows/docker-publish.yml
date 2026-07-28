@@ -1,5 +1,12 @@
 name: Publish image
 
+# ⚠ `build-check` is a REQUIRED check, so its job name must not move — and that rules out a
+# `strategy.matrix` on it: a matrix renames it to `build-check (backend)`, `build-check (frontend)`…
+# and the name the ruleset waits for never reports, leaving every pull request stuck on
+# "Expected — waiting for status". Several images to build? LOOP inside this one job. `build-push`,
+# further down, is NOT a required check — a matrix there is fine, and keeps the slow multi-arch
+# builds parallel.
+
 on:
   push:
     tags: ['v*']
@@ -70,6 +77,8 @@ jobs:
       contents: read
       packages: write
       actions: write
+      id-token: write       # cosign keyless signing: the OIDC token IS the identity
+      attestations: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -91,6 +100,7 @@ jobs:
             type=semver,pattern={{version}}
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        id: build
         with:
           context: .
           push: true
@@ -101,8 +111,27 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # SBOM + SLSA provenance, attached to the manifest. Whoever deploys the image can then
+          # answer "what is inside it, and what built it" WITHOUT trusting this repository — which
+          # is the entire point of shipping an artefact someone else runs. Costs seconds.
+          provenance: mode=max
+          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      # Keyless: no private key to store or rotate. The signing identity IS this workflow's OIDC
+      # token, recorded in Fulcio's transparency log — so a signature proves WHICH workflow of
+      # WHICH repository built it, not merely that someone held a key.
+      # ⚠ Signed BY DIGEST, never by tag: a tag can be re-pointed at another image afterwards,
+      # and the deploying host verifies what it actually pulled.
+      # Verify before deploying:
+      #   cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      #     --certificate-identity-regexp 'https://github.com/actarus314/DecantFi/' <image>:<tag>
+      - name: Sign the image (keyless)
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/decantfi-collector
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
   # The GitHub Release lives HERE, not in release.yml, and that is the whole point: `needs` cannot
   # cross workflows. With the artefact capability the release ANNOUNCES an image — publishing it
