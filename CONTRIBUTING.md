@@ -59,19 +59,8 @@ branch.
 4. All CI checks (typecheck, tests, Docker build) must pass.
 5. One approval required before merge.
 
-**CI must be green before a merge.** Check it:
-
-```bash
-sha=$(gh pr view <n> --json headRefOid --jq .headRefOid)
-gh run list --commit "$sha" --json workflowName,status,conclusion
-```
-
-Green means **every expected workflow is `completed` / `success`** — `CI`, `Publish image`, and
-`CodeQL`. A workflow **missing** from the list is **not** a green: it has not reported yet.
-
-⚠️ **Match on `workflowName`, not on `name`.** CodeQL runs through GitHub's *default setup*, so it
-has no workflow file: its `name` reads `Push on main` — the run's title. Only `workflowName` says
-`CodeQL`.
+**CI must be green before a merge.** See `AGENTS.md` § Merge discipline for the exact check
+command and the `workflowName` vs `name` gotcha (CodeQL runs through GitHub's default setup).
 
 ## Bilingual documentation rule
 
@@ -178,20 +167,9 @@ branche.
 4. Tous les checks CI (typecheck, tests, build Docker) doivent passer.
 5. Une approbation requise avant merge.
 
-**La CI doit être verte avant un merge.** Vérifier :
-
-```bash
-sha=$(gh pr view <n> --json headRefOid --jq .headRefOid)
-gh run list --commit "$sha" --json workflowName,status,conclusion
-```
-
-Vert signifie **tout workflow attendu en `completed` / `success`** — `CI`, `Publish image`, et
-`CodeQL`. Un workflow **absent** de la liste n'est **pas** un vert : il n'a simplement pas encore
-rapporté.
-
-⚠️ **Matcher sur `workflowName`, pas sur `name`.** CodeQL tourne via le *default setup* de GitHub,
-donc n'a pas de fichier de workflow : son `name` affiche `Push on main` — le titre du run. Seul
-`workflowName` indique `CodeQL`.
+**La CI doit être verte avant un merge.** Voir `AGENTS.md` § Merge discipline pour la commande de
+vérification exacte et le piège `workflowName` vs `name` (CodeQL tourne via le *default setup* de
+GitHub).
 
 ## Règle de documentation bilingue
 
