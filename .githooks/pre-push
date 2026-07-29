@@ -6,11 +6,10 @@
 # Every CI check still runs, but NONE of them is required: a red pull request can be merged,
 # and main can be written to directly. This hook is the ONLY thing standing there.
 #
-# It is not theoretical. On dEURO (2026-05-01) a direct push to main removed a compose `user:`
-# directive; the distroless image forces UID 65532, SQLite lost write access to its bind mount,
-# and production broke on the NUC — after :latest had already been pulled. A pull request would
-# have shown the diff. This hook is that missed guardrail, brought back to the one place that
-# still works while the repo is private: the developer's machine.
+# It is not theoretical: a direct push has already broken production on another project in this
+# fleet, in a way a pull request's diff would have caught. This hook is that missed guardrail,
+# brought back to the one place that still works while the repo is private: the developer's
+# machine. (Incident details: cross-project ops memory, not this repo.)
 #
 # Kept active even once the repo is public, where the server-side ruleset refuses the same push:
 # defence in depth, and the local message is far clearer than a remote rejection.
