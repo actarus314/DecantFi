@@ -22,6 +22,11 @@ humain : il décrit ce qui a changé pour un utilisateur du projet, pas ce qui a
   actually running. Renovate only reacts when the base tag moves — a base line that stops being
   rebuilt produces no bump, no pull request and no scan, while the registry keeps serving the CVE.
 
+### Fixed
+- `npm ci` failed on `develop`: the lockfile was resolving `@stellar/stellar-sdk@16.1.0`,
+  which no longer satisfies the open ranges once `16.2.0` was published to npm. Regenerated
+  the lockfile only — no dependency range changed.
+
 ## [0.3.1] - 2026-07-28
 
 ### Added
