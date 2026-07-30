@@ -16,8 +16,16 @@ on:
     # only would leave every PR into develop stuck forever on "Expected — waiting for status".
     # Harmless without `staging`: the branch simply never matches.
     branches: [main, develop]
+  schedule:
+    - cron: '0 4 * * 1'   # weekly: re-scans the PUBLISHED image (see `scheduled-scan` below)
 
 permissions: {}
+
+# Pinned ONCE for both scanning jobs. Two copies would drift, and Renovate's regex manager expects
+# this exact VERSION/SHA256 pair — it bumps them together, in a single pull request.
+env:
+  TRIVY_VERSION: v0.72.0
+  TRIVY_SHA256: bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea
 
 jobs:
   build-check:
@@ -26,9 +34,6 @@ jobs:
     permissions:
       contents: read
       actions: write   # write the GHA layer cache
-    env:
-      TRIVY_VERSION: v0.72.0
-      TRIVY_SHA256: bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea
     steps:
       - uses: actions/checkout@v7
         with:
@@ -69,6 +74,51 @@ jobs:
           set -euo pipefail
           ./trivy image --scanners vuln --severity CRITICAL,HIGH \
             --ignore-unfixed --exit-code 1 --no-progress candidate:pr
+
+  # `build-check` scans a CANDIDATE image while a pull request is open; once merged, nothing looks
+  # at the PUBLISHED one ever again. Renovate covers the ordinary case — the base tag moves, a pull
+  # request opens, the gate re-runs. It does NOT cover a base line that has stopped being rebuilt:
+  # no upstream release means no bump, no pull request, and no scan, while the image on the registry
+  # keeps shipping the vulnerability. A CVE disclosed the day after the merge is invisible until the
+  # next release. Hence a weekly look at what is actually deployed, with the SAME flags as
+  # `build-check` — one definition of "clean" per file.
+  # ⚠ A `schedule` trigger only ever runs from the DEFAULT branch. A pull request that stops at
+  # `develop` arms NOTHING here: it takes the promotion to `main`.
+  scheduled-scan:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/decantfi-collector:latest
+    steps:
+      - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Trivy (pinned + checksum-verified)   # raw binary, see `build-check` above
+        run: |
+          set -euo pipefail
+          v="${TRIVY_VERSION#v}"
+          f="trivy_${v}_Linux-64bit.tar.gz"
+          curl -sSfL -o "$f" \
+            "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/${f}"
+          echo "${TRIVY_SHA256}  ${f}" | sha256sum -c -
+          tar -xzf "$f" trivy
+      - name: Scan the published image (fails on CRITICAL/HIGH)
+        run: |
+          set -euo pipefail
+          # Nothing published yet? A job that goes red every Monday is a red nobody reads any more.
+          # The login step above fails loudly on a broken token, so skipping here cannot hide an
+          # auth problem.
+          if ! docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "::notice::$IMAGE is not published yet — nothing to scan."
+            exit 0
+          fi
+          ./trivy image --scanners vuln --severity CRITICAL,HIGH \
+            --ignore-unfixed --exit-code 1 --no-progress "$IMAGE"
 
   build-push:
     if: startsWith(github.ref, 'refs/tags/v')

@@ -15,6 +15,13 @@ humain : il décrit ce qui a changé pour un utilisateur du projet, pas ce qui a
 
 ## [Unreleased]
 
+### Added
+
+- Weekly Trivy scan of the **published** image (`docker-publish.yml` › `scheduled-scan`). The
+  pull-request gate only ever looked at a candidate image; after the merge nothing watched the one
+  actually running. Renovate only reacts when the base tag moves — a base line that stops being
+  rebuilt produces no bump, no pull request and no scan, while the registry keeps serving the CVE.
+
 ## [0.3.1] - 2026-07-28
 
 ### Added
