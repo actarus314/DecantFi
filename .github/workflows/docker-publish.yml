@@ -84,6 +84,9 @@ jobs:
   # `build-check` — one definition of "clean" per file.
   # ⚠ A `schedule` trigger only ever runs from the DEFAULT branch. A pull request that stops at
   # `develop` arms NOTHING here: it takes the promotion to `main`.
+  # ⚠ Known ceiling, on a PUBLIC repository: GitHub disables scheduled workflows after 60 days with
+  # no repository activity — which is exactly the dormant repository this scan exists for. Renovate's
+  # weekly pull requests keep it awake; without an update bot, re-enable it from the Actions tab.
   scheduled-scan:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
