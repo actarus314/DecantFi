@@ -64,7 +64,7 @@ jobs:
       # compiled nothing. A CI that reports success without running is worse than no CI: it is read
       # as a pass. So the scaffold guard stays (a fresh repo must not go red), but the SILENCE does
       # not: this step turns it into a red that says what to do. Delete it once the steps above are
-      # replaced by the workspaces this repo actually has — see dEURO-dashboard for a worked example.
+      # replaced by the workspaces this repo actually has (one `npm ci --prefix <dir>` per workspace).
       - name: Refuse to pass silently when the npm steps were skipped
         run: |
           set -euo pipefail
