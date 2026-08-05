@@ -96,6 +96,12 @@ not know about reports nothing, and its silence reads exactly like a pass.
   simply not reported yet. "Nothing is red" and "everything is green" are not the same claim, and
   the gap between them is exactly where a broken change slips into `main`.
 
+  > **`Publish image` does not run on a push to `main` — its absence there is not a failed dispatch.**
+  > `docker-publish.yml` listens on `push: tags: ['v*']` — **tags, not branches** (plus
+  > `pull_request` on `main` and `develop`, and a weekly re-scan of the published image). The image
+  > ships **at a tag**, never at every merge. Present on the pull request and absent from the
+  > `push` runs is the normal shape; re-firing the CI over it runs a workflow that never had to.
+
   > **On a pull request targeting `develop`, do not wait for `CodeQL` — it will never come.**
   > CodeQL analyses `main` only, so the `develop` ruleset deliberately does not require it. Its
   > absence there is the expected state, not a check still pending.
