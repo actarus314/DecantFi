@@ -1,6 +1,6 @@
 // Single source of truth for executable quote sources (used by both core and web).
 // A source is executable if it supports one-click swap submission in this app.
-// ponytail: 'stellarbroker' is wired for direct Mediator execution (client-side WS + ephemeral key);
+// 'stellarbroker' is wired for direct Mediator execution (client-side WS + ephemeral key);
 // it is NOT a valid server venue (/api/build rejects it) — doExecute short-circuits SB to the Mediator.
 export const EXECUTABLE_SOURCES = [
   'xbull',

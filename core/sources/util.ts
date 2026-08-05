@@ -25,7 +25,7 @@ export function stroopsOrNull(v: unknown): bigint | null {
 /**
  * Coalesces an async call by key into a shared cache (per tick / request).
  * Two concurrent callers with the same key share the SAME promise → a single RPC read.
- * Without a cache (undefined): runs directly. ponytail: no eviction, the cache lives for the tick's duration.
+ * Without a cache (undefined): runs directly. No eviction, the cache lives for the tick's duration.
  */
 export function cached<T>(
   cache: Map<string, Promise<unknown>> | undefined,

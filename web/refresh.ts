@@ -1,7 +1,7 @@
 // Manual refresh: runs ONE real tick (live network) and logs it with note='manual'.
 // Temporary — the next scheduled collector poll purges it (db.purgeManualTicks).
 // Ephemeral write connection (open/insert/close): the stats read path keeps its query_only connection.
-// ponytail: in-flight guard = 1 refresh at a time; spam-clicks rejected (429) rather than hammering the network.
+// in-flight guard = 1 refresh at a time; spam-clicks rejected (429) rather than hammering the network.
 import { fetchPrices } from '../core/prices.js';
 import { quote } from '../core/engine.js';
 import { buildProbes } from '../collector/probes.js';

@@ -1,5 +1,5 @@
 // Live quoting and wallet balance for the web UI.
-// ponytail: Number = display only, never settlement.
+// Number = display only, never settlement.
 import { quote as engineQuote } from '../core/engine.js';
 import { isExecutableSource } from '../core/executable.js';
 import { rankQuotes } from '../core/rank.js';
@@ -84,7 +84,7 @@ export interface LiveQuote {
     xlmUsd: number | null;
   };
   errors: string[];
-  // health axis, distinct from confidence chips — ponytail: health axis
+  // health axis, distinct from confidence chips
   downSources: Array<{ display: string; sourceId: string; reason: string }>;
 }
 

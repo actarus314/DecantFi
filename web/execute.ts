@@ -259,7 +259,7 @@ export interface ExecDeps {
 }
 
 /** Real dependencies backed by network fetch.
- * ponytail: unlike core/sources/http.ts which returns null on error (silent),
+ * unlike core/sources/http.ts which returns null on error (silent),
  * fetchJson surfaces error details in body so callers can build clear ExecErrors. */
 export function defaultDeps(timeoutMs?: number): ExecDeps {
   return {
@@ -869,7 +869,7 @@ export async function quoteSoroswap(
       tradeType: TradeType.EXACT_IN,
       protocols: [SupportedProtocols.SOROSWAP],
       slippageBps,
-      // ponytail: parity with the collector (core/sources/soroswap.ts maxHops:2). No-op today
+      // parity with the collector (core/sources/soroswap.ts maxHops:2). No-op today
       // (the API already routes BLND→USDC→EURC) but pins the multi-hop: prevents a silent
       // degradation to the tiny direct BLND/EURC pool if the API's default were to change.
       maxHops: 2,

@@ -1,6 +1,6 @@
 // Statistics read from the DB for the web UI. Pure functions (db as param).
 // Window = 7 days. Timezone: server-side aggregation in UTC, client-side conversion.
-// ponytail: Number = display only, never settlement.
+// Number = display only, never settlement.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { type DatabaseSync } from 'node:sqlite';
@@ -110,7 +110,7 @@ export function chipFor(netConfidence: string): Chip {
 }
 
 // xBull route now decoded from sim (collector + live) → displayed as-is, no more mask.
-// ponytail: kept as a seam for the 3 callers.
+// kept as a seam for the 3 callers.
 export function maskedRoute(path: string, _sourceId: string): string {
   return path;
 }
@@ -468,7 +468,7 @@ export function parisOffsetHours(now: Date): number {
  * We NEVER mix two occurrences of the same day-of-week: we take only the most recent
  * date for that dow (so the current week, not the week before).
  *
- * // ponytail: single offset computed at the `now` instant for all 7 days — on the DST
+ * // single offset computed at the `now` instant for all 7 days — on the DST
  * // switchover day (2×/year) this is slightly off, acceptable.
  */
 export function buildIntradayLocal(

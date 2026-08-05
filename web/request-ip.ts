@@ -2,7 +2,7 @@
 // Read once at module load; never re-read per request.
 import type { IncomingMessage } from 'node:http';
 
-// ponytail: deliberate boot-time const — avoids per-request env reads.
+// deliberate boot-time const — avoids per-request env reads.
 export const TRUST_PROXY = /^(1|true|yes)$/i.test(process.env.TRUST_PROXY ?? '');
 
 /** Extracts the real client IP from a request.

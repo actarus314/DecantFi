@@ -16,9 +16,9 @@ export interface RpcSelection {
   probes: RpcProbe[];
 }
 
-// ponytail: tolerance = 2 ledgers (~10s); upgrade if probing >=3 RPCs with lags > 2.
+// tolerance = 2 ledgers (~10s); upgrade if probing >=3 RPCs with lags > 2.
 const LEDGER_LAG_TOLERANCE = 2;
-// ponytail: slowness threshold = 2500ms; lower if the tick cadence is very tight.
+// slowness threshold = 2500ms; lower if the tick cadence is very tight.
 const SLOW_LATENCY_MS = 2500;
 
 export async function probeRpc(

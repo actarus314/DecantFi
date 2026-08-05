@@ -7,7 +7,7 @@
 // It caps per-streamed-tx with tx-level aggregate caps on sold and fee amounts.
 //   All invokeHostFunction ops in a single tx count toward one shared budget.
 //
-// ponytail: assumes 7-decimal Stellar assets (BLND/USDC/EURC);
+// assumes 7-decimal Stellar assets (BLND/USDC/EURC);
 //   a non-7-dec token would need per-asset decimals.
 
 import type { Transaction } from '@stellar/stellar-sdk';

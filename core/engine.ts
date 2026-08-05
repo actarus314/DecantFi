@@ -67,7 +67,7 @@ export async function quoteAll(
   const adapters = (cfg.adapters ?? ADAPTERS).filter(
     (a) => a.available(cfg) && (a.supports ? a.supports(req) : true),
   );
-  // ponytail: one ALS store per adapter — diag.run() injects context without changing the signature.
+  // one ALS store per adapter — diag.run() injects context without changing the signature.
   const stores: Diag[] = adapters.map(() => ({}));
   // Independent timer per adapter (Date.now(): ms precision is enough in prod).
   const startTimes = adapters.map(() => Date.now());

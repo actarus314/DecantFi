@@ -131,7 +131,7 @@ try {
 
 // --- In-memory TTL cache for /api/overview (B3) ---
 
-// ponytail: Map keyed by `${pair}|${offsetH}`; bounded by validated inputs
+// Map keyed by `${pair}|${offsetH}`; bounded by validated inputs
 // (2 pairs × tzoff[-14..14] ≈ 58 keys) — the clear() is a paranoia cap.
 const overviewCache = new Map<string, { at: number; data: unknown }>();
 const OVERVIEW_TTL_MS = 60_000;
@@ -404,7 +404,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         return;
       }
       const result = overview(db, pair, cfg, undefined, offsetH);
-      // ponytail: bounded by validated inputs (2 pairs × tzoff[-14..14] ≈ 58 keys); clear() is a paranoia cap.
+      // bounded by validated inputs (2 pairs × tzoff[-14..14] ≈ 58 keys); clear() is a paranoia cap.
       if (overviewCache.size > 200) overviewCache.clear();
       overviewCache.set(cacheKey, { at: now, data: result });
       json(res, req, 200, result);
@@ -561,7 +561,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         const result = await pickExecutableVenue(pair, amount, b.sender as string, slippageBps, cfg, displayed, undefined, forceVenue, sellAsset);
         // Pre-signature fee guard: if the declared max_fee exceeds the sender's spendable XLM,
         // the network will reject the tx at submission. Attach a feeWarning so the UI can block signing.
-        // ponytail: second loadAccount call — acceptable here (build already made multiple network calls).
+        // second loadAccount call — acceptable here (build already made multiple network calls).
         try {
           if (result.xdr) {
             const { TransactionBuilder, Networks, Horizon } = await import('@stellar/stellar-sdk');

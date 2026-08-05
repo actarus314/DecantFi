@@ -1514,7 +1514,7 @@ function ladderRows(rows, u, down) {
       <td>${impact}</td>
       <td class="left">${routeText}</td></tr>`;
   }).join('');
-  // Failed-source rows (health axis, distinct from confidence chips) — ponytail: health axis
+  // Failed-source rows (health axis, distinct from confidence chips)
   if (down && down.length > 0) {
     html += down.map(d =>
       `<tr><td><span class="muted">${venueCard(d.sourceId, d.display)}</span></td>
@@ -3066,7 +3066,7 @@ async function confirmExecute() {
     }
     if (build.type === 'restore') {
       // the restore tx is submitted; rebuild the actual swap then return to review.
-      // ponytail: best-effort restore branch, not tested live (requires an archived contract).
+      // best-effort restore branch, not tested live (requires an archived contract).
       await doExecute(); return;
     }
     // ─── Composite leg1 done: poll USDC then chain into leg2 ─────────────────

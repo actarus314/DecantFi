@@ -95,7 +95,7 @@ async function liveRoute(req: QuoteRequest, cfg: SourceConfig): Promise<Normaliz
   // Reads each pool — MEMOIZED by pair {a,b} on cfg.rpcCache (shared across the whole tick): EURC
   // probes re-trigger 3 sub-quotes that re-read the same pools → without caching, a burst that saturates
   // the public RPC (429). The result (token_0 + reserves) is independent of order/direction/size → sorted key.
-  // ponytail: silently dropping a pool = Soroswap under-quotes (it loses, never a false winner).
+  // silently dropping a pool = Soroswap under-quotes (it loses, never a false winner).
   const readPair = ([a, b]: [string, string]) =>
     cached(cfg.rpcCache, `soroswap:pool:${[a, b].slice().sort().join('|')}`, async () => {
       try {

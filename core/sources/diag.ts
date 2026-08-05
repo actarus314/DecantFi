@@ -1,5 +1,5 @@
 // Per-source diagnostic context (AsyncLocalStorage): http.ts writes the failure cause here
-// without changing the adapters' signature. ponytail: ALS is the idiomatic Node way.
+// without changing the adapters' signature. ALS is the idiomatic Node way.
 import { AsyncLocalStorage } from 'node:async_hooks';
 export interface Diag { reason?: string; }
 export const diag = new AsyncLocalStorage<Diag>();
