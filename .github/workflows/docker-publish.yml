@@ -24,8 +24,8 @@ permissions: {}
 # Pinned ONCE for both scanning jobs. Two copies would drift, and Renovate's regex manager expects
 # this exact VERSION/SHA256 pair — it bumps them together, in a single pull request.
 env:
-  TRIVY_VERSION: v0.72.0
-  TRIVY_SHA256: bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea
+  TRIVY_VERSION: v0.76.1
+  TRIVY_SHA256: c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0
 
 jobs:
   build-check:
